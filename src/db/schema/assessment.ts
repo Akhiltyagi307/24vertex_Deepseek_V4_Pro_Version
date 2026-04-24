@@ -1,0 +1,173 @@
+import {
+	bigint,
+	boolean,
+	decimal,
+	index,
+	integer,
+	jsonb,
+	pgTable,
+	text,
+	timestamp,
+	unique,
+	uuid,
+	varchar,
+	vector,
+} from "drizzle-orm/pg-core";
+
+import { subjects, topics } from "./academic";
+
+export const performanceTracker = pgTable(
+	"performance_tracker",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		studentId: uuid("student_id").notNull(),
+		topicId: uuid("topic_id")
+			.notNull()
+			.references(() => topics.id, { onDelete: "cascade" }),
+		subjectId: uuid("subject_id")
+			.notNull()
+			.references(() => subjects.id),
+		status: varchar("status", { length: 20 }).default("not_tested"),
+		lastTestId: uuid("last_test_id"),
+		lastTestDate: timestamp("last_test_date"),
+		averageScore: decimal("average_score", { precision: 5, scale: 2 }),
+		testsTaken: integer("tests_taken").default(0),
+		confidenceScore: decimal("confidence_score", { precision: 3, scale: 2 }).default("0"),
+		trend: varchar("trend", { length: 20 }).default("stable"),
+		updatedAt: timestamp("updated_at").defaultNow(),
+		createdAt: timestamp("created_at").defaultNow(),
+	},
+	(t) => [
+		unique().on(t.studentId, t.topicId),
+		index("idx_perf_student_subject").on(t.studentId, t.subjectId),
+		index("idx_perf_status").on(t.status),
+		index("idx_perf_student").on(t.studentId),
+	],
+);
+
+export const tests = pgTable(
+	"tests",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		studentId: uuid("student_id").notNull(),
+		subjectId: uuid("subject_id")
+			.notNull()
+			.references(() => subjects.id),
+		unitName: varchar("unit_name", { length: 250 }),
+		testType: varchar("test_type", { length: 20 }).default("self"),
+		assignmentId: uuid("assignment_id"),
+		testDate: timestamp("test_date").defaultNow(),
+		durationSeconds: integer("duration_seconds"),
+		timeLimitSeconds: integer("time_limit_seconds").default(3600),
+		status: varchar("status", { length: 20 }).default("in_progress"),
+		totalScore: decimal("total_score", { precision: 5, scale: 2 }),
+		totalQuestions: integer("total_questions").default(20),
+		correctAnswers: integer("correct_answers").default(0),
+		isDraft: boolean("is_draft").default(false),
+		difficulty: varchar("difficulty", { length: 10 }),
+		startedAt: timestamp("started_at"),
+		autoSubmitted: boolean("auto_submitted").default(false),
+		abandonedAt: timestamp("abandoned_at"),
+		questionCount: integer("question_count"),
+		questionMix: jsonb("question_mix"),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
+	},
+	(t) => [
+		index("idx_tests_student").on(t.studentId),
+		index("idx_tests_status").on(t.status),
+		index("idx_tests_assignment").on(t.assignmentId),
+		index("idx_tests_type").on(t.testType),
+	],
+);
+
+export const questions = pgTable(
+	"questions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		testId: uuid("test_id")
+			.notNull()
+			.references(() => tests.id, { onDelete: "cascade" }),
+		topicId: uuid("topic_id")
+			.notNull()
+			.references(() => topics.id),
+		questionText: text("question_text").notNull(),
+		questionType: varchar("question_type", { length: 20 }).notNull(),
+		difficultyLevel: varchar("difficulty_level", { length: 10 }),
+		answerKey: jsonb("answer_key").notNull(),
+		options: jsonb("options"),
+		questionNumber: integer("question_number").notNull(),
+		metadata: jsonb("metadata").default({}),
+		createdAt: timestamp("created_at").defaultNow(),
+		embedding: vector("embedding", { dimensions: 1536 }),
+	},
+	(t) => [
+		index("idx_questions_test").on(t.testId),
+		index("idx_questions_topic").on(t.topicId),
+		unique("questions_test_question_number_uidx").on(t.testId, t.questionNumber),
+	],
+);
+
+export const studentAnswers = pgTable(
+	"student_answers",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		testId: uuid("test_id")
+			.notNull()
+			.references(() => tests.id, { onDelete: "cascade" }),
+		questionId: uuid("question_id")
+			.notNull()
+			.references(() => questions.id, { onDelete: "cascade" }),
+		studentAnswer: jsonb("student_answer").notNull(),
+		isCorrect: boolean("is_correct"),
+		scoreEarned: decimal("score_earned", { precision: 5, scale: 2 }),
+		aiFeedback: text("ai_feedback"),
+		timeSpentSeconds: integer("time_spent_seconds"),
+		timeSpentMs: bigint("time_spent_ms", { mode: "number" }).default(0),
+		visits: integer("visits").default(0),
+		flaggedForReview: boolean("flagged_for_review").default(false),
+		createdAt: timestamp("created_at").defaultNow(),
+		updatedAt: timestamp("updated_at").defaultNow(),
+	},
+	(t) => [
+		index("idx_answers_test").on(t.testId),
+		unique("student_answers_test_question_uidx").on(t.testId, t.questionId),
+	],
+);
+
+export const testReports = pgTable("test_reports", {
+	id: uuid("id").defaultRandom().primaryKey(),
+	testId: uuid("test_id")
+		.notNull()
+		.references(() => tests.id, { onDelete: "cascade" })
+		.unique(),
+	studentId: uuid("student_id").notNull(),
+	summaryReport: jsonb("summary_report").notNull(),
+	strengths: text("strengths").array(),
+	improvementAreas: text("improvement_areas").array(),
+	aiInsights: text("ai_insights"),
+	topicPerformance: jsonb("topic_performance"),
+	recommendations: text("recommendations").array(),
+	pdfStoragePath: text("pdf_storage_path"),
+	gradingFailedAt: timestamp("grading_failed_at"),
+	gradingError: text("grading_error"),
+	createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const questionFlags = pgTable(
+	"question_flags",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		questionId: uuid("question_id")
+			.notNull()
+			.references(() => questions.id, { onDelete: "cascade" }),
+		studentId: uuid("student_id").notNull(),
+		reason: text("reason").notNull(),
+		notes: text("notes"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_question_flags_question").on(t.questionId),
+		index("idx_question_flags_student").on(t.studentId, t.createdAt),
+	],
+);

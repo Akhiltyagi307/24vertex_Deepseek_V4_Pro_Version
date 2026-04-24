@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+
+# Next.js
+.next/
+out/
+
+# Env (local secrets — never commit)
+.env
+.env*.local
+
+# Debug / OS
+.DS_Store
+*.pem
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# Temp / scratch
+.tmp_*.json

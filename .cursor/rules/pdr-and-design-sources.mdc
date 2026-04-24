@@ -1,0 +1,31 @@
+---
+description: Use PDR for DB/features; use design-system docs for design-only work (not PDR).
+alwaysApply: true
+---
+
+# Product docs vs design docs
+
+## Read the PDR first (product, data, features)
+
+For tasks that involve **any** of the following, read the relevant sections of `docs/EduAI_PDR_v3_0.md` (or `@`-reference it in chat) **before** implementing:
+
+- Database: schema, migrations, queries, RLS, data modeling
+- **Building functionality or features**: product behavior, flows, requirements, acceptance criteria, domain rules
+- Backend/API behavior tied to product requirements
+
+If the PDR does not cover the topic, say so and proceed from code and existing patterns.
+
+## Do not use the PDR for design-only tasks
+
+If the task is **purely design or visual**—for example typography, spacing, color tokens, component styling, layout polish, motion, or design-system compliance—with **no** change to product behavior, data model, or feature requirements, **do not** treat `docs/EduAI_PDR_v3_0.md` as the source of truth.
+
+## Design-only tasks: use these instead
+
+For design work, follow:
+
+- `.cursor/rules/design-system.mdc` (project design tokens and UI rules)
+- `.agents/skills/ui-craft/references/supabase-design-system.md` (deeper reference)
+
+## Mixed tasks (feature + UI)
+
+When building a feature that includes UI: use the **PDR** for what to build and how it should behave; use the **design-system** references above for how it should look and feel.
