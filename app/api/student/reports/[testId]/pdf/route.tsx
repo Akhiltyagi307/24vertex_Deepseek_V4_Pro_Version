@@ -1,5 +1,9 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 
+import {
+	buildPracticeGradingReportPdfBuffer,
+	uploadPracticeGradingReportPdf,
+} from "@/lib/practice/ai-grade-practice-test";
 import { contentDispositionWithFilename } from "@/lib/http/content-disposition";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
@@ -84,6 +88,33 @@ export async function GET(request: Request, context: RouteContext) {
 		}
 		if (dlErr) {
 			logSupabaseError("StudentReportPdfRoute.storage.download", dlErr, { testId });
+		}
+	}
+
+	// Rich practice report: (re)build the same PDF as the background job if Storage is empty or download failed.
+	if (String(testRow.status) === "graded") {
+		const built = await buildPracticeGradingReportPdfBuffer(testId);
+		if (built.ok) {
+			const up = await uploadPracticeGradingReportPdf(built.userId, testId, built.buffer);
+			if (!up.ok) {
+				logServerError("StudentReportPdfRoute.uploadPracticeGradingReportPdf", new Error(up.message), {
+					testId,
+				});
+			}
+			const short = testId.replace(/-/g, "").slice(0, 8);
+			const filename = `eduai-report-${short}.pdf`;
+			const contentDisposition = contentDispositionWithFilename(
+				inline ? "inline" : "attachment",
+				filename,
+			);
+			return new Response(new Uint8Array(built.buffer), {
+				status: 200,
+				headers: {
+					"Content-Type": "application/pdf",
+					"Content-Disposition": contentDisposition,
+					"Cache-Control": "private, no-store",
+				},
+			});
 		}
 	}
 

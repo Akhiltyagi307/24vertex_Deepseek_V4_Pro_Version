@@ -3,8 +3,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
 	assertTestOwnedInProgress,
-	writeStudentAnswerRow,
+	writeStudentAnswerRows,
 } from "@/lib/practice/submit-practice-shared";
+import type { StudentAnswerWriteRow } from "@/lib/practice/student-answer-write";
 
 const studentAnswerPayloadSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("mcq"), value: z.string().max(8) }),
@@ -20,6 +21,8 @@ const batchSchema = z.object({
 				questionId: z.string().uuid(),
 				studentAnswer: studentAnswerPayloadSchema,
 				flaggedForReview: z.boolean(),
+				timeSpentMs: z.number().int().min(0).max(30 * 60_000).optional(),
+				visits: z.number().int().min(0).max(10_000).optional(),
 			}),
 		)
 		.min(1)
@@ -70,7 +73,10 @@ export async function POST(request: Request) {
 	}
 
 	const qTypes = new Map(qRows.map((r) => [r.id as string, r.question_type as string]));
+	const nowIso = new Date().toISOString();
+	const testId = parsed.data.testId;
 
+	const writeRows: StudentAnswerWriteRow[] = [];
 	for (const item of parsed.data.items) {
 		const qt = qTypes.get(item.questionId);
 		if (!qt) {
@@ -83,21 +89,23 @@ export async function POST(request: Request) {
 		if (item.studentAnswer.kind !== expectedKind) {
 			return Response.json({ ok: false, message: "Answer type mismatch." }, { status: 400 });
 		}
-
-		const { error: upErr } = await writeStudentAnswerRow(supabase, {
-			test_id: parsed.data.testId,
+		writeRows.push({
+			test_id: testId,
 			question_id: item.questionId,
 			student_answer: item.studentAnswer,
 			flagged_for_review: item.flaggedForReview,
-			updated_at: new Date().toISOString(),
+			updated_at: nowIso,
+			time_spent_ms: item.timeSpentMs ?? null,
+			visits: item.visits ?? null,
 		});
+	}
 
-		if (upErr) {
-			if (process.env.NODE_ENV === "development") {
-				console.error("[batch-upsert-answers]", upErr.message, upErr.code, upErr.details);
-			}
-			return Response.json({ ok: false, message: friendlyError() }, { status: 500 });
+	const { error: upErr } = await writeStudentAnswerRows(supabase, writeRows);
+	if (upErr) {
+		if (process.env.NODE_ENV === "development") {
+			console.error("[batch-upsert-answers]", upErr.message, upErr.code, upErr.details);
 		}
+		return Response.json({ ok: false, message: friendlyError() }, { status: 500 });
 	}
 
 	return Response.json({ ok: true as const });

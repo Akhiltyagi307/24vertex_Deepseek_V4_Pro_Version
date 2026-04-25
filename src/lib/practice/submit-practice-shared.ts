@@ -5,11 +5,12 @@ import { gradePracticeTestWithAi, recordGradingFailure } from "@/lib/practice/ai
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
 	writeStudentAnswerRow,
+	writeStudentAnswerRows,
 	type StudentAnswerWriteRow,
 } from "@/lib/practice/student-answer-write";
 
 export type { StudentAnswerWriteRow };
-export { writeStudentAnswerRow };
+export { writeStudentAnswerRow, writeStudentAnswerRows };
 
 export type SubmitPracticeTestResult =
 	| { ok: true; redirectTo: string }
@@ -219,6 +220,8 @@ export async function executePracticeTestSubmit(
 
 	let mcqTotal = 0;
 	let mcqCorrect = 0;
+	const mcqRows: StudentAnswerWriteRow[] = [];
+	const nowIso = new Date().toISOString();
 
 	for (const q of questions) {
 		if (q.question_type !== "multiple_choice") {
@@ -254,19 +257,21 @@ export async function executePracticeTestSubmit(
 				(payload as { kind: "mcq"; value: string })
 			:	{ kind: "mcq" as const, value: letter };
 
-		const { error: upErr } = await writeStudentAnswerRow(supabase, {
+		mcqRows.push({
 			test_id: testId,
 			question_id: q.id as string,
 			student_answer: studentAnswer,
 			is_correct: ok,
 			score_earned: ok ? "100" : "0",
-			updated_at: new Date().toISOString(),
+			updated_at: nowIso,
 		});
+	}
 
+	if (mcqRows.length > 0) {
+		const { error: upErr } = await writeStudentAnswerRows(supabase, mcqRows);
 		if (upErr) {
 			logSupabaseError("executePracticeTestSubmit.student_answers.upsert", upErr, {
 				testId,
-				questionId: q.id as string,
 			});
 			return failGradingInProgress(supabase, userId, testId, "Could not save scored answers before AI grading.");
 		}

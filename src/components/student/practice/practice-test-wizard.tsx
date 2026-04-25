@@ -19,6 +19,7 @@ import {
 	finalizePracticeConfig,
 	generatePracticeTest,
 } from "../../../../app/student/practice/actions";
+import type { GeneratePracticeResult } from "../../../../app/student/practice/actions/types";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
 import { usePaywall } from "@/components/student/subscription/paywall-dialog";
@@ -49,6 +50,51 @@ import {
 } from "@/lib/student/performance-matrix";
 import { getSubjectCardIconConfig } from "@/lib/student/subject-lucide-icon";
 import { cn } from "@/lib/utils";
+
+/** NDJSON from `/api/student/practice/generate-stream` when `PRACTICE_STREAM` + `NEXT_PUBLIC_PRACTICE_STREAM` are enabled. */
+async function readPracticeGenerateNdjsonResponse(res: Response): Promise<GeneratePracticeResult> {
+	const reader = res.body?.getReader();
+	if (!reader) {
+		throw new Error("No response body from generation stream.");
+	}
+	const dec = new TextDecoder();
+	let buffer = "";
+	let final: GeneratePracticeResult | null = null;
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+	while (true) {
+		const { done, value } = await reader.read();
+		if (value) {
+			buffer += dec.decode(value, { stream: true });
+		}
+		const lines = buffer.split("\n");
+		buffer = lines.pop() ?? "";
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (!trimmed) continue;
+			const msg = JSON.parse(trimmed) as
+				| { type: "partial"; partial: unknown }
+				| { type: "done"; result: GeneratePracticeResult }
+				| { type: "error"; message: string };
+			if (msg.type === "error") {
+				throw new Error(msg.message);
+			}
+			if (msg.type === "done") {
+				final = msg.result;
+			}
+		}
+		if (done) break;
+	}
+	if (buffer.trim()) {
+		const msg = JSON.parse(buffer.trim()) as { type: string; result?: GeneratePracticeResult };
+		if (msg.type === "done" && msg.result) {
+			final = msg.result;
+		}
+	}
+	if (!final) {
+		throw new Error("Could not read generation result from stream.");
+	}
+	return final;
+}
 
 export type PracticeEnrolledSubject = {
 	id: string;
@@ -755,12 +801,58 @@ export function PracticeTestWizard({
 		setGeneratingStartedAt(Date.now());
 		setGeneratingElapsed(0);
 		try {
-			const resultPromise = generatePracticeTest({
+			const payload = {
 				subjectId,
 				trackerIds: [...selectedTrackerIds],
 				difficulty: parsedDifficulty.data,
 				durationSeconds: parsedDuration.data,
-			});
+			};
+			const useClientStream = process.env.NEXT_PUBLIC_PRACTICE_STREAM === "true";
+
+			const resultPromise: Promise<GeneratePracticeResult> = (async () => {
+				if (useClientStream) {
+					const res = await fetch(
+						`${typeof window !== "undefined" ? window.location.origin : ""}/api/student/practice/generate-stream`,
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify(payload),
+							signal: abort.signal,
+						},
+					);
+					if (res.status === 404) {
+						return generatePracticeTest(payload);
+					}
+					if (res.status === 402) {
+						const j = (await res.json()) as {
+							ok?: boolean;
+							paywall?: boolean;
+							message?: string;
+							code?: string;
+						};
+						return {
+							ok: false,
+							code:
+								j.code === "quota_tests" ? "quota_tests"
+								: j.code === "trial_expired" ? "trial_expired"
+								: "subscription_expired",
+							message: j.message ?? "Subscription required.",
+							paywall: true,
+						} as GeneratePracticeResult;
+					}
+					if (!res.ok) {
+						const j = (await res.json().catch(() => ({}))) as { message?: string };
+						return {
+							ok: false,
+							code: "generation_failed",
+							message: j.message ?? "Could not generate the test.",
+						} as GeneratePracticeResult;
+					}
+					return readPracticeGenerateNdjsonResponse(res);
+				}
+				return generatePracticeTest(payload);
+			})();
+
 			const result = await Promise.race([
 				resultPromise,
 				new Promise<never>((_, reject) => {

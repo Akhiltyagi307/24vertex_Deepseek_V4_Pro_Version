@@ -219,6 +219,11 @@ export type ValidateGenerationOptions = {
 	expectedTypeCounts?: ExpectedQuestionMixCounts | null;
 };
 
+/** UUID string compare is case-sensitive in JS; DB IDs are lowercase; models may emit uppercase. */
+function normalizePracticeTopicId(id: string): string {
+	return id.trim().toLowerCase();
+}
+
 const PRACTICE_TYPE_KEYS = PRACTICE_BUCKET_KEYS;
 
 /**
@@ -257,18 +262,26 @@ export function validateAndStripGeneration(
 	};
 	let totalTime = 0;
 
+	const canonicalTopicIdByNormalized = new Map<string, string>();
+	for (const id of allowedTopicIds) {
+		canonicalTopicIdByNormalized.set(normalizePracticeTopicId(id), id);
+	}
+	const allowedNormalized = new Set(canonicalTopicIdByNormalized.keys());
+
 	for (const q of raw.questions) {
 		if (seenNumbers.has(q.question_number)) {
 			return { ok: false, message: "Duplicate question numbers in generated test. Try again." };
 		}
 		seenNumbers.add(q.question_number);
 
-		if (!allowedTopicIds.has(q.topic_id)) {
+		const topicKey = normalizePracticeTopicId(q.topic_id);
+		if (!allowedNormalized.has(topicKey)) {
 			return {
 				ok: false,
 				message: "A question referenced a topic that was not in your selection. Try again.",
 			};
 		}
+		q.topic_id = canonicalTopicIdByNormalized.get(topicKey)!;
 
 		if (q.question_type === "multiple_choice") {
 			const optionMap = mcqOptionMap(q.options);

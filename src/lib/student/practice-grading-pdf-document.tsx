@@ -1,175 +1,476 @@
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement, ReactNode } from "react";
 
 import { formatDuration } from "@/lib/student/subject-test-report";
+import { clampGenerationBlockForPdf, splitFeedbackForTwoQuestionPages } from "@/lib/student/practice-grading-pdf-chunks";
 import type { GradedQuestionItem, PracticeGradingSummary } from "@/lib/practice/grading-schema";
-import {
-	chunkTextByMaxChars,
-	PDF_ANALYSIS_FIRST_MAX,
-	PDF_BLOCK_CONT_MAX,
-} from "@/lib/student/practice-grading-pdf-chunks";
 
-// --- Design tokens (aligned with app dark + emerald accent) -----------------
-const c = {
-	bgCover: "#0f172a",
-	card: "#1e293b",
-	cardBorder: "#334155",
-	muted: "#94a3b8",
-	ink: "#1e293b",
-	inkLight: "#f8fafc",
-	accent: "#34d399",
-	accentText: "#6ee7b7",
-	white: "#ffffff",
-};
+/**
+ * Print theme: refined editorial PDF design — strong typographic hierarchy,
+ * EduAI brand (#2ea070) accents, semantic verdict colors, hero score on cover,
+ * accent bars on section labels, and zebra-striped tables.
+ * Tight radii, hairline borders, top accent rule — Supabase Studio inspired.
+ */
+const pdf = {
+	/** Light theme `foreground` (oklch(0.145 0 0) ≈) */
+	ink: "#0a0a0a",
+	inkSubtle: "#404040",
+	muted: "#737373",
+	muted2: "#a3a3a3",
+	border: "#e5e5e5",
+	borderStrong: "#d4d4d4",
+	borderSubtle: "#f0f0f0",
+	/** Studio-like canvas */
+	canvas: "#fafafa",
+	surface: "#ffffff",
+	/** --primary solid (dark mode / brand usage) */
+	brand: "#2ea070",
+	brandDim: "#1d6b45",
+	brandDeep: "#0f4a30",
+	brandSoft: "rgba(46, 160, 112, 0.08)",
+	brandSofter: "rgba(46, 160, 112, 0.04)",
+	brandTint: "rgba(46, 160, 112, 0.22)",
+	/** --destructive */
+	destructive: "#e55353",
+	destructiveSoft: "rgba(229, 83, 83, 0.10)",
+	destructiveInk: "#b91c1c",
+	/** Warning / partial-credit (amber 500 / 700-ish) */
+	warning: "#f59e0b",
+	warningSoft: "#fef3c7",
+	warningInk: "#92400e",
+	/** Success ink for status text */
+	successInk: "#15803d",
+	tHead: "#f5f5f5",
+	tStripe: "#fafafa",
+} as const;
 
 const styles = StyleSheet.create({
+	brandTopRule: { height: 4, width: "100%", backgroundColor: pdf.brand },
 	cover: {
-		padding: 44,
+		padding: 0,
 		fontSize: 10,
 		fontFamily: "Helvetica",
-		backgroundColor: c.bgCover,
-		color: c.inkLight,
+		backgroundColor: pdf.canvas,
+		color: pdf.ink,
 		minHeight: "100%",
 	},
-	coverAccent: {
-		fontSize: 9,
-		color: c.accentText,
-		fontFamily: "Helvetica-Bold",
-		letterSpacing: 1.2,
-		marginBottom: 10,
-		textTransform: "uppercase",
-	},
-	coverTitle: { fontSize: 24, fontFamily: "Helvetica-Bold", marginBottom: 4, color: c.white },
-	coverSub: { fontSize: 10, color: c.muted, marginBottom: 20 },
-	heroLine: { fontSize: 10, color: c.muted, marginBottom: 16 },
-	metaGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 6, gap: 0 },
-	metaCard: {
-		width: "48%",
-		marginRight: "2%",
-		marginBottom: 10,
-		backgroundColor: c.card,
-		borderRadius: 6,
-		padding: 10,
-		borderWidth: 1,
-		borderColor: c.cardBorder,
-	},
-	metaLabel: { fontSize: 8, color: c.muted, marginBottom: 3, textTransform: "uppercase" },
-	metaValue: { fontSize: 12, fontFamily: "Helvetica-Bold", color: c.inkLight },
-	sectionLabel: {
-		fontSize: 9,
-		color: c.accentText,
-		fontFamily: "Helvetica-Bold",
-		textTransform: "uppercase",
-		marginTop: 14,
-		marginBottom: 6,
-	},
-	coverageTable: {
-		borderWidth: 1,
-		borderColor: c.cardBorder,
-		borderRadius: 6,
-		overflow: "hidden",
-		marginTop: 4,
-	},
-	coverageRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: c.cardBorder },
-	coverageRowHead: { backgroundColor: c.card, flexDirection: "row" },
-	coverageCell: {
-		flex: 1,
-		padding: 8,
-		fontSize: 8,
-		color: c.inkLight,
-	},
-	coverageCellNarrow: {
-		width: "18%",
-		padding: 8,
-		fontSize: 8,
-		color: c.inkLight,
-	},
-	coverageHead: { fontFamily: "Helvetica-Bold", color: c.muted, fontSize: 7, textTransform: "uppercase" },
-	summaryNarrative: {
-		marginTop: 12,
-		padding: 12,
-		backgroundColor: c.card,
-		borderLeftWidth: 3,
-		borderLeftColor: c.accent,
-		borderRadius: 4,
-	},
-	summaryNarrativeText: { fontSize: 9, color: c.inkLight, lineHeight: 1.45 },
-	bullets: { marginTop: 4 },
-	bulletItem: { fontSize: 9, color: c.inkLight, lineHeight: 1.4, marginBottom: 3, paddingLeft: 8 },
-	insightsBox: {
-		marginTop: 10,
-		padding: 10,
-		backgroundColor: "#134e4a",
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: "#115e59",
-	},
-	insightsText: { fontSize: 9, color: "#ccfbf1", lineHeight: 1.45 },
-	footer: {
-		position: "absolute",
-		bottom: 28,
-		left: 44,
-		right: 44,
-		fontSize: 7,
-		color: c.muted,
-	},
-
-	// Question pages
-	qPage: {
-		padding: 36,
-		fontSize: 10,
-		fontFamily: "Helvetica",
-		backgroundColor: "#ffffff",
-	},
-	qTopBar: {
+	coverInner: { padding: 28, paddingTop: 22 },
+	coverHeaderRow: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "flex-start",
-		marginBottom: 14,
-		paddingBottom: 10,
-		borderBottomWidth: 2,
-		borderBottomColor: "#0d9488",
+		alignItems: "center",
+		marginBottom: 8,
 	},
-	qTitleBlock: { flex: 1, paddingRight: 12 },
-	qBadgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
-	verdictPill: {
-		borderRadius: 4,
-		paddingVertical: 3,
-		paddingHorizontal: 7,
-		fontSize: 7,
-		fontFamily: "Helvetica-Bold",
-	},
-	scorePill: {
-		fontSize: 18,
-		fontFamily: "Helvetica-Bold",
-		color: "#0f766e",
-	},
-	loc: { fontSize: 8, color: "#64748b", lineHeight: 1.3 },
-	section: { marginBottom: 11 },
-	sectionLabelQ: {
+	coverKicker: {
 		fontSize: 8,
-		color: "#64748b",
+		color: pdf.brand,
 		fontFamily: "Helvetica-Bold",
+		letterSpacing: 1.5,
+		textTransform: "uppercase",
+	},
+	coverTitle: {
+		fontSize: 28,
+		fontFamily: "Helvetica-Bold",
+		marginBottom: 3,
+		marginTop: 4,
+		color: pdf.ink,
+		letterSpacing: -0.6,
+	},
+	coverSub: { fontSize: 9.5, color: pdf.muted, marginBottom: 4, lineHeight: 1.4 },
+	heroLine: { fontSize: 9.5, color: pdf.inkSubtle, marginBottom: 4 },
+	logo: { width: 40, height: 40 },
+	wordmark: {
+		fontSize: 13,
+		fontFamily: "Helvetica-Bold",
+		color: pdf.brand,
+		letterSpacing: 0.2,
+	},
+	// Hero score card (replaces "Overall score" tile with a prominent treatment)
+	heroScoreCard: {
+		marginTop: 12,
+		marginBottom: 8,
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		backgroundColor: pdf.surface,
+		borderWidth: 1,
+		borderColor: pdf.border,
+		borderRadius: 6,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		borderLeftWidth: 4,
+		borderLeftColor: pdf.brand,
+	},
+	heroScoreLeft: { flexDirection: "column" },
+	heroScoreLabel: {
+		fontSize: 7.5,
+		color: pdf.muted,
+		fontFamily: "Helvetica-Bold",
+		letterSpacing: 1,
 		textTransform: "uppercase",
 		marginBottom: 4,
 	},
-	sectionBody: { fontSize: 10, lineHeight: 1.45, color: c.ink },
-	card: {
-		borderWidth: 1,
-		borderColor: "#e2e8f0",
-		backgroundColor: "#f8fafc",
-		borderRadius: 5,
-		padding: 9,
-		marginTop: 3,
-	},
-	continuedHint: {
-		fontSize: 8,
-		color: "#0f766e",
+	heroScoreValue: {
+		fontSize: 38,
 		fontFamily: "Helvetica-Bold",
+		color: pdf.brand,
+		letterSpacing: -1.2,
+		lineHeight: 1,
+	},
+	heroScoreCaption: {
+		fontSize: 9,
+		color: pdf.muted,
+		marginTop: 5,
+	},
+	heroScoreRight: {
+		alignItems: "flex-end",
+		flexDirection: "column",
+		maxWidth: "55%",
+	},
+	heroStat: {
+		fontSize: 9.5,
+		color: pdf.ink,
+		marginBottom: 1,
+		textAlign: "right",
+	},
+	heroStatLabel: {
+		fontSize: 6.5,
+		color: pdf.muted,
+		letterSpacing: 0.8,
+		textTransform: "uppercase",
+		fontFamily: "Helvetica-Bold",
+		marginBottom: 1,
+		textAlign: "right",
+	},
+	metaGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 0 },
+	metaCard: {
+		width: "32%",
+		marginRight: "2%",
+		marginBottom: 8,
+		backgroundColor: pdf.surface,
+		borderRadius: 5,
+		padding: 11,
+		borderWidth: 1,
+		borderColor: pdf.border,
+	},
+	metaCardLast: {
+		marginRight: 0,
+	},
+	metaLabel: {
+		fontSize: 7,
+		color: pdf.muted,
+		marginBottom: 4,
+		letterSpacing: 0.7,
+		textTransform: "uppercase",
+		fontFamily: "Helvetica-Bold",
+	},
+	metaValue: { fontSize: 13, fontFamily: "Helvetica-Bold", color: pdf.ink, letterSpacing: -0.2 },
+	// Cover section labels — accent bar + uppercase strong label
+	sectionLabelRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 14,
 		marginBottom: 6,
+	},
+	sectionLabelRowTight: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginTop: 0,
+		marginBottom: 5,
+	},
+	sectionLabelBar: {
+		width: 3,
+		height: 9,
+		backgroundColor: pdf.brand,
+		marginRight: 6,
+		borderRadius: 1,
+	},
+	sectionLabel: {
+		fontSize: 8.5,
+		color: pdf.ink,
+		fontFamily: "Helvetica-Bold",
+		textTransform: "uppercase",
+		letterSpacing: 1,
+	},
+	sectionLabelTight: {
+		fontSize: 7.5,
+		color: pdf.muted,
+		fontFamily: "Helvetica-Bold",
+		textTransform: "uppercase",
+		letterSpacing: 0.9,
+		marginTop: 0,
+		marginBottom: 5,
+	},
+	coverageTable: {
+		borderWidth: 1,
+		borderColor: pdf.border,
+		borderRadius: 5,
+		overflow: "hidden",
+		marginTop: 0,
+		backgroundColor: pdf.surface,
+	},
+	coverageRow: {
+		flexDirection: "row",
+		borderBottomWidth: 1,
+		borderBottomColor: pdf.borderSubtle,
+	},
+	coverageRowAlt: {
+		backgroundColor: pdf.tStripe,
+	},
+	coverageRowHead: {
+		backgroundColor: pdf.tHead,
+		flexDirection: "row",
+		borderBottomWidth: 1,
+		borderBottomColor: pdf.border,
+	},
+	coverageCell: {
+		flex: 1,
+		padding: 7,
+		fontSize: 8.5,
+		color: pdf.ink,
+		lineHeight: 1.35,
+	},
+	coverageCellNarrow: {
+		width: "16%",
+		padding: 7,
+		fontSize: 8.5,
+		color: pdf.ink,
+	},
+	coverageHead: {
+		fontFamily: "Helvetica-Bold",
+		color: pdf.muted,
+		fontSize: 6.8,
+		textTransform: "uppercase",
+		letterSpacing: 0.7,
+	},
+	statusGood: { color: pdf.successInk, fontFamily: "Helvetica-Bold" },
+	statusWarn: { color: pdf.warningInk, fontFamily: "Helvetica-Bold" },
+	statusBad: { color: pdf.destructiveInk, fontFamily: "Helvetica-Bold" },
+	scoreCellGood: { color: pdf.successInk, fontFamily: "Helvetica-Bold" },
+	scoreCellWarn: { color: pdf.warningInk, fontFamily: "Helvetica-Bold" },
+	scoreCellBad: { color: pdf.destructiveInk, fontFamily: "Helvetica-Bold" },
+	summaryNarrative: {
+		marginTop: 0,
+		padding: 13,
+		paddingLeft: 14,
+		backgroundColor: pdf.surface,
+		borderLeftWidth: 3,
+		borderLeftColor: pdf.brand,
+		borderRadius: 5,
+		borderTopWidth: 1,
+		borderRightWidth: 1,
+		borderBottomWidth: 1,
+		borderTopColor: pdf.border,
+		borderRightColor: pdf.border,
+		borderBottomColor: pdf.border,
+	},
+	summaryNarrativeText: { fontSize: 9.5, color: pdf.ink, lineHeight: 1.55 },
+	/** Brand-tinted tag rows (replaces • bullets) */
+	tagRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 0 },
+	tagChip: {
+		borderWidth: 1,
+		borderColor: pdf.brandTint,
+		backgroundColor: pdf.brandSoft,
+		borderRadius: 3,
+		paddingVertical: 4,
+		paddingHorizontal: 7,
+		marginRight: 5,
+		marginBottom: 5,
+	},
+	tagChipText: { fontSize: 8.5, color: pdf.brandDeep, lineHeight: 1.35 },
+	twoColRow: { flexDirection: "row", marginTop: 4 },
+	twoCol: { width: "49%", marginRight: "1%" },
+	insightsBox: {
+		marginTop: 8,
+		padding: 12,
+		backgroundColor: pdf.brandSoft,
+		borderRadius: 5,
+		borderWidth: 1,
+		borderColor: pdf.brandTint,
+	},
+	insightsLabelRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 5,
+	},
+	insightsBar: {
+		width: 3,
+		height: 8,
+		backgroundColor: pdf.brand,
+		marginRight: 6,
+		borderRadius: 1,
+	},
+	insightsLabel: {
+		fontSize: 8,
+		color: pdf.brandDeep,
+		fontFamily: "Helvetica-Bold",
+		textTransform: "uppercase",
+		letterSpacing: 1,
+	},
+	insightsText: { fontSize: 9.5, color: pdf.brandDeep, lineHeight: 1.5 },
+	footer: {
+		position: "absolute",
+		bottom: 18,
+		left: 28,
+		right: 28,
+		fontSize: 7.5,
+		color: pdf.muted2,
+		textAlign: "center",
+		letterSpacing: 0.4,
+	},
+
+	// Question pages
+	qPage: { padding: 0, fontSize: 11, fontFamily: "Helvetica", backgroundColor: pdf.canvas },
+	qPageInner: { padding: 32, paddingTop: 28 },
+	qHeaderRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "flex-start",
+		marginBottom: 16,
+		paddingBottom: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: pdf.border,
+	},
+	logoSm: { width: 32, height: 32 },
+	qTitleBlock: { flex: 1, paddingRight: 12 },
+	qNumberKicker: {
+		fontSize: 8,
+		color: pdf.brand,
+		fontFamily: "Helvetica-Bold",
+		letterSpacing: 1.3,
+		textTransform: "uppercase",
+		marginBottom: 3,
+	},
+	qLocation: {
+		fontSize: 11,
+		color: pdf.ink,
+		fontFamily: "Helvetica-Bold",
+		marginTop: 1,
+		lineHeight: 1.35,
+		letterSpacing: -0.1,
+	},
+	qBadgeRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8, alignItems: "center" },
+	verdictPill: {
+		borderRadius: 3,
+		paddingVertical: 3,
+		paddingHorizontal: 8,
+		fontSize: 8,
+		fontFamily: "Helvetica-Bold",
+		borderWidth: 1,
+		letterSpacing: 0.6,
 		textTransform: "uppercase",
 	},
+	scorePillWrap: {
+		backgroundColor: pdf.brandSoft,
+		borderWidth: 1,
+		borderColor: pdf.brandTint,
+		borderRadius: 6,
+		paddingVertical: 6,
+		paddingHorizontal: 14,
+		marginTop: 6,
+		alignItems: "center",
+	},
+	scorePillLabel: {
+		fontSize: 6.5,
+		color: pdf.brandDim,
+		fontFamily: "Helvetica-Bold",
+		letterSpacing: 0.9,
+		textTransform: "uppercase",
+		marginBottom: 1,
+	},
+	scorePill: {
+		fontSize: 24,
+		fontFamily: "Helvetica-Bold",
+		color: pdf.brand,
+		letterSpacing: -0.5,
+		lineHeight: 1,
+	},
+	loc: { fontSize: 8.5, color: pdf.muted, lineHeight: 1.4 },
+	section: { marginBottom: 12 },
+	sectionLabelQRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 6,
+	},
+	sectionLabelQBar: {
+		width: 3,
+		height: 8,
+		backgroundColor: pdf.brand,
+		marginRight: 6,
+		borderRadius: 1,
+	},
+	sectionLabelQ: {
+		fontSize: 8,
+		color: pdf.ink,
+		fontFamily: "Helvetica-Bold",
+		letterSpacing: 0.9,
+		textTransform: "uppercase",
+	},
+	sectionBody: { fontSize: 11, lineHeight: 1.6, color: pdf.ink },
+	card: {
+		borderWidth: 1,
+		borderColor: pdf.border,
+		backgroundColor: pdf.surface,
+		borderRadius: 5,
+		padding: 12,
+		marginTop: 0,
+	},
+	cardAnswerKey: {
+		borderWidth: 1,
+		borderColor: pdf.brandTint,
+		backgroundColor: pdf.brandSofter,
+		borderRadius: 5,
+		padding: 12,
+		marginTop: 0,
+	},
+	cardFeedback: {
+		borderWidth: 1,
+		borderColor: pdf.border,
+		backgroundColor: pdf.surface,
+		borderRadius: 5,
+		padding: 12,
+		marginTop: 0,
+		borderLeftWidth: 3,
+		borderLeftColor: pdf.brand,
+	},
+	atGlance: {
+		marginTop: 6,
+		paddingVertical: 5,
+		paddingHorizontal: 8,
+		backgroundColor: pdf.canvas,
+		borderRadius: 3,
+		borderLeftWidth: 2,
+		borderLeftColor: pdf.borderStrong,
+	},
+	atGlanceText: { fontSize: 8.5, color: pdf.inkSubtle, lineHeight: 1.45, fontStyle: "italic" },
+	continuedHint: {
+		fontSize: 9,
+		color: pdf.brand,
+		fontFamily: "Helvetica-Bold",
+		marginTop: 2,
+		letterSpacing: 0.3,
+	},
 });
+
+/** Keep the dark "test details" section to a single printed page (no wrap). */
+const PDF_COVER_NARRATIVE_MAX = 1000;
+const PDF_COVER_INSIGHTS_MAX = 480;
+const PDF_COVER_TOPIC_ROWS_MAX = 10;
+const PDF_COVER_TRUNC_NOTE = "\n\n[Longer detail is available in the in-app report for this practice test.]";
+
+function truncateForSinglePage(text: string, maxChars: number): { text: string; wasTruncated: boolean } {
+	const t = text.trim();
+	if (t.length <= maxChars) return { text: t, wasTruncated: false };
+	const cap = Math.max(0, maxChars - PDF_COVER_TRUNC_NOTE.length);
+	return { text: `${t.slice(0, cap).trimEnd()}${PDF_COVER_TRUNC_NOTE}`, wasTruncated: true };
+}
+
+function formatStatusForPdf(raw: string): string {
+	const t = raw.trim();
+	if (!t || t === "—") return "—";
+	if (t.length <= 3) return t.toUpperCase();
+	return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
 
 function formatDate(iso: string | null | undefined): string {
 	if (!iso) return "—";
@@ -184,28 +485,23 @@ function formatQType(t: string): string {
 	return t.replace(/_/g, " ");
 }
 
-function verdictStyles(v: GradedQuestionItem["verdict"]): { bg: string; fg: string; label: string } {
-	if (v === "correct") return { bg: "#d1fae7", fg: "#047857", label: "Correct" };
-	if (v === "partially_correct") return { bg: "#fef3c7", fg: "#b45309", label: "Partially correct" };
-	return { bg: "#fee2e2", fg: "#b91c1c", label: "Incorrect" };
+function verdictStyles(v: GradedQuestionItem["verdict"]): { bg: string; fg: string; border: string; label: string } {
+	/** Match app badge intent: success (emerald family), warning (amber), destructive (#e55353). */
+	if (v === "correct") {
+		return { bg: pdf.brandSoft, fg: pdf.successInk, border: pdf.brandTint, label: "Correct" };
+	}
+	if (v === "partially_correct") {
+		return { bg: pdf.warningSoft, fg: pdf.warningInk, border: pdf.warning, label: "Partial credit" };
+	}
+	return { bg: pdf.destructiveSoft, fg: pdf.destructiveInk, border: "rgba(229, 83, 83, 0.4)", label: "Incorrect" };
 }
 
-/** Split analysis: first chunk sized for the first question page, rest in larger chunks. */
-function splitAnalysisForQuestionPages(analysis: string): { first: string; rest: string[] } {
-	const t = analysis.trim();
-	if (!t) return { first: "", rest: [] };
-	const parts = chunkTextByMaxChars(t, PDF_ANALYSIS_FIRST_MAX);
-	if (parts.length === 0) return { first: "", rest: [] };
-	if (parts.length === 1) return { first: parts[0] ?? "", rest: [] };
-	const [first, ...tailParts] = parts;
-	const merged = tailParts.join("\n\n");
-	const rest = merged ? chunkTextByMaxChars(merged, PDF_BLOCK_CONT_MAX) : [];
-	return { first: first ?? "", rest };
-}
-
-function splitStep(text: string | undefined): string[] {
-	if (!text?.trim()) return [];
-	return chunkTextByMaxChars(text.trim(), PDF_BLOCK_CONT_MAX);
+/** Color the score / status by performance threshold. */
+function scoreColorStyle(avg: number | null): { color: string; fontFamily: "Helvetica-Bold" } | undefined {
+	if (avg == null) return undefined;
+	if (avg >= 75) return styles.scoreCellGood as { color: string; fontFamily: "Helvetica-Bold" };
+	if (avg >= 50) return styles.scoreCellWarn as { color: string; fontFamily: "Helvetica-Bold" };
+	return styles.scoreCellBad as { color: string; fontFamily: "Helvetica-Bold" };
 }
 
 export type TopicCoverageRow = {
@@ -221,15 +517,14 @@ export type PracticeGradingPdfQuestion = GradedQuestionItem & {
 	question_number: number;
 	question_text: string;
 	question_type: string;
-	/** For location line (not in grader JSON; from topics table) */
 	topic_name: string;
-	/** For location line */
 	chapter_name: string;
 	unit_name: string | null;
 	grade: number | null;
 	student_answer_display: string;
-	/** Per-question item difficulty if present */
 	question_difficulty: string | null;
+	/** Preformatted from questions.answer_key + options (generation pipeline). */
+	generation_answer_display: string;
 };
 
 export type PracticeGradingPdfCoverProps = {
@@ -244,11 +539,63 @@ export type PracticeGradingPdfCoverProps = {
 	totalQuestions: number;
 	overallScorePercent: number | null;
 	summary: PracticeGradingSummary;
+	/** Filesystem path to logo PNG for @react-pdf Image, or null to show wordmark */
+	logoSrc: string | null;
 };
 
 export type PracticeGradingPdfDocumentProps = PracticeGradingPdfCoverProps & {
 	questions: PracticeGradingPdfQuestion[];
 };
+
+function BrandedTopRight({ logoSrc }: { logoSrc: string | null }) {
+	if (logoSrc) {
+		/* @react-pdf/renderer's Image is not a DOM <img>; no alt in types. */
+		// eslint-disable-next-line jsx-a11y/alt-text -- PDF logo, decorative in document
+		return <Image src={logoSrc} style={styles.logo} />;
+	}
+	return <Text style={styles.wordmark}>EduAI</Text>;
+}
+
+function QHeaderRight({ logoSrc }: { logoSrc: string | null }) {
+	if (logoSrc) {
+		// eslint-disable-next-line jsx-a11y/alt-text -- PDF logo, decorative in document
+		return <Image src={logoSrc} style={styles.logoSm} />;
+	}
+	return <Text style={[styles.wordmark, { fontSize: 12 }]}>EduAI</Text>;
+}
+
+function TagChipList({ items }: { items: string[] }) {
+	if (!items.length) return null;
+	return (
+		<View style={styles.tagRow} wrap>
+			{items.map((s, i) => (
+				<View key={i} style={styles.tagChip} wrap={false}>
+					<Text style={styles.tagChipText}>{s}</Text>
+				</View>
+			))}
+		</View>
+	);
+}
+
+/** Section label with brand accent bar — used on the cover page. */
+function CoverSectionLabel({ children, tight }: { children: ReactNode; tight?: boolean }) {
+	return (
+		<View style={tight ? styles.sectionLabelRowTight : styles.sectionLabelRow} wrap={false}>
+			<View style={styles.sectionLabelBar} />
+			<Text style={styles.sectionLabel}>{children}</Text>
+		</View>
+	);
+}
+
+/** Section label with brand accent bar — used on question pages. */
+function QSectionLabel({ children }: { children: ReactNode }) {
+	return (
+		<View style={styles.sectionLabelQRow} wrap={false}>
+			<View style={styles.sectionLabelQBar} />
+			<Text style={styles.sectionLabelQ}>{children}</Text>
+		</View>
+	);
+}
 
 function GlobalFooter() {
 	return (
@@ -256,7 +603,7 @@ function GlobalFooter() {
 			style={styles.footer}
 			fixed
 			render={({ pageNumber, totalPages }) =>
-				`EduAI · Confidential practice report · ${pageNumber} / ${totalPages}`
+				`EduAI  ·  Confidential practice report  ·  ${pageNumber} / ${totalPages}`
 			}
 		/>
 	);
@@ -275,105 +622,167 @@ function ReportCoverPage(props: PracticeGradingPdfCoverProps) {
 		totalQuestions,
 		overallScorePercent,
 		summary,
+		logoSrc,
 	} = props;
 
+	const narrative = truncateForSinglePage(summary.overall_summary ?? "", PDF_COVER_NARRATIVE_MAX);
+	const insightsRaw = summary.ai_insights?.trim() ?? "";
+	const insights = insightsRaw
+		? truncateForSinglePage(insightsRaw, PDF_COVER_INSIGHTS_MAX)
+		: { text: "", wasTruncated: false };
+
+	const topicOverflow = topicCoverageRows.length > PDF_COVER_TOPIC_ROWS_MAX;
+	const topicRowsShown = topicOverflow ? topicCoverageRows.slice(0, PDF_COVER_TOPIC_ROWS_MAX) : topicCoverageRows;
+	const restCount = topicCoverageRows.length - topicRowsShown.length;
+
+	const strengths = summary.strengths ?? [];
+	const focus = summary.improvement_areas ?? [];
+	const recs = summary.recommendations ?? [];
+	const useTwoCol = strengths.length > 0 && focus.length > 0;
+
+	const dateLine = formatDate(testDateIso ?? createdAtIso);
+	const overallScoreLabel = overallScorePercent != null ? `${Math.round(overallScorePercent)}%` : "—";
+
 	return (
-		<Page size="A4" style={styles.cover} wrap>
-			<Text style={styles.coverAccent}>Practice test report</Text>
-			<Text style={styles.coverTitle}>{subjectName}</Text>
-			<Text style={styles.coverSub}>
-				{formatDate(testDateIso ?? createdAtIso)} · {totalQuestions} questions
-			</Text>
-			{studentDisplayName ? <Text style={styles.heroLine}>Student: {studentDisplayName}</Text> : null}
+		<Page size="A4" style={styles.cover} wrap={false}>
+			<View style={styles.brandTopRule} />
+			<View style={styles.coverInner} wrap={false}>
+				<View style={styles.coverHeaderRow} wrap={false}>
+					<Text style={styles.coverKicker}>Practice test report</Text>
+					<BrandedTopRight logoSrc={logoSrc} />
+				</View>
+				<Text style={styles.coverTitle}>{subjectName}</Text>
+				<Text style={styles.coverSub}>
+					{dateLine} · {totalQuestions} {totalQuestions === 1 ? "question" : "questions"}
+				</Text>
 
-			<View style={styles.metaGrid}>
-				<View style={styles.metaCard}>
-					<Text style={styles.metaLabel}>Overall score</Text>
-					<Text style={styles.metaValue}>
-						{overallScorePercent != null ? `${Math.round(overallScorePercent)}%` : "—"}
-					</Text>
-				</View>
-				<View style={styles.metaCard}>
-					<Text style={styles.metaLabel}>Test difficulty</Text>
-					<Text style={styles.metaValue}>{difficulty?.trim() ? difficulty : "—"}</Text>
-				</View>
-				<View style={styles.metaCard}>
-					<Text style={styles.metaLabel}>Time limit</Text>
-					<Text style={styles.metaValue}>
-						{timeLimitSeconds != null ? formatDuration(timeLimitSeconds) : "—"}
-					</Text>
-				</View>
-				<View style={styles.metaCard}>
-					<Text style={styles.metaLabel}>Time taken</Text>
-					<Text style={styles.metaValue}>{formatDuration(durationSeconds)}</Text>
-				</View>
-			</View>
-
-			<Text style={styles.sectionLabel}>Topics and chapters</Text>
-			<View style={styles.coverageTable}>
-				<View style={styles.coverageRowHead} wrap={false}>
-					<Text style={[styles.coverageCell, styles.coverageHead, { flex: 1.1 }]}>Chapter</Text>
-					<Text style={[styles.coverageCell, styles.coverageHead, { flex: 1.1 }]}>Topic</Text>
-					<Text style={[styles.coverageCellNarrow, styles.coverageHead]}>Avg</Text>
-					<Text style={[styles.coverageCellNarrow, styles.coverageHead]}>Status</Text>
-				</View>
-				{topicCoverageRows.map((row, i) => (
-					<View key={i} style={styles.coverageRow} wrap={false}>
-						<Text style={{ ...styles.coverageCell, flex: 1.1 }}>{row.chapterName}</Text>
-						<Text style={{ ...styles.coverageCell, flex: 1.1 }}>{row.topicName}</Text>
-						<Text style={styles.coverageCellNarrow}>
-							{row.averageScore != null ? `${row.averageScore.toFixed(0)}%` : "—"}
+				{/* Hero score panel — overall score + identification context */}
+				<View style={styles.heroScoreCard} wrap={false}>
+					<View style={styles.heroScoreLeft}>
+						<Text style={styles.heroScoreLabel}>Overall score</Text>
+						<Text style={styles.heroScoreValue}>{overallScoreLabel}</Text>
+						<Text style={styles.heroScoreCaption}>
+							Across {totalQuestions} {totalQuestions === 1 ? "question" : "questions"}
 						</Text>
-						<Text style={styles.coverageCellNarrow}>{row.statusLabel}</Text>
 					</View>
-				))}
+					<View style={styles.heroScoreRight}>
+						{studentDisplayName ? (
+							<>
+								<Text style={styles.heroStatLabel}>Student</Text>
+								<Text style={styles.heroStat}>{studentDisplayName}</Text>
+							</>
+						) : null}
+						<Text style={[styles.heroStatLabel, studentDisplayName ? { marginTop: 8 } : {}]}>
+							Subject
+						</Text>
+						<Text style={styles.heroStat}>{subjectName}</Text>
+					</View>
+				</View>
+
+				<View style={styles.metaGrid}>
+					<View style={styles.metaCard}>
+						<Text style={styles.metaLabel}>Test difficulty</Text>
+						<Text style={styles.metaValue}>{difficulty?.trim() ? difficulty : "—"}</Text>
+					</View>
+					<View style={styles.metaCard}>
+						<Text style={styles.metaLabel}>Time limit</Text>
+						<Text style={styles.metaValue}>
+							{timeLimitSeconds != null ? formatDuration(timeLimitSeconds) : "—"}
+						</Text>
+					</View>
+					<View style={[styles.metaCard, styles.metaCardLast]}>
+						<Text style={styles.metaLabel}>Time taken</Text>
+						<Text style={styles.metaValue}>{formatDuration(durationSeconds)}</Text>
+					</View>
+				</View>
+
+				<CoverSectionLabel>Topics and Chapters</CoverSectionLabel>
+				<View style={styles.coverageTable}>
+					<View style={styles.coverageRowHead} wrap={false}>
+						<Text style={[styles.coverageCell, styles.coverageHead, { flex: 1.1 }]}>Chapter</Text>
+						<Text style={[styles.coverageCell, styles.coverageHead, { flex: 1.1 }]}>Topic</Text>
+						<Text style={[styles.coverageCellNarrow, styles.coverageHead]}>Avg</Text>
+						<Text style={[styles.coverageCellNarrow, styles.coverageHead]}>Status</Text>
+					</View>
+					{topicRowsShown.map((row, i) => {
+						const scoreStyle = scoreColorStyle(row.averageScore);
+						const isAlt = i % 2 === 1;
+						return (
+							<View
+								key={i}
+								style={isAlt ? [styles.coverageRow, styles.coverageRowAlt] : styles.coverageRow}
+								wrap={false}
+							>
+								<Text style={{ ...styles.coverageCell, flex: 1.1 }}>{row.chapterName}</Text>
+								<Text style={{ ...styles.coverageCell, flex: 1.1 }}>{row.topicName}</Text>
+								<Text style={scoreStyle ? [styles.coverageCellNarrow, scoreStyle] : styles.coverageCellNarrow}>
+									{row.averageScore != null ? `${row.averageScore.toFixed(0)}%` : "—"}
+								</Text>
+								<Text style={scoreStyle ? [styles.coverageCellNarrow, scoreStyle] : styles.coverageCellNarrow}>
+									{formatStatusForPdf(row.statusLabel)}
+								</Text>
+							</View>
+						);
+					})}
+					{topicOverflow ? (
+						<View style={[styles.coverageRow, { borderBottomWidth: 0 }]} wrap={false}>
+							<Text style={{ padding: 6, fontSize: 7, color: pdf.muted, fontStyle: "italic" }}>
+								… and {restCount} more topic{restCount === 1 ? "" : "s"} (see in-app report)
+							</Text>
+						</View>
+					) : null}
+				</View>
+
+				<CoverSectionLabel>How you did</CoverSectionLabel>
+				<View style={styles.summaryNarrative} wrap={false}>
+					<Text style={styles.summaryNarrativeText}>{narrative.text}</Text>
+				</View>
+
+				{useTwoCol ? (
+					<View style={styles.twoColRow} wrap={false}>
+						<View style={styles.twoCol} wrap={false}>
+							<CoverSectionLabel tight>Strengths</CoverSectionLabel>
+							<TagChipList items={strengths} />
+						</View>
+						<View style={styles.twoCol} wrap={false}>
+							<CoverSectionLabel tight>Focus areas</CoverSectionLabel>
+							<TagChipList items={focus} />
+						</View>
+					</View>
+				) : (
+					<>
+						{strengths.length ? (
+							<View wrap={false}>
+								<CoverSectionLabel>Strengths</CoverSectionLabel>
+								<TagChipList items={strengths} />
+							</View>
+						) : null}
+						{focus.length ? (
+							<View wrap={false}>
+								<CoverSectionLabel>Focus areas</CoverSectionLabel>
+								<TagChipList items={focus} />
+							</View>
+						) : null}
+					</>
+				)}
+
+				{recs.length ? (
+					<View wrap={false}>
+						<CoverSectionLabel>Recommendations</CoverSectionLabel>
+						<TagChipList items={recs} />
+					</View>
+				) : null}
+
+				{insights.text ? (
+					<View style={styles.insightsBox} wrap={false}>
+						<View style={styles.insightsLabelRow} wrap={false}>
+							<View style={styles.insightsBar} />
+							<Text style={styles.insightsLabel}>Insights</Text>
+						</View>
+						<Text style={styles.insightsText}>{insights.text}</Text>
+					</View>
+				) : null}
 			</View>
-
-			<Text style={styles.sectionLabel}>How you did</Text>
-			<View style={styles.summaryNarrative} wrap={false}>
-				<Text style={styles.summaryNarrativeText}>{summary.overall_summary}</Text>
-			</View>
-
-			{summary.strengths?.length ? (
-				<View wrap={false}>
-					<Text style={styles.sectionLabel}>Strengths</Text>
-					{summary.strengths.map((s, i) => (
-						<Text key={i} style={styles.bulletItem}>
-							· {s}
-						</Text>
-					))}
-				</View>
-			) : null}
-
-			{summary.improvement_areas?.length ? (
-				<View wrap={false}>
-					<Text style={styles.sectionLabel}>Focus areas</Text>
-					{summary.improvement_areas.map((s, i) => (
-						<Text key={i} style={styles.bulletItem}>
-							· {s}
-						</Text>
-					))}
-				</View>
-			) : null}
-
-			{summary.recommendations?.length ? (
-				<View wrap={false}>
-					<Text style={styles.sectionLabel}>Recommendations</Text>
-					{summary.recommendations.map((s, i) => (
-						<Text key={i} style={styles.bulletItem}>
-							· {s}
-						</Text>
-					))}
-				</View>
-			) : null}
-
-			{summary.ai_insights?.trim() ? (
-				<View style={styles.insightsBox} wrap={false}>
-					<Text style={styles.sectionLabel}>Insights</Text>
-					<Text style={styles.insightsText}>{summary.ai_insights.trim()}</Text>
-				</View>
-			) : null}
-
 			<GlobalFooter />
 		</Page>
 	);
@@ -381,34 +790,48 @@ function ReportCoverPage(props: PracticeGradingPdfCoverProps) {
 
 type QuestionPageHeaderProps = {
 	q: PracticeGradingPdfQuestion;
+	logoSrc: string | null;
 	continued?: boolean;
 	sectionHint?: string;
 };
 
-function QuestionPageHeader({ q, continued, sectionHint }: QuestionPageHeaderProps) {
+function QuestionPageHeader({ q, logoSrc, continued, sectionHint }: QuestionPageHeaderProps) {
 	const v = verdictStyles(q.verdict);
 	return (
-		<View style={styles.qTopBar} wrap={false}>
+		<View style={styles.qHeaderRow} wrap={false}>
 			<View style={styles.qTitleBlock}>
-				<Text style={styles.loc}>
-					Question {q.question_number} · {formatQType(q.question_type)}
-					{continued ? " · continued" : ""}
+				<Text style={styles.qNumberKicker}>
+					Question {q.question_number}  ·  {formatQType(q.question_type)}
+					{continued ? "  ·  continued" : ""}
 				</Text>
 				{sectionHint ? <Text style={styles.continuedHint}>{sectionHint}</Text> : null}
-				<Text style={{ fontSize: 9, color: c.ink, marginTop: 2 }} wrap>
+				<Text style={styles.qLocation} wrap>
 					{q.chapter_name}
 					{q.unit_name ? ` · ${q.unit_name}` : ""}
 					{q.grade != null ? ` · Grade ${q.grade}` : ""}
 					{q.topic_name ? ` · ${q.topic_name}` : ""}
 				</Text>
 				{q.question_difficulty ? (
-					<Text style={[styles.loc, { marginTop: 2 }]}>Item difficulty: {q.question_difficulty}</Text>
+					<Text style={[styles.loc, { marginTop: 3 }]}>Item difficulty: {q.question_difficulty}</Text>
 				) : null}
 				<View style={styles.qBadgeRow} wrap={false}>
-					<Text style={[styles.verdictPill, { backgroundColor: v.bg, color: v.fg, marginRight: 4 }]}>{v.label}</Text>
+					<Text
+						style={[
+							styles.verdictPill,
+							{ backgroundColor: v.bg, color: v.fg, borderColor: v.border, marginRight: 4 },
+						]}
+					>
+						{v.label}
+					</Text>
 				</View>
 			</View>
-			<Text style={styles.scorePill}>{Math.round(q.score)}%</Text>
+			<View style={{ alignItems: "flex-end" }}>
+				<QHeaderRight logoSrc={logoSrc} />
+				<View style={styles.scorePillWrap} wrap={false}>
+					<Text style={styles.scorePillLabel}>Score</Text>
+					<Text style={styles.scorePill}>{Math.round(q.score)}%</Text>
+				</View>
+			</View>
 		</View>
 	);
 }
@@ -416,109 +839,101 @@ function QuestionPageHeader({ q, continued, sectionHint }: QuestionPageHeaderPro
 function Section({ label, children }: { label: string; children: ReactNode }) {
 	return (
 		<View style={styles.section}>
-			<Text style={styles.sectionLabelQ}>{label}</Text>
+			<QSectionLabel>{label}</QSectionLabel>
 			{children}
 		</View>
+	);
+}
+
+function QuestionFooter({ q, nQuestions }: { q: PracticeGradingPdfQuestion; nQuestions: number }) {
+	return (
+		<Text
+			style={[styles.footer, { position: "absolute", color: pdf.muted2 }]}
+			fixed
+			render={({ pageNumber, totalPages }) =>
+				`Q ${q.question_number} of ${nQuestions}  ·  ${pageNumber} / ${totalPages}`
+			}
+		/>
 	);
 }
 
 function renderQuestionPageSequence(
 	q: PracticeGradingPdfQuestion,
 	nQuestions: number,
+	logoSrc: string | null,
 ): ReactElement[] {
-	const pages: ReactElement[] = [];
-	const { first, rest: analysisRest } = splitAnalysisForQuestionPages(q.analysis);
-	const stepParts = splitStep(q.step_by_step_solution);
+	const gen = clampGenerationBlockForPdf(q.generation_answer_display);
+	const { page1, page2 } = splitFeedbackForTwoQuestionPages(q.analysis, q.step_by_step_solution);
 
-	// page 1: stem + your answer + ref + first analysis
+	const pages: ReactElement[] = [];
+
 	pages.push(
 		<Page key={`${q.question_id}-p0`} size="A4" style={styles.qPage} wrap>
-			<QuestionPageHeader q={q} />
-			<Section label="Question">
-				<Text style={styles.sectionBody} wrap>
-					{q.question_text}
-				</Text>
-			</Section>
-			<Section label="Your answer">
-				<View style={styles.card}>
-					<Text style={styles.sectionBody} wrap>
-						{q.student_answer_display}
-					</Text>
-				</View>
-				{q.user_answer_summary?.trim() ? (
-					<Text style={[styles.loc, { marginTop: 5 }]} wrap>
-						At a glance: {q.user_answer_summary.trim()}
-					</Text>
-				) : null}
-			</Section>
-			<Section label="Reference / model answer">
-				<View style={styles.card}>
-					<Text style={styles.sectionBody} wrap>
-						{q.reference_answer_summary?.trim() ? q.reference_answer_summary.trim() : "—"}
-					</Text>
-				</View>
-			</Section>
-			{first ? (
-				<Section label="Analysis">
-					<Text style={styles.sectionBody} wrap>
-						{first}
-					</Text>
+			<View style={styles.brandTopRule} />
+			<View style={styles.qPageInner}>
+				<QuestionPageHeader q={q} logoSrc={logoSrc} />
+				<Section label="Question">
+					<View style={styles.card}>
+						<Text style={styles.sectionBody} wrap>
+							{q.question_text}
+						</Text>
+					</View>
 				</Section>
-			) : null}
-			<Text
-				style={[styles.footer, { position: "absolute", color: "#64748b" }]}
-				fixed
-				render={({ pageNumber, totalPages }) =>
-					`Q ${q.question_number} of ${nQuestions} · ${pageNumber} / ${totalPages}`
-				}
-			/>
+				<Section label="Your answer">
+					<View style={styles.card}>
+						<Text style={styles.sectionBody} wrap>
+							{q.student_answer_display}
+						</Text>
+					</View>
+					{q.user_answer_summary?.trim() ? (
+						<View style={styles.atGlance} wrap={false}>
+							<Text style={styles.atGlanceText} wrap>
+								At a glance: {q.user_answer_summary.trim()}
+							</Text>
+						</View>
+					) : null}
+				</Section>
+				<Section label="Answer key (practice set)">
+					<View style={styles.cardAnswerKey}>
+						<Text style={styles.sectionBody} wrap>
+							{gen.text || "—"}
+						</Text>
+					</View>
+				</Section>
+				{page1 ? (
+					<Section label="AI feedback">
+						<View style={styles.cardFeedback}>
+							<Text style={styles.sectionBody} wrap>
+								{page1}
+							</Text>
+						</View>
+					</Section>
+				) : null}
+				<QuestionFooter q={q} nQuestions={nQuestions} />
+			</View>
 		</Page>,
 	);
 
-	for (let i = 0; i < analysisRest.length; i++) {
+	if (page2) {
 		pages.push(
-			<Page key={`${q.question_id}-a${i}`} size="A4" style={styles.qPage} wrap>
-				<QuestionPageHeader
-					q={q}
-					continued
-					sectionHint={i === 0 ? "Analysis (continued)" : "Analysis (continued)"}
-				/>
-				<Section label="Analysis">
-					<Text style={styles.sectionBody} wrap>
-						{analysisRest[i]}
-					</Text>
-				</Section>
-				<Text
-					style={[styles.footer, { position: "absolute", color: "#64748b" }]}
-					fixed
-					render={({ pageNumber, totalPages }) =>
-						`Q ${q.question_number} of ${nQuestions} · ${pageNumber} / ${totalPages}`
-					}
-				/>
-			</Page>,
-		);
-	}
-
-	for (let i = 0; i < stepParts.length; i++) {
-		pages.push(
-			<Page key={`${q.question_id}-s${i}`} size="A4" style={styles.qPage} wrap>
-				<QuestionPageHeader
-					q={q}
-					continued
-					sectionHint={i === 0 ? "Step-by-step solution" : "Step-by-step (continued)"}
-				/>
-				<Section label={i === 0 ? "Step-by-step solution" : "Step-by-step (continued)"}>
-					<Text style={styles.sectionBody} wrap>
-						{stepParts[i]}
-					</Text>
-				</Section>
-				<Text
-					style={[styles.footer, { position: "absolute", color: "#64748b" }]}
-					fixed
-					render={({ pageNumber, totalPages }) =>
-						`Q ${q.question_number} of ${nQuestions} · ${pageNumber} / ${totalPages}`
-					}
-				/>
+			<Page key={`${q.question_id}-p1`} size="A4" style={styles.qPage} wrap>
+				<View style={styles.brandTopRule} />
+				<View style={styles.qPageInner}>
+					<QuestionPageHeader
+						q={q}
+						logoSrc={logoSrc}
+						continued
+						sectionHint="AI feedback (continued)"
+					/>
+					<Section label="AI feedback (continued)">
+						<View style={styles.cardFeedback}>
+							<Text style={styles.sectionBody} wrap>
+								{page2}
+							</Text>
+						</View>
+					</Section>
+					<QuestionFooter q={q} nQuestions={nQuestions} />
+				</View>
 			</Page>,
 		);
 	}
@@ -529,10 +944,11 @@ function renderQuestionPageSequence(
 export function PracticeGradingPdfDocument(props: PracticeGradingPdfDocumentProps) {
 	const { questions, ...coverProps } = props;
 	const nQ = questions.length;
+	const logoSrc = coverProps.logoSrc;
 	return (
 		<Document title={`${props.subjectName} — Practice report`}>
 			<ReportCoverPage {...coverProps} />
-			{questions.flatMap((q) => renderQuestionPageSequence(q, nQ))}
+			{questions.flatMap((q) => renderQuestionPageSequence(q, nQ, logoSrc))}
 		</Document>
 	);
 }

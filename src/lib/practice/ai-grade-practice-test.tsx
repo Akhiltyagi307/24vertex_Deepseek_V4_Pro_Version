@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { renderToBuffer } from "@react-pdf/renderer";
 import { generateObject } from "ai";
 
@@ -20,14 +23,26 @@ import { buildTopicRollups, type TopicRollupRow } from "@/lib/practice/topic-rol
 import {
 	formatScoreEarnedForDb,
 	isPostgrestMissingColumnError,
-	writeStudentAnswerRow,
+	writeStudentAnswerRows,
+	type StudentAnswerWriteRow,
 } from "@/lib/practice/student-answer-write";
+import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { PracticeGradingPdfDocument } from "@/lib/student/practice-grading-pdf-document";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type ServerSupabase = SupabaseClient;
+
+function resolvePracticePdfLogoPath(): string | null {
+	const logoPath = path.join(process.cwd(), "public", "brand", "logo-icon.png");
+	try {
+		if (fs.existsSync(logoPath)) return logoPath;
+	} catch {
+		/* ignore */
+	}
+	return null;
+}
 
 const CHUNK_SIZE = 8;
 
@@ -215,6 +230,7 @@ export async function gradePracticeTestWithAi(
 	}
 
 	const answerByQ = new Map((answerRows ?? []).map((r) => [r.question_id as string, r.student_answer]));
+	const questionById = new Map(questions.map((q) => [q.id as string, q]));
 
 	const gradingInputs: GradingQuestionInput[] = questions.map((q) => {
 		const raw = answerByQ.get(q.id as string) ?? null;
@@ -283,7 +299,7 @@ export async function gradePracticeTestWithAi(
 	>();
 
 	for (const g of merged) {
-		const qMeta = questions.find((q) => q.id === g.question_id);
+		const qMeta = questionById.get(g.question_id);
 		const tid = (qMeta?.topic_id as string) ?? g.topic_id;
 		const tname = topicNameById.get(tid) ?? "Topic";
 		if (!byTopic.has(tid)) {
@@ -328,13 +344,12 @@ export async function gradePracticeTestWithAi(
 
 	const nowIso = new Date().toISOString();
 
-	for (const g of merged) {
-		const qRow = questions.find((x) => x.id === g.question_id)!;
+	const gradedRows: StudentAnswerWriteRow[] = merged.map((g) => {
+		const qRow = questionById.get(g.question_id)!;
 		const qt = qRow.question_type as GradingQuestionInput["question_type"];
 		const payload = answerByQ.get(g.question_id);
 		const studentAnswer = payload ?? defaultStudentAnswerForQuestionType(qt);
-
-		const { error: upErr } = await writeStudentAnswerRow(supabase, {
+		return {
 			test_id: testId,
 			question_id: g.question_id,
 			student_answer: studentAnswer,
@@ -344,16 +359,16 @@ export async function gradePracticeTestWithAi(
 			ai_user_answer_summary: g.user_answer_summary?.trim() || null,
 			ai_reference_answer_summary: g.reference_answer_summary?.trim() || null,
 			updated_at: nowIso,
-		});
+		};
+	});
 
-		if (upErr) {
-			logSupabaseError("gradePracticeTestWithAi.student_answers.upsert", upErr, {
-				testId,
-				questionId: g.question_id,
-			});
-			logFail("studentAnswersSave", "Could not save graded answers.");
-			return { ok: false, message: "Could not save graded answers." };
-		}
+	const { error: batchAnswerErr } = await writeStudentAnswerRows(supabase, gradedRows);
+	if (batchAnswerErr) {
+		logSupabaseError("gradePracticeTestWithAi.student_answers.upsert", batchAnswerErr, {
+			testId,
+		});
+		logFail("studentAnswersSave", "Could not save graded answers.");
+		return { ok: false, message: "Could not save graded answers." };
 	}
 
 	const topicPerformancePayload = {
@@ -392,21 +407,26 @@ export async function gradePracticeTestWithAi(
 	}
 
 	// Rolling-mean tracker update with trend recomputation lives in
-	// practice_update_tracker_running (SECURITY DEFINER). Call per-topic.
-	for (const row of topicRollups) {
-		const { error: pe } = await supabase.rpc("practice_update_tracker_running", {
-			p_student_id: userId,
-			p_subject_id: subjectId,
-			p_topic_id: row.topic_id,
-			p_current_test_id: testId,
-			p_current_test_score: row.average_score,
-			p_current_n_incorrect: row.n_incorrect,
-			p_now: nowIso,
-		});
+	// practice_update_tracker_running (SECURITY DEFINER). One row per topic; run in parallel.
+	const trackerResults = await Promise.all(
+		topicRollups.map((row) =>
+			supabase.rpc("practice_update_tracker_running", {
+				p_student_id: userId,
+				p_subject_id: subjectId,
+				p_topic_id: row.topic_id,
+				p_current_test_id: testId,
+				p_current_test_score: row.average_score,
+				p_current_n_incorrect: row.n_incorrect,
+				p_now: nowIso,
+			}),
+		),
+	);
+	for (let i = 0; i < trackerResults.length; i++) {
+		const pe = trackerResults[i]?.error;
 		if (pe) {
 			logSupabaseError("gradePracticeTestWithAi.practice_update_tracker_running", pe, {
 				testId,
-				topicId: row.topic_id,
+				topicId: topicRollups[i]!.topic_id,
 			});
 		}
 	}
@@ -439,14 +459,17 @@ export async function gradePracticeTestWithAi(
 	return { ok: true };
 }
 
+export type BuildPracticeGradingReportPdfResult =
+	| { ok: true; buffer: Buffer; userId: string }
+	| { ok: false; message: string };
+
 /**
- * Renders the graded report to PDF and uploads it to Supabase Storage.
- * Called from the `pdf` background job after grading completes so a slow
- * render doesn't block the student's redirect to their report.
+ * Renders the full practice grading PDF (branded, per-question detail) to a buffer.
+ * Used by the background upload job and by the student report PDF route when storage has no file yet.
  */
-export async function renderAndUploadPracticeReportPdf(
+export async function buildPracticeGradingReportPdfBuffer(
 	testId: string,
-): Promise<{ ok: true; storagePath: string } | { ok: false; message: string }> {
+): Promise<BuildPracticeGradingReportPdfResult> {
 	const admin = createServiceRoleClient();
 
 	const { data: testRow, error: testErr } = await admin
@@ -492,7 +515,7 @@ export async function renderAndUploadPracticeReportPdf(
 
 	const { data: questionRows, error: qErr } = await admin
 		.from("questions")
-		.select("id, topic_id, question_text, question_type, question_number, difficulty_level")
+		.select("id, topic_id, question_text, question_type, question_number, difficulty_level, options, answer_key")
 		.eq("test_id", testId)
 		.order("question_number", { ascending: true });
 	if (qErr || !questionRows?.length) {
@@ -594,6 +617,12 @@ export async function renderAndUploadPracticeReportPdf(
 		const userSummary = a?.ai_user_answer_summary as string | null | undefined;
 		const refSummary = a?.ai_reference_answer_summary as string | null | undefined;
 		const rawAnswer = a?.student_answer ?? null;
+		const optionsRaw = q.options as Record<string, string> | null | undefined;
+		const generationDisplay = formatGenerationAnswerForPdf({
+			questionType: String(q.question_type),
+			options: optionsRaw ?? null,
+			answerKeyJson: q.answer_key,
+		});
 		return {
 			question_id: q.id as string,
 			topic_id: q.topic_id as string,
@@ -612,6 +641,7 @@ export async function renderAndUploadPracticeReportPdf(
 			question_text: q.question_text as string,
 			question_type: q.question_type as string,
 			question_difficulty: (q.difficulty_level as string | null | undefined) ?? null,
+			generation_answer_display: generationDisplay,
 		};
 	});
 
@@ -619,8 +649,10 @@ export async function renderAndUploadPracticeReportPdf(
 		summaryPayload?.overall_percent ?? pdfQuestions.reduce((s, q) => s + q.score, 0) / Math.max(1, pdfQuestions.length),
 	);
 
+	const logoSrc = resolvePracticePdfLogoPath();
+
 	try {
-		const buffer = await renderToBuffer(
+		const raw = await renderToBuffer(
 			<PracticeGradingPdfDocument
 				subjectName={subjectName}
 				studentDisplayName={studentDisplayName}
@@ -633,29 +665,61 @@ export async function renderAndUploadPracticeReportPdf(
 				totalQuestions={questionRows.length}
 				overallScorePercent={overallPercent}
 				summary={summary}
+				logoSrc={logoSrc}
 				questions={pdfQuestions}
 			/>,
 		);
-
-		const storagePath = `${userId}/${testId}.pdf`;
-		const { error: upStorage } = await admin.storage
-			.from("student-test-reports")
-			.upload(storagePath, buffer, {
-				contentType: "application/pdf",
-				upsert: true,
-			});
-
-		if (upStorage) {
-			return { ok: false, message: upStorage.message ?? "Storage upload failed." };
-		}
-
-		await admin.from("test_reports").update({ pdf_storage_path: storagePath }).eq("test_id", testId);
-		return { ok: true, storagePath };
+		const buffer = raw instanceof Buffer ? raw : Buffer.from(raw);
+		return { ok: true, buffer, userId };
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "PDF render failed.";
-		logServerError("renderAndUploadPracticeReportPdf.renderToBuffer", e, { testId });
+		logServerError("buildPracticeGradingReportPdfBuffer.renderToBuffer", e, { testId });
 		return { ok: false, message: msg.length > 300 ? `${msg.slice(0, 300)}…` : msg };
 	}
+}
+
+/**
+ * Uploads a rendered practice report PDF to Storage and sets `test_reports.pdf_storage_path`.
+ */
+export async function uploadPracticeGradingReportPdf(
+	userId: string,
+	testId: string,
+	buffer: Buffer,
+): Promise<{ ok: true; storagePath: string } | { ok: false; message: string }> {
+	const admin = createServiceRoleClient();
+	const storagePath = `${userId}/${testId}.pdf`;
+	const { error: upStorage } = await admin.storage
+		.from("student-test-reports")
+		.upload(storagePath, buffer, {
+			contentType: "application/pdf",
+			upsert: true,
+		});
+
+	if (upStorage) {
+		return { ok: false, message: upStorage.message ?? "Storage upload failed." };
+	}
+
+	const { error: upRow } = await admin.from("test_reports").update({ pdf_storage_path: storagePath }).eq("test_id", testId);
+	if (upRow) {
+		logSupabaseError("uploadPracticeGradingReportPdf.test_reports.update", upRow, { testId });
+	}
+
+	return { ok: true, storagePath };
+}
+
+/**
+ * Renders the graded report to PDF and uploads it to Supabase Storage.
+ * Called from the `pdf` background job after grading completes so a slow
+ * render doesn't block the student's redirect to their report.
+ */
+export async function renderAndUploadPracticeReportPdf(
+	testId: string,
+): Promise<{ ok: true; storagePath: string } | { ok: false; message: string }> {
+	const built = await buildPracticeGradingReportPdfBuffer(testId);
+	if (!built.ok) {
+		return built;
+	}
+	return uploadPracticeGradingReportPdf(built.userId, testId, built.buffer);
 }
 
 /**

@@ -17,7 +17,7 @@ import {
 	XIcon,
 } from "lucide-react";
 
-import { submitPracticeTest, upsertPracticeAnswer } from "../../../../app/student/practice/session-actions";
+import { submitPracticeTest } from "../../../../app/student/practice/session-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -362,13 +362,20 @@ function mergeServerAndLocalDraft(
 	return { answers: mergedAnswers, flagged: mergedFlagged };
 }
 
+type PracticeBatchItem = {
+	questionId: string;
+	studentAnswer: SessionStudentAnswer;
+	flaggedForReview: boolean;
+	timeSpentMs?: number;
+	visits?: number;
+};
+
 function buildBatchItems(
 	sortedQs: PracticeSessionQuestion[],
 	answers: Record<string, SessionStudentAnswer>,
 	flagged: Record<string, boolean>,
-): { questionId: string; studentAnswer: SessionStudentAnswer; flaggedForReview: boolean }[] {
-	const items: { questionId: string; studentAnswer: SessionStudentAnswer; flaggedForReview: boolean }[] =
-		[];
+): PracticeBatchItem[] {
+	const items: PracticeBatchItem[] = [];
 	for (const q of sortedQs) {
 		const a = answers[q.id];
 		if (!a) continue;
@@ -383,7 +390,7 @@ function buildBatchItems(
 
 async function batchUpsertPracticeAnswers(body: {
 	testId: string;
-	items: { questionId: string; studentAnswer: SessionStudentAnswer; flaggedForReview: boolean }[];
+	items: PracticeBatchItem[];
 }): Promise<{ ok: true } | { ok: false; message: string }> {
 	try {
 		const res = await fetch("/api/student/practice/batch-upsert-answers", {
@@ -548,7 +555,7 @@ export function PracticeTestSession({
 			setRemainingSec(Math.max(0, timeLimitSeconds - elapsed));
 		};
 		tick();
-		const id = window.setInterval(tick, 400);
+		const id = window.setInterval(tick, 1000);
 		return () => window.clearInterval(id);
 	}, [timeLimitSeconds, sessionStartedAt, paused]);
 
@@ -651,13 +658,17 @@ export function PracticeTestSession({
 				savedHideTimer.current = undefined;
 			}
 			setSaveUi("saving");
-			const res = await upsertPracticeAnswer({
+			const res = await batchUpsertPracticeAnswers({
 				testId,
-				questionId,
-				studentAnswer: payload,
-				flaggedForReview: markReview,
-				timeSpentMs: perQuestionMsRef.current[questionId] ?? 0,
-				visits: perQuestionVisitsRef.current[questionId] ?? 0,
+				items: [
+					{
+						questionId,
+						studentAnswer: payload,
+						flaggedForReview: markReview,
+						timeSpentMs: perQuestionMsRef.current[questionId] ?? 0,
+						visits: perQuestionVisitsRef.current[questionId] ?? 0,
+					},
+				],
 			});
 			if (!res.ok) {
 				setSaveError(res.message);

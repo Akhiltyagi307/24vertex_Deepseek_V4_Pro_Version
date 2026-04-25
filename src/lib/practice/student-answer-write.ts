@@ -111,3 +111,69 @@ export async function writeStudentAnswerRow(
 
 	return { error };
 }
+
+const MAX_STUDENT_ANSWERS_PER_UPSERT = 100;
+
+function rowHasAiSummaryColumns(row: StudentAnswerWriteRow): boolean {
+	return (
+		row.ai_user_answer_summary !== undefined || row.ai_reference_answer_summary !== undefined
+	);
+}
+
+/**
+ * Batch upsert for `student_answers` using the same `(test_id, question_id)` conflict target.
+ * Splits into chunks; on missing AI summary columns, retries the chunk without those columns; on
+ * any remaining error, falls back to {@link writeStudentAnswerRow} per row so a single bad row
+ * does not block the rest.
+ */
+export async function writeStudentAnswerRows(
+	supabase: ServerSupabase,
+	rows: StudentAnswerWriteRow[],
+): Promise<{ error: { message: string; code?: string; details?: string | null } | null }> {
+	if (rows.length === 0) return { error: null };
+
+	for (let i = 0; i < rows.length; i += MAX_STUDENT_ANSWERS_PER_UPSERT) {
+		const chunk = rows.slice(i, i + MAX_STUDENT_ANSWERS_PER_UPSERT);
+		const { error } = await upsertStudentAnswerChunk(supabase, chunk);
+		if (error) return { error };
+	}
+	return { error: null };
+}
+
+async function upsertStudentAnswerChunk(
+	supabase: ServerSupabase,
+	rows: StudentAnswerWriteRow[],
+): Promise<{ error: { message: string; code?: string; details?: string | null } | null }> {
+	const hasAnySummary = rows.some(rowHasAiSummaryColumns);
+
+	const payloadsWithSummary = rows.map((r) => buildInsertPayload(r, { includeAiSummaryColumns: true }));
+	let { error } = await supabase
+		.from("student_answers")
+		.upsert(payloadsWithSummary, { onConflict: "test_id,question_id" });
+
+	if (error && hasAnySummary && isPostgrestMissingColumnError(error)) {
+		const payloadsNoSummary = rows.map((r) => buildInsertPayload(r, { includeAiSummaryColumns: false }));
+		const second = await supabase
+			.from("student_answers")
+			.upsert(payloadsNoSummary, { onConflict: "test_id,question_id" });
+		error = second.error;
+		if (!error) {
+			logServerError(
+				"writeStudentAnswerRows.missing_ai_summary_columns",
+				"Batch upsert ok after omitting ai_user_answer_summary / ai_reference_answer_summary. Apply supabase/migrations/20260426120000_student_answers_ai_report_summaries.sql on this database.",
+				{ n: rows.length },
+			);
+		}
+	}
+
+	if (error) {
+		for (const row of rows) {
+			const { error: oneErr } = await writeStudentAnswerRow(supabase, row);
+			if (oneErr) {
+				return { error: oneErr };
+			}
+		}
+	}
+
+	return { error: null };
+}

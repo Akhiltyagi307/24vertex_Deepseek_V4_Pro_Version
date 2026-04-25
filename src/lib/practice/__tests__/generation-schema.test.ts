@@ -294,4 +294,22 @@ describe("validateAndStripGeneration - type mix + time budget", () => {
 		const out = validateAndStripGeneration(raw, 2, new Set([TOPIC_A]));
 		expect(out.ok).toBe(false);
 	});
+
+	it("accepts topic_id with different UUID letter casing and normalizes to the allowed form", () => {
+		const raw = makeGeneration([
+			makeQuestion({ question_number: 1, topic_id: TOPIC_A.toUpperCase() }),
+			makeQuestion({
+				question_number: 2,
+				topic_id: TOPIC_B,
+				question_type: "short_answer",
+				options: null,
+				answer_key: shortAnswerKey,
+			}),
+		]);
+		const out = validateAndStripGeneration(raw, 2, new Set([TOPIC_A, TOPIC_B]));
+		expect(out.ok).toBe(true);
+		if (!out.ok) return;
+		expect(out.questions[0].topic_id).toBe(TOPIC_A);
+		expect(out.questions[1].topic_id).toBe(TOPIC_B);
+	});
 });

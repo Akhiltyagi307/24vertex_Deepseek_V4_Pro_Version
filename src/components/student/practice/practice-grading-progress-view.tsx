@@ -37,6 +37,11 @@ const GRADING_STATUS_ROTATE_MS = 6_000;
 /** Show an extra action if grading takes longer than this (worker trigger / cron may need a nudge). */
 const STUCK_REQUEUE_AFTER_SECONDS = 150;
 
+/** Polling backs off after this so realtime can drive most updates. */
+const GRADING_POLL_FAST_MS = 2_000;
+const GRADING_POLL_SLOW_MS = 5_000;
+const GRADING_POLL_BACKOFF_AFTER_MS = 30_000;
+
 function formatElapsed(totalSeconds: number): string {
 	if (totalSeconds < 60) return `${totalSeconds}s`;
 	const m = Math.floor(totalSeconds / 60);
@@ -70,6 +75,16 @@ export function PracticeGradingProgressView({
 		errorSanitized: string;
 	} | null>(null);
 	const [reportErrorHint, setReportErrorHint] = React.useState("");
+	const [pollIntervalMs, setPollIntervalMs] = React.useState(GRADING_POLL_FAST_MS);
+	const lastRealtimeAtRef = React.useRef(0);
+
+	React.useEffect(() => {
+		setPollIntervalMs(GRADING_POLL_FAST_MS);
+		const t = window.setTimeout(() => {
+			setPollIntervalMs(GRADING_POLL_SLOW_MS);
+		}, GRADING_POLL_BACKOFF_AFTER_MS);
+		return () => window.clearTimeout(t);
+	}, [testId]);
 
 	// Rotating status copy: each line stays long enough to read comfortably.
 	React.useEffect(() => {
@@ -98,8 +113,14 @@ export function PracticeGradingProgressView({
 			setPhase(statusToPhase(raw));
 		};
 
-		const pollOnce = async () => {
+		const pollOnce = async (opts?: { skipIfRecentRealtime?: boolean }) => {
 			if (cancelled) return;
+			if (opts?.skipIfRecentRealtime) {
+				const sinceRt = Date.now() - lastRealtimeAtRef.current;
+				if (sinceRt < 3_000 && lastRealtimeAtRef.current > 0) {
+					return;
+				}
+			}
 			const [testRes, jobRes, reportRes] = await Promise.all([
 				supabase.from("tests").select("status").eq("id", testId).maybeSingle(),
 				supabase
@@ -138,6 +159,7 @@ export function PracticeGradingProgressView({
 				},
 				(payload) => {
 					if (cancelled) return;
+					lastRealtimeAtRef.current = Date.now();
 					const next = (payload.new as { status?: string } | null)?.status;
 					applyStatus(next);
 				},
@@ -145,14 +167,14 @@ export function PracticeGradingProgressView({
 			.subscribe();
 
 		void pollOnce();
-		const pollId = window.setInterval(() => void pollOnce(), 1_500);
+		const pollId = window.setInterval(() => void pollOnce({ skipIfRecentRealtime: true }), pollIntervalMs);
 
 		return () => {
 			cancelled = true;
 			window.clearInterval(pollId);
 			void supabase.removeChannel(channel);
 		};
-	}, [testId]);
+	}, [testId, pollIntervalMs]);
 
 	React.useEffect(() => {
 		if (phase !== "graded") return;

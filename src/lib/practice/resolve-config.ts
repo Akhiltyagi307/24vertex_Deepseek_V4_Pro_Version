@@ -216,7 +216,11 @@ export async function resolvePracticeConfigForStudent(
 
 	// Phase 3: pull up to 8 recent incorrect / partial answers for this subject
 	// so the generator can bias toward concepts the student has struggled with.
-	const recentErrors = await loadRecentErrorsForSubject(supabase, user.id, subjectId);
+	// Only include errors whose topic_id is in the student's current selection;
+	// otherwise the model may emit topic_ids that fail validateAndStripGeneration.
+	const recentErrorsAll = await loadRecentErrorsForSubject(supabase, user.id, subjectId);
+	const selectedTopicIds = new Set(canonicalTopics.map((t) => t.topicId));
+	const recentErrors = recentErrorsAll.filter((e) => selectedTopicIds.has(e.topic_id));
 
 	return {
 		ok: true,
