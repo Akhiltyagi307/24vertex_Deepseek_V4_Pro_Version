@@ -9,17 +9,19 @@ import {
 	buildPracticeSystemPrompt,
 	buildPracticeUserMessage,
 	createPracticeGenerationOutputSchema,
+	fetchTopicContextChunksByTopicIds,
 	finalizePracticeConfigSchema,
 	flattenPracticeGenerationOutput,
 	resolvePracticeConfigForStudent,
 	summarizeGroupedQuestionTypeCounts,
-	stringifyPracticeUserMessage,
+	stringifyPracticeUserMessageForModel,
 	validateAndStripGeneration,
 	type PracticeGenerationGroupedOutput,
 	type PracticeGenerationOutput,
 } from "@/lib/practice";
 import { getPracticeQuestionPlan, practiceTypeCountsToQuestionMixJson } from "@/lib/practice/constants";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
+import { tagTopicContextTruncated } from "@/lib/practice/sentry-tags";
 import { repeatPracticeAiResultUntilSuccessOrExhausted } from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import {
@@ -155,6 +157,11 @@ export async function generatePracticeTest(input: unknown): Promise<GeneratePrac
 	const questionMixJson = practiceTypeCountsToQuestionMixJson(plan.counts);
 	const generationOutputSchema = createPracticeGenerationOutputSchema(expectedTypeCounts);
 
+	const topicIds = resolved.canonicalTopics.map((t) => t.topicId);
+	// Topic chunks: service role after resolvePracticeConfigForStudent (enrollment verified).
+	const admin = createServiceRoleClient();
+	const preFetchedTopicContext = await fetchTopicContextChunksByTopicIds(admin, topicIds);
+
 	const userPayload = buildPracticeUserMessage({
 		studentGrade: resolved.studentGrade,
 		subject: { id: subjectId, name: resolved.subjectName },
@@ -162,7 +169,31 @@ export async function generatePracticeTest(input: unknown): Promise<GeneratePrac
 		timeLimitSeconds: durationSeconds,
 		recentErrors: resolved.recentErrors,
 		topics: resolved.canonicalTopics,
+		preFetchedTopicContext,
 	});
+
+	const gmeta = preFetchedTopicContext.meta;
+	if (!gmeta.fetch_error && gmeta.topic_count > 0 && gmeta.context_chunk_count === 0 && gmeta.exercise_chunk_count === 0) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_topic_context_empty",
+			{ topic_count: gmeta.topic_count },
+			{ studentId: resolved.userId },
+		);
+	}
+	if (gmeta.truncated) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_topic_context_truncated",
+			{
+				context_chars: gmeta.context_char_total,
+				exercise_chars: gmeta.exercise_char_total,
+				topic_count: gmeta.topic_count,
+			},
+			{ studentId: resolved.userId },
+		);
+		void tagTopicContextTruncated();
+	}
 
 	const systemPrompt = buildPracticeSystemPrompt({
 		userMessageSummary: {
@@ -173,7 +204,7 @@ export async function generatePracticeTest(input: unknown): Promise<GeneratePrac
 		},
 	});
 
-	const userPrompt = stringifyPracticeUserMessage(userPayload);
+	const userPrompt = stringifyPracticeUserMessageForModel(userPayload);
 	const expectedCount = userPayload.test_parameters.estimated_question_count;
 	const topicIdSet = new Set(resolved.canonicalTopics.map((t) => t.topicId));
 	const formatTypeCounts = (counts: Record<string, number>) =>

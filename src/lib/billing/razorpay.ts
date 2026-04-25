@@ -156,6 +156,25 @@ export async function createPlan(input: RazorpayPlanInput): Promise<{ id: string
 }
 
 // ------------------------------------------------------------
+// Invoices (subscription receipts / hosted invoice link)
+// ------------------------------------------------------------
+
+export type RazorpayInvoice = {
+	id: string;
+	short_url?: string | null;
+	payment_id?: string | null;
+	subscription_id?: string | null;
+	amount?: number;
+	currency?: string;
+	status?: string;
+};
+
+export async function fetchInvoice(invoiceId: string): Promise<RazorpayInvoice> {
+	const rzp = getRazorpayClient();
+	return (await rzp.invoices.fetch(invoiceId)) as unknown as RazorpayInvoice;
+}
+
+// ------------------------------------------------------------
 // Webhook verification
 // ------------------------------------------------------------
 

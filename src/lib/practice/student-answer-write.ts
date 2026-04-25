@@ -1,6 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { logServerError } from "@/lib/server/log-supabase-error";
+
 type ServerSupabase = SupabaseClient;
+
+/**
+ * `student_answers.score_earned` is DECIMAL(5,2) with CHECK (BETWEEN 0 AND 100).
+ * Plain `toFixed(2)` can round past 100 (e.g. 100.006 → "100.01") and fail the check.
+ */
+export function formatScoreEarnedForDb(score: number): string {
+	const n = Math.min(100, Math.max(0, Number.isFinite(score) ? score : 0));
+	return n.toFixed(2);
+}
 
 export type StudentAnswerWriteRow = {
 	test_id: string;
@@ -11,20 +22,27 @@ export type StudentAnswerWriteRow = {
 	is_correct?: boolean | null;
 	score_earned?: string | null;
 	ai_feedback?: string | null;
+	/** Grader output for PDFs; see migration 20260426120000_student_answers_ai_report_summaries.sql */
+	ai_user_answer_summary?: string | null;
+	ai_reference_answer_summary?: string | null;
 	time_spent_ms?: number | null;
 	visits?: number | null;
 };
 
-/**
- * Phase 1: we now rely on the `(test_id, question_id)` unique index in
- * [supabase/migrations/20260419120000_student_answers_unique_test_question.sql](supabase/migrations/20260419120000_student_answers_unique_test_question.sql)
- * so a real `upsert({ onConflict })` is safe — no more manual find-then-insert
- * race.
- */
-export async function writeStudentAnswerRow(
-	supabase: ServerSupabase,
+/** True when PostgREST reports a missing column (migration not applied on this DB). */
+export function isPostgrestMissingColumnError(
+	error: { message: string; code?: string; details?: string | null; hint?: string | null } | null,
+): boolean {
+	if (!error) return false;
+	if (error.code === "42703") return true;
+	const blob = [error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
+	return blob.includes("column") && (blob.includes("does not exist") || blob.includes("undefined column"));
+}
+
+function buildInsertPayload(
 	row: StudentAnswerWriteRow,
-): Promise<{ error: { message: string; code?: string; details?: string | null } | null }> {
+	opts: { includeAiSummaryColumns: boolean },
+): Record<string, unknown> {
 	const insertPayload: Record<string, unknown> = {
 		test_id: row.test_id,
 		question_id: row.question_id,
@@ -41,16 +59,55 @@ export async function writeStudentAnswerRow(
 	if (row.ai_feedback !== undefined) {
 		insertPayload.ai_feedback = row.ai_feedback;
 	}
+	if (opts.includeAiSummaryColumns) {
+		if (row.ai_user_answer_summary !== undefined) {
+			insertPayload.ai_user_answer_summary = row.ai_user_answer_summary;
+		}
+		if (row.ai_reference_answer_summary !== undefined) {
+			insertPayload.ai_reference_answer_summary = row.ai_reference_answer_summary;
+		}
+	}
 	if (row.time_spent_ms !== undefined && row.time_spent_ms !== null) {
 		insertPayload.time_spent_ms = row.time_spent_ms;
 	}
 	if (row.visits !== undefined && row.visits !== null) {
 		insertPayload.visits = row.visits;
 	}
+	return insertPayload;
+}
 
+/**
+ * Phase 1: we now rely on the `(test_id, question_id)` unique index in
+ * [supabase/migrations/20260419120000_student_answers_unique_test_question.sql](supabase/migrations/20260419120000_student_answers_unique_test_question.sql)
+ * so a real `upsert({ onConflict })` is safe — no more manual find-then-insert
+ * race.
+ */
+export async function writeStudentAnswerRow(
+	supabase: ServerSupabase,
+	row: StudentAnswerWriteRow,
+): Promise<{ error: { message: string; code?: string; details?: string | null } | null }> {
+	const hasSummaryCols =
+		row.ai_user_answer_summary !== undefined || row.ai_reference_answer_summary !== undefined;
+
+	const insertPayload = buildInsertPayload(row, { includeAiSummaryColumns: true });
 	const { error } = await supabase
 		.from("student_answers")
 		.upsert(insertPayload, { onConflict: "test_id,question_id" });
+
+	if (error && hasSummaryCols && isPostgrestMissingColumnError(error)) {
+		const retryPayload = buildInsertPayload(row, { includeAiSummaryColumns: false });
+		const { error: err2 } = await supabase
+			.from("student_answers")
+			.upsert(retryPayload, { onConflict: "test_id,question_id" });
+		if (!err2) {
+			logServerError(
+				"writeStudentAnswerRow.missing_ai_summary_columns",
+				"Upsert ok after omitting ai_user_answer_summary / ai_reference_answer_summary. Apply supabase/migrations/20260426120000_student_answers_ai_report_summaries.sql on this database.",
+				{ testId: row.test_id, questionId: row.question_id },
+			);
+		}
+		return { error: err2 };
+	}
 
 	return { error };
 }

@@ -15,6 +15,27 @@ export type SubmitPracticeTestResult =
 	| { ok: true; redirectTo: string }
 	| { ok: false; message: string };
 
+/**
+ * After `practice_start_grading` returned no row (idempotent/double submit), route by real `tests.status`
+ * so we do not send students to the reports list while the attempt is still `grading`.
+ */
+export function redirectPathForExistingTestSubmission(
+	testId: string,
+	subjectId: string | undefined,
+	status: string | undefined,
+): string {
+	if (status === "grading" || status === "grading_failed") {
+		return `/student/practice/${testId}/grading`;
+	}
+	if (status === "graded" && subjectId) {
+		return `/student/reports?subject=${encodeURIComponent(subjectId)}&test=${encodeURIComponent(testId)}`;
+	}
+	if (subjectId) {
+		return `/student/reports?subject=${encodeURIComponent(subjectId)}`;
+	}
+	return "/student/reports";
+}
+
 function friendlyDbError(context: "save" | "submit"): string {
 	return context === "save" ?
 			"We couldn’t save your answer. Wait a moment and try again, or refresh the page if this keeps happening."
@@ -107,6 +128,30 @@ async function startPracticeGrading(
 	return { ok: true, row: rows[0]! };
 }
 
+/** After status is already `grading`, avoid leaving the row stuck if we cannot finish the pipeline. */
+async function failGradingInProgress(
+	supabase: ServerSupabase,
+	userId: string,
+	testId: string,
+	diagnostic: string,
+): Promise<SubmitPracticeTestResult> {
+	const { error } = await supabase
+		.from("tests")
+		.update({
+			status: "grading_failed",
+			is_draft: false,
+			updated_at: new Date().toISOString(),
+		})
+		.eq("id", testId)
+		.eq("student_id", userId);
+	if (error) {
+		logSupabaseError("failGradingInProgress.tests.update", error, { testId });
+		return { ok: false, message: friendlyDbError("submit") };
+	}
+	await recordGradingFailure(supabase, userId, testId, diagnostic);
+	return { ok: true, redirectTo: `/student/practice/${testId}/grading` };
+}
+
 /**
  * Marks the test as grading, performs fast MCQ scoring for the fallback path,
  * runs the AI grader, and finalizes the test status. Phase 1 keeps grading
@@ -121,16 +166,19 @@ export async function executePracticeTestSubmit(
 	const gate = await startPracticeGrading(supabase, testId, elapsedSeconds);
 	if (!gate.ok) {
 		if (gate.alreadySubmitted) {
-			// Best-effort: still route the student to their report if the test exists.
 			const { data: existing } = await supabase
 				.from("tests")
-				.select("subject_id")
+				.select("subject_id, status")
 				.eq("id", testId)
 				.maybeSingle();
-			const subjectId = existing?.subject_id as string | undefined;
-			if (subjectId) {
-				return { ok: true, redirectTo: `/student/reports?subject=${encodeURIComponent(subjectId)}` };
-			}
+			return {
+				ok: true,
+				redirectTo: redirectPathForExistingTestSubmission(
+					testId,
+					existing?.subject_id as string | undefined,
+					existing?.status as string | undefined,
+				),
+			};
 		}
 		return { ok: false, message: gate.message };
 	}
@@ -148,7 +196,12 @@ export async function executePracticeTestSubmit(
 		.order("question_number", { ascending: true });
 
 	if (qErr || !questions?.length) {
-		return { ok: false, message: "Could not load questions for grading." };
+		return failGradingInProgress(
+			supabase,
+			userId,
+			testId,
+			qErr ? "Could not load questions for grading." : "No questions found for this test.",
+		);
 	}
 
 	const { data: existingAnswers, error: aErr } = await supabase
@@ -157,7 +210,7 @@ export async function executePracticeTestSubmit(
 		.eq("test_id", testId);
 
 	if (aErr) {
-		return { ok: false, message: "Could not load your answers." };
+		return failGradingInProgress(supabase, userId, testId, "Could not load your answers.");
 	}
 
 	const answerByQ = new Map(
@@ -215,13 +268,13 @@ export async function executePracticeTestSubmit(
 				testId,
 				questionId: q.id as string,
 			});
-			return { ok: false, message: friendlyDbError("save") };
+			return failGradingInProgress(supabase, userId, testId, "Could not save scored answers before AI grading.");
 		}
 	}
 
 	const mcqOnlyTotalScoreStr = mcqTotal > 0 ? ((100 * mcqCorrect) / mcqTotal).toFixed(2) : null;
 
-	const aiResult = await gradePracticeTestWithAi(supabase, userId, testId, clampedElapsed);
+	const aiResult = await gradePracticeTestWithAi(userId, testId, clampedElapsed);
 	if (!aiResult.ok) {
 		const { error: testErr } = await supabase
 			.from("tests")
@@ -241,6 +294,9 @@ export async function executePracticeTestSubmit(
 		}
 
 		await recordGradingFailure(supabase, userId, testId, aiResult.message);
+		// Do not send the student to reports: this test is not `graded` yet. Same
+		// handoff as the async worker path — grading UI with retry.
+		return { ok: true, redirectTo: `/student/practice/${testId}/grading` };
 	}
 
 	const subjectId = gate.row.subject_id;

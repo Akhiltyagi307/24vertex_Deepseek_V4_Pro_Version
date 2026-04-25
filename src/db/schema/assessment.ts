@@ -122,6 +122,8 @@ export const studentAnswers = pgTable(
 		isCorrect: boolean("is_correct"),
 		scoreEarned: decimal("score_earned", { precision: 5, scale: 2 }),
 		aiFeedback: text("ai_feedback"),
+		aiUserAnswerSummary: text("ai_user_answer_summary"),
+		aiReferenceAnswerSummary: text("ai_reference_answer_summary"),
 		timeSpentSeconds: integer("time_spent_seconds"),
 		timeSpentMs: bigint("time_spent_ms", { mode: "number" }).default(0),
 		visits: integer("visits").default(0),

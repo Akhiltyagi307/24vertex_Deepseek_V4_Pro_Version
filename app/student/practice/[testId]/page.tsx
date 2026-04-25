@@ -57,7 +57,17 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 	if (test.student_id !== user.id) {
 		notFound();
 	}
-	if (test.status !== "in_progress") {
+
+	const st = test.status;
+	if (st === "grading" || st === "grading_failed") {
+		redirect(`/student/practice/${testId}/grading`);
+	}
+	if (st === "graded") {
+		redirect(
+			`/student/reports?subject=${encodeURIComponent(test.subject_id as string)}&test=${encodeURIComponent(testId)}`,
+		);
+	}
+	if (st !== "in_progress") {
 		redirect(`/student/reports?subject=${encodeURIComponent(test.subject_id as string)}`);
 	}
 

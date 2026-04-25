@@ -28,6 +28,7 @@ export function buildPracticeSystemPrompt(context: {
 Your task: generate a single practice test as strict JSON matching the contract below.
 
 Rules:
+- Use \`topic_grounding\` (content_chunks and exercise_chunks per topic) as the primary factual basis for scope and terminology; do not invent curriculum outside those chunks except where needed for coherent, well-formed questions.
 - Generate exactly ${estimated_question_count} questions — this count MUST be respected.
 - ${typeCountsLine}
 - Output questions grouped under the matching questions_by_type bucket. Do not move a question into the wrong bucket and do not invent extra buckets.

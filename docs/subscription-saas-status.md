@@ -26,11 +26,11 @@ This document tracks what is implemented for Razorpay-based subscriptions, usage
 
 ### Razorpay integration
 
-- **Server wrapper:** `src/lib/billing/razorpay.ts` (customer, subscription create/cancel/update, plan create helper, webhook HMAC verification).
+- **Server wrapper:** `src/lib/billing/razorpay.ts` (customer, subscription create/cancel/update, plan create helper, `invoices.fetch` for hosted invoice URLs, webhook HMAC verification).
 - **API routes:**
   - `POST /api/billing/create-subscription` — `planCode`, `startMode` (`immediate` | `after_trial` for hybrid trial),
   - `POST /api/billing/cancel` — cancel at period end,
-  - `POST /api/billing/webhook` — verified webhooks, idempotent event log, subscription/usage/payment updates, Resend emails on key events.
+  - `POST /api/billing/webhook` — verified webhooks, idempotent event log, subscription/usage/payment updates, payment receipt + subscription-active + payment-failed emails via Resend.
 - **Client checkout:** `src/components/student/subscription/razorpay-checkout.tsx` — loads Razorpay Checkout.js, opens subscription checkout, falls back to hosted `short_url` if needed.
 - **Script:** `pnpm razorpay:seed-plans` — creates Razorpay plans and prints SQL to paste into `public.plans.razorpay_plan_id`.
 
@@ -49,7 +49,7 @@ This document tracks what is implemented for Razorpay-based subscriptions, usage
 ### Email and cron
 
 - **Resend helpers:** `src/lib/email/subscription-notifications.ts` (trial ending, subscription active, payment failed, usage near limit).
-- **Webhook:** Sends subscription-active and payment-failed where applicable.
+- **Webhook:** Sends subscription-active, **payment receipt** (amount + hosted invoice link when resolved), and payment-failed where applicable. `payments.invoice_short_url` is set from webhook payloads or `invoices.fetch` when needed; `invoice.paid` backstops invoice id / URL without a second receipt email (avoids duplicates with `subscription.charged`). Webhook dedupe uses Razorpay’s top-level event `id` when present.
 - **Internal cron route:** `GET` / `POST` `app/api/internal/billing/trial-emails/route.ts` — trial reminder emails (deduped via `subscriptions.metadata.trial_emails_sent`), protected by `assertCronRequestAuthorized` → `CRON_SECRET`.
 
 ### Analytics and observability
@@ -80,7 +80,7 @@ This document tracks what is implemented for Razorpay-based subscriptions, usage
    - Set `SAAS_ENFORCEMENT=true` when you are ready to **enforce** limits in production (after smoke-testing).
 
 3. **Legal / compliance (Razorpay and trust)**
-   - Subscription page links to `/legal/refund` and `/legal/terms` — **those routes are not present in the repo yet** (0 matches under `app/legal` at time of writing). Add real pages or change links to your hosted policy URLs.
+   - **Placeholder routes:** `app/legal/refund/page.tsx` and `app/legal/terms/page.tsx` — replace copy with counsel-reviewed policies before scaling.
 
 ### Recommended hardening and product follow-ups
 
@@ -97,10 +97,10 @@ This document tracks what is implemented for Razorpay-based subscriptions, usage
    Only SQL + PDR runbooks; optional `/admin/coupons` for non-developers to mint codes.
 
 8. **Razorpay hosted invoice URL**  
-   Webhook / payment payload should fill `invoice_short_url` in `payments` when Razorpay provides it so the history table always has a “View” link (verify field names in live webhook payload).
+   Implemented: `subscription.charged` and `invoice.paid` populate `invoice_short_url` (payload or Invoices API). Smoke-test with **live** webhooks to confirm field shapes match your account.
 
 9. **Idempotency key for webhooks**  
-   Current synthetic `eventId` in the webhook is a best-effort dedupe. If you see duplicate processing, consider persisting Razorpay’s own event `id` from the JSON body when available.
+   Implemented: prefer Razorpay’s event `id` when the payload includes it; synthetic id remains as fallback.
 
 10. **Staging vs production**  
     Use separate Razorpay apps or test vs live keys and separate `CRON_SECRET` per Vercel environment.

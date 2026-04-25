@@ -17,7 +17,11 @@ import {
 } from "@/lib/practice/grading-schema";
 import { pLimit, withPracticeAiAttempts } from "@/lib/practice/ai-retry";
 import { buildTopicRollups, type TopicRollupRow } from "@/lib/practice/topic-rollup";
-import { writeStudentAnswerRow } from "@/lib/practice/student-answer-write";
+import {
+	formatScoreEarnedForDb,
+	isPostgrestMissingColumnError,
+	writeStudentAnswerRow,
+} from "@/lib/practice/student-answer-write";
 import { PracticeGradingPdfDocument } from "@/lib/student/practice-grading-pdf-document";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -127,22 +131,42 @@ async function runSummaryObject(stats: {
 /**
  * Loads the submitted practice test, runs full-test AI grading, persists rows, updates trackers,
  * renders PDF, uploads to storage, and sets tests.status = graded.
+ *
+ * Always uses the service-role client for reads and writes: the grader must read `answer_key` and
+ * other tables regardless of the caller’s JWT, and a failed run may leave a `test_reports` failure
+ * row that a retry must **upsert** over (insert-only would hit unique on `test_id`).
+ *
+ * Optional `workerContext.jobId` is attached to server logs when invoked from the background worker.
  */
 export async function gradePracticeTestWithAi(
-	supabase: ServerSupabase,
 	userId: string,
 	testId: string,
 	elapsedSeconds: number,
+	workerContext?: { jobId?: string },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+	const supabase = createServiceRoleClient();
+	const logFail = (reason: string, message: string) => {
+		logServerError(`gradePracticeTestWithAi.${reason}`, new Error(message), {
+			testId,
+			jobId: workerContext?.jobId,
+		});
+	};
+
 	const { data: testRow, error: testErr } = await supabase
 		.from("tests")
 		.select(
 			"id, student_id, subject_id, difficulty, time_limit_seconds, test_date, created_at, total_questions",
 		)
 		.eq("id", testId)
+		.eq("student_id", userId)
 		.maybeSingle();
 
-	if (testErr || !testRow || testRow.student_id !== userId) {
+	if (testErr || !testRow) {
+		if (testErr) {
+			logSupabaseError("gradePracticeTestWithAi.tests.select", testErr, { testId });
+		} else {
+			logFail("testRowMissing", "Could not load test.");
+		}
 		return { ok: false, message: "Could not load test." };
 	}
 
@@ -153,10 +177,7 @@ export async function gradePracticeTestWithAi(
 	const subjectLower = subjectName.toLowerCase();
 	const requireMathSteps = subjectLower.includes("math");
 
-	// answer_key is blocked from the authenticated role by column-level grant;
-	// use the service-role client for the grading read path.
-	const admin = createServiceRoleClient();
-	const { data: questions, error: qErr } = await admin
+	const { data: questions, error: qErr } = await supabase
 		.from("questions")
 		.select(
 			"id, topic_id, question_text, question_type, answer_key, options, question_number, difficulty_level",
@@ -165,14 +186,21 @@ export async function gradePracticeTestWithAi(
 		.order("question_number", { ascending: true });
 
 	if (qErr || !questions?.length) {
+		if (qErr) {
+			logSupabaseError("gradePracticeTestWithAi.questions.select", qErr, { testId });
+		} else {
+			logFail("questionsEmpty", "Could not load questions.");
+		}
 		return { ok: false, message: "Could not load questions." };
 	}
 
-	const topicIds = [...new Set(questions.map((q) => q.topic_id as string))];
-	const { data: topicRows } = await supabase
-		.from("topics")
-		.select("id, topic_name, subject_id")
-		.in("id", topicIds);
+	const topicIds = [
+		...new Set(questions.map((q) => q.topic_id as string | null).filter((id): id is string => Boolean(id))),
+	];
+	const { data: topicRows } =
+		topicIds.length > 0
+			? await supabase.from("topics").select("id, topic_name, subject_id").in("id", topicIds)
+			: { data: [] as { id: string; topic_name: string; subject_id: string }[] };
 
 	const topicNameById = new Map((topicRows ?? []).map((t) => [t.id as string, String(t.topic_name)]));
 
@@ -182,6 +210,7 @@ export async function gradePracticeTestWithAi(
 		.eq("test_id", testId);
 
 	if (aErr) {
+		logSupabaseError("gradePracticeTestWithAi.student_answers.select", aErr, { testId });
 		return { ok: false, message: "Could not load answers." };
 	}
 
@@ -229,14 +258,17 @@ export async function gradePracticeTestWithAi(
 	const seen = new Set<string>();
 	for (const g of merged) {
 		if (!expectedIds.has(g.question_id)) {
+			logFail("validationUnknownQ", "AI returned an unknown question id.");
 			return { ok: false, message: "AI returned an unknown question id." };
 		}
 		if (seen.has(g.question_id)) {
+			logFail("validationDuplicateQ", "Duplicate question in AI output.");
 			return { ok: false, message: "Duplicate question in AI output." };
 		}
 		seen.add(g.question_id);
 	}
 	if (seen.size !== expectedIds.size) {
+		logFail("validationIncompleteQ", "AI did not return every question.");
 		return { ok: false, message: "AI did not return every question." };
 	}
 
@@ -290,6 +322,7 @@ export async function gradePracticeTestWithAi(
 		});
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "Summary generation failed.";
+		logServerError("gradePracticeTestWithAi.runSummaryObject", e, { testId, jobId: workerContext?.jobId });
 		return { ok: false, message: msg };
 	}
 
@@ -306,8 +339,10 @@ export async function gradePracticeTestWithAi(
 			question_id: g.question_id,
 			student_answer: studentAnswer,
 			is_correct: verdictToIsCorrect(g.verdict),
-			score_earned: g.score.toFixed(2),
+			score_earned: formatScoreEarnedForDb(g.score),
 			ai_feedback: buildAiFeedback(g),
+			ai_user_answer_summary: g.user_answer_summary?.trim() || null,
+			ai_reference_answer_summary: g.reference_answer_summary?.trim() || null,
 			updated_at: nowIso,
 		});
 
@@ -316,6 +351,7 @@ export async function gradePracticeTestWithAi(
 				testId,
 				questionId: g.question_id,
 			});
+			logFail("studentAnswersSave", "Could not save graded answers.");
 			return { ok: false, message: "Could not save graded answers." };
 		}
 	}
@@ -332,22 +368,26 @@ export async function gradePracticeTestWithAi(
 		summary: summary,
 	};
 
-	const { error: repErr } = await supabase.from("test_reports").insert({
-		test_id: testId,
-		student_id: userId,
-		summary_report: summaryReportPayload,
-		strengths: summary.strengths,
-		improvement_areas: summary.improvement_areas,
-		ai_insights: summary.ai_insights,
-		topic_performance: topicPerformancePayload,
-		recommendations: summary.recommendations,
-		pdf_storage_path: null,
-		grading_failed_at: null,
-		grading_error: null,
-	});
+	const { error: repErr } = await supabase.from("test_reports").upsert(
+		{
+			test_id: testId,
+			student_id: userId,
+			summary_report: summaryReportPayload,
+			strengths: summary.strengths,
+			improvement_areas: summary.improvement_areas,
+			ai_insights: summary.ai_insights,
+			topic_performance: topicPerformancePayload,
+			recommendations: summary.recommendations,
+			pdf_storage_path: null,
+			grading_failed_at: null,
+			grading_error: null,
+		},
+		{ onConflict: "test_id" },
+	);
 
 	if (repErr) {
-		logSupabaseError("gradePracticeTestWithAi.test_reports.insert", repErr, { testId });
+		logSupabaseError("gradePracticeTestWithAi.test_reports.upsert", repErr, { testId });
+		logFail("testReportsSave", "Could not save report.");
 		return { ok: false, message: "Could not save report." };
 	}
 
@@ -371,13 +411,16 @@ export async function gradePracticeTestWithAi(
 		}
 	}
 
-	const totalScoreStr = overallPercent.toFixed(2);
+	const totalScoreStr = formatScoreEarnedForDb(overallPercent);
 
 	const { error: testUpErr } = await supabase
 		.from("tests")
 		.update({
 			status: "graded",
 			is_draft: false,
+			// PDR: reports and `practice_update_tracker_running` use this as the
+			// test’s place in time; set at completion, not only at row creation.
+			test_date: nowIso,
 			duration_seconds: elapsedSeconds,
 			correct_answers: nCorrect,
 			total_score: totalScoreStr,
@@ -388,6 +431,8 @@ export async function gradePracticeTestWithAi(
 		.eq("student_id", userId);
 
 	if (testUpErr) {
+		logSupabaseError("gradePracticeTestWithAi.tests.update", testUpErr, { testId });
+		logFail("testsFinalize", "Could not finalize test.");
 		return { ok: false, message: "Could not finalize test." };
 	}
 
@@ -423,7 +468,7 @@ export async function renderAndUploadPracticeReportPdf(
 
 	const { data: report, error: repErr } = await admin
 		.from("test_reports")
-		.select("summary_report")
+		.select("summary_report, topic_performance")
 		.eq("test_id", testId)
 		.maybeSingle();
 	if (repErr || !report?.summary_report) {
@@ -438,19 +483,48 @@ export async function renderAndUploadPracticeReportPdf(
 		return { ok: false, message: "Report is missing summary data." };
 	}
 
+	const { data: profileRow } = await admin
+		.from("profiles")
+		.select("full_name")
+		.eq("id", userId)
+		.maybeSingle();
+	const studentDisplayName = String(profileRow?.full_name ?? "").trim() || null;
+
 	const { data: questionRows, error: qErr } = await admin
 		.from("questions")
-		.select("id, topic_id, question_text, question_type, question_number")
+		.select("id, topic_id, question_text, question_type, question_number, difficulty_level")
 		.eq("test_id", testId)
 		.order("question_number", { ascending: true });
 	if (qErr || !questionRows?.length) {
 		return { ok: false, message: "Could not load questions." };
 	}
 
-	const { data: answerRows, error: aErr } = await admin
+	const answerSelectFull =
+		"question_id, score_earned, is_correct, ai_feedback, student_answer, ai_user_answer_summary, ai_reference_answer_summary";
+	const answerSelectBase =
+		"question_id, score_earned, is_correct, ai_feedback, student_answer";
+
+	type PdfAnswerRow = {
+		question_id: string;
+		score_earned: unknown;
+		is_correct: unknown;
+		ai_feedback: unknown;
+		student_answer: unknown;
+		ai_user_answer_summary?: unknown;
+		ai_reference_answer_summary?: unknown;
+	};
+
+	const res1 = await admin
 		.from("student_answers")
-		.select("question_id, score_earned, is_correct, ai_feedback")
+		.select(answerSelectFull)
 		.eq("test_id", testId);
+	let answerRows = res1.data as PdfAnswerRow[] | null;
+	let aErr = res1.error;
+	if (aErr && isPostgrestMissingColumnError(aErr)) {
+		const res2 = await admin.from("student_answers").select(answerSelectBase).eq("test_id", testId);
+		answerRows = res2.data as PdfAnswerRow[] | null;
+		aErr = res2.error;
+	}
 	if (aErr) {
 		return { ok: false, message: "Could not load answers." };
 	}
@@ -458,12 +532,50 @@ export async function renderAndUploadPracticeReportPdf(
 	const topicIds = [...new Set(questionRows.map((q) => q.topic_id as string))];
 	const { data: topicRows } = await admin
 		.from("topics")
-		.select("id, topic_name")
+		.select("id, topic_name, chapter_name, unit_name, grade")
 		.in("id", topicIds);
 	const topicNameById = new Map((topicRows ?? []).map((t) => [t.id as string, String(t.topic_name)]));
-	const topicNamesForCover = [
-		...new Set(questionRows.map((q) => topicNameById.get(q.topic_id as string) ?? "Topic")),
-	];
+	const chapterNameById = new Map(
+		(topicRows ?? []).map((t) => [t.id as string, String(t.chapter_name ?? "").trim() || "—"]),
+	);
+	const unitNameById = new Map(
+		(topicRows ?? []).map((t) => [t.id as string, String(t.unit_name ?? "").trim() || ""]),
+	);
+	const topicGradeById = new Map(
+		(topicRows ?? []).map((t) => {
+			const g = t.grade;
+			return [t.id as string, typeof g === "number" ? g : null] as const;
+		}),
+	);
+
+	type TopicPerf = { topic_id: string; topic_name: string; average_score: number; status: string };
+	const perfTopics =
+		(report.topic_performance as { topics?: TopicPerf[] } | null)?.topics?.length ?
+			((report.topic_performance as { topics: TopicPerf[] }).topics)
+		:	[];
+
+	const perfByTopicId = new Map(perfTopics.map((t) => [t.topic_id, t] as const));
+
+	const topicIdOrder: string[] = [];
+	const seenTopic = new Set<string>();
+	for (const q of questionRows) {
+		const tid = q.topic_id as string;
+		if (!seenTopic.has(tid)) {
+			seenTopic.add(tid);
+			topicIdOrder.push(tid);
+		}
+	}
+	const topicCoverageRows = topicIdOrder.map((tid) => {
+		const p = perfByTopicId.get(tid);
+		return {
+			chapterName: chapterNameById.get(tid) ?? "—",
+			topicName: topicNameById.get(tid) ?? "Topic",
+			unitName: unitNameById.get(tid) || null,
+			grade: topicGradeById.get(tid) ?? null,
+			averageScore: p != null ? p.average_score : null,
+			statusLabel: p != null ? p.status : "—",
+		};
+	});
 
 	const answerByQ = new Map(
 		(answerRows ?? []).map((r) => [r.question_id as string, r]),
@@ -472,26 +584,34 @@ export async function renderAndUploadPracticeReportPdf(
 	const pdfQuestions = questionRows.map((q) => {
 		const a = answerByQ.get(q.id as string);
 		const scoreStr = (a?.score_earned as string | null) ?? "0";
-		const scoreNum = Number.parseFloat(scoreStr);
+		const scoreNum = Number.parseFloat(String(scoreStr));
 		const verdict: GradedQuestionItem["verdict"] =
 			a?.is_correct === true ? "correct"
 			: scoreNum > 0 && scoreNum < 100 ? "partially_correct"
 			: "incorrect";
 		const aiText = (a?.ai_feedback as string | null) ?? "";
 		const [analysis, stepsMarker] = aiText.split("\n\nStep-by-step:\n");
+		const userSummary = a?.ai_user_answer_summary as string | null | undefined;
+		const refSummary = a?.ai_reference_answer_summary as string | null | undefined;
+		const rawAnswer = a?.student_answer ?? null;
 		return {
 			question_id: q.id as string,
 			topic_id: q.topic_id as string,
 			topic_name: topicNameById.get(q.topic_id as string) ?? "Topic",
+			chapter_name: chapterNameById.get(q.topic_id as string) ?? "—",
+			unit_name: unitNameById.get(q.topic_id as string) || null,
+			grade: topicGradeById.get(q.topic_id as string) ?? null,
 			verdict,
 			score: Number.isFinite(scoreNum) ? scoreNum : 0,
-			analysis: analysis ?? aiText,
-			step_by_step_solution: stepsMarker ?? undefined,
-			user_answer_summary: "",
-			reference_answer_summary: "",
+			analysis: (analysis ?? aiText).trim(),
+			step_by_step_solution: stepsMarker?.trim() ? stepsMarker.trim() : undefined,
+			user_answer_summary: (userSummary ?? "").trim(),
+			reference_answer_summary: (refSummary ?? "").trim(),
+			student_answer_display: stringifyStudentAnswer(rawAnswer),
 			question_number: q.question_number as number,
 			question_text: q.question_text as string,
 			question_type: q.question_type as string,
+			question_difficulty: (q.difficulty_level as string | null | undefined) ?? null,
 		};
 	});
 
@@ -503,15 +623,16 @@ export async function renderAndUploadPracticeReportPdf(
 		const buffer = await renderToBuffer(
 			<PracticeGradingPdfDocument
 				subjectName={subjectName}
+				studentDisplayName={studentDisplayName}
 				difficulty={(testRow.difficulty as string | null) ?? null}
 				timeLimitSeconds={testRow.time_limit_seconds as number | null}
 				durationSeconds={(testRow.duration_seconds as number | null) ?? null}
 				testDateIso={testRow.test_date as string | null}
 				createdAtIso={testRow.created_at as string | null}
-				topicNames={topicNamesForCover}
+				topicCoverageRows={topicCoverageRows}
 				totalQuestions={questionRows.length}
 				overallScorePercent={overallPercent}
-				overallSummary={summary.overall_summary}
+				summary={summary}
 				questions={pdfQuestions}
 			/>,
 		);
@@ -546,24 +667,36 @@ export async function recordGradingFailure(
 	testId: string,
 	message: string,
 ): Promise<void> {
-	const { data: existing } = await supabase.from("test_reports").select("id").eq("test_id", testId).maybeSingle();
-	if (existing) return;
-
 	const nowIso = new Date().toISOString();
-	const { error } = await supabase.from("test_reports").insert({
-		test_id: testId,
-		student_id: userId,
-		summary_report: { grading_failed: true, message, at: nowIso },
-		strengths: null,
-		improvement_areas: null,
-		ai_insights: null,
-		topic_performance: null,
-		recommendations: null,
-		pdf_storage_path: null,
+	const failureRow = {
+		summary_report: { grading_failed: true, message, at: nowIso } as const,
+		strengths: null as null,
+		improvement_areas: null as null,
+		ai_insights: null as null,
+		topic_performance: null as null,
+		recommendations: null as null,
 		grading_failed_at: nowIso,
 		grading_error: message.slice(0, 2000),
-	});
+	};
+
+	const { data: existing } = await supabase.from("test_reports").select("id").eq("test_id", testId).maybeSingle();
+	const { error } = existing
+		? await supabase
+				.from("test_reports")
+				.update(failureRow)
+				.eq("test_id", testId)
+				.eq("student_id", userId)
+		: await supabase.from("test_reports").insert({
+				test_id: testId,
+				student_id: userId,
+				...failureRow,
+				pdf_storage_path: null,
+			});
 	if (error) {
-		logSupabaseError("recordGradingFailure.test_reports.insert", error, { testId });
+		logSupabaseError(
+			existing ? "recordGradingFailure.test_reports.update" : "recordGradingFailure.test_reports.insert",
+			error,
+			{ testId },
+		);
 	}
 }

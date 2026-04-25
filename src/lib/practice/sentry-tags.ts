@@ -29,3 +29,27 @@ export async function withPracticeSpan<T>(
 		return fn();
 	}
 }
+
+/** Marks a failed Supabase read of `topic_context_chunks` (graceful no-op if Sentry is unavailable). */
+export async function tagTopicContextFetchFailed(): Promise<void> {
+	try {
+		const Sentry = await import("@sentry/nextjs");
+		Sentry.addBreadcrumb({
+			category: "practice",
+			message: "topic_context_chunks query failed",
+			level: "error",
+		});
+		Sentry.getCurrentScope().setTag("practice.topic_context_fetch_failed", "true");
+	} catch {
+		// Sentry not loaded
+	}
+}
+
+export async function tagTopicContextTruncated(): Promise<void> {
+	try {
+		const Sentry = await import("@sentry/nextjs");
+		Sentry.getCurrentScope().setTag("topic_context_truncated", "true");
+	} catch {
+		// Sentry not loaded
+	}
+}

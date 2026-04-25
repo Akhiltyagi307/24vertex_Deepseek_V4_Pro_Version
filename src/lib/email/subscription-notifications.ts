@@ -49,6 +49,44 @@ export async function sendTrialEndingEmail(params: TrialEndingParams): Promise<{
 	}
 }
 
+export type PaymentReceiptParams = CommonParams & {
+	amountLabel: string;
+	planName?: string;
+	invoiceShortUrl?: string | null;
+	paymentRef?: string | null;
+};
+
+/** Sent after a successful charge (webhook). Includes hosted invoice link when available. */
+export async function sendPaymentReceiptEmail(params: PaymentReceiptParams): Promise<{ error: string | null }> {
+	try {
+		const resend = new Resend(getResendApiKey());
+		const subject = "Payment received — EduAI";
+		const planLine = params.planName
+			? `Plan: <strong>${escapeHtml(params.planName)}</strong>.`
+			: "Thank you for your payment.";
+		const refLine = params.paymentRef
+			? `Reference: <code style="font-size:13px;">${escapeHtml(params.paymentRef)}</code>`
+			: null;
+		const bodyLines = [
+			`Hi ${escapeHtml(params.studentName ?? "there")},`,
+			`We received <strong>${escapeHtml(params.amountLabel)}</strong> for your EduAI subscription.`,
+			planLine,
+			...(refLine ? [refLine] : []),
+			params.invoiceShortUrl
+				? "Your Razorpay invoice is available at the link below."
+				: "You can review payment history anytime in your subscription settings.",
+		];
+		const primaryCta = params.invoiceShortUrl
+			? { label: "View invoice", href: params.invoiceShortUrl }
+			: { label: "Payment history", href: `${getAppUrl()}/student/subscription` };
+		const html = wrapHtml(subject, bodyLines, primaryCta);
+		const { error } = await resend.emails.send({ from: getResendFrom(), to: params.to, subject, html });
+		return { error: error?.message ?? null };
+	} catch (e) {
+		return { error: e instanceof Error ? e.message : String(e) };
+	}
+}
+
 export type SubscriptionActiveParams = CommonParams & { planName: string; nextRenewalIso: string };
 export async function sendSubscriptionActiveEmail(params: SubscriptionActiveParams): Promise<{ error: string | null }> {
 	try {

@@ -22,10 +22,28 @@ export type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
 export {
 	buildPracticeUserMessage,
 	stringifyPracticeUserMessage,
+	stringifyPracticeUserMessageForModel,
+	toPracticeUserMessageForModel,
 	type PracticeCoverageMode,
+	type PracticeGroundingMeta,
+	type PracticeGroundingMetaForModel,
 	type PracticeRecentError,
+	type PracticeTopicChunkLine,
+	type PracticeTopicGrounding,
+	type PracticeUserMessageForModel,
 	type PracticeUserMessagePayload,
+	type PreFetchedTopicContext,
 } from "./user-message";
+export {
+	applyTopicContextLimits,
+	fetchTopicContextChunksByTopicIds,
+	getTopicContextLimitsFromEnv,
+	logPracticeTopicContextStats,
+	sortRawChunksByTopicThenCreated,
+	TOPIC_CONTEXT_DEFAULT_LIMITS,
+	type RawTopicChunkRow,
+	type TopicContextLimits,
+} from "./topic-context-chunks";
 export {
 	createPracticeGenerationOutputSchema,
 	flattenPracticeGenerationOutput,

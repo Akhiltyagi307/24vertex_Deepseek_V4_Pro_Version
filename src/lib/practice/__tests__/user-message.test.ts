@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPracticeUserMessage, stringifyPracticeUserMessage } from "../user-message";
+import {
+	buildPracticeUserMessage,
+	stringifyPracticeUserMessage,
+	stringifyPracticeUserMessageForModel,
+	toPracticeUserMessageForModel,
+} from "../user-message";
 
 const TOPICS = [
 	{
@@ -58,6 +63,22 @@ describe("buildPracticeUserMessage", () => {
 		});
 		expect(msg.test_parameters.note).toContain("questions_by_type");
 		expect(msg.topics.length).toBe(2);
+		expect(msg.schema_version).toBe(3);
+		expect(msg.topic_grounding).toHaveLength(2);
+		expect(msg.topic_grounding[0]!.content_chunks).toEqual([]);
+		expect(msg.test_parameters.estimated_question_count).toBe(15);
+		expect(msg.test_parameters.generation_instruction.length).toBeGreaterThan(20);
+		expect(msg.grounding_meta.topic_count).toBe(2);
+		expect(msg.topics[0]).toEqual({
+			topic_id: TOPICS[0]!.topicId,
+			performance: {
+				status: TOPICS[0]!.status,
+				average_score_percent: TOPICS[0]!.averageScore,
+				tests_taken: TOPICS[0]!.testsTaken,
+				trend: TOPICS[0]!.trend,
+				last_test_date: TOPICS[0]!.lastTestDate,
+			},
+		});
 	});
 
 	it("picks the correct coverage mode", () => {
@@ -110,6 +131,32 @@ describe("buildPracticeUserMessage", () => {
 		});
 		const json = stringifyPracticeUserMessage(msg);
 		expect(json).toContain("\"intent\": \"generate_practice_test\"");
-		expect(json).toContain("\"schema_version\": 1");
+		expect(json).toContain("\"schema_version\": 3");
+	});
+
+	it("strips fetch_error from model-facing JSON", () => {
+		const msg = buildPracticeUserMessage({
+			studentGrade: 9,
+			subject: { id: "x", name: "S" },
+			difficulty: "medium",
+			timeLimitSeconds: 3600,
+			topics: TOPICS,
+			preFetchedTopicContext: {
+				byTopic: new Map(),
+				meta: {
+					topic_count: 2,
+					context_chunk_count: 0,
+					exercise_chunk_count: 0,
+					context_char_total: 0,
+					exercise_char_total: 0,
+					truncated: false,
+					fetch_error: "query_failed",
+				},
+			},
+		});
+		const forModel = toPracticeUserMessageForModel(msg);
+		expect("fetch_error" in forModel.grounding_meta).toBe(false);
+		const json = stringifyPracticeUserMessageForModel(msg);
+		expect(json).not.toContain("fetch_error");
 	});
 });

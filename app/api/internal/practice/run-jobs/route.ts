@@ -79,8 +79,12 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 				? testRow.time_limit_seconds
 				: 0;
 
-	const result = await gradePracticeTestWithAi(admin, job.student_id, job.test_id, elapsed);
+	const result = await gradePracticeTestWithAi(job.student_id, job.test_id, elapsed, { jobId: job.id });
 	if (!result.ok) {
+		logServerError("handleGradeJob.gradePracticeTestWithAi", new Error(result.message), {
+			testId: job.test_id,
+			jobId: job.id,
+		});
 		await admin
 			.from("tests")
 			.update({ status: "grading_failed", updated_at: new Date().toISOString() })
@@ -116,7 +120,11 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 		});
 		const pdfResult = await renderAndUploadPracticeReportPdf(job.test_id);
 		if (!pdfResult.ok) {
-			return { ok: false, message: pdfResult.message };
+			logServerError("handleGradeJob.renderAndUploadPracticeReportPdf", new Error(pdfResult.message), {
+				testId: job.test_id,
+			});
+			// Test is already `graded` at this point; do not mark the grade job failed so a stuck row
+			// will not block the queue or confuse diagnostics.
 		}
 	}
 
@@ -137,6 +145,16 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 	const workerId = `vercel-${process.env.VERCEL_REGION ?? "local"}-${crypto.randomUUID().slice(0, 8)}`;
 
 	const admin = createServiceRoleClient();
+
+	// `practice_claim_jobs` only picks `pending`. Workloads that die mid-run leave rows stuck in
+	// `running` forever; reclaim them so grading can complete after deploys or timeouts.
+	const { data: reclaimed, error: reclaimErr } = await admin.rpc("practice_reclaim_stale_running_jobs");
+	if (reclaimErr) {
+		logSupabaseError("runPracticeJobs.practice_reclaim_stale_running_jobs", reclaimErr, { workerId });
+	} else if (typeof reclaimed === "number" && reclaimed > 0) {
+		console.log(`[runPracticeJobs] requeued ${reclaimed} stale running practice job(s)`);
+	}
+
 	const { data: jobs, error } = await admin.rpc("practice_claim_jobs", {
 		p_worker_id: workerId,
 		p_job_types: ["grade", "pdf"],

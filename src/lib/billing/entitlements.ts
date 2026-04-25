@@ -8,6 +8,7 @@ import { isSaasEnforcementEnabled } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { PLAN_CATALOG, type PlanCode, tokenQuotaForGrade } from "@/lib/billing/plans";
+import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
 
 export type SubscriptionStatus =
 	| "trialing"
@@ -110,9 +111,7 @@ function isMissingEntitlementSnapshotRpc(error: {
 }
 
 function daysUntil(iso: string | null): number | null {
-	if (!iso) return null;
-	const ms = new Date(iso).getTime() - Date.now();
-	return Math.max(0, Math.ceil(ms / 86_400_000));
+	return trialDaysLeftFromEnd(iso);
 }
 
 function deriveReason(args: {
@@ -131,6 +130,7 @@ function deriveReason(args: {
 	if (args.status === "past_due") {
 		return { reason: "past_due", canStartTest: false, canChatDoubt: false };
 	}
+	// `grace`: payment retry window — keep access while quotas last; banner warns via `status === "grace"`.
 	if (args.status === "trialing" && args.trialEndsAt && new Date(args.trialEndsAt).getTime() <= now) {
 		return { reason: "trial_expired", canStartTest: false, canChatDoubt: false };
 	}

@@ -36,8 +36,39 @@ export type PracticeRecentError = {
 	last_seen_at: string | null;
 };
 
+export type PracticeTopicChunkLine = { text: string; source_ref: string | null };
+
+export type PracticeGroundingMeta = {
+	topic_count: number;
+	context_chunk_count: number;
+	exercise_chunk_count: number;
+	context_char_total: number;
+	exercise_char_total: number;
+	truncated: boolean;
+	fetch_error?: string;
+};
+
+/** `grounding_meta` as sent to the model: no operational `fetch_error`. */
+export type PracticeGroundingMetaForModel = Omit<PracticeGroundingMeta, "fetch_error">;
+
+export type PreFetchedTopicContext = {
+	byTopic: Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>;
+	meta: PracticeGroundingMeta;
+};
+
+export type PracticeTopicGrounding = {
+	topic_id: string;
+	topic_name: string;
+	curriculum_hint: { unit_name: string; chapter_name: string; grade: number };
+	content_chunks: PracticeTopicChunkLine[];
+	exercise_chunks: PracticeTopicChunkLine[];
+};
+
+const GENERATION_DIRECTIVE_INSTRUCTION =
+	"Generate original practice questions aligned to the supplied curriculum and exercise-style references in topic_grounding; do not copy exercise chunk wording verbatim.";
+
 export type PracticeUserMessagePayload = {
-	schema_version: 1;
+	schema_version: 3;
 	intent: "generate_practice_test";
 	student: {
 		grade: number | null;
@@ -51,6 +82,9 @@ export type PracticeUserMessagePayload = {
 		id: string;
 		name: string;
 	};
+	/** Per-topic NCERT-style chunks from `topic_context_chunks` (server-filled). */
+	topic_grounding: PracticeTopicGrounding[];
+	grounding_meta: PracticeGroundingMeta;
 	test_parameters: {
 		difficulty: PracticeDifficulty;
 		time_limit_seconds: number;
@@ -65,16 +99,12 @@ export type PracticeUserMessagePayload = {
 			long_answer: number;
 		};
 		note: string;
+		/** Instruction for the model; replaces the old parallel `generation_directives` block. */
+		generation_instruction: string;
 	};
+	/** Per-topic performance only; curriculum names live under `topic_grounding`. */
 	topics: Array<{
-		performance_tracker_id: string;
 		topic_id: string;
-		topic_name: string;
-		curriculum: {
-			unit_name: string;
-			chapter_name: string;
-			grade: number;
-		};
 		performance: {
 			status: string;
 			average_score_percent: number | null;
@@ -94,6 +124,21 @@ export type PracticeUserMessagePayload = {
 	};
 };
 
+export type PracticeUserMessageForModel = Omit<PracticeUserMessagePayload, "grounding_meta"> & {
+	grounding_meta: PracticeGroundingMetaForModel;
+};
+
+function defaultGroundingMeta(topicCount: number): PracticeGroundingMeta {
+	return {
+		topic_count: topicCount,
+		context_chunk_count: 0,
+		exercise_chunk_count: 0,
+		context_char_total: 0,
+		exercise_char_total: 0,
+		truncated: false,
+	};
+}
+
 export function buildPracticeUserMessage(input: {
 	studentGrade: number | null;
 	subject: { id: string; name: string };
@@ -101,6 +146,8 @@ export function buildPracticeUserMessage(input: {
 	timeLimitSeconds: number;
 	recentErrors?: PracticeRecentError[];
 	topics: PracticeCanonicalTopic[];
+	/** When omitted, topic_grounding uses empty chunk arrays (e.g. unit tests). Server paths should pass DB-backed context. */
+	preFetchedTopicContext?: PreFetchedTopicContext;
 }): PracticeUserMessagePayload {
 	const plan = getPracticeQuestionPlan(input.timeLimitSeconds);
 	const estimated_question_count = plan.total;
@@ -110,9 +157,27 @@ export function buildPracticeUserMessage(input: {
 		topic_count,
 		estimated_question_count,
 	);
+	const pre = input.preFetchedTopicContext;
+
+	const topic_grounding: PracticeTopicGrounding[] = input.topics.map((t) => {
+		const pack = pre?.byTopic.get(t.topicId) ?? { context: [], exercise: [] };
+		return {
+			topic_id: t.topicId,
+			topic_name: t.topicName,
+			curriculum_hint: {
+				unit_name: t.unitName,
+				chapter_name: t.chapterName,
+				grade: t.grade,
+			},
+			content_chunks: pack.context,
+			exercise_chunks: pack.exercise,
+		};
+	});
+
+	const grounding_meta = pre?.meta ?? defaultGroundingMeta(topic_count);
 
 	return {
-		schema_version: 1,
+		schema_version: 3,
 		intent: "generate_practice_test",
 		student: {
 			grade: input.studentGrade,
@@ -122,6 +187,8 @@ export function buildPracticeUserMessage(input: {
 			id: input.subject.id,
 			name: input.subject.name,
 		},
+		topic_grounding,
+		grounding_meta,
 		test_parameters: {
 			difficulty: input.difficulty,
 			time_limit_seconds: input.timeLimitSeconds,
@@ -131,16 +198,10 @@ export function buildPracticeUserMessage(input: {
 			coverage_instruction,
 			question_type_counts,
 			note: "Question count and per-type counts are fixed by duration. Fill the required questions_by_type buckets exactly before any final ordering.",
+			generation_instruction: GENERATION_DIRECTIVE_INSTRUCTION,
 		},
 		topics: input.topics.map((t) => ({
-			performance_tracker_id: t.trackerId,
 			topic_id: t.topicId,
-			topic_name: t.topicName,
-			curriculum: {
-				unit_name: t.unitName,
-				chapter_name: t.chapterName,
-				grade: t.grade,
-			},
 			performance: {
 				status: t.status,
 				average_score_percent: t.averageScore,
@@ -152,11 +213,22 @@ export function buildPracticeUserMessage(input: {
 		constraints: {
 			question_types: ["multiple_choice", "fill_in_blank", "short_answer", "long_answer"],
 			pedagogy:
-				"Align to NCERT-style outcomes for the given grade. Apply Bloom-style cognitive progression and obey test_parameters.coverage_mode and coverage_instruction. Fill each questions_by_type bucket with exactly the requested number of questions before any final ordering. For fill_in_blank: one word or a very short phrase; no options. For short_answer: brief sentences. For long_answer: multi-sentence or short paragraph. Prefer clarity over trick questions; avoid ambiguous wording. When student.recent_errors is present, bias items toward those concepts where pedagogically appropriate.",
+				"Align to NCERT-style outcomes for the given grade. Apply Bloom-style cognitive progression and obey test_parameters.coverage_mode and coverage_instruction. Fill each questions_by_type bucket with exactly the requested number of questions before any final ordering. For fill_in_blank: one word or a very short phrase; no options. For short_answer: brief sentences. For long_answer: multi-sentence or short paragraph. Prefer clarity over trick questions; avoid ambiguous wording. When student.recent_errors is present, bias items toward those concepts where pedagogically appropriate. Use topic_grounding for curriculum and exercise-style context; per-topic performance is under topics keyed by topic_id.",
 		},
 	};
 }
 
-export function stringifyPracticeUserMessage(payload: PracticeUserMessagePayload): string {
+export function toPracticeUserMessageForModel(payload: PracticeUserMessagePayload): PracticeUserMessageForModel {
+	const { grounding_meta, ...rest } = payload;
+	const { fetch_error: _fetchError, ...metaForModel } = grounding_meta;
+	void _fetchError;
+	return { ...rest, grounding_meta: metaForModel };
+}
+
+export function stringifyPracticeUserMessage(payload: PracticeUserMessagePayload | PracticeUserMessageForModel): string {
 	return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+export function stringifyPracticeUserMessageForModel(payload: PracticeUserMessagePayload): string {
+	return stringifyPracticeUserMessage(toPracticeUserMessageForModel(payload));
 }

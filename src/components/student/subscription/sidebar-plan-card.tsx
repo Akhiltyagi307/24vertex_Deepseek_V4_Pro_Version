@@ -7,15 +7,22 @@ import { ArrowUpRightIcon, CrownIcon, SparklesIcon, ZapIcon } from "lucide-react
 import { useSidebar } from "@/components/ui/sidebar";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
+import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
 import { cn } from "@/lib/utils";
 
 const TRIAL_TOTAL_DAYS = 14;
+
+/** Live count from `trialEndsAt` so the sidebar matches billing after client navigations. */
+function trialingDaysDisplayed(e: EntitlementSnapshot): number | null {
+	if (e.status !== "trialing") return null;
+	return trialDaysLeftFromEnd(e.trialEndsAt) ?? e.trialDaysLeft;
+}
 
 function formatStatusLabel(e: EntitlementSnapshot): string {
 	if (e.staffOverride) return "Staff override";
 	switch (e.status) {
 		case "trialing": {
-			const d = e.trialDaysLeft;
+			const d = trialingDaysDisplayed(e);
 			if (d == null) return "Trial";
 			return d === 0 ? "Ends today" : `${d} day${d === 1 ? "" : "s"} left`;
 		}
@@ -39,8 +46,9 @@ function formatStatusLabel(e: EntitlementSnapshot): string {
 type Tone = "ok" | "warn" | "danger" | "neutral";
 
 export function statusTone(e: EntitlementSnapshot): Tone {
+	const trialingDays = trialingDaysDisplayed(e);
 	if (e.status === "past_due" || e.status === "expired" || e.status === "cancelled") return "danger";
-	if (e.status === "trialing" && e.trialDaysLeft != null && e.trialDaysLeft <= 3) return "warn";
+	if (e.status === "trialing" && trialingDays != null && trialingDays <= 3) return "warn";
 	if (e.status === "active" || e.status === "coupon") return "ok";
 	if (e.status === "trialing") return "neutral";
 	return "neutral";
@@ -118,10 +126,10 @@ export function SidebarPlanCard({
 	const reduceMotion = useReducedMotion();
 	const showPlanCard = isMobile ? openMobile : state === "expanded";
 
-	const showTrialStrip =
-		entitlement.status === "trialing" && entitlement.trialDaysLeft != null;
+	const trialingDaysLive = trialingDaysDisplayed(entitlement);
+	const showTrialStrip = entitlement.status === "trialing" && trialingDaysLive != null;
 	const trialDaysPct = showTrialStrip
-		? Math.max(0, Math.round(((entitlement.trialDaysLeft ?? 0) / TRIAL_TOTAL_DAYS) * 100))
+		? Math.max(0, Math.round(((trialingDaysLive ?? 0) / TRIAL_TOTAL_DAYS) * 100))
 		: 0;
 
 	// Pulse CTA only when free and approaching urgency
@@ -191,7 +199,7 @@ export function SidebarPlanCard({
 							<div className="mb-1.5 flex items-center justify-between text-[10px] leading-none text-muted-foreground">
 								<span>Trial period</span>
 								<span className="tabular-nums">
-									{entitlement.trialDaysLeft}d of {TRIAL_TOTAL_DAYS}d remaining
+									{trialingDaysLive}d of {TRIAL_TOTAL_DAYS}d remaining
 								</span>
 							</div>
 							<div className="relative h-1 overflow-hidden rounded-full bg-muted">

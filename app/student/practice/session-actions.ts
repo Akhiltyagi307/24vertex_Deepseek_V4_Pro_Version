@@ -13,6 +13,7 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
 	assertTestOwnedInProgress,
 	executePracticeTestSubmit,
+	redirectPathForExistingTestSubmission,
 	writeStudentAnswerRow,
 } from "@/lib/practice/submit-practice-shared";
 
@@ -159,7 +160,8 @@ async function triggerWorkerInBackground(): Promise<{ ok: true } | { ok: false; 
 			headers,
 			cache: "no-store",
 			keepalive: true,
-			signal: AbortSignal.timeout(4_000),
+			// Cold starts and large job batches can exceed a few seconds; do not give up before the handler responds.
+			signal: AbortSignal.timeout(20_000),
 		});
 		if (!response.ok) {
 			logServerError("triggerWorkerInBackground.fetch", `Worker returned ${response.status}`);
@@ -212,18 +214,18 @@ export async function submitPracticeTest(
 	type Row = { test_id: string; subject_id: string };
 	const rows = (data ?? []) as Row[];
 	if (rows.length === 0) {
-		// Already submitted / not in_progress. Route to report best-effort.
 		const { data: existing } = await supabase
 			.from("tests")
-			.select("subject_id")
+			.select("subject_id, status")
 			.eq("id", parsed.data.testId)
 			.maybeSingle();
-		const subjectId = existing?.subject_id as string | undefined;
 		return {
 			ok: true,
-			redirectTo: subjectId
-				? `/student/reports?subject=${encodeURIComponent(subjectId)}`
-				: "/student/reports",
+			redirectTo: redirectPathForExistingTestSubmission(
+				parsed.data.testId,
+				existing?.subject_id as string | undefined,
+				existing?.status as string | undefined,
+			),
 		};
 	}
 

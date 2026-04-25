@@ -74,12 +74,26 @@ export async function POST(req: Request) {
 
 	const { data: subRow, error: subErr } = await admin
 		.from("subscriptions")
-		.select("id, razorpay_customer_id, status, trial_ends_at")
+		.select("id, razorpay_customer_id, razorpay_subscription_id, status, trial_ends_at")
 		.eq("profile_id", user.id)
 		.maybeSingle();
 	if (subErr || !subRow) {
 		if (subErr) logSupabaseError("billing.create-subscription.sub", subErr, { userId: user.id });
 		return Response.json({ ok: false, message: "Subscription record missing." }, { status: 500 });
+	}
+
+	const paidPipelineBlocking =
+		(subRow.status === "active" || subRow.status === "grace" || subRow.status === "past_due") &&
+		Boolean(subRow.razorpay_subscription_id);
+	if (paidPipelineBlocking) {
+		return Response.json(
+			{
+				ok: false,
+				message:
+					"You already have an active billing subscription. Open Subscription to manage payment or change plans.",
+			},
+			{ status: 409 },
+		);
 	}
 
 	let customer;

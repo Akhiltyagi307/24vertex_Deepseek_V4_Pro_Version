@@ -6,14 +6,16 @@ import {
 	buildPracticeSystemPrompt,
 	buildPracticeUserMessage,
 	createPracticeGenerationOutputSchema,
+	fetchTopicContextChunksByTopicIds,
 	finalizePracticeConfigSchema,
 	resolvePracticeConfigForStudent,
-	stringifyPracticeUserMessage,
+	stringifyPracticeUserMessageForModel,
 } from "@/lib/practice";
 import { getPracticeQuestionPlan } from "@/lib/practice/constants";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -80,6 +82,11 @@ export async function POST(request: Request) {
 
 	const plan = getPracticeQuestionPlan(parsed.data.durationSeconds);
 
+	const topicIds = resolved.canonicalTopics.map((t) => t.topicId);
+	// Topic chunks: service role after resolvePracticeConfigForStudent (enrollment verified).
+	const admin = createServiceRoleClient();
+	const preFetchedTopicContext = await fetchTopicContextChunksByTopicIds(admin, topicIds);
+
 	const userPayload = buildPracticeUserMessage({
 		studentGrade: resolved.studentGrade,
 		subject: { id: parsed.data.subjectId, name: resolved.subjectName },
@@ -87,6 +94,7 @@ export async function POST(request: Request) {
 		timeLimitSeconds: parsed.data.durationSeconds,
 		recentErrors: resolved.recentErrors,
 		topics: resolved.canonicalTopics,
+		preFetchedTopicContext,
 	});
 
 	const systemPrompt = buildPracticeSystemPrompt({
@@ -97,7 +105,7 @@ export async function POST(request: Request) {
 			constraints: userPayload.constraints,
 		},
 	});
-	const userPrompt = stringifyPracticeUserMessage(userPayload);
+	const userPrompt = stringifyPracticeUserMessageForModel(userPayload);
 
 	const result = streamObject({
 		model: getOpenAIProvider()(getOpenAIChatModel()),

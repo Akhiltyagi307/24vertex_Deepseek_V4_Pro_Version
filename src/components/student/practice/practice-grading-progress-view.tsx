@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GridLoader } from "@/components/ui/grid-loader";
+import { jobStatusHint, sanitizeGradingErrorForUi } from "@/lib/practice/grading-error-ui";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,12 @@ const GRADING_STATUS_MESSAGES = [
 	"Updating your subject progress…",
 	"Finalizing your practice report…",
 ] as const;
+
+/** How long each status line stays visible before rotating to the next. */
+const GRADING_STATUS_ROTATE_MS = 6_000;
+
+/** Show an extra action if grading takes longer than this (worker trigger / cron may need a nudge). */
+const STUCK_REQUEUE_AFTER_SECONDS = 150;
 
 function formatElapsed(totalSeconds: number): string {
 	if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -53,29 +60,35 @@ export function PracticeGradingProgressView({
 	const router = useRouter();
 	const [phase, setPhase] = React.useState<Phase>(statusToPhase(initialStatus));
 	const [rotatingIndex, setRotatingIndex] = React.useState(0);
-	const [retrying, setRetrying] = React.useState(false);
+	const [actionBusy, setActionBusy] = React.useState(false);
 	const [retryError, setRetryError] = React.useState<string | null>(null);
-	const [startedAt] = React.useState(() => Date.now());
+	/** Rebased when a new grading attempt starts after "Try again" from failure. */
+	const [sessionClockStart, setSessionClockStart] = React.useState(() => Date.now());
 	const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+	const [jobInfo, setJobInfo] = React.useState<{
+		status: string;
+		errorSanitized: string;
+	} | null>(null);
+	const [reportErrorHint, setReportErrorHint] = React.useState("");
 
-	// Rotating status copy (slightly slower so each line is readable).
+	// Rotating status copy: each line stays long enough to read comfortably.
 	React.useEffect(() => {
 		if (phase !== "grading") return;
 		const id = window.setInterval(() => {
 			setRotatingIndex((i) => (i + 1) % GRADING_STATUS_MESSAGES.length);
-		}, 3200);
+		}, GRADING_STATUS_ROTATE_MS);
 		return () => window.clearInterval(id);
 	}, [phase]);
 
 	React.useEffect(() => {
 		if (phase !== "grading") return;
 		const id = window.setInterval(() => {
-			setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+			setElapsedSeconds(Math.floor((Date.now() - sessionClockStart) / 1000));
 		}, 1000);
 		return () => window.clearInterval(id);
-	}, [phase, startedAt]);
+	}, [phase, sessionClockStart]);
 
-	// Realtime on `tests` plus fast polling so we pick up `graded` even if Realtime is off.
+	// Realtime on `tests` plus polling for status, `practice_jobs`, and `test_reports` hints.
 	React.useEffect(() => {
 		const supabase = createBrowserSupabase();
 		let cancelled = false;
@@ -87,8 +100,30 @@ export function PracticeGradingProgressView({
 
 		const pollOnce = async () => {
 			if (cancelled) return;
-			const { data } = await supabase.from("tests").select("status").eq("id", testId).maybeSingle();
-			applyStatus(data?.status as string | undefined);
+			const [testRes, jobRes, reportRes] = await Promise.all([
+				supabase.from("tests").select("status").eq("id", testId).maybeSingle(),
+				supabase
+					.from("practice_jobs")
+					.select("status, error")
+					.eq("test_id", testId)
+					.eq("job_type", "grade")
+					.order("created_at", { ascending: false })
+					.limit(1)
+					.maybeSingle(),
+				supabase.from("test_reports").select("grading_error").eq("test_id", testId).maybeSingle(),
+			]);
+			applyStatus(testRes.data?.status as string | undefined);
+			if (jobRes.data) {
+				const errRaw = jobRes.data.error as string | null;
+				setJobInfo({
+					status: String(jobRes.data.status),
+					errorSanitized: sanitizeGradingErrorForUi(errRaw),
+				});
+			} else {
+				setJobInfo(null);
+			}
+			const ge = reportRes.data?.grading_error;
+			setReportErrorHint(sanitizeGradingErrorForUi(typeof ge === "string" ? ge : null));
 		};
 
 		const channel = supabase
@@ -125,21 +160,38 @@ export function PracticeGradingProgressView({
 		router.replace(target);
 	}, [phase, router, subjectId, testId]);
 
-	const onRetry = React.useCallback(async () => {
-		setRetryError(null);
-		setRetrying(true);
-		try {
-			const res = await retryPracticeGrading({ testId });
-			if (!res.ok) {
-				setRetryError(res.message);
-				return;
+	const runRequeue = React.useCallback(
+		async (opts?: { resetSessionClock?: boolean }) => {
+			setRetryError(null);
+			setActionBusy(true);
+			try {
+				const res = await retryPracticeGrading({ testId });
+				if (!res.ok) {
+					setRetryError(res.message);
+					return;
+				}
+				setPhase("grading");
+				setRotatingIndex(0);
+				if (opts?.resetSessionClock) {
+					setSessionClockStart(Date.now());
+					setElapsedSeconds(0);
+				}
+			} finally {
+				setActionBusy(false);
 			}
-			setPhase("grading");
-			setRotatingIndex(0);
-		} finally {
-			setRetrying(false);
-		}
-	}, [testId]);
+		},
+		[testId],
+	);
+
+	const jobStatusLine = jobInfo ? jobStatusHint(jobInfo.status) : "";
+	const showJobErrorInGrading =
+		phase === "grading" &&
+		Boolean(jobInfo?.errorSanitized) &&
+		(jobInfo?.status === "dead" || jobInfo?.status === "pending");
+
+	const failedDetail = phase === "failed" ? (reportErrorHint || jobInfo?.errorSanitized || "") : "";
+
+	const showStuckNudge = phase === "grading" && elapsedSeconds >= STUCK_REQUEUE_AFTER_SECONDS;
 
 	return (
 		<div className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-lg flex-col justify-center gap-6 p-6 sm:p-8">
@@ -177,10 +229,40 @@ export function PracticeGradingProgressView({
 									{GRADING_STATUS_MESSAGES[rotatingIndex]}
 								</p>
 							</div>
+							{jobStatusLine ? (
+								<p className="text-muted-foreground max-w-sm text-center text-sm">{jobStatusLine}</p>
+							) : null}
+							{showJobErrorInGrading && jobInfo?.errorSanitized ? (
+								<p className="text-muted-foreground/90 max-w-sm text-center text-sm leading-snug">
+									{jobInfo.errorSanitized}
+								</p>
+							) : null}
 							<p className="text-muted-foreground text-sm tabular-nums">
 								{totalQuestions != null ? `${totalQuestions} questions · ` : ""}
 								Elapsed {formatElapsed(elapsedSeconds)}
 							</p>
+							{showStuckNudge ? (
+								<div className="flex w-full max-w-sm flex-col items-center gap-2">
+									<p className="text-muted-foreground text-center text-sm">Still waiting? Nudge the grader to run again.</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="default"
+										className="w-full sm:w-auto"
+										disabled={actionBusy}
+										onClick={() => void runRequeue()}
+									>
+										{actionBusy ? (
+											<>
+												<Loader2Icon className="mr-2 size-4 animate-spin" />
+												Re-sending…
+											</>
+										) : (
+											"Re-send to grader"
+										)}
+									</Button>
+								</div>
+							) : null}
 						</>
 					) : null}
 
@@ -202,6 +284,14 @@ export function PracticeGradingProgressView({
 									practice and contact support if this continues.
 								</AlertDescription>
 							</Alert>
+							{jobStatusLine ? (
+								<p className="text-muted-foreground max-w-sm text-center text-sm">{jobStatusLine}</p>
+							) : null}
+							{failedDetail ? (
+								<p className="text-muted-foreground/90 max-w-sm text-center text-sm leading-snug">
+									{failedDetail}
+								</p>
+							) : null}
 							{retryError ? (
 								<Alert variant="destructive" className="w-full">
 									<AlertDescription>{retryError}</AlertDescription>
@@ -211,10 +301,10 @@ export function PracticeGradingProgressView({
 								type="button"
 								size="lg"
 								className="w-full sm:w-auto"
-								disabled={retrying}
-								onClick={() => void onRetry()}
+								disabled={actionBusy}
+								onClick={() => void runRequeue({ resetSessionClock: true })}
 							>
-								{retrying ? (
+								{actionBusy ? (
 									<>
 										<Loader2Icon className="mr-2 size-4 animate-spin" />
 										Queuing retry…

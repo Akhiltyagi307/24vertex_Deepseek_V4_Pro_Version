@@ -399,6 +399,8 @@ AI Configuration Trigger:
 └── Test session initialized with timer
 ```
 
+**Topic context grounding (NCERT chunks):** Practice generation may load rows from `topic_context_chunks` per selected topic (service role after enrollment is verified). If the query fails or returns no chunk rows for the selection, generation **still proceeds** (soft failure). Operators receive signals through server logs and `practice_analytics_events` (for example empty or truncated context), not through a blocking student-facing error in the default product configuration.
+
 #### D. Test Area (Dynamic Testing Interface)
 ```
 Feature: Interactive Test Taking Experience

@@ -32,7 +32,11 @@ function isLocalDevelopmentRequest(request: Request): boolean {
 /**
  * Validates internal cron/worker requests.
  * - In production: `CRON_SECRET` must be set; client must send `Authorization: Bearer <secret>`.
- * - In non-production: if `CRON_SECRET` is unset, allows requests (local dev). If set, requires a matching Bearer token.
+ * - In non-production: if `CRON_SECRET` is unset:
+ *   - On Vercel (`VERCEL`), only loopback is allowed (same-origin server triggers).
+ *   - Off Vercel (e.g. `next dev` on a LAN address), all hosts are allowed so the
+ *     post-submit grader can call `/api/internal/*` without misconfiguring `CRON_SECRET`.
+ *   If a secret is set, requires a matching Bearer token everywhere.
  */
 export function assertCronRequestAuthorized(request: Request): Response | null {
 	const secret = process.env.CRON_SECRET?.trim() ?? "";
@@ -42,9 +46,12 @@ export function assertCronRequestAuthorized(request: Request): Response | null {
 	}
 
 	if (!secret) {
-		return isLocalDevelopmentRequest(request) ?
-				null
-			:	Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		if (process.env.VERCEL) {
+			return isLocalDevelopmentRequest(request) ?
+					null
+				:	Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		}
+		return null;
 	}
 
 	const auth = request.headers.get("authorization") ?? "";

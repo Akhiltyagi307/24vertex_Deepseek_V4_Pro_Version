@@ -1,10 +1,11 @@
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 
-import { verifyWebhookSignature } from "@/lib/billing/razorpay";
+import { fetchInvoice, verifyWebhookSignature } from "@/lib/billing/razorpay";
 import { isPlanCode, PLAN_CATALOG, tokenQuotaForGrade, type PlanCode, type PlanCatalogEntry } from "@/lib/billing/plans";
 import {
 	sendPaymentFailedEmail,
+	sendPaymentReceiptEmail,
 	sendSubscriptionActiveEmail,
 } from "@/lib/email/subscription-notifications";
 import { logServerError } from "@/lib/server/log-supabase-error";
@@ -38,6 +39,7 @@ type WebhookHandlerContext = {
 	studentEmail: string | null;
 	subEntity: Record<string, unknown> | null;
 	paymentEntity: Record<string, unknown> | null;
+	invoiceEntity: Record<string, unknown> | null;
 	targetPlanCode: PlanCode;
 	targetPlan: PlanCatalogEntry;
 	currentStart: string | null;
@@ -49,19 +51,46 @@ function iso(epochSec: number | null | undefined): string | null {
 	return new Date(epochSec * 1000).toISOString();
 }
 
+function formatInrPaise(paise: number): string {
+	return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(paise / 100);
+}
+
+/**
+ * Hosted invoice short URL from webhook payloads or Razorpay Invoices API.
+ */
+async function resolveInvoiceShortUrl(
+	paymentEntity: Record<string, unknown> | null,
+	invoiceEntity: Record<string, unknown> | null,
+): Promise<string | null> {
+	const fromPayment = paymentEntity?.short_url;
+	if (typeof fromPayment === "string" && fromPayment.length > 0) return fromPayment;
+	const fromInvoice = invoiceEntity?.short_url;
+	if (typeof fromInvoice === "string" && fromInvoice.length > 0) return fromInvoice;
+	const invoiceIdRaw = paymentEntity?.invoice_id ?? invoiceEntity?.id;
+	const invoiceId = typeof invoiceIdRaw === "string" && invoiceIdRaw.length > 0 ? invoiceIdRaw : null;
+	if (!invoiceId) return null;
+	try {
+		const inv = await fetchInvoice(invoiceId);
+		return typeof inv.short_url === "string" && inv.short_url.length > 0 ? inv.short_url : null;
+	} catch (e) {
+		logServerError("billing.webhook.fetchInvoice", e);
+		return null;
+	}
+}
+
 /**
  * Razorpay Subscriptions + payments webhook.
  *
  * Events handled (map to subscription state machine):
- *   subscription.authenticated  → mandate created, becomes `active`
- *   subscription.activated      → first successful charge
+ *   subscription.authenticated  → mandate/auth only (analytics); does not grant paid entitlements
+ *   subscription.activated      → first activation: `active`, usage window, welcome email
  *   subscription.charged        → roll usage_periods, append payment
  *   subscription.completed      → total_count reached
  *   subscription.cancelled      → status=cancelled
  *   subscription.halted         → too many retries, status=expired
  *   subscription.pending        → payment authorization failed, status=grace
  *   payment.failed              → status=grace (first strike)
- *   invoice.paid                → backstop payment log
+ *   invoice.paid                → backstop: upsert invoice id / hosted short_url on payments (no extra receipt mail)
  */
 export async function POST(req: Request) {
 	const raw = await req.text();
@@ -78,8 +107,10 @@ export async function POST(req: Request) {
 	}
 
 	const admin = createServiceRoleClient();
-	// Razorpay does not emit an event id; synthesize one for idempotency.
-	const eventId = `${body.event}:${(body.payload?.payment?.entity as { id?: string } | undefined)?.id ?? (body.payload?.subscription?.entity as { id?: string } | undefined)?.id ?? ""}:${(body.payload?.subscription?.entity as { current_start?: number } | undefined)?.current_start ?? Math.floor(Date.now() / 1000)}`;
+	const topEventId = typeof body.id === "string" && body.id.length > 0 ? body.id : null;
+	const eventId =
+		topEventId ??
+		`${body.event}:${(body.payload?.payment?.entity as { id?: string } | undefined)?.id ?? (body.payload?.subscription?.entity as { id?: string } | undefined)?.id ?? (body.payload?.invoice?.entity as { payment_id?: string } | undefined)?.payment_id ?? ""}:${(body.payload?.subscription?.entity as { current_start?: number } | undefined)?.current_start ?? (body.payload?.invoice?.entity as { id?: string } | undefined)?.id ?? Math.floor(Date.now() / 1000)}`;
 
 	const { data: existing } = await admin
 		.from("billing_events")
@@ -144,11 +175,21 @@ async function upsertUsagePeriod(
 	);
 }
 
-async function handleSubscriptionAuthenticated(
-	ctx: WebhookHandlerContext,
-): Promise<void> {
-	const { admin, eventName, subscriptionId, ours, profile, studentEmail, targetPlan, targetPlanCode, currentStart, currentEnd } =
-		ctx;
+/**
+ * Mandate / auth step succeeded at Razorpay. Do not flip `plan_code` or paid quotas here —
+ * wait for `subscription.activated` or `subscription.charged` so we never grant Pro before payment clears.
+ */
+async function handleSubscriptionMandateAuthenticated(ctx: WebhookHandlerContext): Promise<void> {
+	const { admin, subscriptionId, ours } = ctx;
+	await admin.from("practice_analytics_events").insert({
+		student_id: ours.profile_id,
+		event_name: "subscription_mandate_authenticated",
+		props: { razorpay_subscription_id: subscriptionId },
+	});
+}
+
+async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<void> {
+	const { admin, subscriptionId, ours, profile, studentEmail, targetPlan, targetPlanCode, currentStart, currentEnd } = ctx;
 	await admin
 		.from("subscriptions")
 		.update({
@@ -173,7 +214,7 @@ async function handleSubscriptionAuthenticated(
 		event_name: "subscription_started",
 		props: { plan_code: targetPlanCode, razorpay_subscription_id: subscriptionId },
 	});
-	if (eventName === "subscription.activated" && studentEmail) {
+	if (studentEmail) {
 		void sendSubscriptionActiveEmail({
 			to: studentEmail,
 			studentName: profile?.full_name ?? undefined,
@@ -184,7 +225,8 @@ async function handleSubscriptionAuthenticated(
 }
 
 async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<void> {
-	const { admin, subscriptionId, ours, profile, targetPlan, targetPlanCode, currentStart, currentEnd, paymentEntity } = ctx;
+	const { admin, ours, profile, studentEmail, targetPlan, targetPlanCode, currentStart, currentEnd, paymentEntity } =
+		ctx;
 	const amt = (paymentEntity?.amount as number | undefined) ?? targetPlan.pricePaise;
 	const paymentId = paymentEntity?.id as string | undefined;
 	const periodStart = currentStart ?? ours.current_period_end;
@@ -209,6 +251,7 @@ async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<vo
 		tokensQuota: tokenQuotaForGrade(targetPlan, profile?.grade ?? null),
 	});
 	if (paymentId) {
+		const invoiceShortUrl = await resolveInvoiceShortUrl(paymentEntity, null);
 		await admin.from("payments").upsert(
 			{
 				subscription_id: ours.id,
@@ -221,10 +264,22 @@ async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<vo
 				status: (paymentEntity?.status as string | undefined) ?? "captured",
 				method: (paymentEntity?.method as string | undefined) ?? null,
 				captured_at: new Date().toISOString(),
+				invoice_short_url: invoiceShortUrl,
 				metadata: paymentEntity ?? {},
 			},
 			{ onConflict: "razorpay_payment_id" },
 		);
+		const payStatus = String(paymentEntity?.status ?? "captured").toLowerCase();
+		if (studentEmail && payStatus !== "failed") {
+			void sendPaymentReceiptEmail({
+				to: studentEmail,
+				studentName: profile?.full_name ?? undefined,
+				amountLabel: formatInrPaise(amt),
+				planName: targetPlan.name,
+				invoiceShortUrl,
+				paymentRef: paymentId,
+			});
+		}
 	}
 }
 
@@ -259,6 +314,54 @@ async function handleSubscriptionHaltedOrPending(ctx: WebhookHandlerContext): Pr
 		.eq("id", ours.id);
 }
 
+async function handleInvoicePaid(ctx: WebhookHandlerContext): Promise<void> {
+	const { admin, invoiceEntity, ours, targetPlan } = ctx;
+	if (!invoiceEntity) return;
+	const paymentId = typeof invoiceEntity.payment_id === "string" ? invoiceEntity.payment_id : null;
+	if (!paymentId) return;
+
+	let shortUrl =
+		typeof invoiceEntity.short_url === "string" && invoiceEntity.short_url.length > 0
+			? invoiceEntity.short_url
+			: null;
+	const invoiceId = typeof invoiceEntity.id === "string" ? invoiceEntity.id : null;
+	if (!shortUrl && invoiceId) {
+		shortUrl = await resolveInvoiceShortUrl(null, invoiceEntity);
+	}
+
+	const currency = typeof invoiceEntity.currency === "string" ? invoiceEntity.currency : "INR";
+
+	const { data: existing } = await admin.from("payments").select("id").eq("razorpay_payment_id", paymentId).maybeSingle();
+
+	if (existing) {
+		const patch: Record<string, string | null> = {};
+		if (shortUrl) patch.invoice_short_url = shortUrl;
+		if (invoiceId) patch.razorpay_invoice_id = invoiceId;
+		if (Object.keys(patch).length > 0) {
+			await admin.from("payments").update(patch).eq("razorpay_payment_id", paymentId);
+		}
+		return;
+	}
+
+	const amountPaise =
+		typeof invoiceEntity.amount === "number" && invoiceEntity.amount > 0 ? invoiceEntity.amount : targetPlan.pricePaise;
+
+	await admin.from("payments").insert({
+		subscription_id: ours.id,
+		profile_id: ours.profile_id,
+		razorpay_payment_id: paymentId,
+		razorpay_invoice_id: invoiceId,
+		amount_paise: amountPaise,
+		currency,
+		status: "captured",
+		method: null,
+		captured_at: new Date().toISOString(),
+		invoice_short_url: shortUrl,
+		metadata: invoiceEntity ?? {},
+	});
+	// Receipt email is sent from `subscription.charged` to avoid duplicates when both events fire.
+}
+
 async function handlePaymentFailed(ctx: WebhookHandlerContext): Promise<void> {
 	const { admin, subscriptionId, ours, studentEmail, profile } = ctx;
 	await admin
@@ -276,17 +379,15 @@ async function handlePaymentFailed(ctx: WebhookHandlerContext): Promise<void> {
 }
 
 const BILLING_WEBHOOK_HANDLERS: Record<string, (c: WebhookHandlerContext) => Promise<void>> = {
-	"subscription.authenticated": handleSubscriptionAuthenticated,
-	"subscription.activated": handleSubscriptionAuthenticated,
+	"subscription.authenticated": handleSubscriptionMandateAuthenticated,
+	"subscription.activated": handleSubscriptionActivated,
 	"subscription.charged": handleSubscriptionCharged,
 	"subscription.completed": handleSubscriptionCompleted,
 	"subscription.cancelled": handleSubscriptionCancelled,
 	"subscription.halted": handleSubscriptionHaltedOrPending,
 	"subscription.pending": handleSubscriptionHaltedOrPending,
 	"payment.failed": handlePaymentFailed,
-	"invoice.paid": async () => {
-		// Handled alongside subscription.charged; no-op backstop.
-	},
+	"invoice.paid": handleInvoicePaid,
 };
 
 async function handleEvent(
@@ -295,9 +396,11 @@ async function handleEvent(
 ): Promise<void> {
 	const subEntity = (body.payload?.subscription?.entity as Record<string, unknown> | undefined) ?? null;
 	const paymentEntity = (body.payload?.payment?.entity as Record<string, unknown> | undefined) ?? null;
+	const invoiceEntity = (body.payload?.invoice?.entity as Record<string, unknown> | undefined) ?? null;
 	const subscriptionId =
 		(subEntity?.id as string | undefined) ??
 		(paymentEntity?.subscription_id as string | undefined) ??
+		(invoiceEntity?.subscription_id as string | undefined) ??
 		null;
 
 	if (!subscriptionId) return;
@@ -340,6 +443,7 @@ async function handleEvent(
 		studentEmail,
 		subEntity,
 		paymentEntity,
+		invoiceEntity,
 		targetPlanCode,
 		targetPlan,
 		currentStart,
@@ -349,5 +453,10 @@ async function handleEvent(
 	const handler = BILLING_WEBHOOK_HANDLERS[body.event];
 	if (handler) {
 		await handler(ctx);
+	} else {
+		Sentry.captureMessage(`Unhandled Razorpay webhook event: ${body.event}`, {
+			level: "info",
+			tags: { component: "billing.webhook", event: body.event },
+		});
 	}
 }

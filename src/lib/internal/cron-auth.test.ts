@@ -16,14 +16,24 @@ describe("assertCronRequestAuthorized", () => {
 		expect(result).toBeNull();
 	});
 
-	it("denies non-local requests when the cron secret is missing", async () => {
+	it("denies non-local Vercel requests when the cron secret is missing", async () => {
 		vi.stubEnv("NODE_ENV", "development");
 		vi.stubEnv("VERCEL_ENV", "preview");
+		vi.stubEnv("VERCEL", "1");
 		vi.stubEnv("CRON_SECRET", undefined);
 
 		const result = assertCronRequestAuthorized(new Request("https://preview.eduai.app/api/internal/practice/run-jobs"));
 		expect(result?.status).toBe(401);
 		await expect(result?.json()).resolves.toEqual({ ok: false, message: "Unauthorized." });
+	});
+
+	it("allows any host in local off-Vercel dev when the cron secret is missing (LAN, etc.)", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("CRON_SECRET", undefined);
+		vi.stubEnv("VERCEL", undefined);
+
+		const result = assertCronRequestAuthorized(new Request("http://10.0.0.2:3001/api/internal/practice/run-jobs"));
+		expect(result).toBeNull();
 	});
 
 	it("requires a matching bearer token when a cron secret is configured", () => {
