@@ -788,53 +788,63 @@ export function StudentProfileSettingsForm({
 		dateStyle: "long",
 	});
 	const accountDetails = (
-		<div className={cn(settingsNestedWellClass, "flex flex-col gap-4 text-base")}>
-			<LoginEmailField email={loginEmail} isVerified={profile.is_verified} />
-			<AccountReadonlyField
-				label="Enrollment date"
-				value={enrolled}
-				description="Set when your account was created. This cannot be changed."
-			/>
-			<AccountReadonlyField
-				label="Grade"
-				schoolManaged
-				value={profile.grade != null ? String(profile.grade) : "—"}
-				onSchoolPlacementEdit={() => setPlacementField("grade")}
-				placementEditTooltip="Edit grade"
-				placementEditAriaLabel="Edit grade"
-			/>
-			<AccountReadonlyField
-				label="Section"
-				schoolManaged
-				value={profile.section?.trim() || "—"}
-				onSchoolPlacementEdit={() => setPlacementField("section")}
-				placementEditTooltip="Edit section"
-				placementEditAriaLabel="Edit section"
-			/>
-			<AccountReadonlyField
-				label="Stream"
-				schoolManaged
-				value={formatStream(profile.stream)}
-				onSchoolPlacementEdit={() => setPlacementField("stream")}
-				placementEditTooltip="Edit stream"
-				placementEditAriaLabel="Edit stream"
-			/>
-			<AccountReadonlyField
-				label="Elective"
-				schoolManaged
-				value={electiveSubjectName ?? "—"}
-				onSchoolPlacementEdit={() => setPlacementField("elective")}
-				placementEditTooltip="Edit elective"
-				placementEditAriaLabel="Edit elective"
-			/>
-			<AccountReadonlyField
-				label="School"
-				schoolManaged
-				value={profile.school_name?.trim() || "—"}
-				onSchoolPlacementEdit={() => setPlacementField("school")}
-				placementEditTooltip="Edit school name"
-				placementEditAriaLabel="Edit school"
-			/>
+		<div className={cn(settingsNestedWellClass, "text-base")}>
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<div className="min-w-0 sm:col-span-2">
+					<LoginEmailField email={loginEmail} isVerified={profile.is_verified} />
+				</div>
+				<AccountReadonlyField
+					className="min-w-0 sm:col-span-2"
+					label="Enrollment date"
+					value={enrolled}
+					description="Set when your account was created. This cannot be changed."
+				/>
+				<AccountReadonlyField
+					className="min-w-0"
+					label="Grade"
+					schoolManaged
+					value={profile.grade != null ? String(profile.grade) : "—"}
+					onSchoolPlacementEdit={() => setPlacementField("grade")}
+					placementEditTooltip="Edit grade"
+					placementEditAriaLabel="Edit grade"
+				/>
+				<AccountReadonlyField
+					className="min-w-0"
+					label="Section"
+					schoolManaged
+					value={profile.section?.trim() || "—"}
+					onSchoolPlacementEdit={() => setPlacementField("section")}
+					placementEditTooltip="Edit section"
+					placementEditAriaLabel="Edit section"
+				/>
+				<AccountReadonlyField
+					className="min-w-0"
+					label="Stream"
+					schoolManaged
+					value={formatStream(profile.stream)}
+					onSchoolPlacementEdit={() => setPlacementField("stream")}
+					placementEditTooltip="Edit stream"
+					placementEditAriaLabel="Edit stream"
+				/>
+				<AccountReadonlyField
+					className="min-w-0"
+					label="Elective"
+					schoolManaged
+					value={electiveSubjectName ?? "—"}
+					onSchoolPlacementEdit={() => setPlacementField("elective")}
+					placementEditTooltip="Edit elective"
+					placementEditAriaLabel="Edit elective"
+				/>
+				<AccountReadonlyField
+					className="min-w-0 sm:col-span-2"
+					label="School"
+					schoolManaged
+					value={profile.school_name?.trim() || "—"}
+					onSchoolPlacementEdit={() => setPlacementField("school")}
+					placementEditTooltip="Edit school name"
+					placementEditAriaLabel="Edit school"
+				/>
+			</div>
 		</div>
 	);
 
@@ -871,10 +881,10 @@ export function StudentProfileSettingsForm({
 			</div>
 			<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
 				{profile.grade == null
-					? "When your grade is set on your profile, your subjects appear here."
+					? "Set your grade (and stream or elective for 11–12) so we can list the subjects you should see."
 					: profile.grade >= 11
-						? "These follow your grade, stream, and elective. Keep the fields above accurate so this list matches your enrollment."
-						: "These follow your grade. Keep the fields above accurate so this list matches your enrollment."}
+						? "We pick these from your grade, stream, and elective. If something’s missing, fix the fields above or ask your school."
+						: "We pick these from your grade. If the list looks wrong, double-check the fields above with your class teacher."}
 			</p>
 		</div>
 	);
@@ -897,13 +907,13 @@ export function StudentProfileSettingsForm({
 				</Button>
 			</div>
 			<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
-				Share this code with a parent so they can link to your account.
+				Give this code to a parent—they’ll use it in their app to connect to your account.
 			</p>
 		</div>
 	);
 
 	return (
-		<div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
 			<PlacementFieldDialog
 				key={[
 					placementField ?? "closed",
@@ -917,15 +927,15 @@ export function StudentProfileSettingsForm({
 				onClose={() => setPlacementField(null)}
 				profile={profile}
 			/>
-			<div>
-				<h1 className="font-semibold text-3xl tracking-tight">Profile</h1>
-				<p className="mt-2 text-base text-muted-foreground leading-relaxed">
-					Update how you appear in EduAI. Use the School &amp; account tab to adjust grade, section,
-					stream, elective, and school name.
+			<div className="flex shrink-0 flex-col gap-1.5">
+				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Profile</h1>
+				<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
+					Your name, photo, and how you show up in EduAI. School details—grade, section, stream, elective,
+					school—live under <span className="text-foreground/90">School &amp; account</span>.
 				</p>
-				<p className="mt-2 text-muted-foreground text-sm leading-relaxed">
-					Saving updates your profile (including phone). Use the password tab to change your login
-					password. Guardian contact on the Guardian tab cannot be changed here.
+				<p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
+					Use <span className="text-foreground/90">Save changes</span> for the Profile tab. Set a new password on
+					the Password tab. Guardian email on file is read-only here—ask your school to update it if it’s wrong.
 				</p>
 			</div>
 
@@ -966,8 +976,9 @@ export function StudentProfileSettingsForm({
 											School & account
 										</h2>
 										<p className="mt-1 text-foreground/75 text-sm leading-relaxed dark:text-muted-foreground">
-											Your login and enrollment, plus school placement. Use the pencil next to a field
-											to update it. Login email and enrollment date are not editable here.
+											How you sign in, when you joined, and your class setup. Tap the pencil to edit
+											school-managed fields. Login email and enrollment date are fixed (they come from
+											your account and signup).
 										</p>
 									</div>
 									{accountDetails}
@@ -987,7 +998,7 @@ export function StudentProfileSettingsForm({
 										<CardHeader className="px-0 pt-0">
 											<CardTitle className="text-lg">Profile</CardTitle>
 											<CardDescription className="text-base">
-												Details you can change anytime.
+												Name, photo, and phone—what classmates and reports see as you.
 											</CardDescription>
 										</CardHeader>
 										<CardContent className="px-0">
@@ -1047,7 +1058,8 @@ export function StudentProfileSettingsForm({
 										<CardHeader className="px-0 pt-0">
 											<CardTitle className="text-lg">Change password</CardTitle>
 											<CardDescription className="text-base leading-relaxed">
-												Enter your current password, then choose a new one. This does not use the Save changes button below.
+												Update the password for this email login. This uses the button on this tab—not
+												“Save changes” at the bottom.
 											</CardDescription>
 										</CardHeader>
 										<CardContent className="px-0">
@@ -1139,7 +1151,8 @@ export function StudentProfileSettingsForm({
 										<CardHeader className="px-0 pt-0">
 											<CardTitle className="text-lg">Guardian contact</CardTitle>
 											<CardDescription className="text-base leading-relaxed">
-												On file for your parent or guardian. Students cannot change this in EduAI.
+												We show what your school has on file for a parent or guardian. You can’t edit it
+												here.
 											</CardDescription>
 										</CardHeader>
 										<CardContent className="px-0">
@@ -1156,7 +1169,7 @@ export function StudentProfileSettingsForm({
 												/>
 											</div>
 											<p className="mt-4 text-muted-foreground text-sm leading-relaxed">
-												If this information is wrong, ask your school to update it.
+												If a name or email is outdated, your school has to change it in their records.
 											</p>
 										</CardContent>
 									</Card>
@@ -1173,8 +1186,9 @@ export function StudentProfileSettingsForm({
 					)}
 				>
 					<p className="text-muted-foreground text-sm leading-relaxed sm:max-w-md">
-						<strong className="font-medium text-foreground">Save changes</strong> applies to the Profile tab only. School placement saves from each field&apos;s dialog on the School &amp; account tab.
-						Use <strong className="font-medium text-foreground">Update password</strong> on the Password tab. Guardian details are not changed here.
+						<strong className="font-medium text-foreground">Save changes</strong> only saves the Profile tab
+						(name, photo, phone). On School &amp; account, each field saves in its own pop-up. Use{" "}
+						<strong className="font-medium text-foreground">Update password</strong> on the Password tab.
 					</p>
 					<Button
 						type="submit"

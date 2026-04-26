@@ -391,10 +391,12 @@ export function StudentPerformanceView({
 	if (loadError) {
 		return (
 			<div className="p-6">
-				<h1 className="font-semibold text-3xl tracking-tight sm:text-4xl">Performance</h1>
-				<p className="mt-2 text-muted-foreground text-sm">
-					Topic mastery and your performance tracker.
-				</p>
+				<div className="flex flex-col gap-1.5">
+					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
+					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
+						See how well you know each topic and where to revise. We couldn’t load your tracker this time.
+					</p>
+				</div>
 				<Alert variant="destructive" className="mt-6">
 					<AlertTitle>Could not load tracker</AlertTitle>
 					<AlertDescription>{loadError}</AlertDescription>
@@ -406,17 +408,20 @@ export function StudentPerformanceView({
 	if (!loadError && enrolledSubjectCards.length === 0) {
 		return (
 			<div className="p-6">
-				<h1 className="font-semibold text-3xl tracking-tight sm:text-4xl">Performance</h1>
-				<p className="mt-2 text-muted-foreground text-sm">
-					Topic mastery and your performance tracker.
-				</p>
+				<div className="flex flex-col gap-1.5">
+					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
+					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
+						Open a subject to see topic-by-topic strength and what to study next. We need your class details
+						first.
+					</p>
+				</div>
 				<Card className="mt-8 border-border shadow-none">
 					<CardHeader>
-						<CardTitle className="text-base">No subjects on your profile yet</CardTitle>
+						<CardTitle className="text-base">No subjects to show yet</CardTitle>
 						<CardDescription>
 							{profileGrade == null
-								? "Set your grade (and stream or elective for grades 11–12) in settings so we can load the subjects you study."
-								: "No subjects matched your grade and stream. Check that school-managed fields in settings are correct so your subject list matches your enrollment."}
+								? "Add your grade (and stream or elective for 11–12) in Profile so we can load the right subjects."
+								: "Nothing matched your grade and stream. Open Profile and check grade, stream, and elective, or ask your school to confirm your enrollment."}
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -440,19 +445,22 @@ export function StudentPerformanceView({
 						variants={pageVariants}
 					>
 					<motion.div
-						className="flex flex-col gap-1"
+						className="flex shrink-0 flex-col gap-1.5"
 						initial="hidden"
 						animate="show"
 						variants={container}
 					>
 						<motion.h1
-							className="font-semibold text-3xl text-foreground tracking-tight sm:text-4xl"
+							className="font-semibold text-3xl tracking-tight text-balance text-foreground"
 							variants={item}
 						>
 							Performance
 						</motion.h1>
-						<motion.p className="text-muted-foreground text-sm" variants={item}>
-							Choose a subject to open your topic matrix, filters, and practice shortcuts.
+						<motion.p
+							className="text-muted-foreground text-base leading-relaxed max-w-2xl"
+							variants={item}
+						>
+							Pick a subject to see your topic grid, filter weak areas, and jump back into practice.
 						</motion.p>
 					</motion.div>
 
@@ -461,7 +469,7 @@ export function StudentPerformanceView({
 							id="perf-subjects-heading"
 							className="font-mono text-muted-foreground text-sm uppercase tracking-wider"
 						>
-							Your subjects
+							Open a subject
 						</h2>
 						<motion.div
 							className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
@@ -607,7 +615,7 @@ export function StudentPerformanceView({
 							All subjects
 						</Button>
 						{detailSubjectName ? (
-							<h1 className="min-w-0 font-semibold text-2xl text-foreground tracking-tight sm:text-3xl">
+							<h1 className="min-w-0 font-semibold text-3xl tracking-tight text-balance text-foreground">
 								{detailSubjectName}
 							</h1>
 						) : null}

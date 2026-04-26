@@ -53,8 +53,8 @@ function SkeletonEmptyState() {
 		<Card className="gap-0">
 			<CardHeader className="border-b">
 				<div className="flex items-center justify-between gap-3">
-					<CardTitle className="text-base">Receipts will appear here</CardTitle>
-					<span className="text-xs text-muted-foreground">After your first charge</span>
+					<CardTitle className="text-base">No receipts yet</CardTitle>
+					<span className="text-xs text-muted-foreground">After you pay, they show up here</span>
 				</div>
 			</CardHeader>
 			<CardContent className="p-0">
@@ -93,7 +93,8 @@ function SkeletonEmptyState() {
 					</table>
 				</div>
 				<p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-					Paid plans bill via Razorpay. Invoices arrive by email and show here within a few minutes.
+					Payments go through Razorpay. You’ll usually get a receipt by email, and a row appears here within a
+					few minutes.
 				</p>
 			</CardContent>
 		</Card>
@@ -105,7 +106,7 @@ export function PaymentHistorySection({ payments }: { payments: PaymentHistoryRo
 		<section className="flex flex-col gap-4">
 			<div className="flex items-center gap-2">
 				<FileTextIcon className="size-4 text-muted-foreground" aria-hidden />
-				<h2 className="font-heading text-lg font-medium">Payment history</h2>
+				<h2 className="font-heading text-lg font-medium">Payments &amp; receipts</h2>
 			</div>
 
 			{payments.length === 0 ? (
@@ -113,7 +114,7 @@ export function PaymentHistorySection({ payments }: { payments: PaymentHistoryRo
 			) : (
 				<Card className="gap-0">
 					<CardHeader className="border-b">
-						<CardTitle className="text-base">Recent transactions</CardTitle>
+						<CardTitle className="text-base">Recent payments</CardTitle>
 					</CardHeader>
 					<CardContent className="p-0">
 						<div className="overflow-x-auto">

@@ -212,17 +212,17 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 
 	return (
 		<div className="flex flex-col gap-8 p-6 pb-28">
-			<header className="flex flex-col gap-1">
-				<h1 className="font-semibold text-2xl text-foreground tracking-tight">Reports</h1>
-				<p className="text-muted-foreground text-sm">
-					All submitted and graded tests — filter by subject, unit, type, and more; sort the table; open or
-					download each PDF.
+			<header className="flex shrink-0 flex-col gap-1.5">
+				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Reports</h1>
+				<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
+					Every practice and assignment you’ve turned in, with scores and PDFs. Filter by subject or unit, sort
+					the list, and open or download a report.
 				</p>
 				<p className="text-muted-foreground text-xs">
-					Attempts:{" "}
-					<span className="font-medium tabular-nums text-foreground">{overviewStats.selfN}</span> self ·{" "}
-					<span className="font-medium tabular-nums text-foreground">{overviewStats.asgN}</span> assigned
-					(total loaded)
+					In this list:{" "}
+					<span className="font-medium tabular-nums text-foreground">{overviewStats.selfN}</span> practice
+					· <span className="font-medium tabular-nums text-foreground">{overviewStats.asgN}</span> from
+					assignments
 				</p>
 			</header>
 
@@ -242,21 +242,21 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 						<CardDescription>Total reports</CardDescription>
 						<CardTitle className="font-semibold text-2xl tabular-nums">{overviewStats.total}</CardTitle>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Submitted and graded</CardContent>
+					<CardContent className="text-muted-foreground text-xs">On your list</CardContent>
 				</Card>
 				<Card className="border-border shadow-none">
 					<CardHeader className="pb-2">
 						<CardDescription>Submitted</CardDescription>
 						<CardTitle className="font-semibold text-2xl tabular-nums">{overviewStats.submitted}</CardTitle>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Awaiting or partial grade</CardContent>
+					<CardContent className="text-muted-foreground text-xs">Waiting on a final score</CardContent>
 				</Card>
 				<Card className="border-border shadow-none">
 					<CardHeader className="pb-2">
 						<CardDescription>Graded</CardDescription>
 						<CardTitle className="font-semibold text-2xl tabular-nums">{overviewStats.graded}</CardTitle>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Finalized score</CardContent>
+					<CardContent className="text-muted-foreground text-xs">Fully graded</CardContent>
 				</Card>
 				<Card className="border-border shadow-none">
 					<CardHeader className="pb-2">
@@ -265,7 +265,7 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 							{overviewStats.avgScore != null ? `${overviewStats.avgScore}%` : "—"}
 						</CardTitle>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Across all loaded tests</CardContent>
+					<CardContent className="text-muted-foreground text-xs">Across tests in the table</CardContent>
 				</Card>
 				<Card className="border-border shadow-none">
 					<CardHeader className="pb-2">
@@ -278,7 +278,7 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 								: "—"}
 						</CardTitle>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">By test date</CardContent>
+					<CardContent className="text-muted-foreground text-xs">When you last submitted</CardContent>
 				</Card>
 			</section>
 
@@ -287,7 +287,7 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 					id="report-filters-heading"
 					className="font-mono text-muted-foreground text-xs uppercase tracking-wider"
 				>
-					Search, filters, and sort
+					Find a test
 				</h2>
 				<Card className="border-border shadow-none">
 					<CardContent className="flex flex-col gap-4 pt-6">
@@ -296,8 +296,8 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 								Search
 							</Label>
 							<p className="text-muted-foreground text-xs leading-relaxed">
-								Matches <span className="font-medium text-foreground">subject name</span> or{" "}
-								<span className="font-medium text-foreground">unit / chapter</span> text on each row.
+								Search <span className="font-medium text-foreground">subject names</span> and{" "}
+								<span className="font-medium text-foreground">unit or chapter</span> labels in the list.
 							</p>
 							<Input
 								id="report-search"

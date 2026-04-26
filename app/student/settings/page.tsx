@@ -61,7 +61,7 @@ export default async function StudentSettingsPage() {
 		.filter((s: ResolvedSubjectForSettings) => Boolean(s.id && s.name));
 
 	return (
-		<div className="flex flex-col gap-6 p-6 md:p-8">
+		<div className="flex w-full min-w-0 flex-col gap-6 p-6 sm:p-8">
 			<StudentProfileSettingsForm
 				userId={user.id}
 				loginEmail={user.email ?? ""}

@@ -114,7 +114,7 @@ export function PlanComparisonTable({ currentPlanCode, grade, planCatalog = PLAN
 	return (
 		<details className="group rounded-xl border bg-card" open>
 			<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground marker:hidden">
-				<span>Compare plans</span>
+				<span>See how the plans compare</span>
 				<span
 					aria-hidden
 					className="text-xs text-muted-foreground transition-transform group-open:rotate-180"

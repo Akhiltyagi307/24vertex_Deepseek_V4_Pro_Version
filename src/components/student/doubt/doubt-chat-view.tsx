@@ -1153,8 +1153,8 @@ export function DoubtChatView(props: {
 										Start a new chat
 									</h1>
 									<p className="text-muted-foreground text-[14.5px] leading-relaxed [text-wrap:pretty]">
-										Pick a topic and the tutor stays scoped to that chapter of your
-										curriculum. Ask for summaries, worked examples, or practice
+										Choose your subject and chapter first—the tutor only answers in that part of your
+										syllabus. Use it for quick explanations, worked examples, or extra practice
 										questions.
 									</p>
 								</div>

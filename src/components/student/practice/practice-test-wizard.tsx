@@ -1051,7 +1051,8 @@ export function PracticeTestWizard({
 				<Alert>
 					<AlertTitle>No subjects found</AlertTitle>
 					<AlertDescription>
-						Your enrollment may still be updating. Try again later or contact support.
+						We couldn’t find subjects for your account yet. Wait a few minutes, refresh, or ask your school if
+						enrollment is still being set up.
 					</AlertDescription>
 				</Alert>
 			</div>
@@ -1062,10 +1063,10 @@ export function PracticeTestWizard({
 		<div className="w-full p-6 sm:p-8">
 			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 sm:gap-8">
 				<div className="flex shrink-0 flex-col gap-1.5">
-					<h1 className="font-semibold text-3xl tracking-tight text-balance">Practice</h1>
+					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Practice</h1>
 					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-						Configure a practice test from your performance topics. Your selections are verified on the
-						server.
+						Build a timed practice test from the topics you’re already tracking. We match your class and
+						syllabus so questions stay relevant.
 					</p>
 				</div>
 
@@ -1082,7 +1083,8 @@ export function PracticeTestWizard({
 								Choose a subject
 							</h2>
 							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
-								We will use your performance tracker for the subject you pick. You can switch later.
+								Choose the subject you want to revise. We’ll use your performance tracker for that subject—you
+								can go back and change it before you start the test.
 							</p>
 						</div>
 						<FieldSet className="gap-5">
@@ -1239,13 +1241,13 @@ export function PracticeTestWizard({
 								Topics
 							</h2>
 							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base max-w-2xl">
-								Pick one or more topics from your performance tracker for{" "}
-								<span className="text-foreground font-medium">{selectedSubjectName}</span>.{" "}
+								Select the chapters or topics you want in this test for{" "}
+								<span className="text-foreground font-medium">{selectedSubjectName}</span>. Need a refresher?{" "}
 								<Link
 									href="/student/performance"
 									className="font-medium text-emerald-800 underline-offset-4 hover:text-emerald-950 hover:underline dark:text-emerald-400 dark:hover:text-emerald-300"
 								>
-									View performance grid
+									Open your performance grid
 									<span aria-hidden> →</span>
 								</Link>
 							</p>
@@ -1254,8 +1256,8 @@ export function PracticeTestWizard({
 							<Alert>
 								<AlertTitle>Not enough topics</AlertTitle>
 								<AlertDescription>
-									This subject has no topics in your tracker. Choose another subject or contact your
-									teacher if this looks wrong.
+									This subject doesn’t have topics in your tracker yet. Pick a different subject or ask your
+									teacher if the list should be there.
 								</AlertDescription>
 							</Alert>
 						) : (
@@ -1292,7 +1294,7 @@ export function PracticeTestWizard({
 										))}
 									</div>
 									<p className="text-muted-foreground text-xs leading-snug">
-										Pills add matching topics to your selection. You can fine‑tune below.
+										Quick picks add related topics; adjust the list below if you need something specific.
 									</p>
 								</div>
 
@@ -1590,7 +1592,8 @@ export function PracticeTestWizard({
 								Difficulty &amp; time
 							</h2>
 							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
-								These settings shape how the generator calibrates the test.
+								Set how hard the questions should feel and how long you have—closer to an exam, or a quick
+								sprint.
 							</p>
 						</header>
 
@@ -1660,7 +1663,8 @@ export function PracticeTestWizard({
 								<span className="tabular-nums">{practicePlan.counts.long_answer}</span> long answer.
 							</p>
 							<p className="text-muted-foreground text-sm">
-								Total questions and the mix above follow from your time limit (1 hour or 3 hours).
+								For each time limit, we pick a set number and mix of question types (MCQ, short, long, and
+								so on).
 							</p>
 						</FieldSet>
 					</section>
@@ -1670,7 +1674,7 @@ export function PracticeTestWizard({
 					<div className="relative space-y-5">
 						<PracticeReviewSummaryCard
 							title="Ready to generate"
-							description="Your selections are verified on the server. Generate questions when you are ready. You will move to the timed test screen after generation."
+							description="We’ve saved your choices. When you’re ready, generate the paper—you’ll go straight to the timed test screen after."
 							subjectName={reviewConfigSummary.subjectName}
 							topicNames={reviewConfigSummary.topicNames}
 							difficultyLabel={reviewConfigSummary.difficultyLabel}
@@ -1683,7 +1687,7 @@ export function PracticeTestWizard({
 					<div className="space-y-5">
 							<PracticeReviewSummaryCard
 								title="Configuration saved"
-								description="Your choices were verified on the server. Prompt preview below is for development when PRACTICE_PROMPT_PREVIEW is enabled."
+								description="Your choices are stored. The prompt preview below is for developers (when PRACTICE_PROMPT_PREVIEW is on)."
 								subjectName={reviewConfigSummary.subjectName}
 								topicNames={reviewConfigSummary.topicNames}
 								difficultyLabel={reviewConfigSummary.difficultyLabel}
@@ -1912,7 +1916,7 @@ export function PracticeTestWizard({
 										Your test is ready
 									</CardTitle>
 									<CardDescription className="text-base leading-relaxed">
-										Start the timed session when you are ready.
+										The timer starts when you begin—get comfortable, then start when you’re ready to focus.
 									</CardDescription>
 								</CardHeader>
 								<CardContent className="flex flex-col gap-3 pt-0">

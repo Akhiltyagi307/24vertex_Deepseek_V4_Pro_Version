@@ -8,9 +8,9 @@ type Item = {
 
 export function BillingTrustRow() {
 	const items: Item[] = [
-		{ label: "Razorpay secure checkout", icon: ShieldCheckIcon },
-		{ label: "UPI Autopay & cards", icon: SmartphoneIcon },
-		{ label: "Cancel anytime", icon: XCircleIcon },
+		{ label: "Secure checkout (Razorpay)", icon: ShieldCheckIcon },
+		{ label: "Pay with UPI or card", icon: SmartphoneIcon },
+		{ label: "Change or cancel your plan when you need to", icon: XCircleIcon },
 		{
 			label: (
 				<Link

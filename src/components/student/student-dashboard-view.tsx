@@ -179,25 +179,28 @@ export function StudentDashboardView({
 	return (
 		<div className="flex flex-col gap-8 p-6">
 			<motion.div
-				className="flex flex-col gap-1"
+				className="flex shrink-0 flex-col gap-1.5"
 				initial="hidden"
 				animate="show"
 				variants={container}
 			>
 				<motion.h1
-					className="font-semibold text-2xl text-foreground tracking-tight"
+					className="font-semibold text-3xl tracking-tight text-balance text-foreground"
 					variants={item}
 				>
 					Dashboard
 				</motion.h1>
-				<motion.p className="text-muted-foreground text-sm leading-relaxed" variants={item}>
+				<motion.p
+					className="text-muted-foreground text-base leading-relaxed max-w-2xl"
+					variants={item}
+				>
 					{headerGreeting}
 				</motion.p>
 			</motion.div>
 
 			<section aria-labelledby="stats-heading" className="flex flex-col gap-3">
 				<h2 id="stats-heading" className="font-mono text-muted-foreground text-xs uppercase tracking-wider">
-					Your progress
+					At a glance
 				</h2>
 				<motion.div
 					className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
@@ -217,7 +220,7 @@ export function StudentDashboardView({
 							</CardHeader>
 							<CardContent>
 								<p className="font-semibold text-2xl tabular-nums">{performanceStats.testsCompleted}</p>
-								<p className="text-muted-foreground text-xs">Submitted or graded</p>
+								<p className="text-muted-foreground text-xs">Tests you’ve finished or that are graded</p>
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -237,7 +240,7 @@ export function StudentDashboardView({
 										? `${performanceStats.averageScoreLast30Days}%`
 										: "—"}
 								</p>
-								<p className="text-muted-foreground text-xs">Graded tests · last 30 days</p>
+								<p className="text-muted-foreground text-xs">From graded tests in the last 30 days</p>
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -256,7 +259,7 @@ export function StudentDashboardView({
 									{performanceStats.topicsMasteredCount}
 								</p>
 								<p className="text-muted-foreground text-xs tabular-nums">
-									{performanceStats.topicsNeedingImprovementCount} still need attention
+									{performanceStats.topicsNeedingImprovementCount} topics to revisit
 								</p>
 							</CardContent>
 						</Card>
@@ -275,7 +278,7 @@ export function StudentDashboardView({
 								<p className="font-semibold text-2xl tabular-nums">
 									{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
 								</p>
-								<p className="text-muted-foreground text-xs">Logged test duration · last 30 days</p>
+								<p className="text-muted-foreground text-xs">Time in timed tests, last 30 days</p>
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -289,7 +292,7 @@ export function StudentDashboardView({
 				>
 					<div className="flex shrink-0 items-end justify-between gap-4">
 						<h2 id="subjects-heading" className="font-mono text-muted-foreground text-xs uppercase tracking-wider">
-							Your subjects
+							Subjects you study
 						</h2>
 						<Button size="sm" variant="outline" render={<Link href="/student/practice" />}>
 							Start new test
@@ -305,10 +308,10 @@ export function StudentDashboardView({
 					{subjectCards.length === 0 ? (
 						<Card className="border-border shadow-none">
 							<CardHeader>
-								<CardTitle className="text-base">No subjects on your profile yet</CardTitle>
+								<CardTitle className="text-base">No subjects yet</CardTitle>
 								<CardDescription>
-									Subjects come from your grade and curriculum. If this looks wrong, check your profile
-									settings or ask your teacher.
+									We load subjects from your grade and school setup. If this stays empty, open Profile and
+									check your class details, or ask a teacher to confirm your enrollment.
 								</CardDescription>
 							</CardHeader>
 						</Card>
@@ -400,7 +403,7 @@ export function StudentDashboardView({
 													{!hasTopics ? (
 														<div className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2.5">
 															<p className="text-muted-foreground text-sm leading-snug">
-																Curriculum topics are not linked for this grade yet.
+																Topics aren’t linked for this subject yet. Your teacher or admin may still be setting this up.
 															</p>
 														</div>
 													) : !hasAttempts ? (
@@ -411,7 +414,7 @@ export function StudentDashboardView({
 																aria-hidden
 															/>
 															<p className="text-muted-foreground text-sm leading-snug">
-																Run a practice test to start tracking scores and topic coverage.
+																Take a practice test here to start seeing scores and how much of the syllabus you’ve tried.
 															</p>
 														</div>
 													) : (
@@ -470,7 +473,7 @@ export function StudentDashboardView({
 				>
 					<section aria-labelledby="assignments-heading" className="flex flex-col gap-3">
 						<h2 id="assignments-heading" className="font-mono text-muted-foreground text-xs uppercase tracking-wider">
-							Pending assignments
+							Assignments
 						</h2>
 						<motion.div variants={item}>
 							<Card className="border-border shadow-none">
@@ -481,7 +484,7 @@ export function StudentDashboardView({
 											<Badge variant="destructive">{assignmentSummary.overdueCount} overdue</Badge>
 										) : null}
 									</div>
-									<CardDescription>Live from your grade/section assignments</CardDescription>
+									<CardDescription>What your teachers have set for your grade and section</CardDescription>
 								</CardHeader>
 								<CardContent className="flex flex-col gap-3 text-sm">
 									<div className="grid grid-cols-3 gap-2">
@@ -510,13 +513,13 @@ export function StudentDashboardView({
 										</div>
 									) : (
 										<p className="text-muted-foreground text-xs">
-											No active assignment deadlines right now.
+											Nothing due soon—check with your class if you expected homework here.
 										</p>
 									)}
 								</CardContent>
 								<CardFooter>
 									<Button variant="secondary" className="w-full" render={<Link href="/student/practice" />}>
-										Back to practice
+										Start a practice test
 									</Button>
 								</CardFooter>
 							</Card>
@@ -525,14 +528,14 @@ export function StudentDashboardView({
 
 					<section aria-labelledby="activity-heading" className="flex flex-col gap-3">
 						<h2 id="activity-heading" className="font-mono text-muted-foreground text-xs uppercase tracking-wider">
-							Recent activity
+							Recent tests
 						</h2>
 						<motion.div variants={item}>
 							<Card className="border-border shadow-none">
 								<CardContent className="flex flex-col gap-3 pt-6">
 									{recentTests.length === 0 ? (
 										<p className="text-muted-foreground text-sm">
-											No submitted tests yet. Start a practice set to build your activity timeline.
+											No completed tests yet. Finish a practice or assignment attempt to see it here.
 										</p>
 									) : (
 										recentTests.map((row) => (
@@ -564,7 +567,7 @@ export function StudentDashboardView({
 
 			<section aria-labelledby="charts-heading" className="flex flex-col gap-3">
 				<h2 id="charts-heading" className="font-mono text-muted-foreground text-xs uppercase tracking-wider">
-					Analytics
+					Trends &amp; charts
 				</h2>
 				<motion.div initial="hidden" animate="show" variants={container}>
 					<motion.div variants={item}>

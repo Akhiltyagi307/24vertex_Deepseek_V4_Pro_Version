@@ -72,30 +72,30 @@ export default async function StudentSubscriptionPage() {
 		: "";
 
 	return (
-		<div className="mx-auto w-full max-w-4xl p-6 md:p-8">
-			<header className="flex flex-col gap-1">
+		<div className="w-full min-w-0 p-6 sm:p-8">
+			<div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 sm:gap-8">
+			<header className="flex shrink-0 flex-col gap-1.5">
 				<p className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
 					Billing
 				</p>
-				<h1 className="font-heading text-2xl font-semibold tracking-tight text-balance">
-					Your subscription
-				</h1>
-				<p className="text-muted-foreground">
-					Manage your EduAI plan, usage, payment method and receipts.
+				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Your subscription</h1>
+				<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
+					See what’s included in your plan, how much you’ve used, and your past payments. Upgrade when you need
+					more practice tests or AI help.
 				</p>
 			</header>
 
-			<main className="mt-6 flex min-w-0 flex-col gap-6">
+			<main className="flex min-w-0 flex-col gap-6">
 				{entitlement ? (
 					<DevEnforcementBanner enforcementActive={entitlement.enforcementActive} />
 				) : null}
 
 				{showPaymentFailedAlert ? (
 					<Alert variant="destructive">
-						<AlertTitle>We could not collect your last payment</AlertTitle>
+						<AlertTitle>Your last payment didn’t go through</AlertTitle>
 						<AlertDescription>
-							Razorpay is retrying automatically. You have a short grace period before access is paused &mdash;
-							please check your bank / UPI app for a pending mandate.
+							Razorpay will try again automatically. You still have a short grace period—check your bank app
+							or UPI for a failed or pending mandate so your access isn’t paused.
 						</AlertDescription>
 					</Alert>
 				) : null}
@@ -104,7 +104,8 @@ export default async function StudentSubscriptionPage() {
 					<Alert className="border-amber-500/30 bg-amber-500/[0.06] text-amber-900 dark:text-amber-100 [&_[data-slot=alert-description]]:text-amber-900/85 dark:[&_[data-slot=alert-description]]:text-amber-100/80">
 						<AlertTitle>Auto-renewal off</AlertTitle>
 						<AlertDescription>
-							Your subscription is scheduled to end on {renewalDate}. You can re-enable renewal any time before then from the plan cards below.
+							After {renewalDate} your plan will end unless you turn renewal back on. You can switch it on
+							again anytime before that date from the plan cards below.
 						</AlertDescription>
 					</Alert>
 				) : null}
@@ -115,7 +116,8 @@ export default async function StudentSubscriptionPage() {
 					<div>
 						<h2 className="font-heading text-lg font-medium tracking-tight">Choose a plan</h2>
 						<p className="text-sm text-muted-foreground">
-							Paid plans are billed via Razorpay using secure UPI Autopay or card mandates.
+							Pick what fits how often you’ll practice and use the AI tutor. Paid plans use Razorpay with UPI
+							Autopay or card—secure checkout, and you can cancel from this page.
 						</p>
 					</div>
 					<PlanComparison
@@ -144,14 +146,15 @@ export default async function StudentSubscriptionPage() {
 							<CardTitle className="text-base">Have a coupon?</CardTitle>
 						</div>
 						<CardDescription>
-							Parents with a distribution code can unlock a free month of Pro Monthly &mdash; no card required.
+							If your parent has a code from school or a campaign, you can apply it here for a free month on
+							Pro Monthly—no card needed.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-3">
 						<CouponRedeemForm />
 						{isPaid ? (
 							<p className="text-xs text-muted-foreground">
-								You already have an active paid subscription, so the coupon cannot be stacked right now.
+								You’re already on a paid plan, so a coupon can’t be added on top right now.
 							</p>
 						) : null}
 					</CardContent>
@@ -174,10 +177,12 @@ export default async function StudentSubscriptionPage() {
 						</Link>
 					</div>
 					<p>
-						Cancel keeps your access until the end of the current period. Payment and mandate management happen on Razorpay.
+						If you cancel, you keep full access until the end of the period you already paid for. Card and UPI
+						mandate details are managed safely on Razorpay’s site.
 					</p>
 				</footer>
 			</main>
+			</div>
 		</div>
 	);
 }

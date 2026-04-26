@@ -6,11 +6,15 @@ export function firstNameFromFullName(fullName: string | null | undefined): stri
 }
 
 const GREETING_TEMPLATES = [
-	(name: string) => `Ready to crush your goals today, ${name}?`,
-	(name: string) => `Welcome back, ${name}! Let's keep that streak alive.`,
-	(name: string) => `Hey ${name} — your subjects, stats, and next win are all right here.`,
-	(name: string) => `Good to see you, ${name}. Pick a practice and turn focus into progress.`,
-	(name: string) => `${name}, you've got this — one step at a time, starting from your dashboard.`,
+	(name: string) =>
+		`Hi ${name} — here's a snapshot of how you're doing and what to tackle next.`,
+	(name: string) => `Welcome back, ${name}. Your subjects, recent tests, and shortcuts to practice are below.`,
+	(name: string) =>
+		`Good to see you, ${name}. Scan your progress, then open a subject or start a new practice test when you're ready.`,
+	(name: string) =>
+		`${name}, this page shows your scores, topic coverage, assignments, and recent activity in one place.`,
+	(name: string) =>
+		`Hey ${name}. Use your dashboard to spot strong subjects, see what needs work, and jump back into practice.`,
 ] as const;
 
 /** Picks one template at random (call from a server component once per request). */
