@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import {
 	StudentProfileSettingsForm,
 	type ResolvedSubjectForSettings,
@@ -62,13 +63,24 @@ export default async function StudentSettingsPage() {
 
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-6 p-6 sm:p-8">
-			<StudentProfileSettingsForm
-				userId={user.id}
-				loginEmail={user.email ?? ""}
-				profile={profile}
-				electiveSubjectName={electiveSubjectName}
-				resolvedSubjects={resolvedSubjects}
-				subjectsLoadError={subjectResult.loadError}
+			<PageStaggerRoot
+				enableLift={false}
+				className="min-w-0"
+				sections={[
+					{
+						key: "settings",
+						content: (
+							<StudentProfileSettingsForm
+								userId={user.id}
+								loginEmail={user.email ?? ""}
+								profile={profile}
+								electiveSubjectName={electiveSubjectName}
+								resolvedSubjects={resolvedSubjects}
+								subjectsLoadError={subjectResult.loadError}
+							/>
+						),
+					},
+				]}
 			/>
 		</div>
 	);

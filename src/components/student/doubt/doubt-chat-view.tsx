@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { usePaywall } from "@/components/student/subscription/paywall-dialog";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
 	ArrowDown,
@@ -267,14 +268,11 @@ function EmptyState({
 }) {
 	return (
 		<div className="flex flex-col items-start gap-4 pt-4 sm:pt-8">
-			<div className="border-emerald-500/25 bg-emerald-500/10 flex size-10 items-center justify-center rounded-xl border text-emerald-600 dark:text-emerald-400">
-				<Sparkles className="size-5" strokeWidth={1.75} aria-hidden />
-			</div>
-			<div className="max-w-xl space-y-1.5">
+			<div className="max-w-xl min-w-0 w-full space-y-1.5">
 				<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
 					{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
 				</h3>
-				<PageHeaderSubtext>
+				<PageHeaderSubtext variant="wrap">
 					Ask about concepts, worked examples, or practice questions—answers stay scoped to your curriculum for this chapter.
 				</PageHeaderSubtext>
 			</div>
@@ -834,6 +832,8 @@ export function DoubtChatView(props: {
 		Boolean(c) && props.initialFromUrl != null && props.initialFromUrl.conversation.id === c;
 	const showPicker = !c;
 	const notFound = Boolean(c) && props.initialFromUrl == null;
+	const reduceMotion = useReducedMotion();
+	const panelDuration = reduceMotion ? 0 : 0.2;
 
 	const chapters = useMemo(() => groupTopicRowsByChapter(topicRows), [topicRows]);
 
@@ -941,13 +941,13 @@ export function DoubtChatView(props: {
 
 	return (
 		<>
-		<div className="flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden md:flex-row">
+		<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden md:flex-row">
 			<aside
 				className={cn(
 					"flex max-h-[min(40vh,240px)] w-full shrink-0 flex-col overflow-hidden border-b",
 					"border-zinc-200/90 bg-emerald-50/35 text-sidebar-foreground",
 					"dark:border-sidebar-border dark:bg-sidebar dark:border-b",
-					"md:h-full md:max-h-none md:min-h-0 md:w-72 md:border-r md:border-b-0",
+					"md:max-h-none md:min-h-0 md:w-72 md:self-stretch md:border-r md:border-b-0",
 				)}
 			>
 				<div
@@ -1139,22 +1139,30 @@ export function DoubtChatView(props: {
 					</Alert>
 				) : null}
 
-				{showPicker && (
-					<div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-10 sm:py-14">
+				<AnimatePresence mode="wait" initial={false}>
+					{showPicker ? (
+						<motion.div
+							key="picker"
+							className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-10 sm:py-14"
+							initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+							transition={{ duration: panelDuration, ease: "easeOut" }}
+						>
 						<div className="flex w-full max-w-xl flex-col gap-6">
 							{/* Hero */}
-							<div className="flex flex-col items-start gap-3">
+							<div className="flex min-w-0 w-full flex-col items-start gap-3">
 								<div
 									aria-hidden
 									className="border-emerald-500/25 bg-emerald-500/10 flex size-10 items-center justify-center rounded-xl border text-emerald-600 dark:text-emerald-400"
 								>
 									<Sparkles className="size-5" strokeWidth={1.75} />
 								</div>
-								<div className="space-y-1.5">
+								<div className="min-w-0 w-full space-y-1.5">
 									<h1 className="text-foreground text-[22px] font-semibold tracking-tight sm:text-[24px]">
 										Start a new chat
 									</h1>
-									<PageHeaderSubtext>
+									<PageHeaderSubtext variant="wrap">
 										Choose your subject and chapter first so the tutor answers only within that syllabus scope, including explanations, examples, and practice questions.
 									</PageHeaderSubtext>
 								</div>
@@ -1366,24 +1374,30 @@ export function DoubtChatView(props: {
 								</div>
 							</div>
 						</div>
-					</div>
-				)}
-
-				{showThread && props.initialFromUrl ? (
-					<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-						<DoubtChatThread
+					</motion.div>
+					) : showThread && props.initialFromUrl ? (
+						<motion.div
 							key={props.initialFromUrl.conversation.id}
-							conversationId={props.initialFromUrl.conversation.id}
-							subjectId={props.initialFromUrl.conversation.subjectId}
-							topicId={props.initialFromUrl.conversation.topicId}
-							subjectName={props.initialFromUrl.conversation.subjectName}
-							topicName={props.initialFromUrl.conversation.topicName}
-							chapterName={props.initialFromUrl.conversation.chapterName}
-							initialMessages={props.initialFromUrl.messages}
-							initialUsage={props.initialFromUrl.usage}
-						/>
-					</div>
-				) : null}
+							className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+							initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+							transition={{ duration: panelDuration, ease: "easeOut" }}
+						>
+							<DoubtChatThread
+								key={props.initialFromUrl.conversation.id}
+								conversationId={props.initialFromUrl.conversation.id}
+								subjectId={props.initialFromUrl.conversation.subjectId}
+								topicId={props.initialFromUrl.conversation.topicId}
+								subjectName={props.initialFromUrl.conversation.subjectName}
+								topicName={props.initialFromUrl.conversation.topicName}
+								chapterName={props.initialFromUrl.conversation.chapterName}
+								initialMessages={props.initialFromUrl.messages}
+								initialUsage={props.initialFromUrl.usage}
+							/>
+						</motion.div>
+					) : null}
+				</AnimatePresence>
 			</div>
 		</div>
 

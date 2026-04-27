@@ -5,6 +5,7 @@ import {
 	type PerformanceRowSerialized,
 	type RawTrackerEmbedRow,
 } from "@/lib/student/performance-matrix";
+import { getCachedTopicCountsBySubjectForGrade } from "@/lib/cache/curriculum-topic-counts";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import type { createClient } from "@/lib/supabase/server";
@@ -65,6 +66,8 @@ export async function loadStudentPerformanceBundle(
 	topicCountBySubjectId: Map<string, number>;
 	rows: PerformanceRowSerialized[];
 	loadError: string | null;
+	/** True when curriculum has topics but tracker rows are empty — client should run session-bound sync then `router.refresh()`. */
+	trackerNeedsHydration: boolean;
 }> {
 	const subjectResult = await loadStudentSubjects(supabase, profileRow);
 	const enrolledSubjects: EnrolledSubjectRow[] = subjectResult.subjects
@@ -77,28 +80,12 @@ export async function loadStudentPerformanceBundle(
 
 	const enrolledIds = enrolledSubjects.map((s) => s.id);
 
-	const topicQuery =
+	const [topicCountBySubjectId, initialTracker] = await Promise.all([
 		profileRow.grade != null && enrolledIds.length > 0 ?
-			supabase
-				.from("topics")
-				.select("subject_id")
-				.eq("grade", profileRow.grade)
-				.eq("is_active", true)
-				.in("subject_id", enrolledIds)
-		:	Promise.resolve({ data: null as { subject_id: string }[] | null, error: null });
-
-	const [topicRes, initialTracker] = await Promise.all([
-		topicQuery,
+			getCachedTopicCountsBySubjectForGrade(profileRow.grade, enrolledIds)
+		:	Promise.resolve(new Map<string, number>()),
 		supabase.from("performance_tracker").select(trackerSelect).eq("student_id", userId),
 	]);
-
-	const topicCountBySubjectId = new Map<string, number>();
-	if (!topicRes.error && topicRes.data?.length) {
-		for (const t of topicRes.data) {
-			const sid = t.subject_id as string;
-			topicCountBySubjectId.set(sid, (topicCountBySubjectId.get(sid) ?? 0) + 1);
-		}
-	}
 
 	let loadError: string | null = subjectResult.loadError;
 
@@ -107,22 +94,12 @@ export async function loadStudentPerformanceBundle(
 		totalCurriculumTopics += topicCountBySubjectId.get(sid) ?? 0;
 	}
 
-	let finalTracker: TrackerResponse = { data: initialTracker.data, error: initialTracker.error };
+	const trackerNeedsHydration =
+		totalCurriculumTopics > 0 &&
+		!initialTracker.error &&
+		!(initialTracker.data as unknown[] | null)?.length;
 
-	if (totalCurriculumTopics > 0 && !initialTracker.error && !(initialTracker.data as unknown[] | null)?.length) {
-		const { error: syncError } = await supabase.rpc("sync_student_performance_tracker", {
-			p_reset_curriculum: false,
-		});
-		if (syncError) {
-			logSupabaseError("loadStudentPerformanceBundle.sync_student_performance_tracker", syncError, {
-				userId,
-			});
-			loadError ??= "We couldn't refresh your performance tracker right now. Try again.";
-		} else {
-			const refetch = await supabase.from("performance_tracker").select(trackerSelect).eq("student_id", userId);
-			finalTracker = { data: refetch.data, error: refetch.error };
-		}
-	}
+	const finalTracker: TrackerResponse = { data: initialTracker.data, error: initialTracker.error };
 
 	const rows = await (async (first: TrackerResponse) => {
 		const { data, error } = first;
@@ -185,5 +162,6 @@ export async function loadStudentPerformanceBundle(
 		topicCountBySubjectId,
 		rows,
 		loadError,
+		trackerNeedsHydration,
 	};
 }

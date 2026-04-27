@@ -69,6 +69,7 @@ import {
 	type SubjectCardTrackerStats,
 	type TrackerStatus,
 } from "@/lib/student/performance-matrix";
+import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
 import { getSubjectCardIconConfig } from "@/lib/student/subject-lucide-icon";
 
 export type StudentPerformanceViewProps = {
@@ -77,6 +78,7 @@ export type StudentPerformanceViewProps = {
 	subjectFromUrl?: string | null;
 	enrolledSubjectCards: EnrolledSubjectCard[];
 	profileGrade: number | null;
+	trackerNeedsHydration?: boolean;
 };
 
 function useStaggerVariants() {
@@ -277,6 +279,7 @@ export function StudentPerformanceView({
 	subjectFromUrl = null,
 	enrolledSubjectCards,
 	profileGrade,
+	trackerNeedsHydration = false,
 }: StudentPerformanceViewProps) {
 	const { container, item } = useStaggerVariants();
 	const { variants: pageVariants } = usePageTransitionVariants();
@@ -382,6 +385,7 @@ export function StudentPerformanceView({
 	if (loadError) {
 		return (
 			<div className="p-6">
+				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
 					<PageHeaderSubtext>
@@ -399,6 +403,7 @@ export function StudentPerformanceView({
 	if (!loadError && enrolledSubjectCards.length === 0) {
 		return (
 			<div className="p-6">
+				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
 					<PageHeaderSubtext>
@@ -424,6 +429,7 @@ export function StudentPerformanceView({
 
 	return (
 		<div className="flex flex-col gap-8 p-6 pb-28">
+			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<AnimatePresence mode="wait" initial={false}>
 				{!detailSubjectId ? (
 					<motion.div
@@ -689,9 +695,15 @@ export function StudentPerformanceView({
 									).map(([label, value, Icon, iconClass]) => (
 										<motion.div key={label} variants={item}>
 											<Card className={performanceDetailSurfaceClass}>
-												<CardHeader className="flex flex-row items-center justify-between pb-2">
-													<CardTitle className="font-medium text-sm">{label}</CardTitle>
-													<Icon className={cn("size-4 shrink-0", iconClass)} aria-hidden />
+												<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+													<CardTitle className="min-w-0 flex-1 font-medium text-sm leading-snug">
+														{label}
+													</CardTitle>
+													<Icon
+														className={cn("size-8 shrink-0", iconClass)}
+														strokeWidth={2}
+														aria-hidden
+													/>
 												</CardHeader>
 												<CardContent>
 													<motion.p

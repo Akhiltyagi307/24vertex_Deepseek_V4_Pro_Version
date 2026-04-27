@@ -10,8 +10,9 @@
  *
  * Env:
  *   DATABASE_URL     — if set, runs SELECT 1 + lightweight count (best-effort)
- *   PERF_BASE_URL    — if set, GETs / and /login and reports wall time
- *   PERF_SKIP_BUILD  — if "1" or "true", skips `pnpm run build`
+ *   PERF_BASE_URL         — if set, GETs / and /login and reports wall time
+ *   PERF_SKIP_BUILD       — if "1" or "true", skips `pnpm run build`
+ *   PERF_ROUTE_BUDGET_MS  — if set (e.g. 1500), exit 1 when any probed route exceeds this many ms
  */
 
 import { spawnSync } from "node:child_process";
@@ -81,6 +82,11 @@ async function runRouteProbe() {
 		return;
 	}
 	const paths = ["/", "/login"];
+	const budgetRaw = process.env.PERF_ROUTE_BUDGET_MS;
+	const budgetMs = budgetRaw ? Number.parseFloat(String(budgetRaw)) : 0;
+	const budgetActive = Number.isFinite(budgetMs) && budgetMs > 0;
+	let budgetFailed = false;
+
 	for (const p of paths) {
 		const url = `${base}${p}`;
 		const t0 = performance.now();
@@ -88,9 +94,18 @@ async function runRouteProbe() {
 			const res = await fetch(url, { redirect: "manual" });
 			const ms = performance.now() - t0;
 			console.log(`[perf] GET ${url} → ${res.status} in ${fmtMs(ms)}`);
+			if (budgetActive && ms > budgetMs) {
+				console.error(`[perf] BUDGET_FAIL: ${url} took ${fmtMs(ms)} (limit ${fmtMs(budgetMs)})`);
+				budgetFailed = true;
+			}
 		} catch (e) {
 			console.error(`[perf] GET ${url} failed:`, e?.message ?? e);
 		}
+	}
+
+	if (budgetFailed) {
+		console.error("[perf] One or more routes exceeded PERF_ROUTE_BUDGET_MS — exiting with code 1");
+		process.exit(1);
 	}
 }
 

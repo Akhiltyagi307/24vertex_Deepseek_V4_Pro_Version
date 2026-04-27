@@ -247,12 +247,17 @@ export async function submitPracticeTest(
 		return { ok: false, message: friendlyDbError("submit") };
 	}
 
-	const triggerResult = await triggerWorkerInBackground();
-	if (!triggerResult.ok) {
-		logServerError("submitPracticeTest.triggerWorkerInBackground", triggerResult.message, {
-			testId: row.test_id,
+	void triggerWorkerInBackground()
+		.then((triggerResult) => {
+			if (!triggerResult.ok) {
+				logServerError("submitPracticeTest.triggerWorkerInBackground", triggerResult.message, {
+					testId: row.test_id,
+				});
+			}
+		})
+		.catch((err) => {
+			logServerError("submitPracticeTest.triggerWorkerInBackground", err, { testId: row.test_id });
 		});
-	}
 
 	return {
 		ok: true,

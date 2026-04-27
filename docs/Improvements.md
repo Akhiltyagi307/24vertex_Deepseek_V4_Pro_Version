@@ -8,6 +8,22 @@ It extends and updates the bloat/audit notes: some items here overlap with `New-
 
 ---
 
+## Rollout status (sub-1s program, April 2026)
+
+| Area | Status |
+|------|--------|
+| Single cached `profiles` per request | **Done** — `getCachedAppProfileRow` + React `cache()` in [`src/lib/auth/cached-profile.ts`](src/lib/auth/cached-profile.ts) |
+| Layout parallel profile + entitlements | **Done** — `Promise.all` in [`app/student/layout.tsx`](app/student/layout.tsx) |
+| `get_entitlement_snapshot` in deployed DB | **Ops** — apply [`supabase/migrations/20260424120000_get_entitlement_snapshot.sql`](supabase/migrations/20260424120000_get_entitlement_snapshot.sql) in staging/prod (`SECURITY INVOKER`; RLS unchanged) |
+| Tracker sync off render path | **Done** — session-bound server action [`src/lib/student/sync-performance-tracker-action.ts`](src/lib/student/sync-performance-tracker-action.ts) + [`StudentPerformanceTrackerHydrate`](src/components/student/student-performance-tracker-hydrate.tsx) |
+| RSC streaming (dashboard, practice hub) | **Done** — Suspense + async loaders under `app/student/dashboard/` and `app/student/practice/` |
+| Curriculum topic counts (`unstable_cache`) | **Done** — [`src/lib/cache/curriculum-topic-counts.ts`](src/lib/cache/curriculum-topic-counts.ts); revalidate via `revalidateCurriculumTopicCaches()` from trusted server code only |
+| `optimizePackageImports`, image `remotePatterns`, Sentry defaults | **Done** — [`next.config.ts`](../next.config.ts), `sentry.*.config.ts` |
+| Region / pooler / `EXPLAIN` | **Ongoing** — verify per environment (§10) |
+| perf-check route budget | **Done** — optional `PERF_ROUTE_BUDGET_MS` in [`scripts/perf-check.mjs`](../scripts/perf-check.mjs) |
+
+---
+
 ## 1. Consolidate duplicate `profiles` and auth-adjacent reads
 
 ### Why
@@ -85,17 +101,21 @@ If you cannot add SQL immediately, ensure the two `usage_periods` paths are not 
 
 ### Why
 
-In `loadStudentPerformanceBundle` (`src/lib/student/student-performance-load.ts`), when the curriculum has topics but the performance tracker is empty, the code may call `supabase.rpc("sync_student_performance_tracker", ...)`. That **synchronous** RPC on the user’s first dashboard/performance visit adds **full round-trip and DB work** before the page can render.
+Previously, `loadStudentPerformanceBundle` (`src/lib/student/student-performance-load.ts`) called `sync_student_performance_tracker` synchronously when the curriculum had topics but the tracker was empty, adding a full round-trip before render.
 
-### How to implement
+### Status
 
-1. **Defer sync:** Return the page with a “calculating…” or partial state and trigger sync via a **server action** or **route handler** called from the client `useEffect`, or enqueue a **background job** (cron, internal `/api/internal/...` with a secret) after signup or weekly.
+**Implemented:** The bundle returns `trackerNeedsHydration` instead of blocking on the RPC. The client runs `syncPerformanceTrackerFromSession` in `src/lib/student/sync-performance-tracker-action.ts` once (session-bound server action, no user id from the client), then `router.refresh()`. Settings flows that still call the RPC directly after profile updates are unchanged.
 
-2. **Eager backfill:** Run sync when the student **completes onboarding** or **first enrolls in subjects** (one-time path, not every read).
+### How to implement (historical / extensions)
 
-3. **Keep the RPC** only for dev/admin “repair” buttons if you still need manual recovery.
+1. **Defer sync:** Return partial state and trigger sync via a **server action** from the client (current pattern), or a **background job** with a shared secret if you outgrow client-triggered refresh.
 
-**Measure:** Log duration of `sync_student_performance_tracker` in staging; confirm dashboard TTFB drops when the RPC is not invoked on the critical path.
+2. **Eager backfill:** Optionally run sync on onboarding completion (one-time path).
+
+3. **Keep the RPC** for dev/admin “repair” if needed.
+
+**Measure:** Compare dashboard TTFB before/after on first visit with empty tracker.
 
 ---
 
@@ -103,7 +123,7 @@ In `loadStudentPerformanceBundle` (`src/lib/student/student-performance-load.ts`
 
 ### Why
 
-Many routes use `export const dynamic = "force-dynamic"`, which is correct for user-specific data but **prevents** static page caching. You can still cache **deterministic, slowly changing** data across requests: subject lists for a grade, plan metadata shaping, public config, etc. You already have `getCachedPlanCatalog` in `src/lib/cache/deterministic-lookups.ts` — the same idea can apply elsewhere to cut repeated Supabase or CPU work.
+Many routes use `export const dynamic = "force-dynamic"`, which is correct for user-specific data but **prevents** static page caching. You can still cache **deterministic, slowly changing** data across requests: subject lists for a grade, plan metadata shaping, public config, etc. You already have `getCachedPlanCatalog` in `src/lib/cache/deterministic-lookups.ts`. Topic counts by grade + subject set use `getCachedTopicCountsBySubjectForGrade` in `src/lib/cache/curriculum-topic-counts.ts` (Drizzle + `DATABASE_URL`, tag `curriculum-topics`; revalidate with `revalidateCurriculumTopicCaches()` from trusted server code only).
 
 ### How to implement
 
@@ -111,7 +131,7 @@ Many routes use `export const dynamic = "force-dynamic"`, which is correct for u
 
 2. Wrap them in `unstable_cache(async () => ..., keyParts, { revalidate: N, tags: ['tag-name'] })`.
 
-3. From **server actions** or **webhooks** (you already use `revalidatePath` in billing), add `revalidateTag('tag-name')` when that data actually changes (if it ever can during runtime).
+3. From **server actions** or **webhooks** (you already use `revalidatePath` in billing), add `revalidateTag('tag-name', 'max')` when that data actually changes (Next 16 requires a cache life profile as the second argument).
 
 4. Do **not** put user-private rows in a shared global cache key without scoping: either cache per stable id (e.g. `['subjects', grade]`) or only public reference tables.
 
@@ -142,6 +162,10 @@ Use **one** function per “concern” (profile vs entitlements) or one composed
 ---
 
 ## 6. Streaming and Suspense: real parallelism for RSC
+
+### Status
+
+**Partially done:** Student dashboard and practice hub use async server children (`StudentDashboardAsync`, `StudentPracticeAsync`) inside `<Suspense>` with skeleton fallbacks so heavy loaders do not block the parent shell. Apply the same pattern to other heavy routes as needed.
 
 ### Why
 
@@ -179,6 +203,10 @@ Large client components (e.g. long practice and doubt chat files) increase **par
 ---
 
 ## 8. `experimental.optimizePackageImports` in `next.config.ts`
+
+### Status
+
+**Done** for `lucide-react` and `recharts` in `next.config.ts`. Revisit the list if bundle analysis shows more wins.
 
 ### Why
 
@@ -234,6 +262,10 @@ Layout animations and large `motion` trees can delay **first paint** and use CPU
 2. **DATABASE_URL** for Drizzle: use the **pooled** connection string from Supabase docs when using serverless or many short-lived Node processes; use **session/direct** for migrations when required.
 3. **Indexes:** In Drizzle migrations or Supabase SQL, add indexes for foreign keys and frequent filters. Follow `docs/EduAI_PDR_v3_0.md` and existing migration patterns. Use `EXPLAIN (ANALYZE, BUFFERS)` in staging for slow queries.
 
+### Status
+
+Schema already defines helpful indexes (e.g. `idx_topics_subject_grade`, `idx_usage_periods_subscription` in `src/db/schema/`). **Per deploy:** confirm host region matches Supabase, `DATABASE_URL` uses the pooler for runtime, and run `EXPLAIN` on slow paths as data grows.
+
 **Skills reference:** `postgres-drizzle` and `supabase-postgres-best-practices` in `.agents/skills/`.
 
 ---
@@ -254,6 +286,10 @@ Layout animations and large `motion` trees can delay **first paint** and use CPU
 ---
 
 ## 12. Sentry and performance sampling
+
+### Status
+
+**Tuned:** Server, edge, and client configs use lower default `tracesSampleRate` in production builds; server sets `profilesSampleRate` to `0` unless `SENTRY_PROFILES_SAMPLE_RATE` is set.
 
 ### Why
 
@@ -277,6 +313,7 @@ The repo includes `pnpm perf:check` which can run a production `next build` and 
 ### How to implement
 
 - In CI, run with `PERF_SKIP_BUILD=1` if the pipeline already built, and set `PERF_BASE_URL` to a preview deployment to measure `/` and `/login` timings.
+- Set `PERF_ROUTE_BUDGET_MS` (e.g. `1500`) to fail the script when any probed route exceeds that wall time (useful on preview URLs).
 - Extend the script (optional) to add authenticated paths using a test cookie or dedicated perf user — do not commit secrets; use CI env vars.
 
 ---
@@ -301,4 +338,4 @@ The repo includes `pnpm perf:check` which can run a production `next build` and 
 - After P0 items, re-measure TTFB for `/student/dashboard` and a full practice flow (Lighthouse or server timing logs).
 - Update this file when an item is **done** (optional short “Status” subsection per item) or keep that status in your issue tracker instead.
 
-*Last updated: 2026-04-24*
+*Last updated: 2026-04-28*

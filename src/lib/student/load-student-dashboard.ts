@@ -93,6 +93,7 @@ export type StudentDashboardViewPayload = {
 	analytics: ReturnType<typeof buildStudentDashboardAnalyticsPayload>;
 	recentTests: StudentDashboardRecentTest[];
 	assignmentSummary: StudentDashboardAssignmentSummary;
+	trackerNeedsHydration: boolean;
 };
 
 /**
@@ -136,7 +137,7 @@ export async function loadStudentDashboardViewPayload(
 			.order("updated_at", { ascending: false }),
 	]);
 
-	const { enrolledSubjects, topicCountBySubjectId, rows, loadError } = bundle;
+	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } = bundle;
 	if (completedTestRes.error) {
 		logSupabaseError("loadStudentDashboardViewPayload.tests.select", completedTestRes.error, { userId });
 	}
@@ -313,5 +314,6 @@ export async function loadStudentDashboardViewPayload(
 		analytics,
 		recentTests,
 		assignmentSummary,
+		trackerNeedsHydration,
 	};
 }

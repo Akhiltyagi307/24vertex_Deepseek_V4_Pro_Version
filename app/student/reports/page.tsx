@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 
 import { StudentReportsView } from "@/components/student/student-reports-view";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
@@ -59,9 +58,5 @@ export default async function StudentReportsPage() {
 		.map((r) => parseStudentReportTestRow(r as Record<string, unknown>))
 		.filter((row): row is NonNullable<typeof row> => row != null);
 
-	return (
-		<Suspense fallback={<div className="p-6 text-muted-foreground text-sm">Loading reports…</div>}>
-			<StudentReportsView initialTests={initialTests} loadError={testsErr?.message ?? null} />
-		</Suspense>
-	);
+	return <StudentReportsView initialTests={initialTests} loadError={testsErr?.message ?? null} />;
 }

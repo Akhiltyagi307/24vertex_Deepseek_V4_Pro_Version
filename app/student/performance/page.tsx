@@ -19,13 +19,13 @@ export default async function StudentPerformancePage({ searchParams }: PageProps
 	if (!user) {
 		redirect("/login");
 	}
-	const row = await getCachedAppProfileRow();
+	const [row, supabase] = await Promise.all([getCachedAppProfileRow(), createClient()]);
 	if (!row || row.role !== "student") {
 		redirect("/login");
 	}
 
-	const supabase = await createClient();
-	const { enrolledSubjects, topicCountBySubjectId, rows, loadError } = await loadStudentPerformanceBundle(
+	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } =
+		await loadStudentPerformanceBundle(
 		supabase,
 		user.id,
 		{
@@ -45,6 +45,7 @@ export default async function StudentPerformancePage({ searchParams }: PageProps
 			subjectFromUrl={sp.subject ?? null}
 			enrolledSubjectCards={enrolledSubjectCards}
 			profileGrade={row.grade}
+			trackerNeedsHydration={trackerNeedsHydration}
 		/>
 	);
 }

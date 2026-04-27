@@ -19,13 +19,14 @@ import {
 	Search,
 } from "lucide-react";
 import * as React from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,37 @@ function scoreForAverage(r: StudentReportTestRowSerialized): number | null {
 	if (r.status === "graded") return s;
 	if (r.status === "submitted") return s;
 	return null;
+}
+
+function useReportsStaggerVariants() {
+	const reduceMotion = useReducedMotion();
+	const y = reduceMotion ? 0 : 10;
+	const stagger = reduceMotion ? 0 : 0.05;
+	const duration = reduceMotion ? 0 : 0.24;
+
+	const container = React.useMemo(
+		() => ({
+			hidden: {},
+			show: {
+				transition: { staggerChildren: stagger, delayChildren: reduceMotion ? 0 : 0.02 },
+			},
+		}),
+		[reduceMotion, stagger],
+	);
+
+	const item = React.useMemo(
+		() => ({
+			hidden: { opacity: reduceMotion ? 1 : 0, y },
+			show: {
+				opacity: 1,
+				y: 0,
+				transition: { duration, ease: "easeOut" as const },
+			},
+		}),
+		[duration, reduceMotion, y],
+	);
+
+	return { container, item };
 }
 
 export function StudentReportsView({ initialTests, loadError }: StudentReportsViewProps) {
@@ -210,108 +242,145 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 		(outcomeFilter ? 1 : 0);
 
 	const sortIsNonDefault = sortKey !== "date" || sortDir !== "desc";
+	const { container, item } = useReportsStaggerVariants();
 
 	return (
 		<div className="flex flex-col gap-8 p-6 pb-28">
-			<header className="flex shrink-0 flex-col gap-1.5">
-				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Reports</h1>
-				<PageHeaderSubtext>
-					Use this page to review completed tests, track scores, and download PDF copies of your reports.
-				</PageHeaderSubtext>
-			</header>
+			<motion.header
+				className="flex shrink-0 flex-col gap-1.5"
+				initial="hidden"
+				animate="show"
+				variants={container}
+			>
+				<motion.h1
+					className="font-semibold text-3xl tracking-tight text-balance text-foreground"
+					variants={item}
+				>
+					Reports
+				</motion.h1>
+				<motion.div variants={item}>
+					<PageHeaderSubtext>
+						Use this page to review completed tests, track scores, and download PDF copies of your reports.
+					</PageHeaderSubtext>
+				</motion.div>
+			</motion.header>
 
 			{loadError ? (
-				<Alert variant="destructive">
-					<AlertTitle>Could not load tests</AlertTitle>
-					<AlertDescription>{loadError}</AlertDescription>
-				</Alert>
+				<motion.div initial="hidden" animate="show" variants={item}>
+					<Alert variant="destructive">
+						<AlertTitle>Could not load tests</AlertTitle>
+						<AlertDescription>{loadError}</AlertDescription>
+					</Alert>
+				</motion.div>
 			) : null}
 
-			<section aria-labelledby="report-stats-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+			<motion.section
+				aria-labelledby="report-stats-heading"
+				className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+				initial="hidden"
+				animate="show"
+				variants={container}
+			>
 				<h2 id="report-stats-heading" className="sr-only">
 					Reports summary
 				</h2>
-				<Card className="shadow-none">
-					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Total reports</CardTitle>
-						<Library
-							className="size-8 shrink-0 text-cyan-600 dark:text-cyan-400"
-							strokeWidth={2}
-							aria-hidden
-						/>
-					</CardHeader>
-					<CardContent>
-						<p className="font-semibold text-2xl tabular-nums">{overviewStats.total}</p>
-						<p className="text-muted-foreground text-xs">On your list</p>
-					</CardContent>
-				</Card>
-				<Card className="shadow-none">
-					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Submitted</CardTitle>
-						<Clock
-							className="size-8 shrink-0 text-amber-600 dark:text-amber-400"
-							strokeWidth={2}
-							aria-hidden
-						/>
-					</CardHeader>
-					<CardContent>
-						<p className="font-semibold text-2xl tabular-nums">{overviewStats.submitted}</p>
-						<p className="text-muted-foreground text-xs">Waiting on a final score</p>
-					</CardContent>
-				</Card>
-				<Card className="shadow-none">
-					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Graded</CardTitle>
-						<BadgeCheck
-							className="size-8 shrink-0 text-emerald-600 dark:text-emerald-400"
-							strokeWidth={2}
-							aria-hidden
-						/>
-					</CardHeader>
-					<CardContent>
-						<p className="font-semibold text-2xl tabular-nums">{overviewStats.graded}</p>
-						<p className="text-muted-foreground text-xs">Fully graded</p>
-					</CardContent>
-				</Card>
-				<Card className="shadow-none">
-					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Average score</CardTitle>
-						<LineChart
-							className="size-8 shrink-0 text-violet-600 dark:text-violet-400"
-							strokeWidth={2}
-							aria-hidden
-						/>
-					</CardHeader>
-					<CardContent>
-						<p className="font-semibold text-2xl tabular-nums">
-							{overviewStats.avgScore != null ? `${overviewStats.avgScore}%` : "—"}
-						</p>
-						<p className="text-muted-foreground text-xs">Across tests in the table</p>
-					</CardContent>
-				</Card>
-				<Card className="shadow-none">
-					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Last test</CardTitle>
-						<CalendarClock
-							className="size-8 shrink-0 text-sky-600 dark:text-sky-400"
-							strokeWidth={2}
-							aria-hidden
-						/>
-					</CardHeader>
-					<CardContent>
-						<p className="font-semibold text-2xl leading-snug">
-							{overviewStats.lastTestMs
-								? new Date(overviewStats.lastTestMs).toLocaleDateString("en-US", {
-										dateStyle: "medium",
-									})
-								: "—"}
-						</p>
-						<p className="text-muted-foreground text-xs">When you last submitted</p>
-					</CardContent>
-				</Card>
-			</section>
+				<motion.div variants={item}>
+					<Card className="shadow-none">
+						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Total reports</CardTitle>
+							<Library
+								className="size-8 shrink-0 text-cyan-600 dark:text-cyan-400"
+								strokeWidth={2}
+								aria-hidden
+							/>
+						</CardHeader>
+						<CardContent>
+							<p className="font-semibold text-2xl tabular-nums">{overviewStats.total}</p>
+							<p className="text-muted-foreground text-xs">On your list</p>
+						</CardContent>
+					</Card>
+				</motion.div>
+				<motion.div variants={item}>
+					<Card className="shadow-none">
+						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Submitted</CardTitle>
+							<Clock
+								className="size-8 shrink-0 text-amber-600 dark:text-amber-400"
+								strokeWidth={2}
+								aria-hidden
+							/>
+						</CardHeader>
+						<CardContent>
+							<p className="font-semibold text-2xl tabular-nums">{overviewStats.submitted}</p>
+							<p className="text-muted-foreground text-xs">Waiting on a final score</p>
+						</CardContent>
+					</Card>
+				</motion.div>
+				<motion.div variants={item}>
+					<Card className="shadow-none">
+						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Graded</CardTitle>
+							<BadgeCheck
+								className="size-8 shrink-0 text-emerald-600 dark:text-emerald-400"
+								strokeWidth={2}
+								aria-hidden
+							/>
+						</CardHeader>
+						<CardContent>
+							<p className="font-semibold text-2xl tabular-nums">{overviewStats.graded}</p>
+							<p className="text-muted-foreground text-xs">Fully graded</p>
+						</CardContent>
+					</Card>
+				</motion.div>
+				<motion.div variants={item}>
+					<Card className="shadow-none">
+						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Average score</CardTitle>
+							<LineChart
+								className="size-8 shrink-0 text-violet-600 dark:text-violet-400"
+								strokeWidth={2}
+								aria-hidden
+							/>
+						</CardHeader>
+						<CardContent>
+							<p className="font-semibold text-2xl tabular-nums">
+								{overviewStats.avgScore != null ? `${overviewStats.avgScore}%` : "—"}
+							</p>
+							<p className="text-muted-foreground text-xs">Across tests in the table</p>
+						</CardContent>
+					</Card>
+				</motion.div>
+				<motion.div variants={item}>
+					<Card className="shadow-none">
+						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Last test</CardTitle>
+							<CalendarClock
+								className="size-8 shrink-0 text-sky-600 dark:text-sky-400"
+								strokeWidth={2}
+								aria-hidden
+							/>
+						</CardHeader>
+						<CardContent>
+							<p className="font-semibold text-2xl leading-snug">
+								{overviewStats.lastTestMs
+									? new Date(overviewStats.lastTestMs).toLocaleDateString("en-US", {
+											dateStyle: "medium",
+										})
+									: "—"}
+							</p>
+							<p className="text-muted-foreground text-xs">When you last submitted</p>
+						</CardContent>
+					</Card>
+				</motion.div>
+			</motion.section>
 
-			<section aria-labelledby="report-filters-heading" className="flex flex-col gap-4">
+			<motion.section
+				aria-labelledby="report-filters-heading"
+				className="flex flex-col gap-4"
+				initial="hidden"
+				animate="show"
+				variants={item}
+			>
 				<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
 					<h2
 						id="report-filters-heading"
@@ -765,7 +834,7 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 					</table>
 						</div>
 					</Card>
-			</section>
+			</motion.section>
 		</div>
 	);
 }

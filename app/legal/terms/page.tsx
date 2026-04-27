@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import { MotionPageEnter } from "@/components/motion/motion-page-enter";
+
 export const metadata: Metadata = {
 	title: "Terms of use — EduAI",
 	description: "Terms of use for the EduAI service.",
@@ -9,6 +11,7 @@ export const metadata: Metadata = {
 export default function LegalTermsPage() {
 	return (
 		<main className="mx-auto max-w-2xl px-4 py-12 text-foreground">
+			<MotionPageEnter className="flex flex-col">
 			<h1 className="text-2xl font-semibold tracking-tight">Terms of use</h1>
 			<p className="mt-2 text-sm text-muted-foreground">Last updated April 2026</p>
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
@@ -48,6 +51,7 @@ export default function LegalTermsPage() {
 					Home
 				</Link>
 			</p>
+			</MotionPageEnter>
 		</main>
 	);
 }

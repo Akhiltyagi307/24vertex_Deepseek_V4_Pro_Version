@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import { MotionPageEnter } from "@/components/motion/motion-page-enter";
+
 export const metadata: Metadata = {
 	title: "Refund & cancellation policy — EduAI",
 	description: "How refunds and subscription cancellations work for EduAI.",
@@ -9,6 +11,7 @@ export const metadata: Metadata = {
 export default function LegalRefundPage() {
 	return (
 		<main className="mx-auto max-w-2xl px-4 py-12 text-foreground">
+			<MotionPageEnter className="flex flex-col">
 			<h1 className="text-2xl font-semibold tracking-tight">Refund & cancellation</h1>
 			<p className="mt-2 text-sm text-muted-foreground">Last updated April 2026</p>
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
@@ -43,6 +46,7 @@ export default function LegalRefundPage() {
 					Home
 				</Link>
 			</p>
+			</MotionPageEnter>
 		</main>
 	);
 }

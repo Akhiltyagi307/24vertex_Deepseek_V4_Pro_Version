@@ -65,7 +65,7 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 	}));
 
 	return (
-		<div className="flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+		<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden">
 			<DoubtChatView
 				enrolledSubjects={enrolledSubjects}
 				subjectsLoadError={bundle.subjectsLoadError}

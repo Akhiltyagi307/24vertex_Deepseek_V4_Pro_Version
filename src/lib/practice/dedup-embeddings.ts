@@ -2,6 +2,7 @@ import { embedMany } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 
 const EMBEDDING_MODEL_ID = process.env.PRACTICE_EMBEDDING_MODEL?.trim() || "text-embedding-3-small";
 const DUPLICATE_COSINE_THRESHOLD = Number.parseFloat(
@@ -47,29 +48,19 @@ export async function findDuplicatesAgainstStudent(
 	const topicIds = [...new Set(generated.map((g) => g.topic_id))];
 	if (topicIds.length === 0) return [];
 
-	// Pull a cap of past question embeddings for this student on these topics.
+	// Past embeddings for this student on these topics only (inner join tests).
 	const { data: pastRows, error } = await supabase
 		.from("questions")
-		.select("id, topic_id, embedding, test_id")
+		.select("id, topic_id, embedding, test_id, tests!inner(student_id)")
 		.in("topic_id", topicIds)
+		.eq("tests.student_id", studentId)
 		.not("embedding", "is", null)
 		.limit(500);
 
 	if (error || !pastRows?.length) return [];
 
-	// Filter to questions from this student's own tests.
-	const testIds = [...new Set(pastRows.map((r) => r.test_id as string))];
-	if (testIds.length === 0) return [];
-	const { data: testRows } = await supabase
-		.from("tests")
-		.select("id")
-		.in("id", testIds)
-		.eq("student_id", studentId);
-	const ownedTestIds = new Set((testRows ?? []).map((r) => r.id as string));
-
 	const pastByTopic = new Map<string, Array<{ embedding: number[] }>>();
 	for (const r of pastRows) {
-		if (!ownedTestIds.has(r.test_id as string)) continue;
 		const raw = r.embedding as unknown;
 		const vec = Array.isArray(raw)
 			? (raw as number[])
@@ -108,11 +99,19 @@ export async function persistQuestionEmbeddings(
 	serviceClient: SupabaseClient,
 	rows: Array<{ question_id: string; embedding: number[] }>,
 ): Promise<void> {
-	for (const row of rows) {
-		await serviceClient
-			.from("questions")
-			.update({ embedding: toPgVector(row.embedding) })
-			.eq("id", row.question_id);
+	if (rows.length === 0) return;
+	const p_rows = rows.map((r) => ({
+		question_id: r.question_id,
+		embedding: toPgVector(r.embedding),
+	}));
+	const { error } = await serviceClient.rpc("practice_upsert_question_embeddings", {
+		p_rows,
+	});
+	if (error) {
+		logSupabaseError("persistQuestionEmbeddings.practice_upsert_question_embeddings", error, {
+			n: rows.length,
+		});
+		throw error;
 	}
 }
 

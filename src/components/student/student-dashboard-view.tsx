@@ -27,6 +27,7 @@ import type { DashboardPerformanceStats } from "@/lib/student/dashboard-performa
 import { partitionDashboardSubjectsByPriority } from "@/lib/student/dashboard-subject-priority";
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
 import { getSubjectCardIconConfig } from "@/lib/student/subject-lucide-icon";
+import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
 import { cn } from "@/lib/utils";
 
 /** Major section labels + in-column sub-labels: same type scale and alignment. */
@@ -150,6 +151,7 @@ export type StudentDashboardViewProps = {
 	analytics: StudentDashboardAnalyticsPayload;
 	recentTests: StudentDashboardRecentTest[];
 	assignmentSummary: StudentDashboardAssignmentSummary;
+	trackerNeedsHydration?: boolean;
 };
 
 export function StudentDashboardView({
@@ -160,6 +162,7 @@ export function StudentDashboardView({
 	analytics,
 	recentTests,
 	assignmentSummary,
+	trackerNeedsHydration = false,
 }: StudentDashboardViewProps) {
 	const { container, item } = useStaggerVariants();
 
@@ -170,6 +173,7 @@ export function StudentDashboardView({
 
 	return (
 		<div className="flex flex-col gap-8 p-6">
+			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<motion.div
 				className="flex shrink-0 flex-col gap-1.5"
 				initial="hidden"

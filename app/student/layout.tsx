@@ -17,7 +17,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 	if (!user) {
 		redirect("/login");
 	}
-	const row = await getCachedAppProfileRow();
+	const [row, entitlement] = await Promise.all([getCachedAppProfileRow(), getCachedEntitlements()]);
 	if (!row || row.role !== "student") {
 		redirect("/login");
 	}
@@ -26,7 +26,6 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
 	const org = ctx.schoolName?.trim() || "Your school";
 	const displayName = formatPersonDisplayName(ctx.fullName ?? "") || "Student";
-	const entitlement = await getCachedEntitlements();
 
 	return (
 		<StudentShell

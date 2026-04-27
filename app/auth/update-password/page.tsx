@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,6 +12,9 @@ export default function UpdatePasswordPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [done, setDone] = useState(false);
 	const router = useRouter();
+	const reduceMotion = useReducedMotion();
+	const duration = reduceMotion ? 0 : 0.24;
+	const y = reduceMotion ? 0 : 8;
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
@@ -36,7 +40,12 @@ export default function UpdatePasswordPage() {
 
 	return (
 		<div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
-			<div className="space-y-6">
+			<motion.div
+				className="space-y-6"
+				initial={reduceMotion ? false : { opacity: 0, y }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={{ duration, ease: [0.25, 0.1, 0.25, 1] }}
+			>
 				<div>
 					<h1 className="text-xl font-semibold">Set a new password</h1>
 					<p className="mt-1 text-sm text-zinc-600">Use the link from your email to reach this page.</p>
@@ -89,7 +98,7 @@ export default function UpdatePasswordPage() {
 						Back to log in
 					</Link>
 				</p>
-			</div>
+			</motion.div>
 		</div>
 	);
 }

@@ -105,12 +105,18 @@ export async function resolvePracticeConfigForStudent(
 		};
 	}
 
-	const { data: subjectRow, error: subjectRowErr } = await supabase
-		.from("subjects")
-		.select("name, grade, subject_group")
-		.eq("id", subjectId)
-		.maybeSingle();
+	const [subjectRes, trackerRes, recentErrorsAll] = await Promise.all([
+		supabase.from("subjects").select("name, grade, subject_group").eq("id", subjectId).maybeSingle(),
+		supabase
+			.from("performance_tracker")
+			.select("id, topic_id, subject_id, status, last_test_date, average_score, tests_taken, trend")
+			.eq("student_id", user.id)
+			.eq("subject_id", subjectId)
+			.in("id", trackerIds),
+		loadRecentErrorsForSubject(supabase, user.id, subjectId),
+	]);
 
+	const { data: subjectRow, error: subjectRowErr } = subjectRes;
 	if (subjectRowErr || !subjectRow?.name?.trim() || subjectRow.grade == null) {
 		return {
 			ok: false,
@@ -123,12 +129,7 @@ export async function resolvePracticeConfigForStudent(
 	const subjectGrade = subjectRow.grade as number;
 	const subjectGroup = (subjectRow.subject_group as string | null) ?? null;
 
-	const { data: trackers, error: trackerErr } = await supabase
-		.from("performance_tracker")
-		.select("id, topic_id, subject_id, status, last_test_date, average_score, tests_taken, trend")
-		.eq("student_id", user.id)
-		.eq("subject_id", subjectId)
-		.in("id", trackerIds);
+	const { data: trackers, error: trackerErr } = trackerRes;
 
 	if (trackerErr) {
 		return {
@@ -213,11 +214,9 @@ export async function resolvePracticeConfigForStudent(
 		});
 	}
 
-	// Phase 3: pull up to 8 recent incorrect / partial answers for this subject
-	// so the generator can bias toward concepts the student has struggled with.
+	// Phase 3: `recentErrorsAll` was loaded in parallel with subject + trackers.
 	// Only include errors whose topic_id is in the student's current selection;
 	// otherwise the model may emit topic_ids that fail validateAndStripGeneration.
-	const recentErrorsAll = await loadRecentErrorsForSubject(supabase, user.id, subjectId);
 	const selectedTopicIds = new Set(canonicalTopics.map((t) => t.topicId));
 	const recentErrors = recentErrorsAll.filter((e) => selectedTopicIds.has(e.topic_id));
 

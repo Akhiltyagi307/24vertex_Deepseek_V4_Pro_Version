@@ -187,19 +187,24 @@ export async function gradePracticeTestWithAi(
 
 	const subjectId = testRow.subject_id as string;
 
-	const { data: subjectRow } = await supabase.from("subjects").select("name").eq("id", subjectId).maybeSingle();
+	const [subjectRes, questionsRes, answersRes] = await Promise.all([
+		supabase.from("subjects").select("name").eq("id", subjectId).maybeSingle(),
+		supabase
+			.from("questions")
+			.select(
+				"id, topic_id, question_text, question_type, answer_key, options, question_number, difficulty_level",
+			)
+			.eq("test_id", testId)
+			.order("question_number", { ascending: true }),
+		supabase.from("student_answers").select("question_id, student_answer").eq("test_id", testId),
+	]);
+
+	const { data: subjectRow } = subjectRes;
 	const subjectName = String(subjectRow?.name ?? "Subject").trim() || "Subject";
 	const subjectLower = subjectName.toLowerCase();
 	const requireMathSteps = subjectLower.includes("math");
 
-	const { data: questions, error: qErr } = await supabase
-		.from("questions")
-		.select(
-			"id, topic_id, question_text, question_type, answer_key, options, question_number, difficulty_level",
-		)
-		.eq("test_id", testId)
-		.order("question_number", { ascending: true });
-
+	const { data: questions, error: qErr } = questionsRes;
 	if (qErr || !questions?.length) {
 		if (qErr) {
 			logSupabaseError("gradePracticeTestWithAi.questions.select", qErr, { testId });
@@ -219,11 +224,7 @@ export async function gradePracticeTestWithAi(
 
 	const topicNameById = new Map((topicRows ?? []).map((t) => [t.id as string, String(t.topic_name)]));
 
-	const { data: answerRows, error: aErr } = await supabase
-		.from("student_answers")
-		.select("question_id, student_answer")
-		.eq("test_id", testId);
-
+	const { data: answerRows, error: aErr } = answersRes;
 	if (aErr) {
 		logSupabaseError("gradePracticeTestWithAi.student_answers.select", aErr, { testId });
 		return { ok: false, message: "Could not load answers." };
@@ -406,27 +407,21 @@ export async function gradePracticeTestWithAi(
 		return { ok: false, message: "Could not save report." };
 	}
 
-	// Rolling-mean tracker update with trend recomputation lives in
-	// practice_update_tracker_running (SECURITY DEFINER). One row per topic; run in parallel.
-	const trackerResults = await Promise.all(
-		topicRollups.map((row) =>
-			supabase.rpc("practice_update_tracker_running", {
-				p_student_id: userId,
-				p_subject_id: subjectId,
-				p_topic_id: row.topic_id,
-				p_current_test_id: testId,
-				p_current_test_score: row.average_score,
-				p_current_n_incorrect: row.n_incorrect,
-				p_now: nowIso,
-			}),
-		),
-	);
-	for (let i = 0; i < trackerResults.length; i++) {
-		const pe = trackerResults[i]?.error;
-		if (pe) {
-			logSupabaseError("gradePracticeTestWithAi.practice_update_tracker_running", pe, {
+	if (topicRollups.length > 0) {
+		const { error: bulkTrackerErr } = await supabase.rpc("practice_update_trackers_bulk", {
+			p_student_id: userId,
+			p_subject_id: subjectId,
+			p_current_test_id: testId,
+			p_now: nowIso,
+			p_items: topicRollups.map((row) => ({
+				topic_id: row.topic_id,
+				average_score: row.average_score,
+				n_incorrect: row.n_incorrect,
+			})),
+		});
+		if (bulkTrackerErr) {
+			logSupabaseError("gradePracticeTestWithAi.practice_update_trackers_bulk", bulkTrackerErr, {
 				testId,
-				topicId: topicRollups[i]!.topic_id,
 			});
 		}
 	}
@@ -486,14 +481,20 @@ export async function buildPracticeGradingReportPdfBuffer(
 	const userId = testRow.student_id as string;
 	const subjectId = testRow.subject_id as string;
 
-	const { data: subjectRow } = await admin.from("subjects").select("name").eq("id", subjectId).maybeSingle();
-	const subjectName = String(subjectRow?.name ?? "Subject").trim() || "Subject";
+	const [subjectRes, reportRes, profileRes, questionsRes] = await Promise.all([
+		admin.from("subjects").select("name").eq("id", subjectId).maybeSingle(),
+		admin.from("test_reports").select("summary_report, topic_performance").eq("test_id", testId).maybeSingle(),
+		admin.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+		admin
+			.from("questions")
+			.select("id, topic_id, question_text, question_type, question_number, difficulty_level, options, answer_key")
+			.eq("test_id", testId)
+			.order("question_number", { ascending: true }),
+	]);
 
-	const { data: report, error: repErr } = await admin
-		.from("test_reports")
-		.select("summary_report, topic_performance")
-		.eq("test_id", testId)
-		.maybeSingle();
+	const subjectName = String(subjectRes.data?.name ?? "Subject").trim() || "Subject";
+
+	const { data: report, error: repErr } = reportRes;
 	if (repErr || !report?.summary_report) {
 		return { ok: false, message: "No graded report to render." };
 	}
@@ -506,18 +507,9 @@ export async function buildPracticeGradingReportPdfBuffer(
 		return { ok: false, message: "Report is missing summary data." };
 	}
 
-	const { data: profileRow } = await admin
-		.from("profiles")
-		.select("full_name")
-		.eq("id", userId)
-		.maybeSingle();
-	const studentDisplayName = String(profileRow?.full_name ?? "").trim() || null;
+	const studentDisplayName = String(profileRes.data?.full_name ?? "").trim() || null;
 
-	const { data: questionRows, error: qErr } = await admin
-		.from("questions")
-		.select("id, topic_id, question_text, question_type, question_number, difficulty_level, options, answer_key")
-		.eq("test_id", testId)
-		.order("question_number", { ascending: true });
+	const { data: questionRows, error: qErr } = questionsRes;
 	if (qErr || !questionRows?.length) {
 		return { ok: false, message: "Could not load questions." };
 	}
@@ -537,12 +529,28 @@ export async function buildPracticeGradingReportPdfBuffer(
 		ai_reference_answer_summary?: unknown;
 	};
 
-	const res1 = await admin
-		.from("student_answers")
-		.select(answerSelectFull)
-		.eq("test_id", testId);
+	const topicIds = [...new Set(questionRows.map((q) => q.topic_id as string))];
+	const topicsPromise =
+		topicIds.length > 0 ?
+			admin.from("topics").select("id, topic_name, chapter_name, unit_name, grade").in("id", topicIds)
+		:	Promise.resolve({
+				data: [] as Array<{
+					id: string;
+					topic_name: string;
+					chapter_name: string | null;
+					unit_name: string | null;
+					grade: unknown;
+				}>,
+				error: null,
+			});
+
+	const [res1, topicRes] = await Promise.all([
+		admin.from("student_answers").select(answerSelectFull).eq("test_id", testId),
+		topicsPromise,
+	]);
 	let answerRows = res1.data as PdfAnswerRow[] | null;
 	let aErr = res1.error;
+	const topicRows = topicRes.data;
 	if (aErr && isPostgrestMissingColumnError(aErr)) {
 		const res2 = await admin.from("student_answers").select(answerSelectBase).eq("test_id", testId);
 		answerRows = res2.data as PdfAnswerRow[] | null;
@@ -552,11 +560,6 @@ export async function buildPracticeGradingReportPdfBuffer(
 		return { ok: false, message: "Could not load answers." };
 	}
 
-	const topicIds = [...new Set(questionRows.map((q) => q.topic_id as string))];
-	const { data: topicRows } = await admin
-		.from("topics")
-		.select("id, topic_name, chapter_name, unit_name, grade")
-		.in("id", topicIds);
 	const topicNameById = new Map((topicRows ?? []).map((t) => [t.id as string, String(t.topic_name)]));
 	const chapterNameById = new Map(
 		(topicRows ?? []).map((t) => [t.id as string, String(t.chapter_name ?? "").trim() || "—"]),

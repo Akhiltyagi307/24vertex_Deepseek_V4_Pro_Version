@@ -4,6 +4,7 @@ import {
 	renderAndUploadPracticeReportPdf,
 } from "@/lib/practice/ai-grade-practice-test";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
+import { pLimit } from "@/lib/practice/ai-retry";
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -167,9 +168,9 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 	}
 
 	const claimed = (jobs ?? []) as ClaimedJob[];
-	const results: Array<{ id: string; ok: boolean; type: string; message?: string }> = [];
+	const jobWorkerConcurrency = 2;
 
-	for (const job of claimed) {
+	const processOne = async (job: ClaimedJob) => {
 		try {
 			const out =
 				job.job_type === "grade" ? await handleGradeJob(job)
@@ -178,11 +179,10 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 
 			if (out.ok) {
 				await markJobDone(job.id);
-				results.push({ id: job.id, ok: true, type: job.job_type });
-			} else {
-				await markJobFailure(job, out.message);
-				results.push({ id: job.id, ok: false, type: job.job_type, message: out.message });
+				return { id: job.id, ok: true as const, type: job.job_type };
 			}
+			await markJobFailure(job, out.message);
+			return { id: job.id, ok: false as const, type: job.job_type, message: out.message };
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "Unknown worker error";
 			try {
@@ -193,9 +193,14 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 					jobType: job.job_type,
 				});
 			}
-			results.push({ id: job.id, ok: false, type: job.job_type, message: msg });
+			return { id: job.id, ok: false as const, type: job.job_type, message: msg };
 		}
-	}
+	};
+
+	const results = await pLimit(
+		jobWorkerConcurrency,
+		claimed.map((job) => () => processOne(job)),
+	);
 
 	return Response.json({ ok: true, processed: results.length, results });
 }

@@ -73,7 +73,7 @@ export function SubscriptionBanner({ entitlement }: { entitlement: EntitlementSn
 	return (
 		<div
 			className={cn(
-				"flex flex-col items-start gap-2 border-b px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4",
+				"flex shrink-0 flex-col items-start gap-2 border-b px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4",
 				toneClasses[banner.tone],
 			)}
 			role="status"
