@@ -217,7 +217,7 @@ export function PracticeGradingProgressView({
 
 	return (
 		<div className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-lg flex-col justify-center gap-6 p-6 sm:p-8">
-			<Card className="border-border bg-card/80 shadow-md ring-1 ring-border/60 dark:shadow-none dark:ring-border/40">
+			<Card className="bg-card/80 shadow-md dark:shadow-none">
 				<CardHeader className="gap-2 border-b border-border/60 pb-6">
 					<div className="flex items-center gap-2">
 						<SparklesIcon className="size-4 text-primary" aria-hidden />

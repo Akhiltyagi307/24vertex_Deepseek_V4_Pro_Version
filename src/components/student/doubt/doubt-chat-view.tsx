@@ -40,6 +40,7 @@ import type { DoubtChatTopicRow, DoubtChatConversationRow } from "@/lib/doubt/lo
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -54,6 +55,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 
 import { TutorMarkdown } from "./tutor-markdown";
 
@@ -271,10 +274,9 @@ function EmptyState({
 				<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
 					{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
 				</h3>
-				<p className="text-muted-foreground text-[14px] leading-relaxed [text-wrap:pretty]">
-					Ask anything about this topic — concepts, worked examples, or practice
-					questions. The tutor stays scoped to your curriculum for this chapter.
-				</p>
+				<PageHeaderSubtext>
+					Ask about concepts, worked examples, or practice questions—answers stay scoped to your curriculum for this chapter.
+				</PageHeaderSubtext>
 			</div>
 			<div className="flex flex-wrap gap-2">
 				{SUGGESTED_PROMPTS.map((p) => (
@@ -1152,18 +1154,17 @@ export function DoubtChatView(props: {
 									<h1 className="text-foreground text-[22px] font-semibold tracking-tight sm:text-[24px]">
 										Start a new chat
 									</h1>
-									<p className="text-muted-foreground text-[14.5px] leading-relaxed [text-wrap:pretty]">
-										Choose your subject and chapter first—the tutor only answers in that part of your
-										syllabus. Use it for quick explanations, worked examples, or extra practice
-										questions.
-									</p>
+									<PageHeaderSubtext>
+										Choose your subject and chapter first so the tutor answers only within that syllabus scope, including explanations, examples, and practice questions.
+									</PageHeaderSubtext>
 								</div>
 							</div>
 
 							{/* Scope card */}
 							<div
 								className={cn(
-									"border-border/70 bg-card/40 rounded-xl border shadow-sm",
+									cardSurfaceFrameClassName,
+									"bg-card/40 shadow-sm",
 									"divide-border/60 divide-y",
 								)}
 							>

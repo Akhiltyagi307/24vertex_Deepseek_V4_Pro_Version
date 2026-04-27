@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRightIcon, CrownIcon, SparklesIcon, ZapIcon } from "lucide-react";
 
+import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import { useSidebar } from "@/components/ui/sidebar";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
@@ -149,9 +150,10 @@ export function SidebarPlanCard({
 					exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.99 }}
 					transition={cardTransition}
 					className={cn(
-						"group/plancard relative overflow-hidden rounded-xl border bg-sidebar-accent/40 p-4 shadow-sm backdrop-blur-sm",
-						"transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-md",
-						t.border ? t.border : "border-sidebar-border/80",
+						cardSurfaceFrameClassName,
+						"group/plancard relative overflow-hidden p-4 shadow-sm backdrop-blur-sm",
+						"bg-sidebar-accent/40 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-px hover:shadow-md",
+						t.border ? t.border : undefined,
 						t.ring,
 						className,
 					)}

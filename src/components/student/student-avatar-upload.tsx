@@ -7,6 +7,7 @@ import Cropper, { type Area } from "react-easy-crop";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import {
 	Field,
 	FieldContent,
@@ -154,8 +155,9 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 
 				<div
 					className={cn(
-						"w-full min-w-0 overflow-hidden rounded-xl border border-border/90 bg-background shadow-sm",
-						"dark:border-input dark:bg-input/35",
+						cardSurfaceFrameClassName,
+						"w-full min-w-0 overflow-hidden shadow-sm",
+						"bg-background dark:border-input dark:bg-input/35",
 					)}
 				>
 					<div className="flex flex-col items-center gap-8 p-6 sm:flex-row sm:items-center sm:gap-10 sm:p-8 md:gap-12 md:px-10 md:py-9">

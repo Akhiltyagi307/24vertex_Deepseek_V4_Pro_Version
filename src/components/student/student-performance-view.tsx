@@ -3,26 +3,31 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+	ArrowDownUp,
 	ArrowLeftIcon,
-	ArrowUpDownIcon,
 	BookOpenIcon,
 	ChevronDownIcon,
-	ChevronRightIcon,
 	LayoutListIcon,
 	LineChartIcon,
+	ListFilter,
 	ListFilterIcon,
+	ListOrdered,
 	MinusIcon,
 	RotateCcwIcon,
-	SearchIcon,
 	TrendingDownIcon,
 	TrendingUpIcon,
 } from "lucide-react";
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
+import {
+	PageHeaderSubtext,
+	pageHeaderSubtextScrollClass,
+	pageHeaderSubtextTextClass,
+} from "@/components/student/page-header-subtext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -35,16 +40,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuLabel,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	Sheet,
 	SheetContent,
@@ -53,14 +51,16 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { SubjectCoverageTimeline } from "@/components/student/subject-coverage-timeline";
+import {
+	SubjectCard,
+	subjectStatusLabelToDashboardStatus,
+} from "@/components/student/dashboard-subject-card";
 import { cn } from "@/lib/utils";
 import {
+	averageTestScorePercentForSubject,
 	buildSubjectCardTrackerStats,
-	buildSubjectCoverageTimeline,
-	type CoverageTimelinePoint,
+	dominantStatusFromTrackerStats,
 	computeSummary,
-	emptyCoverageTimelineFallback,
 	emptySubjectCardTrackerStats,
 	type EnrolledSubjectCard,
 	type PerformanceRowSerialized,
@@ -143,17 +143,6 @@ function statusLabel(status: TrackerStatus): string {
 			return "Needs improvement";
 		default:
 			return "Not tested";
-	}
-}
-
-function sortModeLabel(mode: SortMode): string {
-	switch (mode) {
-		case "curriculum":
-			return "Curriculum order";
-		case "last_test":
-			return "Last test (recent first)";
-		case "status":
-			return "Status (priority)";
 	}
 }
 
@@ -273,8 +262,12 @@ function practiceHref(topicIds: string[], subjectId: string | null): string {
 }
 
 /** Surfaces for subject drill-down: distinct from page bg in light mode; hover matches subject grid tiles. */
-const performanceDetailSurfaceClass =
-	"border border-border bg-muted shadow-sm ring-0 transition-[border-color,box-shadow,background-color] duration-200 ease-out hover:border-primary/50 hover:shadow-[0_0_28px_-8px_color-mix(in_oklab,var(--primary)_42%,transparent)] hover:bg-black/[0.035] dark:bg-card dark:shadow-none dark:hover:bg-muted/30";
+/** Extra surface styles on top of default `Card` (already uses `cardSurfaceFrameClassName`). */
+const performanceDetailSurfaceClass = cn(
+	"bg-muted shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-out",
+	"hover:border-primary/50 hover:shadow-[0_0_28px_-8px_color-mix(in_oklab,var(--primary)_42%,transparent)]",
+	"hover:bg-black/[0.035] dark:bg-card dark:shadow-none dark:hover:bg-muted/30",
+);
 
 const emptySubjectCardStats: SubjectCardTrackerStats = emptySubjectCardTrackerStats;
 
@@ -335,14 +328,6 @@ export function StudentPerformanceView({
 		[initialRows],
 	);
 
-	const coverageTimelineBySubjectId = React.useMemo(() => {
-		const m = new Map<string, CoverageTimelinePoint[]>();
-		for (const c of enrolledSubjectCards) {
-			m.set(c.subjectId, buildSubjectCoverageTimeline(c.subjectId, c.topicTotal, initialRows));
-		}
-		return m;
-	}, [enrolledSubjectCards, initialRows]);
-
 	const filteredRows = React.useMemo(() => {
 		let r = initialRows;
 		if (detailSubjectId) {
@@ -359,6 +344,12 @@ export function StudentPerformanceView({
 
 	const hasActiveLocalFilters =
 		statusFilter !== "all" || sortMode !== "curriculum" || topicSearch.trim().length > 0;
+
+	const activePerformanceFilterCount = statusFilter !== "all" ? 1 : 0;
+	const performanceSortIsNonDefault = sortMode !== "curriculum";
+
+	const [perfMatrixFiltersOpen, setPerfMatrixFiltersOpen] = React.useState(false);
+	const [perfMatrixSortOpen, setPerfMatrixSortOpen] = React.useState(false);
 
 	const resetLocalFilters = React.useCallback(() => {
 		setStatusFilter("all");
@@ -393,9 +384,9 @@ export function StudentPerformanceView({
 			<div className="p-6">
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
-					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-						See how well you know each topic and where to revise. We couldn’t load your tracker this time.
-					</p>
+					<PageHeaderSubtext>
+						We couldn’t load your performance tracker this time — try again shortly.
+					</PageHeaderSubtext>
 				</div>
 				<Alert variant="destructive" className="mt-6">
 					<AlertTitle>Could not load tracker</AlertTitle>
@@ -410,10 +401,9 @@ export function StudentPerformanceView({
 			<div className="p-6">
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
-					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-						Open a subject to see topic-by-topic strength and what to study next. We need your class details
-						first.
-					</p>
+					<PageHeaderSubtext>
+						Open Profile to add your class details, then return here to open a subject and see topic-by-topic strength.
+					</PageHeaderSubtext>
 				</div>
 				<Card className="mt-8 border-border shadow-none">
 					<CardHeader>
@@ -456,18 +446,17 @@ export function StudentPerformanceView({
 						>
 							Performance
 						</motion.h1>
-						<motion.p
-							className="text-muted-foreground text-base leading-relaxed max-w-2xl"
-							variants={item}
-						>
-							Pick a subject to see your topic grid, filter weak areas, and jump back into practice.
-						</motion.p>
+						<motion.div className={pageHeaderSubtextScrollClass} variants={item}>
+							<p className={pageHeaderSubtextTextClass}>
+								Pick a subject to see your topic grid, filter weak areas, and jump back into practice.
+							</p>
+						</motion.div>
 					</motion.div>
 
 					<section aria-labelledby="perf-subjects-heading" className="flex flex-col gap-3">
 						<h2
 							id="perf-subjects-heading"
-							className="font-mono text-muted-foreground text-sm uppercase tracking-wider"
+							className="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground"
 						>
 							Open a subject
 						</h2>
@@ -478,119 +467,128 @@ export function StudentPerformanceView({
 							variants={container}
 						>
 							{enrolledSubjectCards.map((s) => {
-								const { Icon, iconClassName } = getSubjectCardIconConfig(s.subjectName);
+								const { Icon, iconClassName, shellClassName } = getSubjectCardIconConfig(
+									s.subjectName,
+								);
 								const st = subjectTrackerStats.get(s.subjectId) ?? emptySubjectCardStats;
 								const hasTopics = s.topicTotal > 0;
 								const hasTrackerRows = st.trackedCount > 0;
-								return (
-									<motion.div key={s.subjectId} variants={item}>
-										<motion.div
-											className="h-full"
-											whileHover={reduceMotion ? undefined : { scale: 1.012 }}
-											whileTap={reduceMotion ? undefined : { scale: 0.988 }}
-											transition={{ type: "spring", stiffness: 420, damping: 26 }}
-										>
+								const hasAttempts = s.attemptedCount > 0;
+								const lastLabel = st.lastTestDate ? formatLastTest(st.lastTestDate) : "";
+								const href = `/student/performance?subject=${encodeURIComponent(s.subjectId)}#perf-topic-matrix`;
+								const cardStatus = subjectStatusLabelToDashboardStatus(
+									dominantStatusFromTrackerStats(st),
+								);
+								const avgScore = averageTestScorePercentForSubject(initialRows, s.subjectId) ?? 0;
+
+								const iconEl = (
+									<span
+										className={cn(
+											"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+											"border-border/80 ring-1",
+											shellClassName,
+										)}
+										aria-hidden
+									>
+										<Icon
+											className={cn("size-5 sm:size-[1.375rem]", iconClassName)}
+											strokeWidth={1.25}
+										/>
+									</span>
+								);
+
+								if (!hasTopics) {
+									return (
+										<motion.div key={s.subjectId} className="min-h-0" variants={item}>
 											<Link
-												href={`/student/performance?subject=${encodeURIComponent(s.subjectId)}#perf-topic-matrix`}
+												href={href}
 												scroll
 												aria-label={`Open ${s.subjectName} performance`}
 												className={cn(
-													"group flex h-full min-h-0 flex-col rounded-xl border p-4 text-left sm:p-5",
-													"border-border bg-muted shadow-sm transition-[border-color,box-shadow,background-color] duration-200 ease-out",
-													"hover:border-primary/50 hover:shadow-[0_0_28px_-8px_color-mix(in_oklab,var(--primary)_42%,transparent)]",
-													"hover:bg-black/[0.035] dark:bg-card dark:shadow-none dark:hover:bg-muted/30",
-													"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+													"block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 												)}
 											>
-												<div className="flex items-start justify-between gap-2.5">
-													<p className="min-w-0 flex-1 font-semibold text-foreground text-sm leading-snug sm:text-base">
-														{s.subjectName}
-													</p>
-													<ChevronRightIcon
-														className="size-4 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-														aria-hidden
-													/>
-												</div>
-
-												<div className="mt-3 flex flex-1 flex-col gap-3">
-													{!hasTopics ? (
-														<p className="text-sm leading-snug text-muted-foreground">
-															No topics in the catalog for this grade yet. Your teacher or admin may
-															still be linking the curriculum.
-														</p>
-													) : !hasTrackerRows ? (
-														<p className="text-sm leading-snug text-muted-foreground">
-															Tracker rows appear when your curriculum is linked. Open the subject for your
-															topic list.
-														</p>
-													) : (
-														<>
-															<div className="flex items-end justify-between gap-3">
-																<div className="min-w-0 space-y-1">
-																	<p className="font-semibold text-2xl tabular-nums tracking-tight text-foreground sm:text-3xl">
-																		{s.percentCovered}
-																		<span className="text-muted-foreground text-base font-semibold sm:text-lg">
-																			%
-																		</span>
-																	</p>
-																	<p className="text-muted-foreground text-[11px] leading-snug sm:text-xs">
-																		Percent of this subject&apos;s topics you&apos;ve practiced at least
-																		once.
-																	</p>
-																	<p className="text-muted-foreground text-sm leading-snug">
-																		<span className="font-semibold tabular-nums text-foreground">
-																			{s.attemptedCount}
-																		</span>
-																		<span> of </span>
-																		<span className="font-semibold tabular-nums text-foreground">
-																			{s.topicTotal}
-																		</span>
-																		<span> topics attempted</span>
-																	</p>
-																</div>
-																<Icon
-																	className={cn(
-																		"size-10 shrink-0 sm:size-11",
-																		iconClassName,
-																	)}
-																	strokeWidth={1.25}
-																	aria-hidden
-																/>
-															</div>
-															<SubjectCoverageTimeline
-																points={
-																	coverageTimelineBySubjectId.get(s.subjectId) ??
-																	emptyCoverageTimelineFallback
-																}
-																className="-mx-0.5"
-															/>
-															{st.lastTestDate || st.testsTakenTotal > 0 ? (
-																<p className="text-[12.375px] leading-snug text-muted-foreground sm:text-xs">
-																	{[
-																		st.lastTestDate
-																			? `Last test ${formatLastTest(st.lastTestDate)}`
-																			: null,
-																		st.testsTakenTotal > 0
-																			? `${st.testsTakenTotal} test${st.testsTakenTotal === 1 ? "" : "s"}`
-																			: null,
-																	]
-																		.filter(Boolean)
-																		.join(" · ")}
-																</p>
-															) : null}
-														</>
-													)}
-												</div>
+												<SubjectCard
+													subject={s.subjectName}
+													lastTestDate=""
+													subtitle="No topics in the catalog for this grade yet. Your teacher or admin may still be linking the curriculum."
+													topicsAttempted={0}
+													topicsTotal={0}
+													testsTaken={0}
+													avgScore={0}
+													status="in_progress"
+													showCta={false}
+													metricsIconSlot={iconEl}
+												/>
 											</Link>
 										</motion.div>
+									);
+								}
+
+								if (!hasTrackerRows) {
+									return (
+										<motion.div key={s.subjectId} className="min-h-0" variants={item}>
+											<Link
+												href={href}
+												scroll
+												aria-label={`Open ${s.subjectName} performance`}
+												className={cn(
+													"block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+												)}
+											>
+												<SubjectCard
+													subject={s.subjectName}
+													lastTestDate=""
+													subtitle="Tracker rows appear when your curriculum is linked. Open the subject for your topic list."
+													topicsAttempted={0}
+													topicsTotal={s.topicTotal}
+													testsTaken={0}
+													avgScore={0}
+													status="in_progress"
+													showCta={false}
+													metricsIconSlot={iconEl}
+												/>
+											</Link>
+										</motion.div>
+									);
+								}
+
+								return (
+									<motion.div key={s.subjectId} className="min-h-0" variants={item}>
+										<Link
+											href={href}
+											scroll
+											aria-label={`Open ${s.subjectName} performance`}
+											className={cn(
+												"block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+											)}
+										>
+											<SubjectCard
+												subject={s.subjectName}
+												lastTestDate={hasAttempts ? lastLabel : ""}
+												subtitle={
+													!hasAttempts
+														? st.lastTestDate
+															? `Last test · ${lastLabel}`
+															: "No tests recorded yet"
+														: undefined
+												}
+												topicsAttempted={s.attemptedCount}
+												topicsTotal={s.topicTotal}
+												testsTaken={st.testsTakenTotal}
+												avgScore={hasAttempts ? avgScore : 0}
+												status={!hasAttempts ? "in_progress" : cardStatus}
+												showCta={false}
+												metricsIconSlot={iconEl}
+											/>
+										</Link>
 									</motion.div>
 								);
 							})}
 						</motion.div>
 						<p className="text-muted-foreground text-xs leading-relaxed">
-							Coverage is the share of curriculum topics you have tried at least once. The chart uses
-							each topic&apos;s last activity date (an estimate until first-attempt history exists).
-							Open a subject for mastery breakdown by topic.
+							Coverage is the share of curriculum topics you have tried at least once. Open a subject for
+							mastery breakdown by topic.
 						</p>
 					</section>
 					</motion.div>
@@ -603,7 +601,7 @@ export function StudentPerformanceView({
 						exit="exit"
 						variants={pageVariants}
 					>
-					<header className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+					<header className="flex flex-col gap-1.5">
 						<Button
 							type="button"
 							variant="ghost"
@@ -701,39 +699,48 @@ export function StudentPerformanceView({
 					</motion.section>
 
 					<motion.section
-						aria-labelledby="perf-filters-heading"
-						className="flex flex-col gap-1.5"
+						id="perf-topic-matrix"
+						aria-labelledby="perf-matrix-heading"
+						className="flex scroll-mt-24 flex-col gap-2"
 						initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 8 }}
 						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut", delay: reduceMotion ? 0 : 0.06 }}
+						transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut", delay: reduceMotion ? 0 : 0.08 }}
 					>
-						<h2
-							id="perf-filters-heading"
-							className="font-mono text-muted-foreground text-sm uppercase tracking-wider"
+						<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+							<h2
+								id="perf-matrix-heading"
+								className="m-0 font-mono text-muted-foreground text-xs uppercase tracking-wider"
+							>
+								Topics in this subject
+							</h2>
+							<p className="m-0 shrink-0 text-muted-foreground text-xs">
+								<span className="font-medium tabular-nums text-foreground">{filteredRows.length}</span>
+								{filteredRows.length === 1 ? " topic" : " topics"}
+								{topicSearch.trim() ? " matching search" : ""}
+							</p>
+						</div>
+
+						<Card
+							className={cn(performanceDetailSurfaceClass, "overflow-hidden gap-0 p-0 py-0 shadow-none")}
+							size="sm"
 						>
-							Filters and sort
-						</h2>
-						<Card className={performanceDetailSurfaceClass} size="sm">
-							<CardContent className="flex flex-col gap-2 py-3">
-								<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-									<p className="text-muted-foreground text-sm tabular-nums">
-										<span className="font-medium text-foreground">{filteredRows.length}</span>
-										{filteredRows.length === 1 ? " topic" : " topics"}
-										{topicSearch.trim() ? " matching search" : ""}
-									</p>
-									<div className="flex min-w-0 flex-1 flex-col gap-2 sm:min-w-[20rem] sm:flex-none sm:flex-row sm:items-center sm:justify-end sm:gap-2 lg:min-w-[28rem]">
-										<div className="relative min-w-0 flex-1 sm:min-w-[16rem]">
-											<label htmlFor="perf-topic-search" className="sr-only">
-												Search topics by name, unit, or chapter
-											</label>
-											<SearchIcon
-												className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-												aria-hidden
-											/>
+							{/* Tight vertical padding: Search/Filter band should sit close to the title row and table rule. */}
+							<div className="px-4 py-3 sm:px-5 sm:py-3.5">
+								<div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-6 lg:gap-8">
+									<div className="flex min-w-0 flex-1 flex-col gap-3">
+										<Label htmlFor="perf-topic-search" className="text-foreground text-sm font-medium">
+											Search
+										</Label>
+										<p className="m-0 text-muted-foreground text-xs leading-relaxed">
+											Search <span className="font-medium text-foreground">topic names</span> and{" "}
+											<span className="font-medium text-foreground">unit or chapter</span> labels in
+											the list.
+										</p>
+										<div className="flex min-w-0 flex-col gap-2">
 											<Input
 												id="perf-topic-search"
 												type="search"
-												placeholder="Search topics, units, chapters…"
+												placeholder="e.g. Algebra, English, Unit 3…"
 												value={topicSearch}
 												onChange={(e) => setTopicSearch(e.target.value)}
 												onKeyDown={(e) => {
@@ -742,194 +749,275 @@ export function StudentPerformanceView({
 														setTopicSearch("");
 													}
 												}}
-												className="h-8 border-border bg-background ps-8 dark:bg-input/30"
+												className="box-border h-8 w-full min-w-0 max-w-md border-border bg-background dark:bg-input/30"
 												autoComplete="off"
 												enterKeyHint="search"
 											/>
+											{hasActiveLocalFilters ? (
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													className="h-8 w-fit shrink-0 gap-1.5 px-0 text-muted-foreground hover:text-foreground"
+													onClick={resetLocalFilters}
+												>
+													<RotateCcwIcon className="size-3.5" aria-hidden />
+													Reset filters
+												</Button>
+											) : null}
 										</div>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											className="shrink-0 text-muted-foreground"
-											disabled={!hasActiveLocalFilters}
-											onClick={resetLocalFilters}
-										>
-											<RotateCcwIcon className="size-3.5" aria-hidden />
-											Reset filters
-										</Button>
 									</div>
-								</div>
 
-								<div
-									className="flex flex-col gap-1.5 border-border border-t pt-2"
-									role="toolbar"
-									aria-label="Filter and sort topics"
-								>
-									<span className="text-muted-foreground text-xs">Filters</span>
-									<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-										<div className="flex min-w-0 flex-wrap items-center gap-2">
-											<DropdownMenu>
-												<DropdownMenuTrigger
-													render={
-														<Button
-															variant="outline"
-															size="sm"
-															className="h-8 min-w-[12rem] shrink-0 justify-start gap-1.5 rounded-full border-border px-3 font-normal shadow-none sm:w-56 sm:max-w-[min(100%,18rem)]"
-														/>
-													}
+									<div
+										className="flex min-w-0 flex-1 flex-col gap-3 border-border border-t pt-5 md:min-w-0 md:border-t-0 md:border-l md:pt-0 md:pl-8"
+										role="toolbar"
+										aria-label="Filter and sort topics"
+									>
+										<p className="m-0 text-foreground text-sm font-medium leading-none">
+											Filter and Sort
+										</p>
+										<p className="m-0 text-muted-foreground text-xs leading-relaxed">
+											<span className="font-medium text-foreground">Filters</span> and{" "}
+											<span className="font-medium text-foreground">Sort</span> open as floating
+											panels over the page. Opening one closes the other.
+										</p>
+										<div className="flex w-full min-w-0 gap-3">
+											<div className="flex min-w-0 flex-1 basis-0">
+												<Popover
+													open={perfMatrixFiltersOpen}
+													onOpenChange={(open) => {
+														setPerfMatrixFiltersOpen(open);
+														if (open) setPerfMatrixSortOpen(false);
+													}}
 												>
-													<BookOpenIcon className="size-3.5 shrink-0 text-muted-foreground" />
-													<span className="min-w-0 flex-1 truncate text-left">
-														{detailSubjectId
-															? (detailSubjectName ?? "Subject")
-															: "All subjects"}
-													</span>
-													<ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-												</DropdownMenuTrigger>
-												<DropdownMenuContent className="min-w-52" align="start">
-													<DropdownMenuGroup>
-														<DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-															Subject
-														</DropdownMenuLabel>
-														<DropdownMenuRadioGroup
-															value={detailSubjectId ?? "all"}
-															onValueChange={(v) => navigateSubject(String(v))}
-														>
-															<DropdownMenuRadioItem value="all">
-																All subjects
-															</DropdownMenuRadioItem>
-															{subjectOptions.map((o) => (
-																<DropdownMenuRadioItem key={o.id} value={o.id}>
-																	{o.name}
-																</DropdownMenuRadioItem>
-															))}
-														</DropdownMenuRadioGroup>
-													</DropdownMenuGroup>
-												</DropdownMenuContent>
-											</DropdownMenu>
-
-											<DropdownMenu>
-												<DropdownMenuTrigger
-													render={
-														<Button
-															variant="outline"
-															size="sm"
-															className="h-8 min-w-[12rem] shrink-0 justify-start gap-1.5 rounded-full border-border px-3 font-normal shadow-none sm:w-56 sm:max-w-[min(100%,18rem)]"
-														/>
-													}
-												>
-													<ArrowUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-													<span className="min-w-0 flex-1 truncate text-left">
-														{sortModeLabel(sortMode)}
-													</span>
-													<ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-												</DropdownMenuTrigger>
-												<DropdownMenuContent className="min-w-56" align="start">
-													<DropdownMenuGroup>
-														<DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-															Sort
-														</DropdownMenuLabel>
-														<DropdownMenuRadioGroup
-															value={sortMode}
-															onValueChange={(v) => setSortMode(v as SortMode)}
-														>
-															<DropdownMenuRadioItem value="curriculum">
-																Curriculum order
-															</DropdownMenuRadioItem>
-															<DropdownMenuRadioItem value="last_test">
-																Last test (recent first)
-															</DropdownMenuRadioItem>
-															<DropdownMenuRadioItem value="status">
-																Status (priority)
-															</DropdownMenuRadioItem>
-														</DropdownMenuRadioGroup>
-													</DropdownMenuGroup>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										</div>
-
-										<div className="min-w-0 flex-1">
-											<span className="sr-only">Filter by performance status</span>
-											<div
-												className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:thin]"
-												role="group"
-												aria-label="Filter by performance status"
-											>
-												{(["all", "good", "satisfactory", "bad", "not_tested"] as const).map((s) => {
-													const active = statusFilter === s;
-													const label =
-														s === "all"
-															? "All"
-															: s === "not_tested"
-																? "Not tested"
-																: statusLabel(s);
-													return (
-														<Button
-															key={s}
-															type="button"
-															size="xs"
-															variant={active ? "default" : "outline"}
+													<PopoverTrigger
+														type="button"
+														className={cn(
+															buttonVariants({ variant: "outline", size: "sm" }),
+															"group h-8 min-h-8 w-full min-w-0 shrink justify-between gap-2 px-3",
+														)}
+														aria-expanded={perfMatrixFiltersOpen}
+													>
+														<span className="flex min-w-0 items-center gap-2">
+															<ListFilter className="size-3.5 shrink-0" aria-hidden />
+															<span className="font-medium">Filters</span>
+															{activePerformanceFilterCount > 0 ? (
+																<Badge
+																	variant="secondary"
+																	className="h-5 min-w-5 px-1.5 font-mono text-[11px]"
+																>
+																	{activePerformanceFilterCount}
+																</Badge>
+															) : null}
+														</span>
+														<ChevronDownIcon
 															className={cn(
-																"shrink-0 rounded-full",
-																!active && "border-border bg-background shadow-none",
+																"size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+																perfMatrixFiltersOpen && "rotate-180",
 															)}
-															aria-pressed={active}
-															onClick={() => setStatusFilter(s)}
-														>
-															{label}
-														</Button>
-													);
-												})}
+															aria-hidden
+														/>
+													</PopoverTrigger>
+													<PopoverContent
+														role="group"
+														aria-label="Topic filters"
+														align="start"
+														side="bottom"
+														sideOffset={8}
+														className="w-[min(100vw-2rem,20rem)]"
+													>
+														<div className="flex max-h-[min(24rem,70dvh)] flex-col gap-4 overflow-y-auto">
+															<div className="flex min-w-0 flex-col gap-1">
+																<span className="text-foreground text-sm font-medium">Subject</span>
+																<p className="text-muted-foreground text-xs">One course or all.</p>
+																<div className="mt-1 flex flex-col gap-0.5">
+																	<Button
+																		type="button"
+																		variant={detailSubjectId == null ? "secondary" : "ghost"}
+																		size="sm"
+																		className="h-9 w-full justify-start font-normal"
+																		onClick={() => {
+																			navigateSubject("all");
+																		}}
+																	>
+																		<BookOpenIcon
+																			className="me-2 size-3.5 shrink-0 text-muted-foreground"
+																			aria-hidden
+																		/>
+																		All subjects
+																	</Button>
+																	{subjectOptions.map((o) => {
+																		const selected = detailSubjectId === o.id;
+																		return (
+																			<Button
+																				key={o.id}
+																				type="button"
+																				variant={selected ? "secondary" : "ghost"}
+																				size="sm"
+																				className="h-9 w-full justify-start font-normal"
+																				onClick={() => {
+																					navigateSubject(o.id);
+																				}}
+																			>
+																				<BookOpenIcon
+																					className="me-2 size-3.5 shrink-0 text-muted-foreground"
+																					aria-hidden
+																				/>
+																				<span className="min-w-0 truncate">{o.name}</span>
+																			</Button>
+																		);
+																	})}
+																</div>
+															</div>
+															<div className="flex min-w-0 flex-col gap-1 border-border border-t pt-3">
+																<span className="text-foreground text-sm font-medium">Performance</span>
+																<p className="text-muted-foreground text-xs">
+																	Filter by how you&apos;re doing on a topic.
+																</p>
+																<div
+																	className="mt-1 flex flex-wrap gap-2"
+																	role="group"
+																	aria-label="Filter by performance status"
+																>
+																	{(["all", "good", "satisfactory", "bad", "not_tested"] as const).map(
+																		(s) => {
+																			const active = statusFilter === s;
+																			const label =
+																				s === "all"
+																					? "All"
+																					: s === "not_tested"
+																						? "Not tested"
+																						: statusLabel(s);
+																			return (
+																				<Button
+																					key={s}
+																					type="button"
+																					size="xs"
+																					variant={active ? "default" : "outline"}
+																					className={cn(
+																						"shrink-0 rounded-full",
+																						!active && "border-border bg-background shadow-none",
+																					)}
+																					aria-pressed={active}
+																					onClick={() => setStatusFilter(s)}
+																				>
+																					{label}
+																				</Button>
+																			);
+																		},
+																	)}
+																</div>
+															</div>
+														</div>
+													</PopoverContent>
+												</Popover>
+											</div>
+											<div className="flex min-w-0 flex-1 basis-0">
+												<Popover
+													open={perfMatrixSortOpen}
+													onOpenChange={(open) => {
+														setPerfMatrixSortOpen(open);
+														if (open) setPerfMatrixFiltersOpen(false);
+													}}
+												>
+													<PopoverTrigger
+														type="button"
+														className={cn(
+															buttonVariants({ variant: "outline", size: "sm" }),
+															"group h-8 min-h-8 w-full min-w-0 shrink justify-between gap-2 px-3",
+														)}
+														aria-expanded={perfMatrixSortOpen}
+													>
+														<span className="flex min-w-0 items-center gap-2">
+															<ArrowDownUp className="size-3.5 shrink-0" aria-hidden />
+															<span className="font-medium">Sort</span>
+															{performanceSortIsNonDefault ? (
+																<Badge variant="outline" className="h-5 text-[11px] font-normal">
+																	Custom
+																</Badge>
+															) : null}
+														</span>
+														<ChevronDownIcon
+															className={cn(
+																"size-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+																perfMatrixSortOpen && "rotate-180",
+															)}
+															aria-hidden
+														/>
+													</PopoverTrigger>
+													<PopoverContent
+														role="group"
+														aria-label="Sort options"
+														align="start"
+														side="bottom"
+														sideOffset={8}
+														className="w-[min(100vw-2rem,20rem)]"
+													>
+														<div className="flex flex-col gap-3">
+															<div className="flex min-w-0 flex-col gap-1">
+																<span className="text-foreground text-sm font-medium">Sort by</span>
+																<p className="text-muted-foreground text-xs">
+																	How rows are ordered in the table.
+																</p>
+																<div className="mt-1 flex flex-col gap-0.5">
+																	<Button
+																		type="button"
+																		variant={sortMode === "curriculum" ? "secondary" : "ghost"}
+																		size="sm"
+																		className="h-9 w-full justify-start gap-2 font-normal"
+																		onClick={() => setSortMode("curriculum")}
+																	>
+																		<ListOrdered className="size-3.5 shrink-0 text-muted-foreground" />
+																		Curriculum order
+																	</Button>
+																	<Button
+																		type="button"
+																		variant={sortMode === "last_test" ? "secondary" : "ghost"}
+																		size="sm"
+																		className="h-9 w-full justify-start gap-2 font-normal"
+																		onClick={() => setSortMode("last_test")}
+																	>
+																		<ArrowDownUp className="size-3.5 shrink-0 text-muted-foreground" />
+																		Last test (recent first)
+																	</Button>
+																	<Button
+																		type="button"
+																		variant={sortMode === "status" ? "secondary" : "ghost"}
+																		size="sm"
+																		className="h-9 w-full justify-start gap-2 font-normal"
+																		onClick={() => setSortMode("status")}
+																	>
+																		<LineChartIcon className="size-3.5 shrink-0 text-muted-foreground" />
+																		Status (priority)
+																	</Button>
+																</div>
+															</div>
+														</div>
+													</PopoverContent>
+												</Popover>
 											</div>
 										</div>
 									</div>
 								</div>
-							</CardContent>
-						</Card>
-					</motion.section>
+							</div>
 
-					<motion.section
-						id="perf-topic-matrix"
-						aria-labelledby="perf-matrix-heading"
-						className="flex scroll-mt-24 flex-col gap-1.5"
-						initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 8 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut", delay: reduceMotion ? 0 : 0.12 }}
-					>
-						<h2
-							id="perf-matrix-heading"
-							className="font-mono text-muted-foreground text-sm uppercase tracking-wider"
-						>
-							Topics in this subject
-						</h2>
-						<p className="text-muted-foreground text-xs leading-snug sm:text-sm">
-							Each row is one topic in syllabus order (default sort). Chapter number and name are shown
-							side by side; focus on status and how many tests you&apos;ve taken.
-						</p>
-						<AnimatePresence mode="wait" initial={false}>
-							<motion.div
-								key={matrixPresenceKey}
-								initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 6 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : -4 }}
-								transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
-							>
-								{filteredRows.length === 0 ? (
-									<Card className={performanceDetailSurfaceClass}>
-										<CardContent className="py-10 text-center text-muted-foreground text-sm">
+							<AnimatePresence mode="wait" initial={false}>
+								<motion.div
+									key={matrixPresenceKey}
+									initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 6 }}
+									animate={{ opacity: 1, y: 0 }}
+									exit={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : -4 }}
+									transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
+								>
+									{filteredRows.length === 0 ? (
+										<div className="border-border border-t bg-background px-4 py-10 text-center text-muted-foreground text-sm dark:bg-transparent">
 											{emptyPerformanceMatrixMessage(topicSearch, statusFilter)}
-										</CardContent>
-									</Card>
-								) : (
-									<Card
-										className={cn(performanceDetailSurfaceClass, "overflow-hidden rounded-xl py-0")}
-										size="sm"
-									>
-										<CardContent className="p-0">
+										</div>
+									) : (
+										<div className="overflow-x-auto border-border border-t">
 											<div
 												className={cn(
-													"max-h-[min(40rem,calc(100dvh-13rem))] overflow-auto rounded-xl border border-border/90 bg-background shadow-sm",
+													"max-h-[min(40rem,calc(100dvh-13rem))] overflow-auto bg-background dark:bg-transparent",
 													"[scrollbar-gutter:stable]",
 												)}
 											>
@@ -1082,10 +1170,11 @@ export function StudentPerformanceView({
 													</tbody>
 												</table>
 											</div>
-										</CardContent>
-									</Card>
-								)}							</motion.div>
-						</AnimatePresence>
+										</div>
+									)}
+								</motion.div>
+							</AnimatePresence>
+						</Card>
 					</motion.section>
 					</motion.div>
 				)}

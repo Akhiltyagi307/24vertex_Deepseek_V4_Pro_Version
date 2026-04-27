@@ -22,11 +22,19 @@ import {
 import type { GeneratePracticeResult } from "../../../../app/student/practice/actions/types";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { usePaywall } from "@/components/student/subscription/paywall-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+	cardSurfaceFrameClassName,
+} from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
@@ -1064,10 +1072,9 @@ export function PracticeTestWizard({
 			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 sm:gap-8">
 				<div className="flex shrink-0 flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Practice</h1>
-					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-						Build a timed practice test from the topics you’re already tracking. We match your class and
-						syllabus so questions stay relevant.
-					</p>
+					<PageHeaderSubtext>
+						Build a timed practice test from the topics you’re already tracking, with questions matched to your class and syllabus.
+					</PageHeaderSubtext>
 				</div>
 
 				<form onSubmit={handleSubmit} className="flex w-full flex-col gap-7" noValidate>
@@ -1077,7 +1084,7 @@ export function PracticeTestWizard({
 
 					<div className="flex flex-col gap-7 pr-1">
 						{step === 0 ? (
-					<div className="space-y-6 rounded-xl border border-border/70 bg-card p-5 sm:p-7">
+					<div className={cn(cardSurfaceFrameClassName, "space-y-6 p-5 sm:p-7")}>
 						<div className="space-y-1.5">
 							<h2 className="font-semibold text-foreground text-xl tracking-tight sm:text-[1.375rem]">
 								Choose a subject
@@ -1235,7 +1242,7 @@ export function PracticeTestWizard({
 				) : null}
 
 				{step === 1 && subjectId ? (
-					<div className="flex flex-col gap-6 rounded-xl border border-border/70 bg-card p-5 sm:p-7">
+					<div className={cn(cardSurfaceFrameClassName, "flex flex-col gap-6 p-5 sm:p-7")}>
 						<div className="space-y-1.5 shrink-0">
 							<h2 className="font-semibold text-foreground text-xl tracking-tight sm:text-[1.375rem]">
 								Topics
@@ -1581,7 +1588,7 @@ export function PracticeTestWizard({
 
 				{step === 2 && subjectId ? (
 					<section
-						className="space-y-6 rounded-xl border border-border/70 bg-card p-5 sm:p-7"
+						className={cn(cardSurfaceFrameClassName, "space-y-6 p-5 sm:p-7")}
 						aria-labelledby="practice-wizard-step-2-title"
 					>
 						<header className="space-y-1.5">

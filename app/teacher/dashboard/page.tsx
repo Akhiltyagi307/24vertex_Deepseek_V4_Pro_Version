@@ -25,7 +25,7 @@ export default async function TeacherDashboardPage() {
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-3">
-				<Card className="border-border shadow-none">
+				<Card className="shadow-none">
 					<CardHeader className="pb-2">
 						<CardDescription>Verification</CardDescription>
 						<CardTitle className="flex items-center gap-2 text-base">
@@ -38,7 +38,7 @@ export default async function TeacherDashboardPage() {
 					</CardContent>
 				</Card>
 
-				<Card className="border-border shadow-none">
+				<Card className="shadow-none">
 					<CardHeader className="pb-2">
 						<CardDescription>Account status</CardDescription>
 						<CardTitle className="flex items-center gap-2 text-base">
@@ -51,7 +51,7 @@ export default async function TeacherDashboardPage() {
 					</CardContent>
 				</Card>
 
-				<Card className="border-border shadow-none">
+				<Card className="shadow-none">
 					<CardHeader className="pb-2">
 						<CardDescription>Need help?</CardDescription>
 						<CardTitle className="flex items-center gap-2 text-base">

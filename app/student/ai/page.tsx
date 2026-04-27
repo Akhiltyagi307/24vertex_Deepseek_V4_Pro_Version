@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
+
 import { StudyTipsForm } from "./study-tips-form";
 
 export const metadata = {
@@ -15,10 +17,9 @@ export default function StudentAiStudyTipsPage() {
 		<div className="space-y-6 px-4 py-8 md:px-8">
 			<div className="space-y-2">
 				<h1 className="text-foreground text-2xl font-semibold tracking-tight">AI study tips</h1>
-				<p className="text-muted-foreground max-w-xl text-sm leading-relaxed">
-					Example flow: your input is sent to the server, validated, and answered as structured JSON
-					via the Vercel AI SDK. Use this route as a reference when wiring real product features.
-				</p>
+				<PageHeaderSubtext>
+					Your input is validated on the server and returned as structured JSON via the Vercel AI SDK as a reference for wiring product features.
+				</PageHeaderSubtext>
 			</div>
 			<StudyTipsForm />
 		</div>

@@ -336,7 +336,7 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 	if (payload.tests.length === 0) {
 		return (
 			<TooltipProvider>
-				<Card className="overflow-hidden border-border/80 bg-card shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+				<Card className="overflow-hidden shadow-sm">
 					<CardContent className="flex min-h-[160px] flex-col items-center justify-center gap-4 bg-gradient-to-b from-emerald-50/30 to-card py-12 dark:from-emerald-950/20">
 						<LineChartIcon className="size-10 text-emerald-600/35 dark:text-emerald-400/40" aria-hidden />
 						<div className="flex max-w-md flex-col gap-1 text-center">
@@ -356,7 +356,7 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 
 	return (
 		<TooltipProvider>
-			<Card className="overflow-hidden border-border/80 bg-card shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+			<Card className="overflow-hidden shadow-sm">
 				<CardHeader className="gap-4 border-border/50 border-b bg-gradient-to-br from-emerald-50/90 via-card to-card pb-4 dark:from-emerald-950/40 dark:via-card dark:to-card">
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 						<div className="flex flex-col gap-1.5">

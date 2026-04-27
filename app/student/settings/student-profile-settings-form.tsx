@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import SmoothTab from "@/components/kokonutui/smooth-tab";
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { StudentAvatarUpload } from "@/components/student/student-avatar-upload";
 import {
 	Tooltip,
@@ -929,14 +930,12 @@ export function StudentProfileSettingsForm({
 			/>
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Profile</h1>
-				<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-					Your name, photo, and how you show up in EduAI. School details—grade, section, stream, elective,
-					school—live under <span className="text-foreground/90">School &amp; account</span>.
-				</p>
-				<p className="text-muted-foreground text-sm leading-relaxed max-w-2xl">
-					Use <span className="text-foreground/90">Save changes</span> for the Profile tab. Set a new password on
-					the Password tab. Guardian email on file is read-only here—ask your school to update it if it’s wrong.
-				</p>
+				<PageHeaderSubtext>
+					Manage your name, photo, and appearance here; use{" "}
+					<span className="text-foreground/90">Save changes</span> on this tab, Password for sign-in,{" "}
+					<span className="text-foreground/90">School &amp; account</span> for grade and placement, and note
+					guardian email is read-only until your school updates it.
+				</PageHeaderSubtext>
 			</div>
 
 			<div ref={feedbackRef}>

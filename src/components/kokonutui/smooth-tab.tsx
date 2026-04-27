@@ -14,6 +14,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Transition, Variants } from "motion/react";
 import { AnimatePresence, motion } from "motion/react";
 import * as React from "react";
+import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface TabItem {
@@ -381,7 +382,8 @@ export default function SmoothTab({
       {usePersistentPanels ? (
         <div
           className={cn(
-            "relative w-full overflow-hidden rounded-lg border bg-card",
+            cardSurfaceFrameClassName,
+            "relative w-full overflow-hidden rounded-lg",
             panelClassName
           )}
         >
@@ -402,7 +404,12 @@ export default function SmoothTab({
           })}
         </div>
       ) : (
-        <div className="relative h-[200px] w-full rounded-lg border bg-card">
+        <div
+          className={cn(
+            cardSurfaceFrameClassName,
+            "relative h-[200px] w-full rounded-lg"
+          )}
+        >
           <div className="absolute inset-0 overflow-hidden rounded-lg">
             <AnimatePresence
               custom={direction}
@@ -438,7 +445,7 @@ export default function SmoothTab({
       className={cn(
         "relative flex items-center justify-between gap-1 py-1",
         "mx-auto w-full max-w-3xl bg-background",
-        "rounded-xl border",
+        "rounded-xl border border-border ring-1 ring-foreground/10 transition-colors hover:border-border/80",
         "transition-all duration-200",
         tabListPosition === "bottom" ? "mt-auto" : "mb-4",
         className

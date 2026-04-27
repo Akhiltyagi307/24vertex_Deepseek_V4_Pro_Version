@@ -20,7 +20,14 @@ import {
 import { submitPracticeTest } from "../../../../app/student/practice/session-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+	cardSurfaceFrameClassName,
+} from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1150,8 +1157,9 @@ export function PracticeTestSession({
 
 							<div
 								className={cn(
-									"bg-background flex w-full overflow-hidden rounded-xl border shadow-sm",
-									"ring-1 ring-foreground/[0.07] dark:bg-card dark:ring-foreground/12",
+									cardSurfaceFrameClassName,
+									"flex w-full overflow-hidden shadow-sm",
+									"bg-background dark:bg-card",
 									"flex-col divide-y divide-border/90 sm:w-auto sm:min-w-[min(100%,28rem)] sm:flex-row sm:divide-x sm:divide-y-0",
 								)}
 							>
@@ -1292,7 +1300,7 @@ export function PracticeTestSession({
 					</div>
 				:	null}
 
-				<Card className="border-border/70 flex min-h-0 flex-1 flex-col gap-0 overflow-hidden border-2 shadow-sm ring-1 ring-foreground/[0.06] dark:border-border/80 dark:ring-foreground/[0.08]">
+				<Card className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden shadow-sm">
 					<div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
 						<div className="flex min-h-full min-w-0 flex-1 flex-col">
 						<CardHeader className="shrink-0 space-y-3 pb-3">

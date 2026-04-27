@@ -1,6 +1,7 @@
 import { CheckIcon, MinusIcon } from "lucide-react";
 
 import { PLAN_CATALOG, type PlanCode } from "@/lib/billing/plans";
+import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -112,7 +113,7 @@ export function PlanComparisonTable({ currentPlanCode, grade, planCatalog = PLAN
 	);
 
 	return (
-		<details className="group rounded-xl border bg-card" open>
+		<details className={cn(cardSurfaceFrameClassName, "group")} open>
 			<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground marker:hidden">
 				<span>See how the plans compare</span>
 				<span

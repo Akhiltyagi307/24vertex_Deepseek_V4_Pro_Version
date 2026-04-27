@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TicketIcon } from "lucide-react";
 
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { BillingTrustRow } from "@/components/student/subscription/billing-trust-row";
 import { CancelSubscriptionButton } from "@/components/student/subscription/cancel-subscription-button";
 import { CouponRedeemForm } from "@/components/student/subscription/coupon-redeem-form";
@@ -79,10 +80,9 @@ export default async function StudentSubscriptionPage() {
 						Billing
 					</p>
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Your subscription</h1>
-					<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-						See what’s included in your plan, how much you’ve used, and your past payments. Upgrade when you need
-						more practice tests or AI help.
-					</p>
+					<PageHeaderSubtext>
+						See your plan, usage, payment history, and upgrade options when you need more practice or AI help.
+					</PageHeaderSubtext>
 				</header>
 	
 				<main className="flex min-w-0 flex-col gap-6">

@@ -15,7 +15,6 @@ import {
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
-import { cn } from "@/lib/utils";
 
 type Variant = "compact" | "detail";
 
@@ -165,7 +164,7 @@ export function PlanSummaryCard({
 			(entitlement.status === "active" && entitlement.cancelAtPeriodEnd));
 
 	return (
-		<Card className={cn("border-foreground/10", className)}>
+		<Card className={className}>
 			<CardHeader className="gap-2">
 				<div className="flex items-start justify-between gap-3">
 					<div className="flex items-center gap-2">

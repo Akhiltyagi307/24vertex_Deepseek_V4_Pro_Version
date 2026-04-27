@@ -6,6 +6,7 @@ import { ActivityIcon, BookOpenIcon, CalendarClockIcon, FlameIcon, LineChartIcon
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
+import { pageHeaderSubtextScrollClass, pageHeaderSubtextTextClass } from "@/components/student/page-header-subtext";
 import { SubjectCard, subjectStatusLabelToDashboardStatus } from "@/components/student/dashboard-subject-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import {
 	CardFooter,
 	CardHeader,
 	CardTitle,
+	cardSurfaceFrameClassName,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardOtherSubjectsTable } from "@/components/student/dashboard-other-subjects-table";
@@ -24,6 +26,7 @@ import type { StudentDashboardAnalyticsPayload } from "@/lib/student/dashboard-a
 import type { DashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
 import { partitionDashboardSubjectsByPriority } from "@/lib/student/dashboard-subject-priority";
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
+import { getSubjectCardIconConfig } from "@/lib/student/subject-lucide-icon";
 import { cn } from "@/lib/utils";
 
 /** Major section labels + in-column sub-labels: same type scale and alignment. */
@@ -38,7 +41,10 @@ const StudentDashboardAnalytics = dynamic(
 	{
 		loading: () => (
 			<div
-				className="flex min-h-[280px] flex-col gap-4 rounded-xl border border-border bg-muted/20 p-6"
+				className={cn(
+					cardSurfaceFrameClassName,
+					"flex min-h-[280px] flex-col gap-4 bg-muted/20 p-6",
+				)}
 				aria-busy
 				aria-label="Loading analytics"
 			>
@@ -176,12 +182,9 @@ export function StudentDashboardView({
 				>
 					Dashboard
 				</motion.h1>
-				<motion.p
-					className="text-muted-foreground text-base leading-relaxed max-w-2xl"
-					variants={item}
-				>
-					{headerGreeting}
-				</motion.p>
+				<motion.div className={pageHeaderSubtextScrollClass} variants={item}>
+					<p className={pageHeaderSubtextTextClass}>{headerGreeting}</p>
+				</motion.div>
 			</motion.div>
 
 			<section aria-labelledby="stats-heading" className="flex flex-col gap-3">
@@ -195,7 +198,7 @@ export function StudentDashboardView({
 					variants={container}
 				>
 					<motion.div variants={item}>
-						<Card className="border-border shadow-none">
+						<Card className="shadow-none">
 							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
 								<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Tests completed</CardTitle>
 								<ActivityIcon
@@ -211,7 +214,7 @@ export function StudentDashboardView({
 						</Card>
 					</motion.div>
 					<motion.div variants={item}>
-						<Card className="border-border shadow-none">
+						<Card className="shadow-none">
 							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
 								<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Average score</CardTitle>
 								<LineChartIcon
@@ -231,7 +234,7 @@ export function StudentDashboardView({
 						</Card>
 					</motion.div>
 					<motion.div variants={item}>
-						<Card className="border-border shadow-none">
+						<Card className="shadow-none">
 							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
 								<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Topic mastery</CardTitle>
 								<BookOpenIcon
@@ -251,7 +254,7 @@ export function StudentDashboardView({
 						</Card>
 					</motion.div>
 					<motion.div variants={item}>
-						<Card className="border-border shadow-none">
+						<Card className="shadow-none">
 							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
 								<CardTitle className="min-w-0 flex-1 font-medium text-sm">Time practicing</CardTitle>
 								<FlameIcon
@@ -271,7 +274,7 @@ export function StudentDashboardView({
 				</motion.div>
 			</section>
 
-			<div className="grid min-h-0 gap-6 lg:grid-cols-3 lg:items-start">
+			<div className="grid min-h-0 gap-6 lg:grid-cols-3 lg:items-stretch">
 				<section
 					aria-labelledby="subjects-heading"
 					className="flex min-h-0 min-w-0 flex-col gap-3 lg:col-span-2"
@@ -286,7 +289,7 @@ export function StudentDashboardView({
 						</Alert>
 					) : null}
 					{subjectCards.length === 0 ? (
-						<Card className="border-border shadow-none">
+						<Card className="shadow-none">
 							<CardHeader>
 								<CardTitle className="text-sm font-semibold leading-snug">No subjects yet</CardTitle>
 								<CardDescription>
@@ -309,6 +312,24 @@ export function StudentDashboardView({
 											const hasAttempts = s.attemptedCount > 0;
 											const cardStatus = subjectStatusLabelToDashboardStatus(s.status);
 											const avgScore = s.scorePercent ?? 0;
+											const { Icon, iconClassName, shellClassName } = getSubjectCardIconConfig(
+												s.subjectName,
+											);
+											const subjectIcon = (
+												<span
+													className={cn(
+														"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+														"border-border/80 ring-1",
+														shellClassName,
+													)}
+													aria-hidden
+												>
+													<Icon
+														className={cn("size-5 sm:size-[1.375rem]", iconClassName)}
+														strokeWidth={1.25}
+													/>
+												</span>
+											);
 
 											return (
 												<motion.div key={s.subjectId} className="min-h-0" variants={item}>
@@ -328,6 +349,7 @@ export function StudentDashboardView({
 															status="in_progress"
 															ctaLabel="Start focus session"
 															ctaRender={<Link href={s.practiceHref} />}
+															metricsIconSlot={subjectIcon}
 														/>
 													) : (
 														<SubjectCard
@@ -340,6 +362,7 @@ export function StudentDashboardView({
 															status={cardStatus}
 															ctaLabel="Start focus session"
 															ctaRender={<Link href={s.practiceHref} />}
+															metricsIconSlot={subjectIcon}
 														/>
 													)}
 												</motion.div>
@@ -359,11 +382,7 @@ export function StudentDashboardView({
 											All subjects · {restSubjects.length}
 										</p>
 									)}
-									<div
-										className={cn(
-											"overflow-hidden rounded-xl border border-border bg-card p-[22px] ring-1 ring-foreground/10",
-										)}
-									>
+									<div className={cn(cardSurfaceFrameClassName, "overflow-hidden p-[22px]")}>
 										<DashboardOtherSubjectsTable
 											subjects={restSubjects}
 											motionContainer={container}
@@ -377,17 +396,17 @@ export function StudentDashboardView({
 				</section>
 
 				<motion.div
-					className="flex flex-col gap-6"
+					className="flex min-h-0 flex-col gap-6 lg:h-full"
 					initial="hidden"
 					animate="show"
 					variants={container}
 				>
-					<section aria-labelledby="assignments-heading" className="flex flex-col gap-3">
+					<section aria-labelledby="assignments-heading" className="flex shrink-0 flex-col gap-3">
 						<h2 id="assignments-heading" className={SECTION_LABEL_CLASS}>
 							Assignments
 						</h2>
 						<motion.div variants={item}>
-							<Card className="border-border shadow-none">
+							<Card className="shadow-none">
 								<CardHeader className="pb-2">
 									<div className="flex items-center justify-between gap-2">
 										<CardTitle className="text-sm font-semibold leading-snug">Assignment status</CardTitle>
@@ -437,13 +456,16 @@ export function StudentDashboardView({
 						</motion.div>
 					</section>
 
-					<section aria-labelledby="activity-heading" className="flex flex-col gap-3">
+					<section
+						aria-labelledby="activity-heading"
+						className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:min-h-0"
+					>
 						<h2 id="activity-heading" className={SECTION_LABEL_CLASS}>
 							Recent tests
 						</h2>
-						<motion.div variants={item}>
-							<Card className="border-border shadow-none">
-								<CardContent className="flex flex-col gap-3 pt-6">
+						<motion.div variants={item} className="flex min-h-0 flex-1 flex-col">
+							<Card className="flex min-h-0 flex-1 flex-col shadow-none">
+								<CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-6">
 									{recentTests.length === 0 ? (
 										<p className="text-muted-foreground text-sm">
 											No completed tests yet. Finish a practice or assignment attempt to see it here.
@@ -466,7 +488,11 @@ export function StudentDashboardView({
 											</div>
 										))
 									)}
-									<Button variant="link" className="h-auto px-0 text-primary" render={<Link href="/student/reports" />}>
+									<Button
+										variant="link"
+										className="mt-auto h-auto px-0 pt-1 text-primary"
+										render={<Link href="/student/reports" />}
+									>
 										Open reports
 									</Button>
 								</CardContent>

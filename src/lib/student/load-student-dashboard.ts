@@ -17,6 +17,7 @@ import {
 } from "@/lib/student/performance-matrix";
 import type { StudentProfileSubjectsRow } from "@/lib/student/student-performance-load";
 import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
@@ -33,7 +34,18 @@ type DashboardCompletedTestRow = {
 	subject_id: string;
 	duration_seconds: number | null;
 	time_limit_seconds: number | null;
+	/** Populated via FK embed (same pattern as `app/student/reports/page.tsx`). */
+	subjects?: { id?: string; name?: string | null } | null;
 };
+
+function subjectNameFromCompletedTestRow(
+	t: DashboardCompletedTestRow,
+	enrolledNameBySubjectId: Map<string, string>,
+): string {
+	const joined = t.subjects?.name;
+	if (typeof joined === "string" && joined.trim()) return joined.trim();
+	return enrolledNameBySubjectId.get(t.subject_id) ?? "Subject";
+}
 
 type DashboardAssignmentRow = {
 	id: string;
@@ -99,8 +111,18 @@ export async function loadStudentDashboardViewPayload(
 		role: profileRow.role,
 	};
 
-	const completedTestSelect =
-		"id, test_date, total_score, subject_id, duration_seconds, time_limit_seconds";
+	const completedTestSelect = `
+		id,
+		test_date,
+		total_score,
+		subject_id,
+		duration_seconds,
+		time_limit_seconds,
+		subjects (
+			id,
+			name
+		)
+	`;
 
 	const [bundle, completedTestRes] = await Promise.all([
 		loadStudentPerformanceBundle(supabase, userId, bundleInput),
@@ -110,10 +132,14 @@ export async function loadStudentDashboardViewPayload(
 			.eq("student_id", userId)
 			.eq("is_draft", false)
 			.in("status", ["submitted", "graded"])
-			.order("test_date", { ascending: false }),
+			.order("test_date", { ascending: false, nullsFirst: false })
+			.order("updated_at", { ascending: false }),
 	]);
 
 	const { enrolledSubjects, topicCountBySubjectId, rows, loadError } = bundle;
+	if (completedTestRes.error) {
+		logSupabaseError("loadStudentDashboardViewPayload.tests.select", completedTestRes.error, { userId });
+	}
 	const completedTestRows = completedTestRes.data;
 
 	const assignmentSelect = "id, title, due_date, time_limit_seconds, status, subject_id";
@@ -228,7 +254,7 @@ export async function loadStudentDashboardViewPayload(
 		.slice(0, 5)
 		.map((t) => ({
 			id: t.id,
-			subjectName: subjectNameById.get(t.subject_id) ?? "Subject",
+			subjectName: subjectNameFromCompletedTestRow(t, subjectNameById),
 			testDateIso: t.test_date,
 			scorePercent: parsePercent(t.total_score),
 			durationSeconds: t.duration_seconds,

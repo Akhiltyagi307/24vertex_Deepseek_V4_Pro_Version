@@ -3,19 +3,24 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
 	ArrowDownUp,
+	BadgeCheck,
 	BookOpen,
+	CalendarClock,
 	ChevronDownIcon,
 	CircleDot,
+	Clock,
 	Eye,
 	FileDownIcon,
 	Gauge,
 	Library,
+	LineChart,
 	ListFilter,
 	ListOrdered,
 	Search,
 } from "lucide-react";
 import * as React from "react";
 
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -112,16 +117,12 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 			const t = rowTimestamp(r);
 			if (t > last) last = t;
 		}
-		const selfN = initialTests.filter((r) => r.testType === "self").length;
-		const asgN = initialTests.filter((r) => r.testType === "assigned").length;
 		return {
 			total,
 			submitted,
 			graded,
 			avgScore: avg,
 			lastTestMs: last,
-			selfN,
-			asgN,
 		};
 	}, [initialTests]);
 
@@ -214,16 +215,9 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 		<div className="flex flex-col gap-8 p-6 pb-28">
 			<header className="flex shrink-0 flex-col gap-1.5">
 				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Reports</h1>
-				<p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
-					Every practice and assignment you’ve turned in, with scores and PDFs. Filter by subject or unit, sort
-					the list, and open or download a report.
-				</p>
-				<p className="text-muted-foreground text-xs">
-					In this list:{" "}
-					<span className="font-medium tabular-nums text-foreground">{overviewStats.selfN}</span> practice
-					· <span className="font-medium tabular-nums text-foreground">{overviewStats.asgN}</span> from
-					assignments
-				</p>
+				<PageHeaderSubtext>
+					Use this page to review completed tests, track scores, and download PDF copies of your reports.
+				</PageHeaderSubtext>
 			</header>
 
 			{loadError ? (
@@ -233,69 +227,112 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 				</Alert>
 			) : null}
 
-			<section aria-labelledby="report-stats-heading" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+			<section aria-labelledby="report-stats-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
 				<h2 id="report-stats-heading" className="sr-only">
 					Reports summary
 				</h2>
-				<Card className="border-border shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Total reports</CardDescription>
-						<CardTitle className="font-semibold text-2xl tabular-nums">{overviewStats.total}</CardTitle>
+				<Card className="shadow-none">
+					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Total reports</CardTitle>
+						<Library
+							className="size-8 shrink-0 text-cyan-600 dark:text-cyan-400"
+							strokeWidth={2}
+							aria-hidden
+						/>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">On your list</CardContent>
+					<CardContent>
+						<p className="font-semibold text-2xl tabular-nums">{overviewStats.total}</p>
+						<p className="text-muted-foreground text-xs">On your list</p>
+					</CardContent>
 				</Card>
-				<Card className="border-border shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Submitted</CardDescription>
-						<CardTitle className="font-semibold text-2xl tabular-nums">{overviewStats.submitted}</CardTitle>
+				<Card className="shadow-none">
+					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Submitted</CardTitle>
+						<Clock
+							className="size-8 shrink-0 text-amber-600 dark:text-amber-400"
+							strokeWidth={2}
+							aria-hidden
+						/>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Waiting on a final score</CardContent>
+					<CardContent>
+						<p className="font-semibold text-2xl tabular-nums">{overviewStats.submitted}</p>
+						<p className="text-muted-foreground text-xs">Waiting on a final score</p>
+					</CardContent>
 				</Card>
-				<Card className="border-border shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Graded</CardDescription>
-						<CardTitle className="font-semibold text-2xl tabular-nums">{overviewStats.graded}</CardTitle>
+				<Card className="shadow-none">
+					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Graded</CardTitle>
+						<BadgeCheck
+							className="size-8 shrink-0 text-emerald-600 dark:text-emerald-400"
+							strokeWidth={2}
+							aria-hidden
+						/>
 					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Fully graded</CardContent>
+					<CardContent>
+						<p className="font-semibold text-2xl tabular-nums">{overviewStats.graded}</p>
+						<p className="text-muted-foreground text-xs">Fully graded</p>
+					</CardContent>
 				</Card>
-				<Card className="border-border shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Average score</CardDescription>
-						<CardTitle className="font-semibold text-2xl tabular-nums">
+				<Card className="shadow-none">
+					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Average score</CardTitle>
+						<LineChart
+							className="size-8 shrink-0 text-violet-600 dark:text-violet-400"
+							strokeWidth={2}
+							aria-hidden
+						/>
+					</CardHeader>
+					<CardContent>
+						<p className="font-semibold text-2xl tabular-nums">
 							{overviewStats.avgScore != null ? `${overviewStats.avgScore}%` : "—"}
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">Across tests in the table</CardContent>
+						</p>
+						<p className="text-muted-foreground text-xs">Across tests in the table</p>
+					</CardContent>
 				</Card>
-				<Card className="border-border shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Last test</CardDescription>
-						<CardTitle className="font-semibold text-lg leading-snug">
+				<Card className="shadow-none">
+					<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+						<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Last test</CardTitle>
+						<CalendarClock
+							className="size-8 shrink-0 text-sky-600 dark:text-sky-400"
+							strokeWidth={2}
+							aria-hidden
+						/>
+					</CardHeader>
+					<CardContent>
+						<p className="font-semibold text-2xl leading-snug">
 							{overviewStats.lastTestMs
 								? new Date(overviewStats.lastTestMs).toLocaleDateString("en-US", {
 										dateStyle: "medium",
 									})
 								: "—"}
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="text-muted-foreground text-xs">When you last submitted</CardContent>
+						</p>
+						<p className="text-muted-foreground text-xs">When you last submitted</p>
+					</CardContent>
 				</Card>
 			</section>
 
 			<section aria-labelledby="report-filters-heading" className="flex flex-col gap-4">
-				<h2
-					id="report-filters-heading"
-					className="font-mono text-muted-foreground text-xs uppercase tracking-wider"
-				>
-					Find a test
-				</h2>
-				<Card className="border-border shadow-none">
-					<CardContent className="flex flex-col gap-4 pt-6">
-						<div className="flex flex-col gap-2">
+				<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+					<h2
+						id="report-filters-heading"
+						className="m-0 font-mono text-muted-foreground text-xs uppercase tracking-wider"
+					>
+						Find a test
+					</h2>
+					<p className="m-0 shrink-0 text-muted-foreground text-xs">
+						Showing{" "}
+						<span className="font-medium tabular-nums text-foreground">{filteredSorted.length}</span> of{" "}
+						<span className="font-medium tabular-nums text-foreground">{initialTests.length}</span>
+					</p>
+				</div>
+				<Card className="overflow-hidden p-0 shadow-none">
+						<div className="p-[22px]">
+							<div className="flex flex-col gap-6 md:flex-row md:items-stretch">
+						<div className="flex min-w-0 flex-1 flex-col gap-3 md:min-h-0">
 							<Label htmlFor="report-search" className="text-foreground text-sm font-medium">
 								Search
 							</Label>
-							<p className="text-muted-foreground text-xs leading-relaxed">
+							<p className="m-0 text-muted-foreground text-xs leading-relaxed">
 								Search <span className="font-medium text-foreground">subject names</span> and{" "}
 								<span className="font-medium text-foreground">unit or chapter</span> labels in the list.
 							</p>
@@ -311,33 +348,35 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 										else p.delete("q");
 									});
 								}}
-								className="max-w-xl"
+								className="box-border h-8 w-1/2 min-w-0 max-w-[50%] md:mt-auto"
 								autoComplete="off"
 							/>
 						</div>
 
-						<div className="border-border border-t pt-1">
-							<p className="mb-2 text-muted-foreground text-xs">
+						<div className="flex min-w-0 flex-1 flex-col gap-3 border-border border-t pt-6 md:min-h-0 md:border-t-0 md:border-l md:pl-8 md:pt-0">
+							<p className="m-0 text-foreground text-sm font-medium leading-none">Filter and Sort</p>
+							<p className="m-0 text-muted-foreground text-xs leading-relaxed">
 								<span className="font-medium text-foreground">Filters</span> and{" "}
 								<span className="font-medium text-foreground">Sort</span> open as floating panels over the
 								page. Opening one closes the other.
 							</p>
-							<div className="flex flex-wrap gap-2">
-								<Popover
-									open={filtersOpen}
-									onOpenChange={(open) => {
-										setFiltersOpen(open);
-										if (open) setSortOpen(false);
-									}}
-								>
-									<PopoverTrigger
-										type="button"
-										className={cn(
-											buttonVariants({ variant: "outline", size: "sm" }),
-											"group min-w-[10rem] justify-between gap-2 px-3",
-										)}
-										aria-expanded={filtersOpen}
+							<div className="flex w-1/2 min-w-0 max-w-[50%] gap-3 md:mt-auto">
+								<div className="flex min-w-0 flex-1 basis-0">
+									<Popover
+										open={filtersOpen}
+										onOpenChange={(open) => {
+											setFiltersOpen(open);
+											if (open) setSortOpen(false);
+										}}
 									>
+										<PopoverTrigger
+											type="button"
+											className={cn(
+												buttonVariants({ variant: "outline", size: "sm" }),
+												"group h-8 min-h-8 w-full min-w-0 shrink justify-between gap-2 px-3",
+											)}
+											aria-expanded={filtersOpen}
+										>
 										<span className="flex min-w-0 items-center gap-2">
 											<ListFilter className="size-3.5 shrink-0" aria-hidden />
 											<span className="font-medium">Filters</span>
@@ -451,23 +490,24 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 											</div>
 										</div>
 									</PopoverContent>
-								</Popover>
-
-								<Popover
-									open={sortOpen}
-									onOpenChange={(open) => {
-										setSortOpen(open);
-										if (open) setFiltersOpen(false);
-									}}
-								>
-									<PopoverTrigger
-										type="button"
-										className={cn(
-											buttonVariants({ variant: "outline", size: "sm" }),
-											"group min-w-[10rem] justify-between gap-2 px-3",
-										)}
-										aria-expanded={sortOpen}
+									</Popover>
+								</div>
+								<div className="flex min-w-0 flex-1 basis-0">
+									<Popover
+										open={sortOpen}
+										onOpenChange={(open) => {
+											setSortOpen(open);
+											if (open) setFiltersOpen(false);
+										}}
 									>
+										<PopoverTrigger
+											type="button"
+											className={cn(
+												buttonVariants({ variant: "outline", size: "sm" }),
+												"group h-8 min-h-8 w-full min-w-0 shrink justify-between gap-2 px-3",
+											)}
+											aria-expanded={sortOpen}
+										>
 										<span className="flex min-w-0 items-center gap-2">
 											<ArrowDownUp className="size-3.5 shrink-0" aria-hidden />
 											<span className="font-medium">Sort</span>
@@ -540,37 +580,22 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 											</div>
 										</div>
 									</PopoverContent>
-								</Popover>
+									</Popover>
+								</div>
 							</div>
 						</div>
-					</CardContent>
-				</Card>
-			</section>
-
-			<section aria-labelledby="report-table-heading" className="flex flex-col gap-3">
-				<div className="flex flex-wrap items-baseline justify-between gap-2">
-					<h2
-						id="report-table-heading"
-						className="font-mono text-muted-foreground text-xs uppercase tracking-wider"
-					>
-						All tests
-					</h2>
-					<p className="text-muted-foreground text-xs">
-						Showing{" "}
-						<span className="font-medium tabular-nums text-foreground">{filteredSorted.length}</span> of{" "}
-						<span className="font-medium tabular-nums text-foreground">{initialTests.length}</span>
-					</p>
-				</div>
-
-				<div
-					className={cn(
-						"overflow-x-auto rounded-xl border border-border bg-card shadow-sm",
-						"dark:shadow-none",
-					)}
-				>
-					<table className="w-full min-w-[880px] border-collapse text-left text-sm">
+							</div>
+						</div>
+						<div className="overflow-x-auto border-border border-t">
+							<h2 id="report-table-heading" className="sr-only">
+								All tests
+							</h2>
+							<table
+								aria-labelledby="report-table-heading"
+								className="w-full min-w-[880px] border-collapse text-left text-sm"
+							>
 						<thead>
-							<tr className="border-border border-b bg-muted/80 dark:bg-muted/40">
+							<tr className="border-border border-b bg-muted/85 dark:bg-muted/70">
 								<th scope="col" className="px-4 py-3 font-medium">
 									Date
 								</th>
@@ -619,12 +644,12 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 							) : (
 								filteredSorted.map((r) => {
 									const dateStr = r.testDate
-										? new Date(r.testDate).toLocaleString(undefined, {
+										? new Date(r.testDate).toLocaleString("en-US", {
 												dateStyle: "medium",
 												timeStyle: "short",
 											})
 										: r.createdAt
-											? new Date(r.createdAt).toLocaleString(undefined, {
+											? new Date(r.createdAt).toLocaleString("en-US", {
 													dateStyle: "medium",
 													timeStyle: "short",
 												})
@@ -738,7 +763,8 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 							)}
 						</tbody>
 					</table>
-				</div>
+						</div>
+					</Card>
 			</section>
 		</div>
 	);

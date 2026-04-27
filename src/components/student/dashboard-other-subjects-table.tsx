@@ -87,6 +87,9 @@ const th = "px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-
 /** Header cell chrome: must sit on `th` (not `tr`) so `rounded-t-*` works with `border-separate`. */
 const thHeaderBg = "border-border border-b-2 bg-muted/60";
 
+/** Opaque header background + stacking so sticky thead covers scrolling rows (see scroll wrapper below). */
+const thSticky = "sticky top-0 z-10 bg-muted backdrop-blur-sm";
+
 function TableRow({
 	children,
 	className,
@@ -121,29 +124,39 @@ export function DashboardOtherSubjectsTable({
 	const useRowMotion = Boolean(motionItem);
 
 	return (
-		<div className="min-w-0 w-full overflow-x-auto">
+		<div
+			className={cn(
+				"min-w-0 w-full max-h-[min(28rem,55vh)] overflow-auto overscroll-contain [scrollbar-gutter:stable]",
+			)}
+		>
 			<table
 				className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm sm:min-w-0"
 				aria-label="Other subjects and quick links to practice"
 			>
 				<thead>
 					<tr>
-						<th scope="col" className={cn(th, thHeaderBg, "rounded-tl-lg", "w-[24%] min-w-[7.5rem] sm:w-[22%]")}>
+						<th
+							scope="col"
+							className={cn(th, thHeaderBg, thSticky, "rounded-tl-lg", "w-[24%] min-w-[7.5rem] sm:w-[22%]")}
+						>
 							Subject
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, "w-[18%] min-w-[5.5rem]")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-[18%] min-w-[5.5rem]")}>
 							Status
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, "w-[30%] min-w-[9rem]")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-[30%] min-w-[9rem]")}>
 							Progress
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, "w-14 text-right tabular-nums sm:w-16")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-14 text-right tabular-nums sm:w-16")}>
 							Done
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, "w-[3.5rem] text-right tabular-nums sm:w-16")}>
+						<th
+							scope="col"
+							className={cn(th, thHeaderBg, thSticky, "w-[3.5rem] text-right tabular-nums sm:w-16")}
+						>
 							Avg score
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, "rounded-tr-lg", "w-9 text-right")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "rounded-tr-lg", "w-9 text-right")}>
 							<span className="sr-only">Open practice</span>
 						</th>
 					</tr>
