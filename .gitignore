@@ -16,6 +16,10 @@ coverage/
 # Env (local secrets — never commit)
 .env
 .env*.local
+env.local
+
+# pnpm store when created inside the repo (never commit)
+.pnpm-store/
 
 # Debug / OS
 .DS_Store
@@ -33,3 +37,4 @@ yarn-error.log*
 
 # Temp / scratch
 .tmp_*.json
+.mcp-github-push-batches/

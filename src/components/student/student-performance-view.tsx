@@ -665,18 +665,33 @@ export function StudentPerformanceView({
 								>
 									{(
 										[
-											["Total topics", summary.total, LayoutListIcon],
-											["Mastered", summary.good, LineChartIcon],
-											["Satisfactory", summary.satisfactory, ListFilterIcon],
-											["Needs improvement", summary.bad, TrendingDownIcon],
-											["Not tested", summary.not_tested, BookOpenIcon],
+											["Total topics", summary.total, LayoutListIcon, "text-muted-foreground"],
+											[
+												"Mastered",
+												summary.good,
+												LineChartIcon,
+												"text-emerald-600 dark:text-emerald-400",
+											],
+											[
+												"Satisfactory",
+												summary.satisfactory,
+												ListFilterIcon,
+												"text-amber-600 dark:text-amber-400",
+											],
+											[
+												"Needs improvement",
+												summary.bad,
+												TrendingDownIcon,
+												"text-red-600 dark:text-red-400",
+											],
+											["Not tested", summary.not_tested, BookOpenIcon, "text-muted-foreground"],
 										] as const
-									).map(([label, value, Icon]) => (
+									).map(([label, value, Icon, iconClass]) => (
 										<motion.div key={label} variants={item}>
 											<Card className={performanceDetailSurfaceClass}>
 												<CardHeader className="flex flex-row items-center justify-between pb-2">
 													<CardTitle className="font-medium text-sm">{label}</CardTitle>
-													<Icon className="text-primary/80" aria-hidden />
+													<Icon className={cn("size-4 shrink-0", iconClass)} aria-hidden />
 												</CardHeader>
 												<CardContent>
 													<motion.p
