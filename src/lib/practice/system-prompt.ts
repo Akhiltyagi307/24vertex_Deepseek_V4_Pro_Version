@@ -1,15 +1,27 @@
+import {
+	getPracticeGenerationSubjectPreamble,
+	resolvePracticeGenerationSubjectRouting,
+} from "./generation-prompt-registry";
 import type { PracticeUserMessagePayload } from "./user-message";
 
+export type PracticeGenerationSubjectContext = {
+	subjectName: string;
+	/** `subjects.grade` for this curriculum row */
+	subjectGrade: number | null;
+	subjectGroup: string | null;
+	studentGrade: number | null;
+};
+
+type UserMessageSummary = Pick<
+	PracticeUserMessagePayload,
+	"schema_version" | "intent" | "test_parameters" | "constraints"
+>;
+
 /**
- * System prompt for the assessment generator (server-side).
- * Output is written to DB; students never receive raw answer keys from this channel.
+ * Shared rules and JSON contract for the assessment generator (server-side).
+ * Subject-specific preamble is prepended by `buildPracticeSystemPrompt`.
  */
-export function buildPracticeSystemPrompt(context: {
-	userMessageSummary: Pick<
-		PracticeUserMessagePayload,
-		"schema_version" | "intent" | "test_parameters" | "constraints"
-	>;
-}): string {
+export function buildPracticeGenerationSharedSystemInstructions(userMessageSummary: UserMessageSummary): string {
 	const {
 		estimated_question_count,
 		difficulty,
@@ -18,16 +30,12 @@ export function buildPracticeSystemPrompt(context: {
 		coverage_mode,
 		coverage_instruction,
 		question_type_counts,
-	} = context.userMessageSummary.test_parameters;
+	} = userMessageSummary.test_parameters;
 
 	const c = question_type_counts;
 	const typeCountsLine = `Fill questions_by_type with exactly ${c.multiple_choice} multiple_choice, ${c.fill_in_blank} fill_in_blank, ${c.short_answer} short_answer, and ${c.long_answer} long_answer questions (total ${estimated_question_count}).`;
 
-	return `You are an expert educator and assessment specialist for Indian K-12 (grades 6–12), NCERT-aligned.
-
-Your task: generate a single practice test as strict JSON matching the contract below.
-
-Rules:
+	return `Rules:
 - Use \`topic_grounding\` (content_chunks and exercise_chunks per topic) as the primary factual basis for scope and terminology; do not invent curriculum outside those chunks except where needed for coherent, well-formed questions.
 - Generate exactly ${estimated_question_count} questions — this count MUST be respected.
 - ${typeCountsLine}
@@ -116,5 +124,27 @@ Response JSON shape (types are illustrative; follow field names exactly):
   }
 }
 
-Schema marker: intent=${context.userMessageSummary.intent}, schema_version=${context.userMessageSummary.schema_version}.`;
+Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessageSummary.schema_version}.`;
+}
+
+/**
+ * System prompt for the assessment generator (server-side).
+ * Output is written to DB; students never receive raw answer keys from this channel.
+ */
+export function buildPracticeSystemPrompt(context: {
+	userMessageSummary: UserMessageSummary;
+	generationSubject: PracticeGenerationSubjectContext;
+}): string {
+	const routing = resolvePracticeGenerationSubjectRouting(
+		context.generationSubject.subjectGrade,
+		context.generationSubject.studentGrade,
+		context.generationSubject.subjectGroup,
+		context.generationSubject.subjectName,
+	);
+	const preamble = getPracticeGenerationSubjectPreamble(routing, {
+		subjectName: context.generationSubject.subjectName,
+		subjectGrade: context.generationSubject.subjectGrade,
+	});
+	const shared = buildPracticeGenerationSharedSystemInstructions(context.userMessageSummary);
+	return `${preamble}\n\n${shared}`;
 }

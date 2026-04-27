@@ -244,6 +244,12 @@ export async function runPracticeGenerationAfterResolve(
 			test_parameters: userPayload.test_parameters,
 			constraints: userPayload.constraints,
 		},
+		generationSubject: {
+			subjectName: resolved.subjectName,
+			subjectGrade: resolved.subjectGrade,
+			subjectGroup: resolved.subjectGroup,
+			studentGrade: resolved.studentGrade,
+		},
 	});
 
 	const userPrompt = stringifyPracticeUserMessageForModel(userPayload);

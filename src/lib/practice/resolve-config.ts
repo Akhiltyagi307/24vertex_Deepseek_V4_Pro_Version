@@ -23,6 +23,9 @@ export type PracticeConfigResolveSuccess = {
 	studentGrade: number | null;
 	subjectId: string;
 	subjectName: string;
+	/** Curriculum grade from \`subjects.grade\` (used for prompt band). */
+	subjectGrade: number;
+	subjectGroup: string | null;
 	canonicalTopics: PracticeCanonicalTopic[];
 	recentErrors: PracticeRecentError[];
 };
@@ -102,27 +105,23 @@ export async function resolvePracticeConfigForStudent(
 		};
 	}
 
-	let resolvedSubjectName =
-		(subjectRpcRows as RpcRow[] | null)?.find((r) => r.id === subjectId)?.name ?? null;
-	if (!resolvedSubjectName) {
-		const { data: subRow, error: subErr } = await supabase
-			.from("subjects")
-			.select("name")
-			.eq("id", subjectId)
-			.maybeSingle();
-		if (subErr || !subRow?.name) {
-			return {
-				ok: false,
-				code: "database_error",
-				message: "Could not resolve subject name.",
-			};
-		}
-		resolvedSubjectName = subRow.name;
+	const { data: subjectRow, error: subjectRowErr } = await supabase
+		.from("subjects")
+		.select("name, grade, subject_group")
+		.eq("id", subjectId)
+		.maybeSingle();
+
+	if (subjectRowErr || !subjectRow?.name?.trim() || subjectRow.grade == null) {
+		return {
+			ok: false,
+			code: "database_error",
+			message: subjectRowErr?.message ?? "Could not load subject details.",
+		};
 	}
 
-	if (!resolvedSubjectName?.trim()) {
-		return { ok: false, code: "database_error", message: "Subject not found." };
-	}
+	const resolvedSubjectName = subjectRow.name.trim();
+	const subjectGrade = subjectRow.grade as number;
+	const subjectGroup = (subjectRow.subject_group as string | null) ?? null;
 
 	const { data: trackers, error: trackerErr } = await supabase
 		.from("performance_tracker")
@@ -228,6 +227,8 @@ export async function resolvePracticeConfigForStudent(
 		studentGrade: profileRow.grade ?? null,
 		subjectId,
 		subjectName: resolvedSubjectName,
+		subjectGrade,
+		subjectGroup,
 		canonicalTopics,
 		recentErrors,
 	};

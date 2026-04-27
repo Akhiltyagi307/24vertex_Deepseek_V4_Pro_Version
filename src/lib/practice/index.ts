@@ -17,7 +17,18 @@ export {
 	practiceDurationSecondsSchema,
 	type FinalizePracticeConfigInput,
 } from "./schemas";
-export { buildPracticeSystemPrompt } from "./system-prompt";
+export {
+	buildPracticeGenerationSharedSystemInstructions,
+	buildPracticeSystemPrompt,
+	type PracticeGenerationSubjectContext,
+} from "./system-prompt";
+export {
+	getPracticeGenerationPromptBand,
+	getPracticeGenerationSubjectPreamble,
+	resolvePracticeGenerationSubjectRouting,
+	type PracticeGenerationPromptBand,
+	type PracticeGenerationSubjectRouting,
+} from "./generation-prompt-registry";
 export type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
 export {
 	buildPracticeUserMessage,

@@ -64,6 +64,12 @@ export async function finalizePracticeConfig(input: unknown): Promise<FinalizePr
 			test_parameters: userPayload.test_parameters,
 			constraints: userPayload.constraints,
 		},
+		generationSubject: {
+			subjectName: resolved.subjectName,
+			subjectGrade: resolved.subjectGrade,
+			subjectGroup: resolved.subjectGroup,
+			studentGrade: resolved.studentGrade,
+		},
 	});
 
 	return {
