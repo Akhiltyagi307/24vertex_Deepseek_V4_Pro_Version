@@ -44,6 +44,8 @@ export type CheckoutButtonProps = {
 	prefill?: { name?: string; email?: string; contact?: string };
 	className?: string;
 	disabled?: boolean;
+	/** Parent portal: bill this student profile (server verifies link). */
+	billingProfileId?: string;
 };
 
 export function RazorpayCheckoutButton({
@@ -54,6 +56,7 @@ export function RazorpayCheckoutButton({
 	prefill,
 	className,
 	disabled,
+	billingProfileId,
 }: CheckoutButtonProps) {
 	const router = useRouter();
 	const [pending, setPending] = React.useState(false);
@@ -64,7 +67,11 @@ export function RazorpayCheckoutButton({
 			const res = await fetch("/api/billing/create-subscription", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ planCode, startMode }),
+				body: JSON.stringify({
+					planCode,
+					startMode,
+					...(billingProfileId ? { billingProfileId } : {}),
+				}),
 			});
 			const data = (await res.json()) as {
 				ok: boolean;

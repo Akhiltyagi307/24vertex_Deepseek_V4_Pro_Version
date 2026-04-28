@@ -79,6 +79,10 @@ export type StudentPerformanceViewProps = {
 	enrolledSubjectCards: EnrolledSubjectCard[];
 	profileGrade: number | null;
 	trackerNeedsHydration?: boolean;
+	/** Default `/student`; parent portal uses `/parent`. */
+	portalBasePath?: string;
+	/** Read-only: hide practice CTAs and use performance URLs only. */
+	parentViewer?: boolean;
 };
 
 function useStaggerVariants() {
@@ -193,6 +197,7 @@ function rowMatchesTopicSearch(row: PerformanceRowSerialized, rawQuery: string):
 function emptyPerformanceMatrixMessage(
 	searchQuery: string,
 	statusFilter: TrackerStatus | "all",
+	parentViewer: boolean,
 ): string {
 	const q = searchQuery.trim();
 	const hasStatus = statusFilter !== "all";
@@ -205,7 +210,9 @@ function emptyPerformanceMatrixMessage(
 	if (hasStatus) {
 		return "No topics match these filters. Try clearing the status filter.";
 	}
-	return "No performance tracker rows for this subject yet. Rows are created when your curriculum is linked to your account; contact your teacher or admin if this stays empty.";
+	return parentViewer
+		? "No topic rows for this subject yet. Rows appear once their curriculum is linked to their account; contact support if this stays empty."
+		: "No performance tracker rows for this subject yet. Rows are created when your curriculum is linked to your account; contact support if this stays empty.";
 }
 
 function statusBadgeVariant(
@@ -255,12 +262,23 @@ function formatScore(n: number | null): string {
 	return `${Math.round(n)}%`;
 }
 
-function practiceHref(topicIds: string[], subjectId: string | null): string {
-	if (!topicIds.length) return "/student/practice";
+function practiceHref(
+	topicIds: string[],
+	subjectId: string | null,
+	opts: { basePath: string; allowPractice: boolean },
+): string {
+	const base = opts.basePath.replace(/\/$/, "");
+	if (!opts.allowPractice) {
+		const sp = new URLSearchParams();
+		if (subjectId) sp.set("subject", subjectId);
+		const q = sp.toString();
+		return `${base}/performance${q ? `?${q}` : ""}#perf-topic-matrix`;
+	}
+	if (!topicIds.length) return `${base}/practice`;
 	const sp = new URLSearchParams();
 	sp.set("topicIds", topicIds.join(","));
 	if (subjectId) sp.set("subjectId", subjectId);
-	return `/student/practice?${sp.toString()}`;
+	return `${base}/practice?${sp.toString()}`;
 }
 
 /** Surfaces for subject drill-down: distinct from page bg in light mode; hover matches subject grid tiles. */
@@ -280,11 +298,15 @@ export function StudentPerformanceView({
 	enrolledSubjectCards,
 	profileGrade,
 	trackerNeedsHydration = false,
+	portalBasePath = "/student",
+	parentViewer = false,
 }: StudentPerformanceViewProps) {
 	const { container, item } = useStaggerVariants();
 	const { variants: pageVariants } = usePageTransitionVariants();
 	const reduceMotion = useReducedMotion();
 	const router = useRouter();
+	const allowPractice = !parentViewer;
+	const practiceOpts = React.useMemo(() => ({ basePath: portalBasePath, allowPractice }), [portalBasePath, allowPractice]);
 
 	const subjectOptions = React.useMemo(
 		() =>
@@ -317,13 +339,14 @@ export function StudentPerformanceView({
 
 	const navigateSubject = React.useCallback(
 		(id: string) => {
+			const base = portalBasePath.replace(/\/$/, "");
 			if (id === "all") {
-				router.replace("/student/performance", { scroll: false });
+				router.replace(`${base}/performance`, { scroll: false });
 			} else {
-				router.replace(`/student/performance?subject=${encodeURIComponent(id)}`, { scroll: false });
+				router.replace(`${base}/performance?subject=${encodeURIComponent(id)}`, { scroll: false });
 			}
 		},
-		[router],
+		[router, portalBasePath],
 	);
 
 	const subjectTrackerStats = React.useMemo(
@@ -387,9 +410,13 @@ export function StudentPerformanceView({
 			<div className="p-6">
 				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
-					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
+					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">
+						{parentViewer ? "Subject progress" : "Performance"}
+					</h1>
 					<PageHeaderSubtext>
-						We couldn’t load your performance tracker this time — try again shortly.
+						{parentViewer
+							? "We couldn’t load their topic tracker this time — try again shortly."
+							: "We couldn’t load your performance tracker this time — try again shortly."}
 					</PageHeaderSubtext>
 				</div>
 				<Alert variant="destructive" className="mt-6">
@@ -405,22 +432,32 @@ export function StudentPerformanceView({
 			<div className="p-6">
 				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
-					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Performance</h1>
+					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">
+						{parentViewer ? "Subject progress" : "Performance"}
+					</h1>
 					<PageHeaderSubtext>
-						Open Profile to add your class details, then return here to open a subject and see topic-by-topic strength.
+						{parentViewer
+							? "Their class details may be incomplete. Ask them to update Profile in the student app, then return here for topic-by-topic strength."
+							: "Open Profile to add your class details, then return here to open a subject and see topic-by-topic strength."}
 					</PageHeaderSubtext>
 				</div>
 				<Card className="mt-8 border-border shadow-none">
 					<CardHeader>
 						<CardTitle className="text-base">No subjects to show yet</CardTitle>
 						<CardDescription>
-							{profileGrade == null
-								? "Add your grade (and stream or elective for 11–12) in Profile so we can load the right subjects."
-								: "Nothing matched your grade and stream. Open Profile and check grade, stream, and elective, or ask your school to confirm your enrollment."}
+							{parentViewer
+								? profileGrade == null
+									? "Their grade (and stream or elective for 11–12) may be missing. Ask them to complete Profile in the student app."
+									: "Nothing matched their grade and stream. They should check Profile or confirm enrollment with their school."
+								: profileGrade == null
+									? "Add your grade (and stream or elective for 11–12) in Profile so we can load the right subjects."
+									: "Nothing matched your grade and stream. Open Profile and check grade, stream, and elective, or ask your school to confirm your enrollment."}
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<Button render={<Link href="/student/settings" />}>Open settings</Button>
+						<Button render={<Link href={parentViewer ? "/parent/dashboard" : "/student/settings"} />}>
+							{parentViewer ? "Back to overview" : "Open settings"}
+						</Button>
 					</CardContent>
 				</Card>
 			</div>
@@ -450,11 +487,13 @@ export function StudentPerformanceView({
 							className="font-semibold text-3xl tracking-tight text-balance text-foreground"
 							variants={item}
 						>
-							Performance
+							{parentViewer ? "Subject progress" : "Performance"}
 						</motion.h1>
 						<motion.div className={pageHeaderSubtextScrollClass} variants={item}>
 							<p className={pageHeaderSubtextTextClass}>
-								Pick a subject to see your topic grid, filter weak areas, and jump back into practice.
+								{parentViewer
+									? "Pick a subject to review their topic grid and see where they’re strong or need support. Practice starts in the student app."
+									: "Pick a subject to see your topic grid, filter weak areas, and jump back into practice."}
 							</p>
 						</motion.div>
 					</motion.div>
@@ -481,7 +520,7 @@ export function StudentPerformanceView({
 								const hasTrackerRows = st.trackedCount > 0;
 								const hasAttempts = s.attemptedCount > 0;
 								const lastLabel = st.lastTestDate ? formatLastTest(st.lastTestDate) : "";
-								const href = `/student/performance?subject=${encodeURIComponent(s.subjectId)}#perf-topic-matrix`;
+								const href = `${portalBasePath.replace(/\/$/, "")}/performance?subject=${encodeURIComponent(s.subjectId)}#perf-topic-matrix`;
 								const cardStatus = subjectStatusLabelToDashboardStatus(
 									dominantStatusFromTrackerStats(st),
 								);
@@ -517,7 +556,7 @@ export function StudentPerformanceView({
 												<SubjectCard
 													subject={s.subjectName}
 													lastTestDate=""
-													subtitle="No topics in the catalog for this grade yet. Your teacher or admin may still be linking the curriculum."
+													subtitle="No topics in the catalog for this grade yet. Curriculum data may still be updating."
 													topicsAttempted={0}
 													topicsTotal={0}
 													testsTaken={0}
@@ -545,7 +584,11 @@ export function StudentPerformanceView({
 												<SubjectCard
 													subject={s.subjectName}
 													lastTestDate=""
-													subtitle="Tracker rows appear when your curriculum is linked. Open the subject for your topic list."
+													subtitle={
+														parentViewer
+															? "Tracker rows appear when their curriculum is linked. Open the subject for the topic list."
+															: "Tracker rows appear when your curriculum is linked. Open the subject for your topic list."
+													}
 													topicsAttempted={0}
 													topicsTotal={s.topicTotal}
 													testsTaken={0}
@@ -593,8 +636,9 @@ export function StudentPerformanceView({
 							})}
 						</motion.div>
 						<p className="text-muted-foreground text-xs leading-relaxed">
-							Coverage is the share of curriculum topics you have tried at least once. Open a subject for
-							mastery breakdown by topic.
+							{parentViewer
+								? "Coverage is the share of curriculum topics they have tried at least once. Open a subject for mastery breakdown by topic."
+								: "Coverage is the share of curriculum topics you have tried at least once. Open a subject for mastery breakdown by topic."}
 						</p>
 					</section>
 					</motion.div>
@@ -1038,7 +1082,7 @@ export function StudentPerformanceView({
 								>
 									{filteredRows.length === 0 ? (
 										<div className="border-border border-t bg-background px-4 py-10 text-center text-muted-foreground text-sm dark:bg-transparent">
-											{emptyPerformanceMatrixMessage(topicSearch, statusFilter)}
+											{emptyPerformanceMatrixMessage(topicSearch, statusFilter, parentViewer)}
 										</div>
 									) : (
 										<div className="overflow-x-auto border-border border-t">
@@ -1051,7 +1095,9 @@ export function StudentPerformanceView({
 												<table className="w-full min-w-[52rem] border-separate border-spacing-0 text-sm">
 													<caption className="sr-only">
 														Performance by topic for {detailSubjectName ?? "this subject"}. One row per topic; order
-														follows your sort choice (default curriculum order matches the full syllabus sequence).
+														{parentViewer
+															? " follows the selected sort order (default curriculum order matches the full syllabus sequence)."
+															: " follows your sort choice (default curriculum order matches the full syllabus sequence)."}
 													</caption>
 													<thead>
 														<tr
@@ -1064,7 +1110,9 @@ export function StudentPerformanceView({
 																scope="col"
 																className="w-11 border-border border-e px-2 py-2 text-center align-middle font-medium text-muted-foreground text-xs"
 															>
-																<span className="sr-only">Select for practice</span>
+																<span className="sr-only">
+																	{parentViewer ? "Topic rows (read-only)" : "Select for practice"}
+																</span>
 															</th>
 															<th
 																scope="col"
@@ -1207,7 +1255,7 @@ export function StudentPerformanceView({
 				)}
 			</AnimatePresence>
 
-			{detailSubjectId && selectedList.length > 0 ? (
+			{detailSubjectId && selectedList.length > 0 && allowPractice ? (
 				<div
 					className={cn(
 						"fixed z-40 flex max-w-[calc(100vw-2rem)] items-center gap-4 rounded-xl border border-border",
@@ -1228,7 +1276,7 @@ export function StudentPerformanceView({
 						>
 							Clear
 						</Button>
-						<Button size="sm" render={<Link href={practiceHref(selectedList, detailSubjectId)} />}>
+						<Button size="sm" render={<Link href={practiceHref(selectedList, detailSubjectId, practiceOpts)} />}>
 							Start practice
 						</Button>
 					</div>
@@ -1288,12 +1336,16 @@ export function StudentPerformanceView({
 									</p>
 								</div>
 								<SheetFooter className="sm:flex-row">
-									<Button
-										className="w-full sm:w-auto"
-										render={<Link href={practiceHref([sheetRow.topicId], sheetRow.subjectId)} />}
-									>
-										Practice this topic
-									</Button>
+									{allowPractice ? (
+										<Button
+											className="w-full sm:w-auto"
+											render={
+												<Link href={practiceHref([sheetRow.topicId], sheetRow.subjectId, practiceOpts)} />
+											}
+										>
+											Practice this topic
+										</Button>
+									) : null}
 								</SheetFooter>
 							</>
 						) : null}

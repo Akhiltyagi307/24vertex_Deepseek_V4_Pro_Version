@@ -5,4 +5,3 @@ export * from "./comms-audit";
 export * from "./doubt";
 export * from "./practice-tables";
 export * from "./profiles";
-export * from "./teaching";

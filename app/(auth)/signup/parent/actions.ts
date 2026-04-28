@@ -17,10 +17,11 @@ export async function completeParentRegistration(
 		email: raw.email,
 		password: raw.password,
 		fullName: raw.fullName,
+		studentLinkCode: raw.studentLinkCode,
 	});
 
 	if (!parsed.success) {
-		return { error: parsed.error.flatten().fieldErrors.email?.[0] ?? "Invalid form" };
+		return { error: parsed.error.flatten().fieldErrors.studentLinkCode?.[0] ?? "Check your details." };
 	}
 
 	const v = parsed.data;
@@ -47,5 +48,17 @@ export async function completeParentRegistration(
 		return { error: "We couldn't complete registration. Try again or contact support." };
 	}
 
-	redirect("/parent/dashboard");
+	const { error: linkErr } = await supabase.rpc("link_parent_to_student", {
+		p_student_ref: v.studentLinkCode,
+	});
+
+	if (linkErr) {
+		logSupabaseError("completeParentRegistration.link_parent_to_student", linkErr);
+		return {
+			error:
+				"We created your account but couldn't link that student. Check their six-character link code from Profile. If their profile already has a guardian email on file, your parent login email must match it. You can link again from the parent portal.",
+		};
+	}
+
+	redirect("/parent/select-student");
 }

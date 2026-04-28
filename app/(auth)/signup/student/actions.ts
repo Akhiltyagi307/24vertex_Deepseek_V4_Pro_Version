@@ -59,8 +59,8 @@ export async function completeStudentRegistration(
 		p_section: v.section.trim(),
 		p_stream: streamVal,
 		p_elective_subject_id: electiveVal,
-		p_parent_name: v.parentName,
-		p_parent_email: v.parentEmail,
+		p_parent_name: v.parentName ?? null,
+		p_parent_email: v.parentEmail ?? null,
 	});
 
 	if (rpcError) {

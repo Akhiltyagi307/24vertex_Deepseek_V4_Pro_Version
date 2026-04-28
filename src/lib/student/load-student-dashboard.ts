@@ -1,13 +1,15 @@
 import "server-only";
 
 import type {
-	StudentDashboardAssignmentSummary,
 	StudentDashboardRecentTest,
 	StudentDashboardSubjectCard,
 } from "@/components/student/student-dashboard-view";
 import { buildStudentDashboardAnalyticsPayload } from "@/lib/student/dashboard-analytics";
 import { buildDashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
-import { pickStudentDashboardGreeting } from "@/lib/student/dashboard-greeting";
+import {
+	pickParentDashboardGreeting,
+	pickStudentDashboardGreeting,
+} from "@/lib/student/dashboard-greeting";
 import {
 	averageTestScorePercentForSubject,
 	buildEnrolledSubjectCards,
@@ -47,21 +49,6 @@ function subjectNameFromCompletedTestRow(
 	return enrolledNameBySubjectId.get(t.subject_id) ?? "Subject";
 }
 
-type DashboardAssignmentRow = {
-	id: string;
-	title: string;
-	due_date: string | null;
-	time_limit_seconds: number | null;
-	status: string | null;
-	subject_id: string;
-};
-
-type DashboardAssignmentSubmissionRow = {
-	assignment_id: string;
-	status: string | null;
-	submitted_at: string | null;
-	score: string | number | null;
-};
 
 function parsePercent(v: string | number | null | undefined): number | null {
 	if (v == null || v === "") return null;
@@ -76,7 +63,27 @@ function statusPriority(status: "good" | "satisfactory" | "bad" | "not_tested"):
 	return 3;
 }
 
-function buildPracticeHref(subjectId: string, topicIds: string[]): string {
+export type LoadStudentDashboardOptions = {
+	/** Default: student practice deep-links. Parent portal links to performance instead. */
+	subjectCardLinkMode?: "practice" | "performance";
+	/** Base path for performance links when `subjectCardLinkMode === "performance"` (default `/parent/performance`). */
+	performancePathPrefix?: string;
+	/** Parent portal uses guardian-focused greetings and labels in shared dashboard UI. */
+	viewerRole?: "student" | "parent";
+};
+
+function buildSubjectActionHref(
+	subjectId: string,
+	topicIds: string[],
+	opts?: LoadStudentDashboardOptions,
+): string {
+	const mode = opts?.subjectCardLinkMode ?? "practice";
+	if (mode === "performance") {
+		const base = (opts?.performancePathPrefix ?? "/parent/performance").replace(/\/$/, "");
+		const params = new URLSearchParams();
+		params.set("subject", subjectId);
+		return `${base}?${params.toString()}`;
+	}
 	const params = new URLSearchParams();
 	params.set("subjectId", subjectId);
 	if (topicIds.length) {
@@ -92,7 +99,6 @@ export type StudentDashboardViewPayload = {
 	subjectsLoadError: string | null;
 	analytics: ReturnType<typeof buildStudentDashboardAnalyticsPayload>;
 	recentTests: StudentDashboardRecentTest[];
-	assignmentSummary: StudentDashboardAssignmentSummary;
 	trackerNeedsHydration: boolean;
 };
 
@@ -104,6 +110,7 @@ export async function loadStudentDashboardViewPayload(
 	supabase: SupabaseServer,
 	userId: string,
 	profileRow: StudentDashboardProfileRow,
+	opts?: LoadStudentDashboardOptions,
 ): Promise<StudentDashboardViewPayload> {
 	const bundleInput: StudentProfileSubjectsRow = {
 		grade: profileRow.grade,
@@ -142,51 +149,6 @@ export async function loadStudentDashboardViewPayload(
 		logSupabaseError("loadStudentDashboardViewPayload.tests.select", completedTestRes.error, { userId });
 	}
 	const completedTestRows = completedTestRes.data;
-
-	const assignmentSelect = "id, title, due_date, time_limit_seconds, status, subject_id";
-	const assignmentMap = new Map<string, DashboardAssignmentRow>();
-
-	const [gradeSectionRes, directRes] = await Promise.all([
-		profileRow.grade != null ?
-			(() => {
-				let q = supabase
-					.from("assignments")
-					.select(assignmentSelect)
-					.eq("status", "active")
-					.contains("target_grades", [profileRow.grade]);
-				if (profileRow.section) {
-					q = q.contains("target_sections", [profileRow.section]);
-				}
-				return q;
-			})()
-		:	Promise.resolve({ data: [] as DashboardAssignmentRow[], error: null }),
-		supabase
-			.from("assignments")
-			.select(assignmentSelect)
-			.eq("status", "active")
-			.contains("target_student_ids", [userId]),
-	]);
-
-	for (const row of gradeSectionRes.data ?? []) {
-		assignmentMap.set(row.id, row as DashboardAssignmentRow);
-	}
-	for (const row of directRes.data ?? []) {
-		assignmentMap.set(row.id, row as DashboardAssignmentRow);
-	}
-
-	const assignmentRows = [...assignmentMap.values()];
-	const assignmentIds = assignmentRows.map((a) => a.id);
-	let submissionByAssignmentId = new Map<string, DashboardAssignmentSubmissionRow>();
-	if (assignmentIds.length > 0) {
-		const { data: submissions } = await supabase
-			.from("assignment_submissions")
-			.select("assignment_id, status, submitted_at, score")
-			.eq("student_id", userId)
-			.in("assignment_id", assignmentIds);
-		submissionByAssignmentId = new Map(
-			(submissions ?? []).map((row) => [row.assignment_id as string, row as DashboardAssignmentSubmissionRow]),
-		);
-	}
 
 	const performanceStats = buildDashboardPerformanceStats(rows, completedTestRows ?? []);
 
@@ -246,7 +208,7 @@ export async function loadStudentDashboardViewPayload(
 			lastTestDateIso: st.lastTestDate,
 			status: dominantStatusFromTrackerStats(st),
 			scorePercent: averageTestScorePercentForSubject(rows, c.subjectId),
-			practiceHref: buildPracticeHref(c.subjectId, weakTopicIds),
+			practiceHref: buildSubjectActionHref(c.subjectId, weakTopicIds, opts),
 		};
 	});
 
@@ -261,50 +223,10 @@ export async function loadStudentDashboardViewPayload(
 			durationSeconds: t.duration_seconds,
 		}));
 
-	const submissionDone = new Set(["submitted", "graded", "completed"]);
-	const nowTs = new Date().getTime();
-	let pendingCount = 0;
-	let overdueCount = 0;
-	let completedCount = 0;
-	let nextDueTitle: string | null = null;
-	let nextDueIso: string | null = null;
-
-	const pendingWithDue: { dueTs: number; title: string; dueIso: string | null }[] = [];
-	for (const assignment of assignmentRows) {
-		const submission = submissionByAssignmentId.get(assignment.id);
-		const isCompleted =
-			(submission?.status != null && submissionDone.has(submission.status)) ||
-			submission?.submitted_at != null;
-		const dueTs = assignment.due_date ? new Date(assignment.due_date).getTime() : Number.NaN;
-		if (isCompleted) {
-			completedCount += 1;
-			continue;
-		}
-		pendingCount += 1;
-		if (Number.isFinite(dueTs) && dueTs < nowTs) {
-			overdueCount += 1;
-		}
-		pendingWithDue.push({
-			dueTs: Number.isFinite(dueTs) ? dueTs : Number.MAX_SAFE_INTEGER,
-			title: assignment.title,
-			dueIso: assignment.due_date,
-		});
-	}
-	pendingWithDue.sort((a, b) => a.dueTs - b.dueTs);
-	if (pendingWithDue.length > 0) {
-		nextDueTitle = pendingWithDue[0]!.title;
-		nextDueIso = pendingWithDue[0]!.dueIso;
-	}
-
-	const assignmentSummary: StudentDashboardAssignmentSummary = {
-		pendingCount,
-		overdueCount,
-		completedCount,
-		nextDueTitle,
-		nextDueIso,
-	};
-
-	const headerGreeting = pickStudentDashboardGreeting(profileRow.full_name);
+	const headerGreeting =
+		opts?.viewerRole === "parent"
+			? pickParentDashboardGreeting(profileRow.full_name)
+			: pickStudentDashboardGreeting(profileRow.full_name);
 
 	return {
 		headerGreeting,
@@ -313,7 +235,6 @@ export async function loadStudentDashboardViewPayload(
 		subjectsLoadError: loadError,
 		analytics,
 		recentTests,
-		assignmentSummary,
 		trackerNeedsHydration,
 	};
 }

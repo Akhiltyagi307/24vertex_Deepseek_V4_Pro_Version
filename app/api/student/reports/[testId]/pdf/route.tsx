@@ -47,7 +47,25 @@ export async function GET(request: Request, context: RouteContext) {
 		return new Response("Not found", { status: 404 });
 	}
 	if (testRow.student_id !== user.id) {
-		return new Response("Forbidden", { status: 403 });
+		const { data: prof } = await supabase
+			.from("profiles")
+			.select("role")
+			.eq("id", user.id)
+			.maybeSingle();
+		if (prof?.role === "parent") {
+			const { data: link } = await supabase
+				.from("parent_student_links")
+				.select("student_id")
+				.eq("parent_id", user.id)
+				.eq("student_id", testRow.student_id as string)
+				.eq("status", "active")
+				.maybeSingle();
+			if (!link) {
+				return new Response("Forbidden", { status: 403 });
+			}
+		} else {
+			return new Response("Forbidden", { status: 403 });
+		}
 	}
 
 	const { data: subjectRow } = await supabase

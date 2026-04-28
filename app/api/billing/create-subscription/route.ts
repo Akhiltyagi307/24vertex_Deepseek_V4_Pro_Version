@@ -21,6 +21,8 @@ const bodySchema = z.object({
 	 * inside the 14-day free trial window (hybrid "skip the wait" flow).
 	 */
 	startMode: z.enum(["immediate", "after_trial"]).default("immediate"),
+	/** When set, a verified parent may purchase for this student profile instead of self. */
+	billingProfileId: z.string().uuid().optional(),
 });
 
 /**
@@ -66,19 +68,51 @@ export async function POST(req: Request) {
 		return Response.json({ ok: false, message: "Invalid plan code." }, { status: 500 });
 	}
 
+	const { data: callerProfile } = await admin
+		.from("profiles")
+		.select("role")
+		.eq("id", user.id)
+		.maybeSingle();
+
+	let targetProfileId = user.id;
+	if (parsed.data.billingProfileId) {
+		if (callerProfile?.role !== "parent" || parsed.data.billingProfileId === user.id) {
+			return Response.json({ ok: false, message: "Not allowed to bill this account." }, { status: 403 });
+		}
+		const { data: linkRow } = await supabase
+			.from("parent_student_links")
+			.select("student_id")
+			.eq("parent_id", user.id)
+			.eq("student_id", parsed.data.billingProfileId)
+			.eq("status", "active")
+			.maybeSingle();
+		if (!linkRow) {
+			return Response.json({ ok: false, message: "Student not linked to your account." }, { status: 403 });
+		}
+		const { data: billedProfile } = await admin
+			.from("profiles")
+			.select("role")
+			.eq("id", parsed.data.billingProfileId)
+			.maybeSingle();
+		if (billedProfile?.role !== "student") {
+			return Response.json({ ok: false, message: "Invalid billing profile." }, { status: 400 });
+		}
+		targetProfileId = parsed.data.billingProfileId;
+	}
+
 	const { data: profile } = await admin
 		.from("profiles")
 		.select("full_name, phone, parent_email")
-		.eq("id", user.id)
+		.eq("id", targetProfileId)
 		.maybeSingle();
 
 	const { data: subRow, error: subErr } = await admin
 		.from("subscriptions")
 		.select("id, razorpay_customer_id, razorpay_subscription_id, status, trial_ends_at")
-		.eq("profile_id", user.id)
+		.eq("profile_id", targetProfileId)
 		.maybeSingle();
 	if (subErr || !subRow) {
-		if (subErr) logSupabaseError("billing.create-subscription.sub", subErr, { userId: user.id });
+		if (subErr) logSupabaseError("billing.create-subscription.sub", subErr, { profileId: targetProfileId });
 		return Response.json({ ok: false, message: "Subscription record missing." }, { status: 500 });
 	}
 
@@ -86,11 +120,13 @@ export async function POST(req: Request) {
 		(subRow.status === "active" || subRow.status === "grace" || subRow.status === "past_due") &&
 		Boolean(subRow.razorpay_subscription_id);
 	if (paidPipelineBlocking) {
+		const billedForChild = targetProfileId !== user.id;
 		return Response.json(
 			{
 				ok: false,
-				message:
-					"You already have an active billing subscription. Open Subscription to manage payment or change plans.",
+				message: billedForChild
+					? "This student already has an active paid subscription. Use Razorpay or cancel at period end before starting a new checkout."
+					: "You already have an active billing subscription. Open Subscription to manage payment or change plans.",
 			},
 			{ status: 409 },
 		);
@@ -103,7 +139,7 @@ export async function POST(req: Request) {
 			name: profile?.full_name ?? "EduAI student",
 			email: user.email ?? "",
 			contact: profile?.phone ?? undefined,
-			notes: { profile_id: user.id },
+			notes: { profile_id: targetProfileId },
 		});
 	} catch (e) {
 		logServerError("billing.create-subscription.customer", e);
@@ -127,7 +163,7 @@ export async function POST(req: Request) {
 			totalCount,
 			startAt,
 			customerId: customer.id,
-			notes: { profile_id: user.id, plan_code: plan.code },
+			notes: { profile_id: targetProfileId, plan_code: plan.code },
 		});
 	} catch (e) {
 		logServerError("billing.create-subscription.rzp", e);
@@ -142,16 +178,16 @@ export async function POST(req: Request) {
 			pending_plan_code: plan.code,
 			updated_at: new Date().toISOString(),
 		})
-		.eq("profile_id", user.id);
+		.eq("profile_id", targetProfileId);
 	if (updErr) {
-		logSupabaseError("billing.create-subscription.update", updErr, { userId: user.id });
+		logSupabaseError("billing.create-subscription.update", updErr, { profileId: targetProfileId });
 	}
 
 	void recordPracticeEvent(
 		supabase,
 		"upgrade_clicked",
-		{ plan_code: plan.code, start_mode: parsed.data.startMode },
-		{ studentId: user.id },
+		{ plan_code: plan.code, start_mode: parsed.data.startMode, billed_by_parent: callerProfile?.role === "parent" },
+		{ studentId: targetProfileId },
 	);
 
 	return Response.json({

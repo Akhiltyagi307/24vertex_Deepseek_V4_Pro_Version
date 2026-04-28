@@ -1263,8 +1263,8 @@ export function PracticeTestWizard({
 							<Alert>
 								<AlertTitle>Not enough topics</AlertTitle>
 								<AlertDescription>
-									This subject doesn’t have topics in your tracker yet. Pick a different subject or ask your
-									teacher if the list should be there.
+									This subject doesn’t have topics in your tracker yet. Pick a different subject or reach out to
+									support if the list should be there.
 								</AlertDescription>
 							</Alert>
 						) : (

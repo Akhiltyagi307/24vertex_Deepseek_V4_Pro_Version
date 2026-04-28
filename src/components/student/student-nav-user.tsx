@@ -33,12 +33,15 @@ function initials(name: string) {
 
 export function StudentNavUser({
 	user,
+	settingsHref = "/student/settings",
 }: {
 	user: {
 		name: string;
 		email: string;
 		avatar: string | null;
 	};
+	/** Parent portal uses `/parent/settings`. */
+	settingsHref?: string;
 }) {
 	const { isMobile } = useSidebar();
 	const router = useRouter();
@@ -90,7 +93,7 @@ export function StudentNavUser({
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
-							<DropdownMenuItem onClick={() => router.push("/student/settings")}>
+							<DropdownMenuItem onClick={() => router.push(settingsHref)}>
 								<BadgeCheckIcon />
 								Account
 							</DropdownMenuItem>

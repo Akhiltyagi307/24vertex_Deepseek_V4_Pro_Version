@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * `cancel_at_period_end = true`. The `subscription.cancelled` webhook later
  * flips `status → cancelled` once the cycle actually ends.
  */
-export async function POST() {
+export async function POST(req: Request) {
 	const supabase = await createClient();
 	const {
 		data: { user },
@@ -23,14 +23,49 @@ export async function POST() {
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
+
+	let billingProfileId: string | undefined;
+	try {
+		const json = await req.json();
+		if (json && typeof json === "object" && typeof (json as { billingProfileId?: unknown }).billingProfileId === "string") {
+			billingProfileId = (json as { billingProfileId: string }).billingProfileId;
+		}
+	} catch {
+		/* no JSON body */
+	}
+
 	const admin = createServiceRoleClient();
+	const { data: callerProfile } = await admin
+		.from("profiles")
+		.select("role")
+		.eq("id", user.id)
+		.maybeSingle();
+
+	let targetProfileId = user.id;
+	if (billingProfileId && billingProfileId !== user.id) {
+		if (callerProfile?.role !== "parent") {
+			return Response.json({ ok: false, message: "Forbidden." }, { status: 403 });
+		}
+		const { data: linkRow } = await supabase
+			.from("parent_student_links")
+			.select("student_id")
+			.eq("parent_id", user.id)
+			.eq("student_id", billingProfileId)
+			.eq("status", "active")
+			.maybeSingle();
+		if (!linkRow) {
+			return Response.json({ ok: false, message: "Student not linked." }, { status: 403 });
+		}
+		targetProfileId = billingProfileId;
+	}
+
 	const { data: sub, error } = await admin
 		.from("subscriptions")
 		.select("id, razorpay_subscription_id, status")
-		.eq("profile_id", user.id)
+		.eq("profile_id", targetProfileId)
 		.maybeSingle();
 	if (error || !sub) {
-		if (error) logSupabaseError("billing.cancel.load", error, { userId: user.id });
+		if (error) logSupabaseError("billing.cancel.load", error, { profileId: targetProfileId });
 		return Response.json({ ok: false, message: "No subscription to cancel." }, { status: 404 });
 	}
 	if (!sub.razorpay_subscription_id) {
@@ -52,12 +87,14 @@ export async function POST() {
 	void recordPracticeEvent(
 		supabase,
 		"subscription_cancelled",
-		{ soft: true },
-		{ studentId: user.id },
+		{ soft: true, source: callerProfile?.role === "parent" ? "parent_portal" : "subscription_page" },
+		{ studentId: targetProfileId },
 	);
 
 	revalidatePath("/student", "layout");
 	revalidatePath("/student/subscription");
+	revalidatePath("/parent", "layout");
+	revalidatePath("/parent/subscription");
 
 	return Response.json({ ok: true });
 }

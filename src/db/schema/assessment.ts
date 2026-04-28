@@ -55,7 +55,6 @@ export const tests = pgTable(
 			.references(() => subjects.id),
 		unitName: varchar("unit_name", { length: 250 }),
 		testType: varchar("test_type", { length: 20 }).default("self"),
-		assignmentId: uuid("assignment_id"),
 		testDate: timestamp("test_date").defaultNow(),
 		durationSeconds: integer("duration_seconds"),
 		timeLimitSeconds: integer("time_limit_seconds").default(3600),
@@ -76,7 +75,6 @@ export const tests = pgTable(
 	(t) => [
 		index("idx_tests_student").on(t.studentId),
 		index("idx_tests_status").on(t.status),
-		index("idx_tests_assignment").on(t.assignmentId),
 		index("idx_tests_type").on(t.testType),
 	],
 );

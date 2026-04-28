@@ -197,6 +197,18 @@ export default async function StudentSubscriptionPage() {
 										Refund &amp; cancellation policy
 									</Link>
 									<Link
+										href="/legal/shipping"
+										className="underline-offset-4 hover:text-foreground hover:underline"
+									>
+										Shipping &amp; delivery
+									</Link>
+									<Link
+										href="/legal/privacy"
+										className="underline-offset-4 hover:text-foreground hover:underline"
+									>
+										Privacy policy
+									</Link>
+									<Link
 										href="/legal/terms"
 										className="underline-offset-4 hover:text-foreground hover:underline"
 									>

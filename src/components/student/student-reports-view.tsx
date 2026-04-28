@@ -4,7 +4,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
 	ArrowDownUp,
 	BadgeCheck,
-	BookOpen,
 	CalendarClock,
 	ChevronDownIcon,
 	CircleDot,
@@ -41,7 +40,13 @@ import {
 export type StudentReportsViewProps = {
 	initialTests: StudentReportTestRowSerialized[];
 	loadError: string | null;
+	/** Parent portal: guardian-facing copy (monitoring tone). */
+	parentViewer?: boolean;
 };
+
+function reportPdfPath(testId: string) {
+	return `/api/student/reports/${encodeURIComponent(testId)}/pdf`;
+}
 
 function rowTimestamp(r: StudentReportTestRowSerialized): number {
 	const raw = r.testDate ?? r.createdAt;
@@ -89,7 +94,11 @@ function useReportsStaggerVariants() {
 	return { container, item };
 }
 
-export function StudentReportsView({ initialTests, loadError }: StudentReportsViewProps) {
+export function StudentReportsView({
+	initialTests,
+	loadError,
+	parentViewer = false,
+}: StudentReportsViewProps) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -130,7 +139,6 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 
 	const sortKey = searchParams.get("sort") ?? "date";
 	const sortDir = searchParams.get("dir") === "asc" ? "asc" : "desc";
-	const typeFilter = searchParams.get("type") ?? "";
 	const difficultyFilter = searchParams.get("difficulty") ?? "";
 	const outcomeFilter = searchParams.get("outcome") ?? "";
 	const subjectFilter = searchParams.get("subject") ?? "";
@@ -180,7 +188,6 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 
 	let filteredSorted = initialTests.filter((r) => {
 		if (subjectFilter && r.subjectId !== subjectFilter) return false;
-		if (typeFilter && r.testType !== typeFilter) return false;
 		if (difficultyFilter) {
 			const d = (r.difficulty ?? "").toLowerCase();
 			if (d !== difficultyFilter.toLowerCase()) return false;
@@ -237,7 +244,6 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 
 	const activeFilterCount =
 		(subjectFilter ? 1 : 0) +
-		(typeFilter ? 1 : 0) +
 		(difficultyFilter ? 1 : 0) +
 		(outcomeFilter ? 1 : 0);
 
@@ -256,11 +262,13 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 					className="font-semibold text-3xl tracking-tight text-balance text-foreground"
 					variants={item}
 				>
-					Reports
+					{parentViewer ? "Test reports" : "Reports"}
 				</motion.h1>
 				<motion.div variants={item}>
 					<PageHeaderSubtext>
-						Use this page to review completed tests, track scores, and download PDF copies of your reports.
+						{parentViewer
+							? "Review your child’s completed tests, scores, and download PDF copies for your records."
+							: "Use this page to review completed tests, track scores, and download PDF copies of your reports."}
 					</PageHeaderSubtext>
 				</motion.div>
 			</motion.header>
@@ -296,7 +304,7 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 						</CardHeader>
 						<CardContent>
 							<p className="font-semibold text-2xl tabular-nums">{overviewStats.total}</p>
-							<p className="text-muted-foreground text-xs">On your list</p>
+							<p className="text-muted-foreground text-xs">{parentViewer ? "On this list" : "On your list"}</p>
 						</CardContent>
 					</Card>
 				</motion.div>
@@ -368,7 +376,9 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 										})
 									: "—"}
 							</p>
-							<p className="text-muted-foreground text-xs">When you last submitted</p>
+							<p className="text-muted-foreground text-xs">
+								{parentViewer ? "Their last submitted test" : "When you last submitted"}
+							</p>
 						</CardContent>
 					</Card>
 				</motion.div>
@@ -485,28 +495,6 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 														replaceQuery((p) => {
 															if (v) p.set("subject", v);
 															else p.delete("subject");
-														});
-													}}
-												/>
-											</div>
-											<div className="flex min-w-0 flex-col gap-1">
-												<span className="text-foreground text-sm font-medium">Test type</span>
-												<p className="text-muted-foreground text-xs">Self vs teacher-assigned.</p>
-												<ReportsPillSelect
-													menuTitle="Test type"
-													ariaLabel="Filter by test type"
-													icon={BookOpen}
-													value={typeFilter}
-													options={[
-														{ value: "", label: "All types" },
-														{ value: "self", label: "Self" },
-														{ value: "assigned", label: "Assigned" },
-													]}
-													className="w-full max-w-none sm:w-full"
-													onValueChange={(v) => {
-														replaceQuery((p) => {
-															if (v) p.set("type", v);
-															else p.delete("type");
 														});
 													}}
 												/>
@@ -725,7 +713,7 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 											: "—";
 									const correct = r.correctAnswers ?? 0;
 									const totalQ = r.totalQuestions ?? 0;
-									const pdfBase = `/api/student/reports/${encodeURIComponent(r.id)}/pdf`;
+									const pdfBase = reportPdfPath(r.id);
 									const pdfViewHref = `${pdfBase}?disposition=inline`;
 									const pdfDownloadHref = `${pdfBase}?disposition=attachment`;
 									return (
@@ -773,7 +761,11 @@ export function StudentReportsView({ initialTests, loadError }: StudentReportsVi
 																			? "text-emerald-700 dark:text-emerald-400"
 																			: "text-destructive",
 																	)}
-																	title="vs average across all your reports"
+																	title={
+																	parentViewer
+																		? "vs average across all tests in this list"
+																		: "vs average across all your reports"
+																}
 																>
 																	{delta > 0 ? "+" : ""}
 																	{delta}

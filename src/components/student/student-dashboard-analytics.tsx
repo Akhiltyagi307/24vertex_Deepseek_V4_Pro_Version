@@ -264,7 +264,14 @@ function AnalyticsActivityCalendar({
 	);
 }
 
-export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboardAnalyticsPayload }) {
+export function StudentDashboardAnalytics({
+	payload,
+	variant = "student",
+}: {
+	payload: StudentDashboardAnalyticsPayload;
+	/** Parent portal: guardian-facing labels (third person / monitoring tone). */
+	variant?: "student" | "parent";
+}) {
 	const [rangeDays, setRangeDays] = React.useState<RangeDays>(30);
 	const reduceMotion = useReducedMotion();
 
@@ -278,7 +285,10 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 	);
 	const kpi = React.useMemo(() => buildKpi(payload.tests, rangeDays), [payload.tests, rangeDays]);
 	const focus = React.useMemo(() => findFocusSubject(subjectBars), [subjectBars]);
-	const summaryLine = React.useMemo(() => buildSummaryLine(kpi, rangeDays), [kpi, rangeDays]);
+	const summaryLine = React.useMemo(
+		() => buildSummaryLine(kpi, rangeDays, variant),
+		[kpi, rangeDays, variant],
+	);
 
 	const heatmapDays = React.useMemo(() => buildHeatmapDays(payload.tests, 12), [payload.tests]);
 
@@ -334,6 +344,7 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 			};
 
 	if (payload.tests.length === 0) {
+		const isParent = variant === "parent";
 		return (
 			<TooltipProvider>
 				<Card className="overflow-hidden shadow-sm">
@@ -342,10 +353,16 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 						<div className="flex max-w-md flex-col gap-1 text-center">
 							<p className="font-medium text-foreground text-sm">No recent activity to chart</p>
 							<p className="text-muted-foreground text-sm">
-								Complete a practice test to unlock trends, subject comparison, and topic distribution.
+								{isParent
+									? "When your child completes practice tests, you'll see trends, subject comparison, and topic distribution here."
+									: "Complete a practice test to unlock trends, subject comparison, and topic distribution."}
 							</p>
 						</div>
-						<Button render={<Link href="/student/practice" />}>Start practice</Button>
+						{isParent ? (
+							<Button render={<Link href="/parent/performance" />}>View subject progress</Button>
+						) : (
+							<Button render={<Link href="/student/practice" />}>Start practice</Button>
+						)}
 					</CardContent>
 				</Card>
 			</TooltipProvider>
@@ -360,7 +377,9 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 				<CardHeader className="gap-4 border-border/50 border-b bg-gradient-to-br from-emerald-50/90 via-card to-card pb-4 dark:from-emerald-950/40 dark:via-card dark:to-card">
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 						<div className="flex flex-col gap-1.5">
-							<CardTitle className="text-lg tracking-tight">Performance insights</CardTitle>
+							<CardTitle className="text-lg tracking-tight">
+								{variant === "parent" ? "Learning insights" : "Performance insights"}
+							</CardTitle>
 							<CardDescription className="text-muted-foreground">
 								{kpi.testCount > 0 && kpi.avgScore != null
 									? `This period: ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"} · ${kpi.avgScore}% avg`
@@ -418,7 +437,10 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 								<p className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-2.5 text-muted-foreground text-xs leading-relaxed dark:border-emerald-800/50 dark:bg-emerald-950/35">
 									<span className="font-medium text-foreground">Focus idea:</span> short sessions on{" "}
 									<span className="font-medium text-emerald-800 dark:text-emerald-200">{focus.subjectName}</span>{" "}
-									(recent avg {focus.avgScore}%) can lift your balance across subjects.
+									(recent avg {focus.avgScore}%)
+									{variant === "parent"
+										? " can help strengthen their balance across subjects."
+										: " can lift your balance across subjects."}
 								</p>
 							) : null}
 							{!hasTestsInRange && rangeDays === 7 && payload.tests.length > 0 ? (
@@ -430,7 +452,9 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 
 						<TabsContent value="trend" className="flex flex-col gap-2">
 							<p className="text-muted-foreground text-xs">
-								Daily average score on days you completed tests (gaps mean no scored tests that day).
+								{variant === "parent"
+									? "Daily average score on days they completed tests (gaps mean no scored tests that day)."
+									: "Daily average score on days you completed tests (gaps mean no scored tests that day)."}
 							</p>
 							<motion.div
 								{...trendAnimation}
@@ -502,7 +526,9 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 
 						<TabsContent value="topics" className="flex flex-col gap-2">
 							<p className="text-muted-foreground text-xs">
-								How your curriculum topics are currently labeled from practice (not time-scoped).
+								{variant === "parent"
+									? "How curriculum topics are labeled from their practice so far (not time-scoped)."
+									: "How your curriculum topics are currently labeled from practice (not time-scoped)."}
 							</p>
 							<motion.div
 								{...trendAnimation}
@@ -545,7 +571,9 @@ export function StudentDashboardAnalytics({ payload }: { payload: StudentDashboa
 				</CardContent>
 				<CardFooter className="flex flex-col items-start gap-1 border-border/50 bg-muted/5 dark:bg-muted/10">
 					<p className="text-muted-foreground text-xs">
-						Charts use your completed tests. Topic labels update as you practice more topics.
+						{variant === "parent"
+							? "Charts reflect their completed tests. Topic labels update as they practice more topics."
+							: "Charts use your completed tests. Topic labels update as you practice more topics."}
 					</p>
 				</CardFooter>
 			</Card>

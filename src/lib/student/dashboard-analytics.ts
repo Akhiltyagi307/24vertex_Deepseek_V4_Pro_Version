@@ -274,14 +274,27 @@ export function findFocusSubject(bars: SubjectBarPoint[]): FocusSubject | null {
 	return best;
 }
 
-export function buildSummaryLine(kpi: { testCount: number; avgScore: number | null }, rangeDays: 7 | 30): string {
+export function buildSummaryLine(
+	kpi: { testCount: number; avgScore: number | null },
+	rangeDays: 7 | 30,
+	viewer: "student" | "parent" = "student",
+): string {
 	if (kpi.testCount === 0) {
+		if (viewer === "parent") {
+			return rangeDays === 7
+				? "No completed tests in the last 7 days. After they take practice tests, trends will show here."
+				: "No completed tests in the last 30 days. After they take practice tests, trends will show here.";
+		}
 		return rangeDays === 7
 			? "No completed tests in the last 7 days. Start a practice set to see your trends."
 			: "No completed tests in the last 30 days. Start a practice set to see your trends.";
 	}
 	if (kpi.avgScore != null) {
-		return `Your average score is ${kpi.avgScore}% across ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"}.`;
+		return viewer === "parent"
+			? `Their average score is ${kpi.avgScore}% across ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"}.`
+			: `Your average score is ${kpi.avgScore}% across ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"}.`;
 	}
-	return `You completed ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"} in this period.`;
+	return viewer === "parent"
+		? `They completed ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"} in this period.`
+		: `You completed ${kpi.testCount} test${kpi.testCount === 1 ? "" : "s"} in this period.`;
 }

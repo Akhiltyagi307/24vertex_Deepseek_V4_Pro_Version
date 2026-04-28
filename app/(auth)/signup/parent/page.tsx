@@ -47,14 +47,19 @@ export default function ParentSignupPage() {
 		}
 
 		const fullName = String(fd.get("fullName") ?? "").trim();
-		const parsedSignup = parentSignupSchema.safeParse({ email, password, fullName });
+		const studentLinkCode = String(fd.get("studentLinkCode") ?? "").trim();
+		const parsedSignup = parentSignupSchema.safeParse({ email, password, fullName, studentLinkCode });
 		if (!parsedSignup.success) {
-			setState({ error: "Please check your name and email." });
+			const msg =
+				parsedSignup.error.flatten().fieldErrors.studentLinkCode?.[0] ??
+				parsedSignup.error.flatten().fieldErrors.email?.[0] ??
+				"Please check your details.";
+			setState({ error: msg });
 			setPending(false);
 			return;
 		}
 
-		const { email: payloadEmail, fullName: payloadName } = parsedSignup.data;
+		const { email: payloadEmail, fullName: payloadName, studentLinkCode: payloadCode } = parsedSignup.data;
 		const supabase = createClient();
 		const { data: authData, error: signUpError } = await supabase.auth.signUp({
 			email,
@@ -65,7 +70,7 @@ export default function ParentSignupPage() {
 					[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 						version: 1,
 						role: "parent",
-						payload: { email: payloadEmail, fullName: payloadName },
+						payload: { email: payloadEmail, fullName: payloadName, studentLinkCode: payloadCode },
 					}),
 				},
 			},
@@ -98,8 +103,8 @@ export default function ParentSignupPage() {
 			<div>
 				<h1 className="text-2xl font-semibold tracking-tight">Parent sign up</h1>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Create a parent account. After you register, link your student from the parent dashboard
-					using their student ID (or wait for an invitation when a student adds your email).
+					Use your own email for this parent account, and enter your child&apos;s six-character link code from
+					their EduAI Profile so we can connect them to you.
 				</p>
 			</div>
 			<form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -108,8 +113,28 @@ export default function ParentSignupPage() {
 					<Input id="fullName" name="fullName" required autoComplete="name" />
 				</Field>
 				<Field>
+					<FieldLabel htmlFor="studentLinkCode">Student link code</FieldLabel>
+					<Input
+						id="studentLinkCode"
+						name="studentLinkCode"
+						required
+						autoComplete="off"
+						placeholder="e.g. AB1234"
+						className="font-mono tracking-wide uppercase"
+					/>
+					<p className="text-muted-foreground mt-1.5 text-xs">
+						{
+							"Your child can find this under Profile -> Link code. It is two letters and four numbers."
+						}
+					</p>
+				</Field>
+				<Field>
 					<FieldLabel htmlFor="email">Email</FieldLabel>
 					<Input id="email" name="email" type="email" required autoComplete="email" />
+					<p className="text-muted-foreground mt-1.5 text-xs">
+						If your child&apos;s EduAI profile already lists a guardian/parent email, use that exact email
+						here. Otherwise linking will fail after you verify your inbox.
+					</p>
 				</Field>
 				<Field>
 					<FieldLabel htmlFor="password">Password</FieldLabel>

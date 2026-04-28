@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ActivityIcon, BookOpenIcon, CalendarClockIcon, FlameIcon, LineChartIcon } from "lucide-react";
+import { ActivityIcon, BookOpenIcon, FlameIcon, LineChartIcon } from "lucide-react";
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
@@ -81,14 +81,6 @@ export type StudentDashboardRecentTest = {
 	durationSeconds: number | null;
 };
 
-export type StudentDashboardAssignmentSummary = {
-	pendingCount: number;
-	overdueCount: number;
-	completedCount: number;
-	nextDueTitle: string | null;
-	nextDueIso: string | null;
-};
-
 function formatLastTest(iso: string | null): string {
 	if (!iso) return "—";
 	try {
@@ -150,8 +142,9 @@ export type StudentDashboardViewProps = {
 	subjectsLoadError: string | null;
 	analytics: StudentDashboardAnalyticsPayload;
 	recentTests: StudentDashboardRecentTest[];
-	assignmentSummary: StudentDashboardAssignmentSummary;
 	trackerNeedsHydration?: boolean;
+	/** Parent portal reuses this view with read-only messaging and links under `/parent`. */
+	variant?: "student" | "parent";
 };
 
 export function StudentDashboardView({
@@ -161,9 +154,10 @@ export function StudentDashboardView({
 	subjectsLoadError,
 	analytics,
 	recentTests,
-	assignmentSummary,
 	trackerNeedsHydration = false,
+	variant = "student",
 }: StudentDashboardViewProps) {
+	const isParent = variant === "parent";
 	const { container, item } = useStaggerVariants();
 
 	const { priority: prioritySubjects, rest: restSubjects } = React.useMemo(
@@ -184,7 +178,7 @@ export function StudentDashboardView({
 					className="font-semibold text-3xl tracking-tight text-balance text-foreground"
 					variants={item}
 				>
-					Dashboard
+					{isParent ? "Overview" : "Dashboard"}
 				</motion.h1>
 				<motion.div className={pageHeaderSubtextScrollClass} variants={item}>
 					<p className={pageHeaderSubtextTextClass}>{headerGreeting}</p>
@@ -213,7 +207,11 @@ export function StudentDashboardView({
 							</CardHeader>
 							<CardContent>
 								<p className="font-semibold text-2xl tabular-nums">{performanceStats.testsCompleted}</p>
-								<p className="text-muted-foreground text-xs">Tests you’ve finished or that are graded</p>
+								<p className="text-muted-foreground text-xs">
+									{isParent
+										? "Tests finished or graded for them"
+										: "Tests you’ve finished or that are graded"}
+								</p>
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -233,7 +231,9 @@ export function StudentDashboardView({
 										? `${performanceStats.averageScoreLast30Days}%`
 										: "—"}
 								</p>
-								<p className="text-muted-foreground text-xs">From graded tests in the last 30 days</p>
+								<p className="text-muted-foreground text-xs">
+									{isParent ? "From their graded tests in the last 30 days" : "From graded tests in the last 30 days"}
+								</p>
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -252,7 +252,9 @@ export function StudentDashboardView({
 									{performanceStats.topicsMasteredCount}
 								</p>
 								<p className="text-muted-foreground text-xs tabular-nums">
-									{performanceStats.topicsNeedingImprovementCount} topics to revisit
+									{isParent
+										? `${performanceStats.topicsNeedingImprovementCount} topics they could strengthen`
+										: `${performanceStats.topicsNeedingImprovementCount} topics to revisit`}
 								</p>
 							</CardContent>
 						</Card>
@@ -271,7 +273,9 @@ export function StudentDashboardView({
 								<p className="font-semibold text-2xl tabular-nums">
 									{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
 								</p>
-								<p className="text-muted-foreground text-xs">Time in timed tests, last 30 days</p>
+								<p className="text-muted-foreground text-xs">
+									{isParent ? "Time they spent in timed tests, last 30 days" : "Time in timed tests, last 30 days"}
+								</p>
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -284,7 +288,7 @@ export function StudentDashboardView({
 					className="flex min-h-0 min-w-0 flex-col gap-3 lg:col-span-2"
 				>
 					<h2 id="subjects-heading" className={cn(SECTION_LABEL_CLASS, "shrink-0")}>
-						Subjects you study
+						{isParent ? "Subjects" : "Subjects you study"}
 					</h2>
 					{subjectsLoadError ? (
 						<Alert variant="destructive">
@@ -297,8 +301,17 @@ export function StudentDashboardView({
 							<CardHeader>
 								<CardTitle className="text-sm font-semibold leading-snug">No subjects yet</CardTitle>
 								<CardDescription>
-									We load subjects from your grade and school setup. If this stays empty, open Profile and
-									check your class details, or ask a teacher to confirm your enrollment.
+									{isParent ? (
+										<>
+											Subjects come from their grade and school setup. If this stays empty, ask them to check class
+											details in the student app or confirm enrollment with their school.
+										</>
+									) : (
+										<>
+											We load subjects from your grade and school setup. If this stays empty, open Profile and
+											check your class details, or ask your school to confirm your enrollment.
+										</>
+									)}
 								</CardDescription>
 							</CardHeader>
 						</Card>
@@ -351,7 +364,7 @@ export function StudentDashboardView({
 															testsTaken={0}
 															avgScore={0}
 															status="in_progress"
-															ctaLabel="Start focus session"
+															ctaLabel={isParent ? "View performance" : "Start focus session"}
 															ctaRender={<Link href={s.practiceHref} />}
 															metricsIconSlot={subjectIcon}
 														/>
@@ -364,7 +377,7 @@ export function StudentDashboardView({
 															testsTaken={s.testsTaken}
 															avgScore={avgScore}
 															status={cardStatus}
-															ctaLabel="Start focus session"
+															ctaLabel={isParent ? "View performance" : "Start focus session"}
 															ctaRender={<Link href={s.practiceHref} />}
 															metricsIconSlot={subjectIcon}
 														/>
@@ -405,74 +418,21 @@ export function StudentDashboardView({
 					animate="show"
 					variants={container}
 				>
-					<section aria-labelledby="assignments-heading" className="flex shrink-0 flex-col gap-3">
-						<h2 id="assignments-heading" className={SECTION_LABEL_CLASS}>
-							Assignments
-						</h2>
-						<motion.div variants={item}>
-							<Card className="shadow-none">
-								<CardHeader className="pb-2">
-									<div className="flex items-center justify-between gap-2">
-										<CardTitle className="text-sm font-semibold leading-snug">Assignment status</CardTitle>
-										{assignmentSummary.overdueCount > 0 ? (
-											<Badge variant="destructive">{assignmentSummary.overdueCount} overdue</Badge>
-										) : null}
-									</div>
-									<CardDescription>What your teachers have set for your grade and section</CardDescription>
-								</CardHeader>
-								<CardContent className="flex flex-col gap-3 text-sm">
-									<div className="grid grid-cols-3 gap-2">
-										<div className="rounded-lg border border-border/70 bg-muted/20 px-2.5 py-2">
-											<p className="text-muted-foreground text-xs">Pending</p>
-											<p className="font-semibold tabular-nums">{assignmentSummary.pendingCount}</p>
-										</div>
-										<div className="rounded-lg border border-border/70 bg-muted/20 px-2.5 py-2">
-											<p className="text-muted-foreground text-xs">Overdue</p>
-											<p className="font-semibold tabular-nums">{assignmentSummary.overdueCount}</p>
-										</div>
-										<div className="rounded-lg border border-border/70 bg-muted/20 px-2.5 py-2">
-											<p className="text-muted-foreground text-xs">Completed</p>
-											<p className="font-semibold tabular-nums">{assignmentSummary.completedCount}</p>
-										</div>
-									</div>
-									{assignmentSummary.nextDueTitle ? (
-										<div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3">
-											<CalendarClockIcon className="mt-0.5 shrink-0 text-muted-foreground" />
-											<div className="flex flex-col gap-0.5">
-												<p className="font-medium">{assignmentSummary.nextDueTitle}</p>
-												<p className="text-muted-foreground text-xs">
-													Due {formatLastTest(assignmentSummary.nextDueIso)}
-												</p>
-											</div>
-										</div>
-									) : (
-										<p className="text-muted-foreground text-xs">
-											Nothing due soon—check with your class if you expected homework here.
-										</p>
-									)}
-								</CardContent>
-								<CardFooter>
-									<Button variant="secondary" className="w-full" render={<Link href="/student/practice" />}>
-										Start a practice test
-									</Button>
-								</CardFooter>
-							</Card>
-						</motion.div>
-					</section>
-
 					<section
 						aria-labelledby="activity-heading"
 						className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:min-h-0"
 					>
 						<h2 id="activity-heading" className={SECTION_LABEL_CLASS}>
-							Recent tests
+							{isParent ? "Their recent tests" : "Recent tests"}
 						</h2>
 						<motion.div variants={item} className="flex min-h-0 flex-1 flex-col">
 							<Card className="flex min-h-0 flex-1 flex-col shadow-none">
 								<CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-6">
 									{recentTests.length === 0 ? (
 										<p className="text-muted-foreground text-sm">
-											No completed tests yet. Finish a practice or assignment attempt to see it here.
+											{isParent
+												? "No completed tests yet. When they finish a timed practice test, it will show here."
+												: "No completed tests yet. Finish a practice attempt to see it here."}
 										</p>
 									) : (
 										recentTests.map((row) => (
@@ -495,9 +455,9 @@ export function StudentDashboardView({
 									<Button
 										variant="link"
 										className="mt-auto h-auto px-0 pt-1 text-primary"
-										render={<Link href="/student/reports" />}
+										render={<Link href={isParent ? "/parent/reports" : "/student/reports"} />}
 									>
-										Open reports
+										{isParent ? "View test reports" : "Open reports"}
 									</Button>
 								</CardContent>
 							</Card>
@@ -508,11 +468,11 @@ export function StudentDashboardView({
 
 			<section aria-labelledby="charts-heading" className="flex flex-col gap-3">
 				<h2 id="charts-heading" className={SECTION_LABEL_CLASS}>
-					Trends &amp; charts
+					{isParent ? "Progress charts" : "Trends & charts"}
 				</h2>
 				<motion.div initial="hidden" animate="show" variants={container}>
 					<motion.div variants={item}>
-						<StudentDashboardAnalytics payload={analytics} />
+						<StudentDashboardAnalytics payload={analytics} variant={isParent ? "parent" : "student"} />
 					</motion.div>
 				</motion.div>
 			</section>

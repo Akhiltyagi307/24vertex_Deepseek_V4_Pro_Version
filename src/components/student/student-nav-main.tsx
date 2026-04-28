@@ -41,7 +41,7 @@ const progressItems: NavItem[] = [
 
 const accountItems: NavItem[] = [
 	{ title: "Profile", href: "/student/settings", icon: UserRoundIcon },
-	{ title: "Subscription", href: "/student/subscription", icon: CreditCardIcon },
+	{ title: "Plan & billing", href: "/student/subscription", icon: CreditCardIcon },
 ];
 
 const groupLabelClass =
@@ -82,10 +82,12 @@ export function StudentNavMain() {
 			</SidebarGroup>
 			<SidebarSeparator />
 			<SidebarGroup className="pt-0">
+				<SidebarGroupLabel className={groupLabelClass}>Progress</SidebarGroupLabel>
 				<NavMenuItems items={progressItems} />
 			</SidebarGroup>
 			<SidebarSeparator />
 			<SidebarGroup className="pt-0">
+				<SidebarGroupLabel className={groupLabelClass}>Account</SidebarGroupLabel>
 				<NavMenuItems items={accountItems} />
 			</SidebarGroup>
 		</>

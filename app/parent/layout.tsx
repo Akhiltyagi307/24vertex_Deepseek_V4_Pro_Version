@@ -1,12 +1,10 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { getProfile } from "@/lib/auth/routing";
 
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) {
 		redirect("/login");
 	}
@@ -14,5 +12,5 @@ export default async function ParentLayout({ children }: { children: React.React
 	if (!profile || profile.role !== "parent") {
 		redirect("/login");
 	}
-	return <div className="min-h-screen p-6">{children}</div>;
+	return <>{children}</>;
 }

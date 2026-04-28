@@ -15,7 +15,7 @@ export type SubjectTestRowSerialized = {
 };
 
 export type TestStatus = "in_progress" | "submitted" | "graded" | "expired";
-export type TestType = "self" | "assigned";
+export type TestType = "self";
 
 export function parseTestRow(r: Record<string, unknown>): SubjectTestRowSerialized {
 	return {

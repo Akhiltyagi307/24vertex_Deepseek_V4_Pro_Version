@@ -42,7 +42,10 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import {
+	chapterTopicDisplayLabel,
+	difficultyDisplayLabel,
 	isAnswered,
+	normalizeDifficultyLevel,
 	optionEntries,
 	type PracticeQuestionKind,
 	type SessionStudentAnswer,
@@ -78,6 +81,8 @@ export type PracticeSessionQuestion = {
 	options: Record<string, string> | null;
 	topic_id: string;
 	topic_name: string;
+	/** From `topics.chapter_name` when joined; used with `topic_name` for the header line. */
+	chapter_name: string | null;
 };
 
 export type PracticeTestSessionProps = {
@@ -115,15 +120,19 @@ function Kbd({ children, className }: { children: React.ReactNode; className?: s
 	);
 }
 
-/** Muted styling for difficulty in the question metadata bar (question body stays primary). */
+/** Difficulty pills: green (easy), yellow/amber (medium), red (hard). */
 function difficultyClass(d: string | null): string {
-	if (d === "hard") {
-		return "border-destructive/25 bg-destructive/[0.06] text-destructive/70 dark:text-destructive/65";
+	const n = normalizeDifficultyLevel(d);
+	if (n === "hard") {
+		return "border-red-800/55 bg-red-950/60 text-red-100 dark:border-red-700/55 dark:bg-red-950/65 dark:text-red-50";
 	}
-	if (d === "easy") {
-		return "border-border/55 bg-muted/35 text-foreground/55 dark:text-foreground/50";
+	if (n === "medium") {
+		return "border-amber-600/50 bg-amber-950/45 text-amber-100 dark:border-amber-500/45 dark:bg-amber-950/50 dark:text-amber-50";
 	}
-	return "border-border/55 bg-muted/35 text-foreground/55 dark:text-foreground/50";
+	if (n === "easy") {
+		return "border-emerald-700/45 bg-emerald-950/45 text-emerald-100 dark:border-emerald-600/45 dark:bg-emerald-950/50 dark:text-emerald-50";
+	}
+	return "border-border/55 bg-muted/35 text-foreground/70 dark:text-foreground/65";
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -1304,8 +1313,8 @@ export function PracticeTestSession({
 					<div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
 						<div className="flex min-h-full min-w-0 flex-1 flex-col">
 						<CardHeader className="shrink-0 space-y-3 pb-3">
-							<div className="text-muted-foreground flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-								<div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+							<div className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+								<div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
 									<Badge
 										variant="outline"
 										className="border-border/60 bg-muted/30 text-muted-foreground shrink-0 font-mono tabular-nums font-normal"
@@ -1315,15 +1324,17 @@ export function PracticeTestSession({
 									<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
 										<div className="flex items-center gap-2">
 											<span className="text-xs font-medium whitespace-nowrap opacity-90">
-												Difficulty
+												Difficulty:
 											</span>
 											{active.difficulty_level ?
 												<Badge
 													variant="outline"
-													className={cn("border-border/50 font-normal", difficultyClass(active.difficulty_level))}
+													className={cn(
+														"border-border/50 font-semibold tracking-tight",
+														difficultyClass(active.difficulty_level),
+													)}
 												>
-													{active.difficulty_level.charAt(0).toUpperCase() +
-														active.difficulty_level.slice(1)}
+													{difficultyDisplayLabel(active.difficulty_level)}
 												</Badge>
 											:	<Badge
 													variant="outline"
@@ -1334,53 +1345,57 @@ export function PracticeTestSession({
 										</div>
 										<div className="flex min-w-0 max-w-full items-center gap-2">
 											<span className="shrink-0 text-xs font-medium whitespace-nowrap opacity-90">
-												Question type
+												Question type:
 											</span>
 											<Badge
 												variant="outline"
-												className="border-border/50 text-muted-foreground bg-muted/25 shrink-0 font-normal"
+												className="border-border/50 bg-muted/25 text-foreground/90 shrink-0 font-normal"
 											>
 												{questionTypeLabel(active.question_type)}
 											</Badge>
 										</div>
 										<div className="flex min-w-0 max-w-full items-center gap-2">
 											<span className="shrink-0 text-xs font-medium whitespace-nowrap opacity-90">
-												Chapter/topic
+												Chapter/topic:
 											</span>
 											<Badge
 												variant="outline"
-												className="border-border/50 text-muted-foreground bg-muted/25 max-w-[min(100%,20rem)] truncate font-normal"
-												title={active.topic_name}
+												className="border-border/50 bg-muted/25 text-foreground/90 max-w-[min(100%,24rem)] truncate font-normal"
+												title={chapterTopicDisplayLabel(active.chapter_name, active.topic_name)}
 											>
-												{active.topic_name}
+												{chapterTopicDisplayLabel(active.chapter_name, active.topic_name)}
 											</Badge>
 										</div>
 									</div>
 								</div>
 								<div
-									className="flex shrink-0 flex-wrap items-center gap-2 opacity-95"
+									className="flex min-h-7 shrink-0 flex-wrap items-center gap-2 opacity-95"
 									role="group"
 									aria-label="Review options"
 								>
-									<BookmarkIcon
-										className={cn(
-											"size-4 shrink-0",
-											flagged[active.id] ?
-												"text-amber-600 dark:text-amber-400"
-											:	"text-muted-foreground/80",
-										)}
-										aria-hidden
-									/>
-									<input
-										type="checkbox"
-										id={`review-${active.id}`}
-										checked={flagged[active.id] ?? false}
-										onChange={(e) => onFlagToggle(active, e.target.checked)}
-										className="border-input/55 size-4 rounded"
-									/>
+									<span className="flex size-7 shrink-0 items-center justify-center">
+										<BookmarkIcon
+											className={cn(
+												"size-4",
+												flagged[active.id] ?
+													"text-amber-600 dark:text-amber-400"
+												:	"text-muted-foreground/80",
+											)}
+											aria-hidden
+										/>
+									</span>
+									<span className="flex h-7 shrink-0 items-center">
+										<input
+											type="checkbox"
+											id={`review-${active.id}`}
+											checked={flagged[active.id] ?? false}
+											onChange={(e) => onFlagToggle(active, e.target.checked)}
+											className="border-input/55 size-4 shrink-0 rounded"
+										/>
+									</span>
 									<Label
 										htmlFor={`review-${active.id}`}
-										className="text-muted-foreground hover:text-foreground/80 cursor-pointer text-sm font-normal whitespace-nowrap"
+										className="text-muted-foreground hover:text-foreground/80 cursor-pointer text-xs font-medium whitespace-nowrap"
 									>
 										Mark for review
 									</Label>

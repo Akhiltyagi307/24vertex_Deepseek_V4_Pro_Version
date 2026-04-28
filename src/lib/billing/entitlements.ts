@@ -366,6 +366,14 @@ export const getCachedEntitlements = cache(async (): Promise<EntitlementSnapshot
 	return getEntitlements(supabase, user.id);
 });
 
+/**
+ * Entitlements for an arbitrary profile (e.g. parent's active child). Callers must enforce access control.
+ */
+export const getCachedEntitlementsForProfile = cache(async (profileId: string): Promise<EntitlementSnapshot | null> => {
+	const supabase = await createClient();
+	return getEntitlements(supabase, profileId);
+});
+
 export type ConsumeResult =
 	| { ok: true }
 	| { ok: false; code: "quota_tests" | "quota_tokens" | "trial_expired" | "expired" | "no_subscription"; message: string };

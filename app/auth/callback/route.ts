@@ -74,12 +74,33 @@ export async function GET(request: Request) {
 		const destination = await resolvePostAuthPath();
 		return NextResponse.redirect(new URL(destination, origin));
 	}
+
+	if (pending === "failed_parent_email_mismatch") {
+		await supabase.auth.signOut();
+		const u = new URL("/login", origin);
+		u.searchParams.set(
+			"error",
+			"Guardian email mismatch: your parent login email must match the guardian email on your student's profile. Ask your student to open Profile and set guardian email to match, then try again or link from the parent portal after you log in.",
+		);
+		return NextResponse.redirect(u);
+	}
+
+	if (pending === "failed_student_not_found") {
+		await supabase.auth.signOut();
+		const u = new URL("/login", origin);
+		u.searchParams.set(
+			"error",
+			"No student matched that link code. Ask your student for the six-character code from Profile (two letters + four numbers), then sign up again.",
+		);
+		return NextResponse.redirect(u);
+	}
+
 	if (pending === "failed") {
 		await supabase.auth.signOut();
 		const u = new URL("/login", origin);
 		u.searchParams.set(
 			"error",
-			"Could not finish registration after email verification. Please try signing up again or contact support.",
+			"Could not finish registration after email verification. Try signing up again or log in if you already have an account. Contact support if this continues.",
 		);
 		return NextResponse.redirect(u);
 	}

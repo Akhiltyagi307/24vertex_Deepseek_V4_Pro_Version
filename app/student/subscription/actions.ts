@@ -21,7 +21,8 @@ export type RedeemCouponResult =
 				| "exhausted"
 				| "already_redeemed"
 				| "blocked_paid"
-				| "database_error";
+				| "database_error"
+				| "forbidden";
 			message: string;
 		};
 
@@ -34,8 +35,11 @@ const INVALID = "This coupon code is not recognised.";
  * Students who are already on an active paid subscription cannot stack a
  * coupon on top — we block them and suggest waiting until the subscription
  * ends or cancelling first.
+ *
+ * Parents must pass {@link billingProfileId} (linked student); coupons apply to
+ * that student's subscription row.
  */
-export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult> {
+export async function redeemCoupon(rawCode: string, billingProfileId?: string): Promise<RedeemCouponResult> {
 	const code = rawCode.trim().toUpperCase();
 	if (!code || code.length > 40) {
 		return { ok: false, code: "invalid_code", message: INVALID };
@@ -49,6 +53,47 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 		return { ok: false, code: "unauthorized", message: "Sign in to redeem a coupon." };
 	}
 	const admin = createServiceRoleClient();
+
+	const { data: callerProfile } = await admin
+		.from("profiles")
+		.select("role")
+		.eq("id", user.id)
+		.maybeSingle();
+
+	let targetProfileId = user.id;
+	if (billingProfileId) {
+		if (callerProfile?.role !== "parent") {
+			return { ok: false, code: "forbidden", message: "Only a parent account can apply a coupon for another profile." };
+		}
+		if (billingProfileId === user.id) {
+			return { ok: false, code: "forbidden", message: "Invalid student account for coupon." };
+		}
+		const { data: linkRow } = await supabase
+			.from("parent_student_links")
+			.select("student_id")
+			.eq("parent_id", user.id)
+			.eq("student_id", billingProfileId)
+			.eq("status", "active")
+			.maybeSingle();
+		if (!linkRow) {
+			return { ok: false, code: "forbidden", message: "Student not linked to your account." };
+		}
+		const { data: billedProfile } = await admin
+			.from("profiles")
+			.select("role")
+			.eq("id", billingProfileId)
+			.maybeSingle();
+		if (billedProfile?.role !== "student") {
+			return { ok: false, code: "forbidden", message: "Invalid billing profile." };
+		}
+		targetProfileId = billingProfileId;
+	} else if (callerProfile?.role === "parent") {
+		return {
+			ok: false,
+			code: "forbidden",
+			message: "Select a linked student in the parent portal before applying a coupon.",
+		};
+	}
 
 	const { data: coupon, error: cErr } = await admin
 		.from("coupons")
@@ -72,22 +117,32 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 		.from("coupon_redemptions")
 		.select("id")
 		.eq("coupon_id", coupon.id)
-		.eq("profile_id", user.id)
+		.eq("profile_id", targetProfileId)
 		.maybeSingle();
 	if (already) {
-		return { ok: false, code: "already_redeemed", message: "You have already redeemed this coupon." };
+		return {
+			ok: false,
+			code: "already_redeemed",
+			message:
+				targetProfileId === user.id
+					? "You have already redeemed this coupon."
+					: "This student has already redeemed this coupon.",
+		};
 	}
 
 	const { data: sub } = await admin
 		.from("subscriptions")
 		.select("id, status")
-		.eq("profile_id", user.id)
+		.eq("profile_id", targetProfileId)
 		.maybeSingle();
 	if (sub && (sub.status === "active" || sub.status === "grace" || sub.status === "past_due")) {
 		return {
 			ok: false,
 			code: "blocked_paid",
-			message: "You already have an active paid subscription. Cancel it first to redeem this coupon.",
+			message:
+				targetProfileId === user.id
+					? "You already have an active paid subscription. Cancel it first to redeem this coupon."
+					: "This student already has an active paid subscription. Cancel it first to redeem this coupon.",
 		};
 	}
 
@@ -97,7 +152,7 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 	const { data: profile } = await admin
 		.from("profiles")
 		.select("grade")
-		.eq("id", user.id)
+		.eq("id", targetProfileId)
 		.maybeSingle();
 
 	const now = new Date();
@@ -108,7 +163,7 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 		const { data: newSub, error: insErr } = await admin
 			.from("subscriptions")
 			.insert({
-				profile_id: user.id,
+				profile_id: targetProfileId,
 				plan_code: grant,
 				status: "coupon",
 				current_period_start: now.toISOString(),
@@ -117,7 +172,7 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 			.select("id")
 			.single();
 		if (insErr || !newSub) {
-			logSupabaseError("billing.redeem_coupon.insert_sub", insErr, { userId: user.id });
+			logSupabaseError("billing.redeem_coupon.insert_sub", insErr, { profileId: targetProfileId });
 			return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
 		}
 		subId = newSub.id;
@@ -134,7 +189,7 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 			})
 			.eq("id", subId);
 		if (updErr) {
-			logSupabaseError("billing.redeem_coupon.update_sub", updErr, { userId: user.id });
+			logSupabaseError("billing.redeem_coupon.update_sub", updErr, { profileId: targetProfileId });
 			return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
 		}
 	}
@@ -142,7 +197,7 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 	await admin.from("usage_periods").upsert(
 		{
 			subscription_id: subId,
-			profile_id: user.id,
+			profile_id: targetProfileId,
 			period_start: now.toISOString(),
 			period_end: end.toISOString(),
 			tests_quota: plan.testsPerPeriod,
@@ -168,24 +223,34 @@ export async function redeemCoupon(rawCode: string): Promise<RedeemCouponResult>
 
 	await admin.from("coupon_redemptions").insert({
 		coupon_id: coupon.id,
-		profile_id: user.id,
+		profile_id: targetProfileId,
 		subscription_id: subId ?? null,
 	});
 
 	void recordPracticeEvent(
 		supabase,
 		"coupon_redeemed",
-		{ code, plan_code: grant, duration_days: coupon.duration_days },
-		{ studentId: user.id },
+		{
+			code,
+			plan_code: grant,
+			duration_days: coupon.duration_days,
+			billed_by_parent: callerProfile?.role === "parent" && targetProfileId !== user.id,
+		},
+		{ studentId: targetProfileId },
 	);
 
 	revalidatePath("/student", "layout");
 	revalidatePath("/student/subscription");
 	revalidatePath("/student/settings");
+	revalidatePath("/parent", "layout");
+	revalidatePath("/parent/subscription");
 
+	const forParent = callerProfile?.role === "parent" && targetProfileId !== user.id;
 	return {
 		ok: true,
-		message: `Coupon applied! You have ${coupon.duration_days} days of ${plan.name} access.`,
+		message: forParent
+			? `Coupon applied! This student now has ${coupon.duration_days} days of ${plan.name} access.`
+			: `Coupon applied! You have ${coupon.duration_days} days of ${plan.name} access.`,
 	};
 }
 

@@ -55,6 +55,16 @@ export function getAppUrl(): string {
 	return appUrl;
 }
 
+/**
+ * Optional support inbox shown on legal pages. If unset, copy falls back to in-app / school routing.
+ * Must be safe to expose to the browser (NEXT_PUBLIC_).
+ */
+export function getPublicSupportEmail(): string | null {
+	const raw = readTrimmedEnv("NEXT_PUBLIC_SUPPORT_EMAIL");
+	if (!raw || !raw.includes("@")) return null;
+	return raw;
+}
+
 /** Resend API key — required when sending parent contact notifications. */
 export function getResendApiKey(): string {
 	const key = process.env.RESEND_API_KEY?.trim();

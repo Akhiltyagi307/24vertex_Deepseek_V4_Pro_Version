@@ -885,7 +885,7 @@ export function StudentProfileSettingsForm({
 					? "Set your grade (and stream or elective for 11–12) so we can list the subjects you should see."
 					: profile.grade >= 11
 						? "We pick these from your grade, stream, and elective. If something’s missing, fix the fields above or ask your school."
-						: "We pick these from your grade. If the list looks wrong, double-check the fields above with your class teacher."}
+						: "We pick these from your grade. If the list looks wrong, double-check the fields above with your school."}
 			</p>
 		</div>
 	);
@@ -894,14 +894,15 @@ export function StudentProfileSettingsForm({
 		<div className={settingsNestedWellClass}>
 			<p className="text-foreground text-sm font-semibold">Link code</p>
 			<div className="mt-2 flex flex-wrap items-center gap-3">
-				<code
+				<div
 					className={cn(
-						"rounded-lg border border-border/80 bg-background px-3 py-2 font-mono text-base shadow-sm dark:border-border dark:bg-muted/40",
+						"rounded-lg border border-border/80 bg-muted/30 px-3 py-2 font-mono text-base text-foreground shadow-none dark:border-border dark:bg-muted/25",
 						profile.student_link_code ? "tracking-wide" : "break-all text-sm",
 					)}
+					aria-readonly
 				>
 					{shareText}
-				</code>
+				</div>
 				<Button type="button" variant="outline" size="default" onClick={copyShareCode} className="shrink-0">
 					{copied ? <CheckIcon /> : <CopyIcon />}
 					{copied ? "Copied" : "Copy"}
@@ -930,11 +931,13 @@ export function StudentProfileSettingsForm({
 			/>
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Profile</h1>
-				<PageHeaderSubtext>
-					Manage your name, photo, and appearance here; use{" "}
-					<span className="text-foreground/90">Save changes</span> on this tab, Password for sign-in,{" "}
-					<span className="text-foreground/90">School &amp; account</span> for grade and placement, and note
-					guardian email is read-only until your school updates it.
+				<PageHeaderSubtext variant="wrap">
+					Update your name, photo, and appearance here. Tap{" "}
+					<span className="text-foreground/90">Save changes</span> when you&apos;re done.
+					<br />
+					<span className="text-foreground/90">Password</span>,{" "}
+					<span className="text-foreground/90">School &amp; account</span>, and{" "}
+					<span className="text-foreground/90">Guardian</span> cover sign-in, grade, and parent info.
 				</PageHeaderSubtext>
 			</div>
 
@@ -1148,27 +1151,32 @@ export function StudentProfileSettingsForm({
 								<div>
 									<Card className="border-0 bg-transparent p-0 shadow-none ring-0">
 										<CardHeader className="px-0 pt-0">
-											<CardTitle className="text-lg">Guardian contact</CardTitle>
+											<CardTitle className="text-lg">Guardian &amp; parent connection</CardTitle>
 											<CardDescription className="text-base leading-relaxed">
-												We show what your school has on file for a parent or guardian. You can’t edit it
-												here.
+												After a parent connects using your link code, we show their contact here.
+												You cannot change these fields.
 											</CardDescription>
 										</CardHeader>
 										<CardContent className="px-0">
 											<div className="flex flex-col gap-4">
-												<AccountReadonlyField
-													label="Guardian name"
-													value={profile.parent_name?.trim() || "—"}
-													lockedFieldHint="Guardian details are on file from your school and cannot be edited here."
-												/>
-												<AccountReadonlyField
-													label="Guardian email"
-													value={profile.parent_email?.trim() || "—"}
-													lockedFieldHint="Guardian details are on file from your school and cannot be edited here."
-												/>
+												<p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-relaxed">
+													<span className="text-muted-foreground font-medium">Guardian name</span>
+													<span className="text-muted-foreground"> - </span>
+													<span className="min-w-0 text-foreground">
+														{profile.parent_name?.trim() || "—"}
+													</span>
+												</p>
+												<p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-relaxed">
+													<span className="text-muted-foreground font-medium">Guardian email</span>
+													<span className="text-muted-foreground"> - </span>
+													<span className="min-w-0 break-all text-foreground">
+														{profile.parent_email?.trim() || "—"}
+													</span>
+												</p>
 											</div>
-											<p className="mt-4 text-muted-foreground text-sm leading-relaxed">
-												If a name or email is outdated, your school has to change it in their records.
+											<p className="mt-6 text-muted-foreground text-sm leading-relaxed">
+												These values are set when your parent links their account with your link
+												code.
 											</p>
 										</CardContent>
 									</Card>

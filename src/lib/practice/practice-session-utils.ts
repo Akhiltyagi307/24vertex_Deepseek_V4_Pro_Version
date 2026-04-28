@@ -60,6 +60,34 @@ export function questionTypeNavLabel(t: PracticeQuestionKind): string {
 	}
 }
 
+/** Normalize DB / API difficulty strings to canonical easy | medium | hard. */
+export function normalizeDifficultyLevel(raw: string | null): "easy" | "medium" | "hard" | null {
+	if (raw == null || !String(raw).trim()) return null;
+	const n = String(raw).trim().toLowerCase();
+	if (n === "easy" || n === "medium" || n === "hard") return n;
+	return null;
+}
+
+/** Pill text: HARD, MEDIUM, EASY (falls back to uppercase raw). */
+export function difficultyDisplayLabel(raw: string | null): string {
+	const n = normalizeDifficultyLevel(raw);
+	if (n) return n.toUpperCase();
+	const t = raw?.trim();
+	return t ? t.toUpperCase() : "—";
+}
+
+/**
+ * One line for the question header: chapter and topic when both exist and differ,
+ * otherwise the topic title (or chapter) alone.
+ */
+export function chapterTopicDisplayLabel(chapterName: string | null, topicName: string): string {
+	const tp = topicName.trim();
+	const ch = chapterName?.trim() ?? "";
+	if (!tp && !ch) return "—";
+	if (ch && tp && ch.toLowerCase() !== tp.toLowerCase()) return `${ch} · ${tp}`;
+	return tp || ch;
+}
+
 /** Approximate visible text length for progress UI (strips HTML from rich written answers). */
 export function writtenAnswerPlainLen(raw: string): number {
 	return raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().length;

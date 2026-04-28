@@ -4,10 +4,10 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { z } from "zod";
 import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
 import { getProfile } from "@/lib/auth/routing";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
-	parentProfileBodySchema,
+	parentRegistrationPayloadSchema,
 	studentProfileBodySchema,
-	teacherProfileBodySchema,
 } from "@/lib/validations/auth";
 
 const pendingEnvelopeSchema = z.discriminatedUnion("role", [
@@ -19,19 +19,30 @@ const pendingEnvelopeSchema = z.discriminatedUnion("role", [
 	z.object({
 		version: z.literal(1),
 		role: z.literal("parent"),
-		payload: parentProfileBodySchema,
-	}),
-	z.object({
-		version: z.literal(1),
-		role: z.literal("teacher"),
-		payload: teacherProfileBodySchema,
+		payload: parentRegistrationPayloadSchema,
 	}),
 ]);
 
 export type ConsumePendingRegistrationResult =
 	| "completed_profile"
 	| "no_pending"
-	| "failed";
+	| "failed"
+	| "failed_parent_email_mismatch"
+	| "failed_student_not_found";
+
+function classifyLinkParentError(message: string):
+	| "parent_email_mismatch"
+	| "student_not_found"
+	| "generic" {
+	const m = message.toLowerCase();
+	if (m.includes("parent email does not match")) {
+		return "parent_email_mismatch";
+	}
+	if (m.includes("student not found")) {
+		return "student_not_found";
+	}
+	return "generic";
+}
 
 type ParsedPending = z.infer<typeof pendingEnvelopeSchema>;
 
@@ -125,13 +136,14 @@ export async function consumePendingRegistration(
 			p_section: v.section.trim(),
 			p_stream: streamVal,
 			p_elective_subject_id: electiveVal,
-			p_parent_name: v.parentName,
-			p_parent_email: v.parentEmail,
+			p_parent_name: v.parentName ?? null,
+			p_parent_email: v.parentEmail ?? null,
 		});
 		if (rpcError) {
 			if (/profile already exists/i.test(rpcError.message)) {
 				return "no_pending";
 			}
+			logSupabaseError("consumePendingRegistration.register_student", rpcError);
 			return "failed";
 		}
 		return "completed_profile";
@@ -146,29 +158,25 @@ export async function consumePendingRegistration(
 			if (/profile already exists/i.test(rpcError.message)) {
 				return "no_pending";
 			}
+			logSupabaseError("consumePendingRegistration.register_parent", rpcError);
 			return "failed";
+		}
+		const { error: linkErr } = await supabase.rpc("link_parent_to_student", {
+			p_student_ref: v.studentLinkCode,
+		});
+		if (linkErr) {
+			logSupabaseError("consumePendingRegistration.link_parent_to_student", linkErr);
+			switch (classifyLinkParentError(linkErr.message ?? "")) {
+				case "parent_email_mismatch":
+					return "failed_parent_email_mismatch";
+				case "student_not_found":
+					return "failed_student_not_found";
+				default:
+					return "failed";
+			}
 		}
 		return "completed_profile";
 	}
 
-	const v = envelope.payload;
-	const subjectIds = [...new Set(v.assignments.map((a) => a.subjectId))];
-	const pAssignments = v.assignments.map((a) => ({
-		grade: a.grade,
-		section: a.section,
-		subject_id: a.subjectId,
-	}));
-	const { error: rpcError } = await supabase.rpc("register_teacher", {
-		p_full_name: v.fullName,
-		p_school_name: v.schoolName,
-		p_subjects_taught: subjectIds,
-		p_assignments: pAssignments,
-	});
-	if (rpcError) {
-		if (/profile already exists/i.test(rpcError.message)) {
-			return "no_pending";
-		}
-		return "failed";
-	}
-	return "completed_profile";
+	return "failed";
 }

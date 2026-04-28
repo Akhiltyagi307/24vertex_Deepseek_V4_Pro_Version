@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { redeemCoupon } from "../../../../app/student/subscription/actions";
 
-export function CouponRedeemForm() {
+export function CouponRedeemForm({ billingProfileId }: { billingProfileId?: string }) {
 	const [code, setCode] = React.useState("");
 	const [pending, startTransition] = React.useTransition();
 	const router = useRouter();
@@ -17,7 +17,7 @@ export function CouponRedeemForm() {
 		const trimmed = code.trim();
 		if (!trimmed) return;
 		startTransition(async () => {
-			const res = await redeemCoupon(trimmed);
+			const res = await redeemCoupon(trimmed, billingProfileId);
 			if (res.ok) {
 				toast.success(res.message);
 				setCode("");

@@ -20,7 +20,7 @@ export default async function HomePage() {
 				<div>
 					<h1 className="text-2xl font-semibold tracking-tight">EduAI</h1>
 					<p className="mt-2 text-zinc-600">
-						Create an account for your role, then log in. Students, parents, and teachers each have a
+						Create an account for your role, then log in. Students and parents each have a
 						dedicated portal.
 					</p>
 				</div>
@@ -37,8 +37,8 @@ export default async function HomePage() {
 					>
 						Log in
 					</Link>
-					<p className="text-center text-xs font-medium text-zinc-500">Or jump to a role</p>
-					<div className="grid gap-2 sm:grid-cols-3">
+					<p className="text-center text-xs font-medium text-zinc-500">Or jump to signup</p>
+					<div className="grid gap-2 sm:grid-cols-2">
 						<Link
 							href="/signup/student"
 							className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm hover:bg-zinc-50"
@@ -50,12 +50,6 @@ export default async function HomePage() {
 							className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm hover:bg-zinc-50"
 						>
 							Parent
-						</Link>
-						<Link
-							href="/signup/teacher"
-							className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm hover:bg-zinc-50"
-						>
-							Teacher
 						</Link>
 					</div>
 				</nav>

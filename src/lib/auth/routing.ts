@@ -36,16 +36,10 @@ export async function resolvePostAuthPath(): Promise<string> {
 		return "/student/dashboard";
 	}
 	if (profile.role === "parent") {
-		return "/parent/dashboard";
-	}
-	if (profile.role === "teacher") {
-		if (!profile.is_verified) {
-			return "/teacher/pending";
-		}
-		return "/teacher/dashboard";
+		return "/parent/select-student";
 	}
 	if (profile.role === "admin") {
-		return "/teacher/dashboard";
+		return "/";
 	}
 
 	return "/";

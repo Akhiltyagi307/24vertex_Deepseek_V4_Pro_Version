@@ -15,7 +15,7 @@ export async function linkParentToStudent(
 		studentId: formData.get("studentId"),
 	});
 	if (!parsed.success) {
-		return { error: parsed.error.issues[0]?.message ?? "Invalid student reference." };
+		return { error: parsed.error.issues[0]?.message ?? "Invalid link code or ID." };
 	}
 
 	const supabase = await createClient();
@@ -27,7 +27,7 @@ export async function linkParentToStudent(
 		logSupabaseError("linkParentToStudent.link_parent_to_student", error);
 		return {
 			error:
-				"We couldn't link that student. Check the code and that your email matches their parent email on file.",
+				"We couldn't link that account. Check the link code or student ID. If their profile lists a guardian email, your parent login email must match it.",
 		};
 	}
 

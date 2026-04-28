@@ -28,18 +28,13 @@ const step0Schema = z
 		path: ["confirmPassword"],
 	});
 
-const step2Schema = z.object({
-	parentName: z.string().min(1).max(200),
-	parentEmail: z.string().email(),
-});
-
 const selectClassName = cn(
 	"h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base text-foreground transition-colors outline-none",
 	"focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
 	"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-secondary",
 );
 
-const STEP_LABELS = ["Your account", "School details", "Parent / guardian"] as const;
+const STEP_LABELS = ["Your account", "School details"] as const;
 
 const step1Schema = z
 	.object({
@@ -107,8 +102,6 @@ export function StudentSignupForm({ electives }: Props) {
 		| "arts"
 	>("");
 	const [electiveSubjectId, setElectiveSubjectId] = useState("");
-	const [parentName, setParentName] = useState("");
-	const [parentEmail, setParentEmail] = useState("");
 
 	const senior = grade >= 11 && grade <= 12;
 	const lastStep = step === STEP_LABELS.length - 1;
@@ -126,45 +119,27 @@ export function StudentSignupForm({ electives }: Props) {
 				fd.set("electiveSubjectId", electiveSubjectId);
 			}
 		}
-		fd.set("parentName", parentName.trim());
-		fd.set("parentEmail", parentEmail.trim());
 		return fd;
 	}
 
 	function goNext() {
 		setStepError(null);
-		if (step === 0) {
-			const parsed = step0Schema.safeParse({
-				fullName: fullName.trim(),
-				email: email.trim(),
-				password,
-				confirmPassword,
-			});
-			if (!parsed.success) {
-				setStepError(formatStepErrors(parsed.error));
-				return;
-			}
-			setStep(1);
+		const parsed = step0Schema.safeParse({
+			fullName: fullName.trim(),
+			email: email.trim(),
+			password,
+			confirmPassword,
+		});
+		if (!parsed.success) {
+			setStepError(formatStepErrors(parsed.error));
 			return;
 		}
-		if (step === 1) {
-			const parsed = step1Schema.safeParse({
-				grade,
-				section: section.trim(),
-				stream: senior ? stream || null : null,
-				electiveSubjectId: senior ? electiveSubjectId : undefined,
-			});
-			if (!parsed.success) {
-				setStepError(formatStepErrors(parsed.error));
-				return;
-			}
-			setStep(2);
-		}
+		setStep(1);
 	}
 
 	function goBack() {
 		setStepError(null);
-		setStep((s) => Math.max(0, s - 1));
+		setStep(0);
 	}
 
 	function onGradeChange(next: number) {
@@ -181,12 +156,15 @@ export function StudentSignupForm({ electives }: Props) {
 
 		setStepError(null);
 		setState({});
-		const parsedFinal = step2Schema.safeParse({
-			parentName: parentName.trim(),
-			parentEmail: parentEmail.trim(),
+
+		const parsedSchool = step1Schema.safeParse({
+			grade,
+			section: section.trim(),
+			stream: senior ? stream || null : null,
+			electiveSubjectId: senior ? electiveSubjectId : undefined,
 		});
-		if (!parsedFinal.success) {
-			setStepError(formatStepErrors(parsedFinal.error));
+		if (!parsedSchool.success) {
+			setStepError(formatStepErrors(parsedSchool.error));
 			return;
 		}
 
@@ -204,8 +182,6 @@ export function StudentSignupForm({ electives }: Props) {
 			stream: senior ? stream : null,
 			electiveSubjectId:
 				senior && electiveSubjectId.length > 0 ? electiveSubjectId : null,
-			parentName: parentName.trim(),
-			parentEmail: parentEmail.trim(),
 		});
 		if (!fullParsed.success) {
 			setStepError(formatStepErrors(fullParsed.error));
@@ -241,8 +217,8 @@ export function StudentSignupForm({ electives }: Props) {
 							section: d.section,
 							stream: d.stream,
 							electiveSubjectId: d.electiveSubjectId,
-							parentName: d.parentName,
-							parentEmail: d.parentEmail,
+							parentName: d.parentName ?? null,
+							parentEmail: d.parentEmail ?? null,
 						},
 					}),
 				},
@@ -419,32 +395,10 @@ export function StudentSignupForm({ electives }: Props) {
 							</Field>
 						</>
 					) : null}
-				</div>
-			) : null}
-
-			{step === 2 ? (
-				<div className="space-y-4">
-					<Field>
-						<FieldLabel htmlFor="parentName">Parent / guardian name</FieldLabel>
-						<Input
-							id="parentName"
-							name="parentName"
-							autoComplete="name"
-							value={parentName}
-							onChange={(e) => setParentName(e.target.value)}
-						/>
-					</Field>
-					<Field>
-						<FieldLabel htmlFor="parentEmail">Parent / guardian email</FieldLabel>
-						<Input
-							id="parentEmail"
-							name="parentEmail"
-							type="email"
-							autoComplete="email"
-							value={parentEmail}
-							onChange={(e) => setParentEmail(e.target.value)}
-						/>
-					</Field>
+					<p className="rounded-lg border border-border/90 bg-muted/40 px-3 py-2.5 text-muted-foreground text-sm leading-relaxed">
+						A parent connects later using the link code shown on your Profile after signup—they don’t need
+						your signup details besides that code.
+					</p>
 				</div>
 			) : null}
 

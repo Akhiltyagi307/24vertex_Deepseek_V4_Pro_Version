@@ -46,7 +46,7 @@ type PageStaggerRootProps = {
 	sections: PageStaggerSection[];
 	/**
 	 * When `false`, only opacity is staggered (no vertical offset). Prefer this under
-	 * `app/student|teacher|parent/template.tsx` where the segment already does a short lift.
+	 * `app/student|parent/template.tsx` where the segment already does a short lift.
 	 */
 	enableLift?: boolean;
 };

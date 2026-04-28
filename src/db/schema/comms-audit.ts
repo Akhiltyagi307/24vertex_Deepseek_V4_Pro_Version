@@ -77,7 +77,6 @@ export const userPreferences = pgTable("user_preferences", {
 	enableEmailNotifications: boolean("enable_email_notifications").default(true),
 	enableInappNotifications: boolean("enable_inapp_notifications").default(true),
 	notificationTypes: jsonb("notification_types").default({
-		assignment: true,
 		test_result: true,
 		announcement: true,
 		reminder: true,

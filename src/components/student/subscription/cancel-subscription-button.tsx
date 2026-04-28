@@ -10,7 +10,14 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { cancelAtPeriodEnd } from "../../../../app/student/subscription/actions";
 
-export function CancelSubscriptionButton({ disabled }: { disabled?: boolean }) {
+export function CancelSubscriptionButton({
+	disabled,
+	billingProfileId,
+}: {
+	disabled?: boolean;
+	/** When set, POST /api/billing/cancel as parent for this student profile. */
+	billingProfileId?: string;
+}) {
 	const [pending, startTransition] = React.useTransition();
 	const [confirmOpen, setConfirmOpen] = React.useState(false);
 	const titleId = React.useId();
@@ -19,6 +26,24 @@ export function CancelSubscriptionButton({ disabled }: { disabled?: boolean }) {
 
 	function onConfirmCancel() {
 		startTransition(async () => {
+			if (billingProfileId) {
+				const res = await fetch("/api/billing/cancel", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ billingProfileId }),
+				});
+				const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+				if (res.ok && data.ok) {
+					setConfirmOpen(false);
+					toast.success(
+						"The subscription will end at the current period. Your child keeps access until then.",
+					);
+					router.refresh();
+				} else {
+					toast.error(data.message ?? "Could not cancel.");
+				}
+				return;
+			}
 			const res = await cancelAtPeriodEnd();
 			if (res.ok) {
 				setConfirmOpen(false);
@@ -72,8 +97,9 @@ export function CancelSubscriptionButton({ disabled }: { disabled?: boolean }) {
 								Cancel subscription?
 							</Dialog.Title>
 							<Dialog.Description id={descriptionId} className="text-sm text-muted-foreground">
-								Your plan will remain active until the current billing period ends. You can still renew
-								again before that date.
+								{billingProfileId
+									? "The student keeps full access until the period already paid for ends. You can turn renewal back on in Razorpay before that date if needed."
+									: "Your plan will remain active until the current billing period ends. You can still renew again before that date."}
 							</Dialog.Description>
 						</div>
 						<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

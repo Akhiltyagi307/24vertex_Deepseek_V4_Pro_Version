@@ -22,6 +22,8 @@ type Props = {
 	prefill?: { name?: string; email?: string; contact?: string };
 	/** When set (e.g. from server `getCachedPlanCatalog`), avoids duplicate static catalog reads. */
 	planCatalog?: typeof PLAN_CATALOG;
+	/** Parent pays for a linked student's subscription. */
+	billingProfileId?: string;
 };
 
 function formatTokens(n: number): string {
@@ -57,6 +59,7 @@ export function PlanComparison({
 	grade,
 	prefill,
 	planCatalog = PLAN_CATALOG,
+	billingProfileId,
 }: Props) {
 	const monthly = planCatalog.pro_monthly;
 	const annual = planCatalog.pro_annual;
@@ -98,6 +101,8 @@ export function PlanComparison({
 					startMode={isTrialing ? "after_trial" : "immediate"}
 					prefill={prefill}
 					className="w-full"
+					disabled={currentPlanCode === "pro_monthly"}
+					billingProfileId={billingProfileId}
 				/>
 			),
 		},
@@ -122,6 +127,8 @@ export function PlanComparison({
 					variant="outline"
 					prefill={prefill}
 					className="w-full"
+					disabled={currentPlanCode === "pro_annual"}
+					billingProfileId={billingProfileId}
 				/>
 			),
 		},

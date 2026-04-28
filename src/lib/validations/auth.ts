@@ -48,8 +48,27 @@ const studentProfileShape = z.object({
 	section: z.string().min(1).max(5),
 	stream: streamEnum.optional().nullable(),
 	electiveSubjectId: z.string().uuid().optional().nullable(),
-	parentName: z.string().min(1).max(200),
-	parentEmail: z.string().email(),
+	/** Set when a parent links via link code, or legacy signup. Omitted or null at new student signup. */
+	parentName: z
+		.union([z.string(), z.null(), z.undefined()])
+		.transform((s) => {
+			if (s == null) return null;
+			const t = s.trim();
+			return t === "" ? null : t;
+		})
+		.refine((v) => v === null || (v.length >= 1 && v.length <= 200), {
+			message: "Parent name must be 200 characters or fewer",
+		}),
+	parentEmail: z
+		.union([z.string(), z.null(), z.undefined()])
+		.transform((s) => {
+			if (s == null) return null;
+			const t = s.trim().toLowerCase();
+			return t === "" ? null : t;
+		})
+		.refine((v) => v === null || z.string().email().safeParse(v).success, {
+			message: "Invalid parent email",
+		}),
 });
 
 /** Student profile fields (no password) — used after email verification via user metadata. */
@@ -66,24 +85,16 @@ export const parentProfileBodySchema = z.object({
 	fullName: z.string().min(1).max(200),
 });
 
-export const parentSignupSchema = parentProfileBodySchema.extend({
-	password: z.string().min(8),
+/** Parent signup + pending registration: student link code (format XX1234). */
+export const parentRegistrationPayloadSchema = parentProfileBodySchema.extend({
+	studentLinkCode: z
+		.string()
+		.trim()
+		.regex(/^[A-Za-z]{2}\d{4}$/, { message: "Enter the 6-character link code (e.g. AB1234)." })
+		.transform((s) => s.toUpperCase()),
 });
 
-export const teacherAssignmentRowSchema = z.object({
-	grade: z.coerce.number().int().min(6).max(12),
-	section: z.string().min(1).max(5),
-	subjectId: z.string().uuid(),
-});
-
-export const teacherProfileBodySchema = z.object({
-	email: z.string().email(),
-	fullName: z.string().min(1).max(200),
-	schoolName: z.string().min(1).max(300),
-	assignments: z.array(teacherAssignmentRowSchema).min(1),
-});
-
-export const teacherSignupSchema = teacherProfileBodySchema.extend({
+export const parentSignupSchema = parentRegistrationPayloadSchema.extend({
 	password: z.string().min(8),
 });
 

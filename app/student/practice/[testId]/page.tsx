@@ -27,14 +27,18 @@ function parseSessionAnswer(raw: unknown): SessionStudentAnswer | null {
 	return null;
 }
 
-function topicNameFromRow(topics: unknown): string {
-	if (!topics) return "Topic";
+function topicsFieldsFromRow(topics: unknown): { topic_name: string; chapter_name: string | null } {
+	if (!topics) return { topic_name: "Topic", chapter_name: null };
 	if (Array.isArray(topics)) {
-		const first = topics[0] as { topic_name?: string } | undefined;
-		return first?.topic_name?.trim() ? String(first.topic_name) : "Topic";
+		const first = topics[0] as { topic_name?: string; chapter_name?: string | null } | undefined;
+		const tn = first?.topic_name?.trim() ? String(first.topic_name) : "";
+		const ch = first?.chapter_name?.trim() ? String(first.chapter_name) : null;
+		return { topic_name: tn || "Topic", chapter_name: ch };
 	}
-	const o = topics as { topic_name?: string };
-	return o.topic_name?.trim() ? String(o.topic_name) : "Topic";
+	const o = topics as { topic_name?: string; chapter_name?: string | null };
+	const tn = o.topic_name?.trim() ? String(o.topic_name) : "";
+	const ch = o.chapter_name?.trim() ? String(o.chapter_name) : null;
+	return { topic_name: tn || "Topic", chapter_name: ch };
 }
 
 export default async function PracticeSessionPage({ params }: PageProps) {
@@ -93,7 +97,7 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 	const { data: qRows, error: qErr } = await supabase
 		.from("questions")
 		.select(
-			"id, question_number, question_text, question_type, difficulty_level, options, topic_id, topics(topic_name)",
+			"id, question_number, question_text, question_type, difficulty_level, options, topic_id, topics(topic_name, chapter_name)",
 		)
 		.eq("test_id", testId)
 		.order("question_number", { ascending: true });
@@ -107,16 +111,20 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 		.select("question_id, student_answer, flagged_for_review")
 		.eq("test_id", testId);
 
-	const questions: PracticeSessionQuestion[] = qRows.map((r) => ({
-		id: r.id as string,
-		question_number: r.question_number as number,
-		question_text: r.question_text as string,
-		question_type: r.question_type as PracticeSessionQuestion["question_type"],
-		difficulty_level: (r.difficulty_level as string | null) ?? null,
-		options: (r.options as Record<string, string> | null) ?? null,
-		topic_id: r.topic_id as string,
-		topic_name: topicNameFromRow(r.topics),
-	}));
+	const questions: PracticeSessionQuestion[] = qRows.map((r) => {
+		const tf = topicsFieldsFromRow(r.topics);
+		return {
+			id: r.id as string,
+			question_number: r.question_number as number,
+			question_text: r.question_text as string,
+			question_type: r.question_type as PracticeSessionQuestion["question_type"],
+			difficulty_level: (r.difficulty_level as string | null) ?? null,
+			options: (r.options as Record<string, string> | null) ?? null,
+			topic_id: r.topic_id as string,
+			topic_name: tf.topic_name,
+			chapter_name: tf.chapter_name,
+		};
+	});
 
 	const initialAnswers = questions.map((q) => {
 		const row = (aRows ?? []).find((a) => a.question_id === q.id);

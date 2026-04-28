@@ -110,6 +110,31 @@ export async function loadDoubtPageBundle(userId: string) {
 	};
 }
 
+/** Server-side bundle for a known student profile id (parent must be linked via RLS). */
+export async function loadDoubtPageBundleForStudentProfile(studentId: string) {
+	const supabase = await createClient();
+	const { data: profileRow, error: profileErr } = await supabase
+		.from("profiles")
+		.select("grade, stream, elective_subject_id, role")
+		.eq("id", studentId)
+		.maybeSingle();
+
+	if (profileErr || !profileRow || profileRow.role !== "student") {
+		return { ok: false as const, code: "not_student" as const };
+	}
+
+	const subj = await loadStudentSubjects(supabase, profileRow);
+	const conversations = await loadDoubtConversationsList(studentId);
+
+	return {
+		ok: true as const,
+		profile: profileRow,
+		subjects: subj.subjects,
+		subjectsLoadError: subj.loadError,
+		conversations,
+	};
+}
+
 export type LoadedDoubtConversation = {
 	id: string;
 	studentId: string;

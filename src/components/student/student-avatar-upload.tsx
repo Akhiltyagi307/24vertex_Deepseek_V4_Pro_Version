@@ -145,7 +145,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 	}
 
 	return (
-		<Field className="gap-4">
+		<Field className="gap-5">
 			<FieldLabel className="text-base font-semibold tracking-tight text-foreground">
 				Profile picture
 			</FieldLabel>
@@ -160,8 +160,8 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 						"bg-background dark:border-input dark:bg-input/35",
 					)}
 				>
-					<div className="flex flex-col items-center gap-8 p-6 sm:flex-row sm:items-center sm:gap-10 sm:p-8 md:gap-12 md:px-10 md:py-9">
-						<div className="relative shrink-0">
+					<div className="flex flex-col items-center gap-10 p-7 sm:flex-row sm:items-start sm:justify-between sm:gap-12 sm:p-9 md:gap-16 md:px-11 md:py-10 lg:gap-20 lg:px-14">
+						<div className="relative shrink-0 sm:pt-1">
 							<div
 								className={cn(
 									"absolute -inset-2 rounded-full bg-gradient-to-br from-emerald-500/20 via-transparent to-transparent opacity-80 blur-md",
@@ -193,9 +193,9 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 							</Avatar>
 						</div>
 
-						<div className="flex min-w-0 flex-1 flex-col items-center gap-6 pb-1 text-center sm:items-start sm:gap-7 sm:pb-0 sm:text-left">
-							<div className="max-w-md space-y-2.5 sm:space-y-3">
-								<p className="text-foreground text-sm font-medium leading-snug sm:text-base">
+						<div className="flex min-w-0 flex-1 flex-col items-center gap-7 pb-1 text-center sm:items-start sm:justify-center sm:gap-8 sm:self-stretch sm:pb-0 sm:pl-2 sm:text-left lg:pl-6">
+							<div className="w-full space-y-3 sm:space-y-3.5">
+								<p className="text-foreground text-sm font-semibold leading-snug sm:text-base">
 									{displayName.trim() ? (
 										<>
 											Photo for <span className="text-foreground/90">{displayName.trim()}</span>
@@ -204,13 +204,13 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 										"Your profile photo"
 									)}
 								</p>
-								<p className="text-muted-foreground text-sm leading-relaxed sm:text-[0.9375rem]">
+								<p className="max-w-prose text-muted-foreground text-sm leading-relaxed sm:text-[0.9375rem]">
 									Square crop, shown across EduAI. JPEG, PNG, or WebP, up to 5MB — zoom and
 									reposition before saving.
 								</p>
 							</div>
 
-							<div className="flex w-full max-w-md flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:pl-3 md:pl-5">
+							<div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3">
 								<Button
 									type="button"
 									variant="default"

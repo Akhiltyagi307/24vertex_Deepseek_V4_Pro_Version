@@ -102,9 +102,12 @@ const toneStyles: Record<
 export function SidebarPlanCard({
 	entitlement,
 	className,
+	manageHref = "/student/subscription",
 }: {
 	entitlement: EntitlementSnapshot;
 	className?: string;
+	/** Parent portal passes `/parent/subscription`. */
+	manageHref?: string;
 }) {
 	const plan = PLAN_CATALOG[entitlement.planCode];
 	const isFree = plan.code === "free";
@@ -245,7 +248,7 @@ export function SidebarPlanCard({
 									? "No practice tests left this period."
 									: "No AI output allowance left for doubt chat this period."}{" "}
 							<Link
-								href="/student/subscription"
+								href={manageHref}
 								className="font-medium text-sidebar-foreground underline-offset-2 hover:underline"
 							>
 								View plans
@@ -264,7 +267,7 @@ export function SidebarPlanCard({
 						}
 					>
 						<Link
-							href="/student/subscription"
+							href={manageHref}
 							className={cn(
 								"flex w-full items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors",
 								isFree
