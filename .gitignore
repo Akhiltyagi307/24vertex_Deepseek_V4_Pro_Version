@@ -38,3 +38,10 @@ yarn-error.log*
 # Temp / scratch
 .tmp_*.json
 .mcp-github-push-batches/
+
+# Agent/cursor metadata and references (non-production)
+.agents/
+.cursor/
+docs/
+testsprite_tests/
+EduAI_PRD_v3_2_TestSprite_Backend.md

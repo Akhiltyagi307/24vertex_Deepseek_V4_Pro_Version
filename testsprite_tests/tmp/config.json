@@ -1,7 +1,0 @@
-{
-  "status": "init",
-  "scope": "codebase",
-  "type": "backend",
-  "localEndpoint": "http://localhost:3001/student/practice",
-  "serverPort": 8136
-}
