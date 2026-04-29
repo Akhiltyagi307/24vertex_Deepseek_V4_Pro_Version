@@ -2,10 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { AuthSplitShellMotion } from "@/components/auth/auth-split-shell-motion";
+import { Boxes } from "@/components/ui/background-boxes";
 
 export function AuthSplitShell({ children }: { children: React.ReactNode }) {
 	const logo = (
-		<Link href="/" className="inline-flex h-10 max-w-full shrink-0 items-center gap-3">
+		<Link
+			href="/"
+			aria-label="24VERTEX home"
+			className="inline-flex h-10 max-w-full shrink-0 items-center gap-3 rounded-lg outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+		>
 			<span className="relative size-10 shrink-0">
 				<Image
 					src="/brand/logo-icon.png"
@@ -21,24 +26,15 @@ export function AuthSplitShell({ children }: { children: React.ReactNode }) {
 	);
 
 	return (
-		<div className="grid min-h-svh lg:grid-cols-2">
-			<div className="flex min-h-0 flex-col bg-background p-6 text-foreground md:p-10 lg:border-r lg:border-border">
-				<AuthSplitShellMotion logo={logo}>{children}</AuthSplitShellMotion>
+		<div className="relative flex min-h-svh flex-col overflow-hidden bg-background text-foreground">
+			<div
+				className="absolute inset-0 z-0 overflow-hidden opacity-[0.42] motion-reduce:opacity-[0.18]"
+				aria-hidden
+			>
+				<Boxes />
 			</div>
-			{/* Decorative panel: no `priority` — column is hidden below lg; avoids preloading a large asset on mobile. */}
-			<div className="relative hidden overflow-hidden lg:block">
-				<Image
-					src="/brand/auth-fractal-glass.png"
-					alt=""
-					fill
-					className="object-cover"
-					loading="lazy"
-					sizes="50vw"
-				/>
-				<div
-					aria-hidden
-					className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/20 via-transparent to-black/15"
-				/>
+			<div className="relative z-10 flex min-h-0 flex-1 flex-col p-6 md:p-10 pointer-events-none">
+				<AuthSplitShellMotion logo={logo}>{children}</AuthSplitShellMotion>
 			</div>
 		</div>
 	);

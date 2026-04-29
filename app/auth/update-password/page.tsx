@@ -1,20 +1,27 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+	Field,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
 
 export default function UpdatePasswordPage() {
 	const [password, setPassword] = useState("");
 	const [confirm, setConfirm] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [done, setDone] = useState(false);
+	const [pending, setPending] = useState(false);
 	const router = useRouter();
-	const reduceMotion = useReducedMotion();
-	const duration = reduceMotion ? 0 : 0.24;
-	const y = reduceMotion ? 0 : 8;
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
@@ -27,10 +34,12 @@ export default function UpdatePasswordPage() {
 			setError("Passwords do not match.");
 			return;
 		}
+		setPending(true);
 		const supabase = createClient();
 		const { error: updateError } = await supabase.auth.updateUser({ password });
 		if (updateError) {
 			setError(updateError.message);
+			setPending(false);
 			return;
 		}
 		setDone(true);
@@ -39,26 +48,31 @@ export default function UpdatePasswordPage() {
 	}
 
 	return (
-		<div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
-			<motion.div
-				className="space-y-6"
-				initial={reduceMotion ? false : { opacity: 0, y }}
-				animate={{ opacity: 1, y: 0 }}
-				transition={{ duration, ease: [0.25, 0.1, 0.25, 1] }}
-			>
-				<div>
-					<h1 className="text-xl font-semibold">Set a new password</h1>
-					<p className="mt-1 text-sm text-zinc-600">Use the link from your email to reach this page.</p>
+		<form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-6">
+			<FieldGroup>
+				<div className="flex flex-col gap-2 text-center md:text-left">
+					<h1 className="text-2xl font-bold tracking-tight">Set a new password</h1>
+					<p className="text-balance text-sm text-muted-foreground">
+						Use the link from your email to reach this page.
+					</p>
 				</div>
-				{done ? (
-					<p className="text-sm text-green-800">Password updated. Redirecting to log in…</p>
-				) : (
-					<form onSubmit={handleSubmit} className="space-y-4">
-						<div>
-							<label htmlFor="password" className="block text-sm font-medium">
-								New password
-							</label>
-							<input
+				<AnimateFormAlert show={Boolean(done)} motionKey="update-pw-done">
+					<Alert>
+						<AlertTitle>Password updated</AlertTitle>
+						<AlertDescription>Redirecting to log in…</AlertDescription>
+					</Alert>
+				</AnimateFormAlert>
+				<AnimateFormAlert show={Boolean(error)} motionKey="update-pw-error">
+					<Alert variant="destructive">
+						<AlertTitle>Error</AlertTitle>
+						<AlertDescription>{error}</AlertDescription>
+					</Alert>
+				</AnimateFormAlert>
+				{!done ? (
+					<>
+						<Field>
+							<FieldLabel htmlFor="password">New password</FieldLabel>
+							<Input
 								id="password"
 								type="password"
 								value={password}
@@ -66,14 +80,11 @@ export default function UpdatePasswordPage() {
 								required
 								minLength={8}
 								autoComplete="new-password"
-								className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
 							/>
-						</div>
-						<div>
-							<label htmlFor="confirm" className="block text-sm font-medium">
-								Confirm password
-							</label>
-							<input
+						</Field>
+						<Field>
+							<FieldLabel htmlFor="confirm">Confirm password</FieldLabel>
+							<Input
 								id="confirm"
 								type="password"
 								value={confirm}
@@ -81,24 +92,24 @@ export default function UpdatePasswordPage() {
 								required
 								minLength={8}
 								autoComplete="new-password"
-								className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
 							/>
-						</div>
-						{error ? <p className="text-sm text-red-600">{error}</p> : null}
-						<button
-							type="submit"
-							className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-800"
-						>
-							Update password
-						</button>
-					</form>
-				)}
-				<p className="text-center text-sm">
-					<Link href="/login" className="underline">
+						</Field>
+						<Field>
+							<Button type="submit" className="w-full" disabled={pending}>
+								{pending ? "Please wait…" : "Update password"}
+							</Button>
+						</Field>
+					</>
+				) : null}
+				<FieldDescription className="text-center md:text-left">
+					<Link
+						href="/login"
+						className="text-foreground underline underline-offset-4 hover:text-foreground"
+					>
 						Back to log in
 					</Link>
-				</p>
-			</motion.div>
-		</div>
+				</FieldDescription>
+			</FieldGroup>
+		</form>
 	);
 }

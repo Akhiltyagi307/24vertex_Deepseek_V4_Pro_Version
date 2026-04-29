@@ -19,7 +19,8 @@ function trialingDaysDisplayed(e: EntitlementSnapshot): number | null {
 	return trialDaysLeftFromEnd(e.trialEndsAt) ?? e.trialDaysLeft;
 }
 
-function formatStatusLabel(e: EntitlementSnapshot): string {
+/** Shared with portal sidebars for collapsed-rail billing announcements. */
+export function formatStatusLabel(e: EntitlementSnapshot): string {
 	if (e.staffOverride) return "Staff override";
 	switch (e.status) {
 		case "trialing": {
@@ -63,12 +64,11 @@ function formatTokens(n: number): string {
 
 const toneStyles: Record<
 	Tone,
-	{ dot: string; pill: string; aura: string; icon: string; border: string; ring: string }
+	{ dot: string; pill: string; icon: string; border: string; ring: string }
 > = {
 	ok: {
 		dot: "bg-emerald-500",
 		pill: "text-emerald-700 bg-emerald-500/10 ring-emerald-500/20 dark:text-emerald-300",
-		aura: "from-emerald-500/10",
 		icon: "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20 dark:text-emerald-400",
 		border: "",
 		ring: "",
@@ -76,7 +76,6 @@ const toneStyles: Record<
 	warn: {
 		dot: "bg-amber-500",
 		pill: "text-amber-700 bg-amber-500/10 ring-amber-500/20 dark:text-amber-300",
-		aura: "from-amber-500/10",
 		icon: "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400",
 		border: "border-amber-500/40",
 		ring: "ring-1 ring-inset ring-amber-500/15",
@@ -84,7 +83,6 @@ const toneStyles: Record<
 	danger: {
 		dot: "bg-rose-500",
 		pill: "text-rose-700 bg-rose-500/10 ring-rose-500/20 dark:text-rose-300",
-		aura: "from-rose-500/10",
 		icon: "bg-rose-500/10 text-rose-600 ring-rose-500/20 dark:text-rose-400",
 		border: "border-rose-500/50",
 		ring: "ring-1 ring-inset ring-rose-500/20",
@@ -92,7 +90,6 @@ const toneStyles: Record<
 	neutral: {
 		dot: "bg-sky-500",
 		pill: "text-sky-700 bg-sky-500/10 ring-sky-500/20 dark:text-sky-300",
-		aura: "from-sky-500/10",
 		icon: "bg-primary/10 text-primary ring-primary/15",
 		border: "",
 		ring: "",
@@ -136,9 +133,6 @@ export function SidebarPlanCard({
 		? Math.max(0, Math.round(((trialingDaysLive ?? 0) / TRIAL_TOTAL_DAYS) * 100))
 		: 0;
 
-	// Pulse CTA only when free and approaching urgency
-	const shouldPulse = !reduceMotion && isFree && (tone === "warn" || tone === "danger");
-
 	const cardTransition = reduceMotion
 		? { duration: 0 }
 		: { duration: 0.26, ease: [0.25, 0.1, 0.25, 1] as const };
@@ -148,28 +142,19 @@ export function SidebarPlanCard({
 			{showPlanCard ? (
 				<motion.div
 					key="sidebar-plan-card"
-					initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, scale: 0.98 }}
-					animate={{ opacity: 1, y: 0, scale: 1 }}
-					exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.99 }}
+					initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+					animate={{ opacity: 1 }}
+					exit={reduceMotion ? { opacity: 0 } : { opacity: 0 }}
 					transition={cardTransition}
 					className={cn(
 						cardSurfaceFrameClassName,
-						"group/plancard relative overflow-hidden p-4 shadow-sm backdrop-blur-sm",
-						"bg-sidebar-accent/40 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-px hover:shadow-md",
+						"group/plancard relative p-4 shadow-sm",
+						"bg-sidebar-accent/40 transition-colors duration-200 hover:bg-sidebar-accent/55",
 						t.border ? t.border : undefined,
 						t.ring,
 						className,
 					)}
 				>
-					{/* Ambient glow */}
-					<div
-						aria-hidden
-						className={cn(
-							"pointer-events-none absolute -top-10 -right-10 size-28 rounded-full bg-gradient-to-br to-transparent opacity-70 blur-2xl",
-							t.aura,
-						)}
-					/>
-
 					{/* Header row */}
 					<div className="relative flex items-center gap-2.5">
 						<div
@@ -257,15 +242,7 @@ export function SidebarPlanCard({
 					) : null}
 
 					{/* CTA */}
-					<motion.div
-						className="mt-3.5"
-						animate={shouldPulse ? { scale: [1, 1.025, 1] } : { scale: 1 }}
-						transition={
-							shouldPulse
-								? { repeat: Infinity, duration: 2.5, ease: "easeInOut" }
-								: {}
-						}
-					>
+					<div className="mt-3.5">
 						<Link
 							href={manageHref}
 							className={cn(
@@ -287,7 +264,7 @@ export function SidebarPlanCard({
 								</>
 							)}
 						</Link>
-					</motion.div>
+					</div>
 				</motion.div>
 			) : null}
 		</AnimatePresence>

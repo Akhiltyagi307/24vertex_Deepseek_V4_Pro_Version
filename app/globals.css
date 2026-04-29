@@ -135,27 +135,28 @@
     --sidebar-ring: #2ea070;
 }
 
-/* Supabase Studio–style tokens scoped to auth routes (design-v2.md §18) */
+/* Supabase Studio–style tokens scoped to auth routes (design-v2.md §18).
+   Slight green-tinted neutrals (not flat #000) so the shell matches product craft rules. */
 .dark.auth-studio {
-    --background: #1c1c1c;
-    --foreground: #ededed;
-    --card: #252525;
-    --card-foreground: #ededed;
-    --popover: #2a2a2a;
-    --popover-foreground: #ededed;
+    --background: oklch(0.21 0.006 155);
+    --foreground: oklch(0.94 0.004 155);
+    --card: oklch(0.26 0.005 155);
+    --card-foreground: oklch(0.94 0.004 155);
+    --popover: oklch(0.29 0.005 155);
+    --popover-foreground: oklch(0.94 0.004 155);
     --primary: #2ea070;
     --primary-foreground: #000000;
     --subject-grid-icon: #2ea070;
-    --secondary: #252525;
-    --secondary-foreground: #ededed;
-    --muted: #252525;
-    --muted-foreground: #a0a0a0;
-    --accent: #2c2c2c;
-    --accent-foreground: #ededed;
+    --secondary: oklch(0.26 0.005 155);
+    --secondary-foreground: oklch(0.94 0.004 155);
+    --muted: oklch(0.26 0.005 155);
+    --muted-foreground: oklch(0.68 0.01 155);
+    --accent: oklch(0.3 0.006 155);
+    --accent-foreground: oklch(0.94 0.004 155);
     --destructive: #e55353;
-    --border: #2e2e2e;
-    /* Input stroke: must contrast with --background (#1c1c1c); same family as Supabase UI */
-    --input: #3e3e3e;
+    --border: oklch(0.34 0.008 155);
+    /* Input stroke: must contrast with page background */
+    --input: oklch(0.38 0.01 155);
     --ring: #2ea070;
     --sidebar: #181818;
     --sidebar-foreground: #ededed;
@@ -175,7 +176,9 @@
     @apply bg-background text-foreground;
     }
   html {
-    @apply font-sans;
+    @apply scroll-smooth font-sans;
+    /* Sticky landing header (~h-14): hash links land with space above section titles */
+    scroll-padding-top: 4.75rem;
     }
 }
 

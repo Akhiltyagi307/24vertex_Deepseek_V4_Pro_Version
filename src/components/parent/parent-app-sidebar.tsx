@@ -6,6 +6,7 @@ import { GraduationCapIcon } from "lucide-react";
 import { ParentNavMain } from "@/components/parent/parent-nav-main";
 import { StudentNavUser } from "@/components/student/student-nav-user";
 import {
+	formatStatusLabel,
 	SidebarPlanCard,
 	statusTone,
 } from "@/components/student/subscription/sidebar-plan-card";
@@ -19,6 +20,7 @@ import {
 	SidebarMenuItem,
 	SidebarRail,
 	SidebarSeparator,
+	useSidebar,
 } from "@/components/ui/sidebar";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { cn } from "@/lib/utils";
@@ -37,16 +39,41 @@ export function ParentAppSidebar({
 	childGradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
 }) {
+	const { state, isMobile } = useSidebar();
+	const collapsedDesktop = state === "collapsed" && !isMobile;
 	const collapsedTone = entitlement ? statusTone(entitlement) : null;
 	const showCollapsedDot =
 		collapsedTone === "warn" || collapsedTone === "danger";
+
+	const homeTooltip = collapsedDesktop
+		? entitlement && showCollapsedDot
+			? `EduAI · ${childGradeLabel} · ${formatStatusLabel(entitlement)}`
+			: `EduAI · ${childGradeLabel}`
+		: undefined;
+
+	const homeAriaLabel = collapsedDesktop
+		? entitlement && showCollapsedDot
+			? `EduAI, ${childGradeLabel}. Parent dashboard. Billing: ${formatStatusLabel(entitlement)}.`
+			: `EduAI, ${childGradeLabel}. Parent dashboard.`
+		: undefined;
+
+	const homeTitle =
+		entitlement && showCollapsedDot
+			? `Billing: ${formatStatusLabel(entitlement)}`
+			: undefined;
 
 	return (
 		<Sidebar collapsible="icon" className="!top-12 h-auto">
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" render={<Link href="/parent/dashboard" />}>
+						<SidebarMenuButton
+							size="lg"
+							tooltip={homeTooltip}
+							aria-label={homeAriaLabel}
+							title={homeTitle}
+							render={<Link href="/parent/dashboard" />}
+						>
 							<div className="relative flex aspect-square size-8 items-center justify-center rounded-lg bg-emerald-600 text-white dark:bg-emerald-500">
 								<GraduationCapIcon className="size-4" />
 								{showCollapsedDot && (

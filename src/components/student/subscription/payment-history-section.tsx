@@ -43,7 +43,7 @@ function statusMeta(status: string): {
 }
 
 function formatMethod(method: string | null): string {
-	if (!method) return "\u2014";
+	if (!method) return "N/A";
 	return method.replaceAll("_", " ").toUpperCase();
 }
 
@@ -60,15 +60,15 @@ function SkeletonEmptyState() {
 			<CardContent className="p-0">
 				<div className="overflow-x-auto" aria-hidden>
 					<table className="w-full min-w-[38rem] text-sm">
-						<thead className="bg-muted/40 text-left">
-							<tr>
-								{["Date", "Amount", "Status", "Method", "Receipt"].map((h) => (
-									<th key={h} className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
-										{h}
-									</th>
-								))}
-							</tr>
-						</thead>
+								<thead className="bg-muted/40 text-left">
+									<tr>
+										{["Date", "Amount", "Status", "Method", "Receipt"].map((h) => (
+											<th key={h} scope="col" className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
+												{h}
+											</th>
+										))}
+									</tr>
+								</thead>
 						<tbody>
 							{Array.from({ length: rows }).map((_, i) => (
 								<tr key={i} className="border-t border-dashed border-border/70">
@@ -121,11 +121,21 @@ export function PaymentHistorySection({ payments }: { payments: PaymentHistoryRo
 							<table className="w-full min-w-[38rem] text-sm">
 								<thead className="bg-muted/50 text-left">
 									<tr>
-										<th className="px-3 py-2.5 font-medium">Date</th>
-										<th className="px-3 py-2.5 font-medium">Amount</th>
-										<th className="px-3 py-2.5 font-medium">Status</th>
-										<th className="px-3 py-2.5 font-medium">Method</th>
-										<th className="px-3 py-2.5 font-medium">Receipt</th>
+										<th scope="col" className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
+											Date
+										</th>
+										<th scope="col" className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
+											Amount
+										</th>
+										<th scope="col" className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
+											Status
+										</th>
+										<th scope="col" className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
+											Method
+										</th>
+										<th scope="col" className="px-3 py-2.5 text-xs font-medium text-muted-foreground">
+											Receipt
+										</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -162,7 +172,7 @@ export function PaymentHistorySection({ payments }: { payments: PaymentHistoryRo
 															View receipt
 														</a>
 													) : (
-														<span className="text-muted-foreground">{"\u2014"}</span>
+														<span className="text-muted-foreground">Not yet</span>
 													)}
 												</td>
 											</tr>

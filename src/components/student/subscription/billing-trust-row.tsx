@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileTextIcon, ShieldCheckIcon, SmartphoneIcon, XCircleIcon } from "lucide-react";
+import { FileTextIcon, RefreshCwIcon, ShieldCheckIcon, SmartphoneIcon } from "lucide-react";
 
 type Item = {
 	label: React.ReactNode;
@@ -10,7 +10,7 @@ export function BillingTrustRow() {
 	const items: Item[] = [
 		{ label: "Secure checkout (Razorpay)", icon: ShieldCheckIcon },
 		{ label: "Pay with UPI or card", icon: SmartphoneIcon },
-		{ label: "Change or cancel your plan when you need to", icon: XCircleIcon },
+		{ label: "Change or cancel your plan when you need to", icon: RefreshCwIcon },
 		{
 			label: (
 				<Link

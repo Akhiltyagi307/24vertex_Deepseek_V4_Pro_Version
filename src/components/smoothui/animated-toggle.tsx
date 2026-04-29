@@ -32,7 +32,7 @@ export default function AnimatedToggle({
 				checked
 					? "bg-emerald-600 dark:bg-emerald-500"
 					: "bg-background/85 dark:bg-foreground/22",
-				"focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2",
+				"focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 			)}
 		>
 			<motion.span

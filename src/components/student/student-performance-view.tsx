@@ -465,13 +465,13 @@ export function StudentPerformanceView({
 	}
 
 	return (
-		<div className="flex flex-col gap-8 p-6 pb-28">
+		<div className="flex flex-col gap-6 p-6 pb-24 sm:gap-7 sm:pb-28">
 			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<AnimatePresence mode="wait" initial={false}>
 				{!detailSubjectId ? (
 					<motion.div
 						key="perf-subject-list"
-						className="flex flex-col gap-8"
+						className="flex flex-col gap-6 sm:gap-7"
 						initial="hidden"
 						animate="show"
 						exit="exit"
@@ -506,7 +506,7 @@ export function StudentPerformanceView({
 							Open a subject
 						</h2>
 						<motion.div
-							className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3"
+							className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 lg:grid-cols-3 lg:gap-4"
 							initial="hidden"
 							animate="show"
 							variants={container}
@@ -556,14 +556,19 @@ export function StudentPerformanceView({
 												<SubjectCard
 													subject={s.subjectName}
 													lastTestDate=""
-													subtitle="No topics in the catalog for this grade yet. Curriculum data may still be updating."
+													subtitle={
+														parentViewer
+															? "Topics for this grade are not in the catalog yet. Curriculum may still be updating."
+															: "No topics in the catalog for this grade yet. When they appear, open this subject and start with any topic."
+													}
 													topicsAttempted={0}
 													topicsTotal={0}
 													testsTaken={0}
 													avgScore={0}
-													status="in_progress"
+													status="ready_to_start"
 													showCta={false}
 													metricsIconSlot={iconEl}
+													density="compact"
 												/>
 											</Link>
 										</motion.div>
@@ -586,16 +591,17 @@ export function StudentPerformanceView({
 													lastTestDate=""
 													subtitle={
 														parentViewer
-															? "Tracker rows appear when their curriculum is linked. Open the subject for the topic list."
-															: "Tracker rows appear when your curriculum is linked. Open the subject for your topic list."
+															? "Their topic list appears once curriculum is linked. Open the subject to see what loads next."
+															: "Your topic list appears once curriculum is linked. Open the subject to get started."
 													}
 													topicsAttempted={0}
 													topicsTotal={s.topicTotal}
 													testsTaken={0}
 													avgScore={0}
-													status="in_progress"
+													status="ready_to_start"
 													showCta={false}
 													metricsIconSlot={iconEl}
+													density="compact"
 												/>
 											</Link>
 										</motion.div>
@@ -619,16 +625,19 @@ export function StudentPerformanceView({
 													!hasAttempts
 														? st.lastTestDate
 															? `Last test · ${lastLabel}`
-															: "No tests recorded yet"
+															: parentViewer
+																? "No tests yet. Open the subject to see topics and encourage their next attempt."
+																: "No tests yet. Open this subject when you are ready; your first run starts the scoreboard."
 														: undefined
 												}
 												topicsAttempted={s.attemptedCount}
 												topicsTotal={s.topicTotal}
 												testsTaken={st.testsTakenTotal}
 												avgScore={hasAttempts ? avgScore : 0}
-												status={!hasAttempts ? "in_progress" : cardStatus}
+												status={!hasAttempts ? "ready_to_start" : cardStatus}
 												showCta={false}
 												metricsIconSlot={iconEl}
+												density="compact"
 											/>
 										</Link>
 									</motion.div>

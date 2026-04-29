@@ -141,7 +141,13 @@ export const studentSchoolPlacementSchema = z
 		section: z.string().trim().min(1, "Enter your section.").max(5),
 		stream: streamEnum.nullable(),
 		electiveSubjectId: z.string().uuid().nullable().optional(),
-		schoolName: z.string().max(300).optional().transform(trimToNull),
+		/** Client sends explicit `null` when the profile has no school name; plain `.optional()` rejects null. */
+		schoolName: z
+			.string()
+			.max(300)
+			.nullable()
+			.optional()
+			.transform((s) => trimToNull(s)),
 	})
 	.superRefine((data, ctx) => {
 		const elective = data.electiveSubjectId ?? null;

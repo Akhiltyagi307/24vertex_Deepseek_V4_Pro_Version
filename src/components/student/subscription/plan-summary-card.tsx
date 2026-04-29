@@ -24,14 +24,14 @@ function formatStatusLabel(e: EntitlementSnapshot): string {
 		case "trialing": {
 			const d = e.trialDaysLeft;
 			if (d == null) return "Free trial";
-			return d === 0 ? "Trial ending today" : `Trial \u2014 ${d}\u00A0day${d === 1 ? "" : "s"} left`;
+			return d === 0 ? "Trial ending today" : `Trial, ${d}\u00A0day${d === 1 ? "" : "s"} left`;
 		}
 		case "active":
 			return e.cancelAtPeriodEnd ? "Active (cancels at period end)" : "Active";
 		case "coupon":
 			return "Complimentary (coupon)";
 		case "grace":
-			return "Payment retrying \u2014 access preserved";
+			return "Payment retrying; access preserved";
 		case "past_due":
 			return "Payment failed";
 		case "cancelled":

@@ -106,7 +106,7 @@ export function RazorpayCheckoutButton({
 				handler: () => {
 					toast.success(
 						startMode === "after_trial"
-							? "Payment method saved — you'll be charged after your trial ends."
+							? "Payment method saved. You will be charged after your trial ends."
 							: "Thanks! Activating your subscription…",
 					);
 					router.refresh();

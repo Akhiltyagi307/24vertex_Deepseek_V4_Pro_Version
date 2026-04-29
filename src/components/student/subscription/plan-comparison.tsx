@@ -71,7 +71,7 @@ export function PlanComparison({
 			? "Manage on Razorpay"
 			: isTrialing
 				? billingStart
-					? `Start Pro \u2014 billing begins ${billingStart}`
+					? `Start Pro: billing begins ${billingStart}`
 					: "Start Pro after trial"
 				: "Upgrade to Pro Monthly";
 
@@ -117,7 +117,7 @@ export function PlanComparison({
 				`${annual.testsPerPeriod} tests / year (burn at any pace)`,
 				`${formatTokens(isSenior ? annual.tokensGrade11to12 : annual.tokensGrade6to10)} AI output tokens / year (doubt chat)`,
 				"Billed once a year",
-				"Cancel anytime \u2014 keep access until period end",
+				"Cancel anytime; you keep access until period end",
 			],
 			action: (
 				<RazorpayCheckoutButton
@@ -142,7 +142,7 @@ export function PlanComparison({
 					<Card
 						key={c.code}
 						className={cn(
-							"relative h-full transition-[transform,box-shadow] duration-200",
+							"relative h-full transition-[transform,box-shadow] duration-200 ease-out",
 							c.elevated
 								? "shadow-sm md:shadow-md ring-1 ring-primary/30 md:-translate-y-1"
 								: "",
@@ -154,7 +154,12 @@ export function PlanComparison({
 								Most popular
 							</div>
 						) : null}
-						<CardHeader className="gap-2">
+						<CardHeader
+							className={cn(
+								"gap-2",
+								c.elevated && !isCurrent ? "pr-24 sm:pr-28" : "",
+							)}
+						>
 							<div className="flex items-start justify-between gap-3">
 								<CardTitle className="text-base">{c.title}</CardTitle>
 								{isCurrent ? (

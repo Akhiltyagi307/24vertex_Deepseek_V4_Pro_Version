@@ -111,10 +111,10 @@ export default function ParentSignupPage() {
 	}
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="text-2xl font-semibold tracking-tight">Parent sign up</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
+		<div className="flex flex-col gap-6">
+			<div className="flex flex-col gap-2 text-center md:text-left">
+				<h1 className="text-2xl font-bold tracking-tight">Parent sign up</h1>
+				<p className="text-balance text-sm text-muted-foreground">
 					Use your own email for this parent account, and enter your child&apos;s six-character link code from
 					their EduAI Profile so we can connect them to you.
 				</p>

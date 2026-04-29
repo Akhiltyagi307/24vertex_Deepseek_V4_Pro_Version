@@ -29,6 +29,9 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+/** Matches the Cmd/Ctrl+B listener in `SidebarProvider`. */
+const SIDEBAR_TOGGLE_KEYBOARD_HINT = "Ctrl+B / ⌘B"
+const SIDEBAR_TOGGLE_LABEL = `Toggle sidebar · ${SIDEBAR_TOGGLE_KEYBOARD_HINT}`
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -252,26 +255,41 @@ function Sidebar({
 function SidebarTrigger({
   className,
   onClick,
+  title,
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar()
+  const triggerTitle = title ?? SIDEBAR_TOGGLE_LABEL
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon-sm"
-      className={cn(className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            data-sidebar="trigger"
+            data-slot="sidebar-trigger"
+            variant="ghost"
+            size="icon-sm"
+            className={cn(className)}
+            title={triggerTitle}
+            onClick={(event) => {
+              onClick?.(event)
+              toggleSidebar()
+            }}
+            {...props}
+          >
+            <PanelLeftIcon />
+            <span className="sr-only">{triggerTitle}</span>
+          </Button>
+        }
+      />
+      <TooltipContent side="bottom" align="start" className="max-w-[14rem]">
+        <span className="block leading-snug">Toggle sidebar</span>
+        <span className="mt-0.5 block text-[0.7rem] leading-snug opacity-80">
+          Keyboard: {SIDEBAR_TOGGLE_KEYBOARD_HINT}
+        </span>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -282,10 +300,10 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      aria-label="Toggle Sidebar"
+      aria-label={SIDEBAR_TOGGLE_LABEL}
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title={SIDEBAR_TOGGLE_LABEL}
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",

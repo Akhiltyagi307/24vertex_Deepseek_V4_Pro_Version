@@ -293,7 +293,8 @@ const PLACEMENT_FIELD_COPY: Record<
 > = {
 	grade: {
 		title: "Edit grade",
-		description: "Your grade drives which subjects apply. If you move to grade 11 or 12, set your stream next.",
+		description:
+			"Your grade drives which subjects apply. For grades 11–12, choose your stream and elective below before saving.",
 	},
 	section: {
 		title: "Edit section",
@@ -340,26 +341,40 @@ function PlacementFieldDialog({
 		profile.grade != null && profile.grade >= 11 && profile.grade <= 12;
 	const streamElectiveBlocked = profile.grade == null || profile.grade < 11;
 	const electiveNeedsStream = seniorEligible && !profile.stream;
+	const gradeDialogSenior = field === "grade" && gradeDraft >= 11 && gradeDraft <= 12;
 
 	useEffect(() => {
-		if (!open || field !== "elective") return;
-		if (!seniorEligible || electiveNeedsStream) return;
-		const g = profile.grade!;
-		const st = profile.stream!;
+		if (!open) return;
+
+		let grade: number;
+		let stream: string;
+		if (field === "elective") {
+			if (!seniorEligible || electiveNeedsStream) return;
+			grade = profile.grade!;
+			stream = profile.stream!;
+		} else if (gradeDialogSenior) {
+			const st = streamDraft.trim();
+			if (!st) return;
+			grade = gradeDraft;
+			stream = st;
+		} else {
+			return;
+		}
+
 		let cancelled = false;
 		(async () => {
 			const supabase = createClient();
 			const { data, error: qErr } = await supabase
 				.from("subjects")
 				.select("id, name, stream")
-				.eq("grade", g)
+				.eq("grade", grade)
 				.eq("is_elective", true)
 				.eq("is_active", true)
 				.order("name");
 			if (cancelled || qErr) return;
 			const rows = (data ?? []).filter((s) => {
 				const rowStream = s.stream as string | null;
-				return !rowStream || rowStream === st;
+				return !rowStream || rowStream === stream;
 			});
 			setElectives(rows.map((s) => ({ id: s.id as string, name: s.name as string })));
 		})().catch(() => {
@@ -368,7 +383,17 @@ function PlacementFieldDialog({
 		return () => {
 			cancelled = true;
 		};
-	}, [open, field, profile.grade, profile.stream, seniorEligible, electiveNeedsStream]);
+	}, [
+		open,
+		field,
+		gradeDraft,
+		streamDraft,
+		profile.grade,
+		profile.stream,
+		seniorEligible,
+		electiveNeedsStream,
+		gradeDialogSenior,
+	]);
 
 	function handleOpenChange(next: boolean) {
 		if (!next) onClose();
@@ -409,8 +434,25 @@ function PlacementFieldDialog({
 	async function handleSaveField() {
 		if (!field) return;
 		switch (field) {
-			case "grade":
+			case "grade": {
+				if (gradeDraft >= 11 && gradeDraft <= 12) {
+					const s = streamDraft.trim();
+					if (!s) {
+						setError("Select your stream for grades 11–12.");
+						return;
+					}
+					const electiveOk =
+						electiveDraft && electives.some((e) => e.id === electiveDraft) ?
+							electiveDraft
+						:	null;
+					return saveWithPatch({
+						grade: gradeDraft,
+						stream: s,
+						electiveSubjectId: electiveOk,
+					});
+				}
 				return saveWithPatch({ grade: gradeDraft });
+			}
 			case "section":
 				return saveWithPatch({ section: sectionDraft });
 			case "stream": {
@@ -456,6 +498,7 @@ function PlacementFieldDialog({
 		electiveDraft && electives.some((elective) => elective.id === electiveDraft) ?
 			electiveDraft
 		:	"";
+	const gradeDialogElectiveValue = gradeDialogSenior ? effectiveElectiveDraft : "";
 
 	return (
 		<Dialog.Root open={open} onOpenChange={(o) => handleOpenChange(o)}>
@@ -491,22 +534,96 @@ function PlacementFieldDialog({
 					) : null}
 
 					{field === "grade" ? (
-						<div className="flex flex-col gap-2">
-							<label htmlFor={`${titleId}-grade`} className="text-foreground/70 text-sm font-medium">
-								Grade
-							</label>
-							<select
-								id={`${titleId}-grade`}
-								className={placementSelectClass}
-								value={gradeDraft}
-								onChange={(e) => setGradeDraft(Number(e.target.value))}
-							>
-								{GRADE_OPTIONS.map((g) => (
-									<option key={g} value={g}>
-										{g}
-									</option>
-								))}
-							</select>
+						<div className="flex flex-col gap-4">
+							<div className="flex flex-col gap-2">
+								<label htmlFor={`${titleId}-grade`} className="text-foreground/70 text-sm font-medium">
+									Grade
+								</label>
+								<select
+									id={`${titleId}-grade`}
+									className={placementSelectClass}
+									value={gradeDraft}
+									onChange={(e) => {
+										const n = Number(e.target.value);
+										const prev = gradeDraft;
+										setGradeDraft(n);
+										if (n < 11) {
+											setStreamDraft("");
+											setElectiveDraft("");
+											setElectives([]);
+										} else if (prev < 11 && n >= 11) {
+											setStreamDraft("");
+											setElectiveDraft("");
+											setElectives([]);
+										} else if (n >= 11 && prev >= 11 && n !== prev) {
+											setElectiveDraft("");
+										}
+									}}
+								>
+									{GRADE_OPTIONS.map((g) => (
+										<option key={g} value={g}>
+											{g}
+										</option>
+									))}
+								</select>
+							</div>
+							{gradeDialogSenior ? (
+								<>
+									<div className="flex flex-col gap-2">
+										<label
+											htmlFor={`${titleId}-grade-stream`}
+											className="text-foreground/70 text-sm font-medium"
+										>
+											Stream
+										</label>
+										<select
+											id={`${titleId}-grade-stream`}
+											className={placementSelectClass}
+											value={streamDraft}
+											onChange={(e) => {
+												const v = e.target.value;
+												setStreamDraft(v);
+												setElectiveDraft("");
+												if (!v.trim()) setElectives([]);
+											}}
+										>
+											<option value="">Select stream…</option>
+											{PLACEMENT_STREAM_OPTIONS.map((o) => (
+												<option key={o.value} value={o.value}>
+													{o.label}
+												</option>
+											))}
+										</select>
+									</div>
+									<div className="flex flex-col gap-2">
+										<label
+											htmlFor={`${titleId}-grade-elective`}
+											className="text-foreground/70 text-sm font-medium"
+										>
+											Elective (optional)
+										</label>
+										<select
+											id={`${titleId}-grade-elective`}
+											className={placementSelectClass}
+											value={gradeDialogElectiveValue}
+											onChange={(e) => setElectiveDraft(e.target.value)}
+											disabled={!streamDraft.trim()}
+										>
+											<option value="">None</option>
+											{electives.map((el) => (
+												<option key={el.id} value={el.id}>
+													{el.name}
+												</option>
+											))}
+										</select>
+										{!streamDraft.trim() ? (
+											<p className="text-muted-foreground text-xs leading-relaxed">
+												Choose a stream first to see electives for this grade.
+											</p>
+										) : null}
+									</div>
+								</>
+							) : null}
 						</div>
 					) : null}
 

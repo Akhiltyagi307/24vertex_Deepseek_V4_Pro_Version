@@ -83,7 +83,9 @@ export function PlanComparisonTable({ currentPlanCode, grade, planCatalog = PLAN
 			label: "Effective price / test",
 			highlight: true,
 			values: [
-				<span key="v" className="text-muted-foreground">{"\u2014"}</span>,
+				<span key="v" className="text-muted-foreground tabular-nums">
+					N/A
+				</span>,
 				<span key="v" className="tabular-nums">{formatRupeesRounded(monthlyPerTestPaise)}</span>,
 				<span key="v" className="font-medium tabular-nums text-primary">
 					{formatRupeesRounded(annualPerTestPaise)}
@@ -114,11 +116,11 @@ export function PlanComparisonTable({ currentPlanCode, grade, planCatalog = PLAN
 
 	return (
 		<details className={cn(cardSurfaceFrameClassName, "group")} open>
-			<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground marker:hidden">
+			<summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-t-xl px-4 py-3 text-sm font-medium text-foreground outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
 				<span>See how the plans compare</span>
 				<span
 					aria-hidden
-					className="text-xs text-muted-foreground transition-transform group-open:rotate-180"
+					className="text-xs text-muted-foreground transition-transform duration-200 ease-out group-open:rotate-180"
 				>
 					&#x25BE;
 				</span>

@@ -5,9 +5,9 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 export default function AccountIncompletePage() {
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-col items-center gap-1 text-center">
-				<h1 className="text-2xl font-semibold tracking-tight">Account could not be loaded</h1>
-				<p className="text-sm text-balance text-muted-foreground">
+			<div className="flex flex-col items-center gap-2 text-center">
+				<h1 className="text-2xl font-bold tracking-tight">Account could not be loaded</h1>
+				<p className="text-balance text-sm text-muted-foreground">
 					Your session is active, but we could not load your portal profile. Common causes are
 					out-of-date database migrations (run the latest Supabase migrations) or a brief database
 					error. If it persists, check the dev server log for{" "}

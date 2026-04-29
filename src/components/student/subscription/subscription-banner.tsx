@@ -36,7 +36,7 @@ function chooseBanner(e: EntitlementSnapshot): null | {
 		return {
 			tone: "warning",
 			title: days === 0 ? "Your trial ends today" : `Only ${days} day${days === 1 ? "" : "s"} left on your trial`,
-			body: "Add a payment method now so you never lose access — the first charge happens only after the trial ends.",
+			body: "Add a payment method now so you never lose access; the first charge happens only after the trial ends.",
 			ctaLabel: "Continue seamlessly",
 		};
 	}

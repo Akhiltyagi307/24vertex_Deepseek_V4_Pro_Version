@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
-import { FieldGroup } from "@/components/ui/field";
+import { FieldDescription, FieldGroup } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
 type RolePickerPanelProps = {
@@ -21,27 +21,33 @@ export function RolePickerPanel({ isCompletingProfile }: RolePickerPanelProps) {
 	return (
 		<div className="flex flex-col gap-6">
 			<FieldGroup>
-				<div className="flex flex-col items-center gap-1 text-center">
-					<h1 className={cn("text-2xl font-semibold tracking-tight", itemEnter)}>
+				<div className="flex flex-col items-center gap-2 text-center">
+					<h1 className={cn("text-2xl font-bold tracking-tight", itemEnter)}>
 						{isCompletingProfile ? "Complete sign up" : "Sign up"}
 					</h1>
 					<p
 						className={cn(
-							"text-sm text-balance text-muted-foreground",
+							"max-w-[44ch] text-balance text-sm leading-relaxed text-muted-foreground",
 							itemEnter,
 							"motion-safe:delay-75",
 						)}
 					>
 						{isCompletingProfile
-							? "You are signed in but still need a profile. Choose how you will use EduAI."
-							: "Choose student or parent to create your EduAI account, then log in anytime."}
+							? "You are signed in but still need a profile. Choose how you will use the product."
+							: "Choose student or parent to create your account, then sign in whenever you need it."}
 					</p>
 				</div>
-				<div className="flex flex-col gap-2">
-					<Link href="/signup/student" className={cn(linkClass, itemEnter, "motion-safe:delay-100")}>
+				<div className="flex flex-col gap-3">
+					<Link
+						href="/signup/student"
+						className={cn(linkClass, "min-h-11 py-2.5 text-base font-semibold", itemEnter, "motion-safe:delay-100")}
+					>
 						Student
 					</Link>
-					<Link href="/signup/parent" className={cn(linkClass, itemEnter, "motion-safe:delay-150")}>
+					<Link
+						href="/signup/parent"
+						className={cn(linkClass, "min-h-11 py-2.5 text-base font-semibold", itemEnter, "motion-safe:delay-150")}
+					>
 						Parent
 					</Link>
 				</div>
@@ -51,15 +57,15 @@ export function RolePickerPanel({ isCompletingProfile }: RolePickerPanelProps) {
 					<SignOutButton />
 				</div>
 			) : (
-				<p className="text-center text-sm text-muted-foreground">
+				<FieldDescription className="text-center text-sm text-muted-foreground">
 					Already have an account?{" "}
 					<Link
 						href="/login"
-						className="text-foreground underline underline-offset-4 hover:text-foreground"
+						className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
 					>
 						Log in
 					</Link>
-				</p>
+				</FieldDescription>
 			)}
 		</div>
 	);

@@ -148,7 +148,7 @@ export function DashboardOtherSubjectsTable({
 							Progress
 						</th>
 						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-14 text-right tabular-nums sm:w-16")}>
-							Done
+							Coverage
 						</th>
 						<th
 							scope="col"

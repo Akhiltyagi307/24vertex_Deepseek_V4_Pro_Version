@@ -7,15 +7,15 @@ export function firstNameFromFullName(fullName: string | null | undefined): stri
 
 const GREETING_TEMPLATES = [
 	(name: string) =>
-		`Hi ${name} — here's a snapshot of how you're doing and what to tackle next.`,
+		`Hi ${name}, here's a quick snapshot of your progress and what to work on next.`,
 	(name: string) =>
-		`Welcome back, ${name} — your subjects, recent tests, and practice shortcuts are all below.`,
+		`Welcome back, ${name}. Subjects, recent tests, and shortcuts to practice are below.`,
 	(name: string) =>
-		`Good to see you, ${name} — scan your progress and open a subject or start practice whenever you're ready.`,
+		`Good to see you, ${name}. Review progress, open a subject, or continue practice when you're ready.`,
 	(name: string) =>
-		`${name}, this page shows your scores, topic coverage, and recent activity in one place.`,
+		`${name}, your scores, topic coverage, and recent activity are summarized on this page.`,
 	(name: string) =>
-		`Hey ${name} — use this overview to spot strong subjects, see what needs work, and jump back into practice.`,
+		`Hi ${name}, use this overview to see strong subjects, gaps, and a quick path back into practice.`,
 ] as const;
 
 /** Picks one template at random (call from a server component once per request). */
@@ -28,24 +28,24 @@ export function pickStudentDashboardGreeting(fullName: string | null | undefined
 const PARENT_GREETING_TEMPLATES = [
 	(name: string) =>
 		name === "there"
-			? "Overview of your linked student — scores, subjects, and what to watch next."
-			: `${name}'s activity at a glance — scores, subjects, and what to watch next.`,
+			? "Your linked student at a glance: scores, subjects, and what to watch next."
+			: `${name}'s activity at a glance: scores, subjects, and what to watch next.`,
 	(name: string) =>
 		name === "there"
-			? "You're viewing this student's EduAI progress: recent tests, topic coverage, and trends below."
-			: `You're viewing ${name}'s EduAI progress: recent tests, topic coverage, and trends below.`,
+			? "EduAI progress for your linked student: recent tests, topic coverage, and trends below."
+			: `EduAI progress for ${name}: recent tests, topic coverage, and trends below.`,
 	(name: string) =>
 		name === "there"
-			? "Monitor this student's learning snapshot — strengths, gaps, and recent timed tests in one place."
-			: `Monitor ${name}'s learning snapshot — strengths, gaps, and recent timed tests in one place.`,
+			? "Snapshot of your student: strengths, gaps, and recent timed tests below."
+			: `Snapshot of ${name}: strengths, gaps, and recent timed tests below.`,
 	(name: string) =>
 		name === "there"
-			? "Here's how they're doing lately — use this overview to follow school readiness and study habits."
-			: `Here's how ${name} is doing lately — use this overview to follow school readiness and study habits.`,
+			? "Your student's recent progress, school readiness, and study habits are summarized below."
+			: `${name}'s recent progress, school readiness, and study habits are summarized below.`,
 	(name: string) =>
 		name === "there"
-			? "Student dashboard — track scores, see which subjects need attention, and open detailed reports when you need them."
-			: `${name}'s dashboard — track scores, see which subjects need attention, and open detailed reports when you need them.`,
+			? "Track your student's scores, see which subjects need attention, and open detailed reports when you need them."
+			: `Track ${name}'s scores, see which subjects need attention, and open detailed reports when you need them.`,
 ] as const;
 
 /** Parent portal: addresses the guardian; `fullName` is the linked student's name. */

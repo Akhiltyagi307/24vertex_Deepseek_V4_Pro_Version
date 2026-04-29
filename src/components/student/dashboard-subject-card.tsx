@@ -1,22 +1,24 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
 import { cn } from "@/lib/utils";
 
-/** Matches shadcn `Card` / shared `cardSurfaceFrameClassName`; subject layout padding + green hover glow. */
+/** Frame + hover/focus ring; padding comes from `SubjectCard` (`default` vs `compact`). */
 export const dashboardSubjectCardSurfaceClassName = cn(
 	cardSurfaceFrameClassName,
-	"p-[22px]",
-	"transition-[border-color,box-shadow] duration-200 ease-out",
-	"hover:border-emerald-500/55 hover:shadow-[0_0_28px_-8px_rgba(16,185,129,0.38)]",
-	"dark:hover:border-emerald-400/50 dark:hover:shadow-[0_0_30px_-8px_rgba(52,211,153,0.32)]",
+	"motion-safe:transition-[border-color,box-shadow] motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0.16,1,0.3,1)]",
+	"motion-reduce:transition-none",
+	"hover:border-emerald-500/50 hover:shadow-[0_2px_14px_-4px_rgba(16,185,129,0.2)]",
+	"focus-within:border-emerald-500/50 focus-within:shadow-[0_2px_14px_-4px_rgba(16,185,129,0.2)]",
+	"dark:hover:border-emerald-400/45 dark:hover:shadow-[0_2px_16px_-4px_rgba(52,211,153,0.18)]",
+	"dark:focus-within:border-emerald-400/45 dark:focus-within:shadow-[0_2px_16px_-4px_rgba(52,211,153,0.18)]",
 );
 
-/** Shared CTA: pair with `variant="secondary"` `size="sm"` — white text on emerald, compact */
+/** Shared CTA: pair with `variant="secondary"` `size="sm"` (white text on emerald, compact). */
 export const dashboardSubjectCardCtaClassName = cn(
 	"h-8 rounded-lg px-3.5",
 	"text-xs font-semibold shadow-sm",
@@ -27,7 +29,7 @@ export const dashboardSubjectCardCtaClassName = cn(
 // Types
 // ============================================================================
 
-type SubjectStatus = "needs_attention" | "in_progress" | "on_track";
+type SubjectStatus = "needs_attention" | "in_progress" | "on_track" | "ready_to_start";
 
 export interface SubjectCardProps {
 	subject: string;
@@ -48,6 +50,8 @@ export interface SubjectCardProps {
 	/** Renders in the header after the status label (e.g. per-subject icon), top-right. */
 	metricsIconSlot?: ReactNode;
 	className?: string;
+	/** Tighter padding, smaller ring, shorter metric rows (Performance subject grid). */
+	density?: "default" | "compact";
 }
 
 // ============================================================================
@@ -58,6 +62,10 @@ const STATUS_CONFIG: Record<
 	SubjectStatus,
 	{
 		label: string;
+		/** Shown from `min-[360px]` until `sm` when `extraNarrowLabel` is set; else shown for all widths below `sm`. */
+		narrowLabel?: string;
+		/** With `narrowLabel`: shown below viewport 360px (Tailwind `min-[360px]`). */
+		extraNarrowLabel?: string;
 		dotColor: string;
 		textColor: string;
 		ringColor: string;
@@ -89,6 +97,17 @@ const STATUS_CONFIG: Record<
 		scoreColor: "text-emerald-400",
 		defaultCta: "Take next test",
 	},
+	/** No attempts yet: warm, non-alarming cue (Performance / dashboard cold start). */
+	ready_to_start: {
+		label: "Ready when you are",
+		narrowLabel: "When ready",
+		extraNarrowLabel: "Ready",
+		dotColor: "bg-primary/55",
+		textColor: "text-primary",
+		ringColor: "stroke-primary/35",
+		scoreColor: "text-muted-foreground",
+		defaultCta: "Open this subject",
+	},
 };
 
 // ============================================================================
@@ -110,47 +129,122 @@ export function SubjectCard({
 	showCta = true,
 	metricsIconSlot,
 	className,
+	density = "default",
 }: SubjectCardProps) {
+	const titleId = useId();
 	const config = STATUS_CONFIG[status];
+	const compact = density === "compact";
 	const coverage =
 		topicsTotal > 0 ? Math.round((topicsAttempted / topicsTotal) * 100) : 0;
+	const coverageAriaValueText =
+		topicsTotal > 0
+			? `${coverage}% topic coverage, ${topicsAttempted} of ${topicsTotal} topics`
+			: `${coverage}% topic coverage, no topics in plan yet`;
 
-	const ringSize = 118;
+	const ringSize = compact ? 96 : 118;
 	const ringCenter = ringSize / 2;
-	const radius = 48;
-	const strokeWidth = 7;
+	const radius = compact ? 38 : 48;
+	const strokeWidth = compact ? 6 : 7;
 	const circumference = 2 * Math.PI * radius;
 	const dashOffset = circumference * (1 - coverage / 100);
+	const metaLine = subtitle ?? `Last test · ${lastTestDate}`;
+	const showScorePercent = status !== "ready_to_start";
+	const avgScoreAria = showScorePercent
+		? `${avgScore}%`
+		: "No tests yet, no average score yet";
 
 	return (
-		<div className={cn(dashboardSubjectCardSurfaceClassName, "flex h-full flex-col", className)}>
-			<div className="mb-4 flex items-start justify-between gap-3">
+		<div
+			className={cn(
+				dashboardSubjectCardSurfaceClassName,
+				compact ? "p-4" : "p-5",
+				"flex h-full flex-col",
+				compact ? "gap-2" : "gap-3",
+				className,
+			)}
+		>
+			<div className="flex items-start justify-between gap-3">
 				<div className="min-w-0 flex-1 pr-1">
-					<h3 className="m-0 text-sm font-semibold leading-snug text-foreground">{subject}</h3>
-					<p className="m-0 text-xs text-muted-foreground leading-snug">
-						{subtitle ?? `Last test · ${lastTestDate}`}
+					<h3
+						id={titleId}
+						className="m-0 truncate text-sm font-semibold leading-snug text-foreground"
+						title={subject}
+					>
+						{subject}
+					</h3>
+					<p
+						className={cn(
+							"m-0 text-xs text-muted-foreground leading-snug",
+							compact ? "line-clamp-2 [overflow-wrap:anywhere]" : "truncate",
+						)}
+						title={metaLine}
+					>
+						{metaLine}
 					</p>
 				</div>
 				<div className="flex shrink-0 items-center gap-2 self-start pt-0.5 min-[360px]:gap-2.5">
-					<div className="flex min-w-0 max-w-[9.5rem] items-center justify-end gap-1.5 sm:max-w-[11rem]">
-						<span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", config.dotColor)} />
+					<div className="flex min-w-0 max-w-[11rem] items-center justify-end gap-1.5 sm:max-w-[13.5rem]">
+						<span
+							className={cn("h-1.5 w-1.5 shrink-0 rounded-full", config.dotColor)}
+							aria-hidden
+						/>
 						<span
 							className={cn(
-								"text-right text-[0.6rem] font-medium uppercase leading-tight tracking-[0.05em] sm:text-xs sm:tracking-[0.06em]",
+								"text-right text-[0.6875rem] font-medium uppercase leading-tight tracking-[0.05em] sm:text-xs sm:tracking-[0.06em]",
 								config.textColor,
 							)}
 						>
-							{config.label}
+							{config.narrowLabel ? (
+								<>
+									<span className="sr-only">{config.label}</span>
+									{config.extraNarrowLabel ? (
+										<>
+											<span
+												aria-hidden
+												className="inline min-[360px]:hidden sm:hidden"
+											>
+												{config.extraNarrowLabel}
+											</span>
+											<span
+												aria-hidden
+												className="hidden min-[360px]:inline sm:hidden"
+											>
+												{config.narrowLabel}
+											</span>
+										</>
+									) : (
+										<span aria-hidden className="sm:hidden">
+											{config.narrowLabel}
+										</span>
+									)}
+									<span aria-hidden className="hidden sm:inline">
+										{config.label}
+									</span>
+								</>
+							) : (
+								config.label
+							)}
 						</span>
 					</div>
 					{metricsIconSlot ? <div className="shrink-0">{metricsIconSlot}</div> : null}
 				</div>
 			</div>
 
-			<div className="my-1 flex min-h-[118px] flex-1 items-center gap-2 min-[400px]:gap-3 sm:gap-4">
+			<div
+				className={cn(
+					"flex min-w-0 flex-1 items-center gap-2 min-[400px]:gap-3 sm:gap-4",
+					compact ? "min-h-[96px]" : "min-h-[118px]",
+				)}
+			>
 				<div
 					className="relative flex-shrink-0"
 					style={{ width: ringSize, height: ringSize }}
+					role="progressbar"
+					aria-valuemin={0}
+					aria-valuemax={100}
+					aria-valuenow={coverage}
+					aria-valuetext={coverageAriaValueText}
+					aria-labelledby={titleId}
 				>
 					<svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden>
 						<circle
@@ -170,15 +264,31 @@ export function SubjectCard({
 							strokeLinecap="round"
 							strokeDasharray={circumference}
 							strokeDashoffset={dashOffset}
-							className={cn("transition-[stroke-dashoffset] duration-500", config.ringColor)}
+							className={cn(
+								"motion-safe:transition-[stroke-dashoffset] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+								config.ringColor,
+							)}
 						/>
 					</svg>
-					<div className="absolute inset-0 flex flex-col items-center justify-center gap-px">
-						<span className="text-2xl font-semibold leading-none text-foreground tabular-nums sm:text-[1.65rem]">
+					<div
+						className="absolute inset-0 flex flex-col items-center justify-center gap-px"
+						aria-hidden
+					>
+						<span
+							className={cn(
+								"font-semibold leading-none text-foreground tabular-nums",
+								compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-[1.65rem]",
+							)}
+						>
 							{coverage}%
 						</span>
-						<span className="text-[0.65rem] uppercase leading-none tracking-wider text-muted-foreground">
-							Done
+						<span
+							className={cn(
+								"uppercase leading-none tracking-wider text-muted-foreground",
+								compact ? "text-[0.6rem]" : "text-[0.65rem]",
+							)}
+						>
+							Coverage
 						</span>
 					</div>
 				</div>
@@ -187,28 +297,52 @@ export function SubjectCard({
 					<div
 						className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 sm:gap-x-5"
 						role="group"
-						aria-label="Subject progress"
+						aria-label="Practice stats"
 					>
-						<span className="border-b border-border/50 py-2 text-xs text-muted-foreground sm:text-[0.8125rem]">
-							Topics
-						</span>
-						<span className="border-b border-border/50 py-2 text-right text-sm font-medium tabular-nums text-foreground sm:text-[0.9375rem]">
-							{topicsAttempted} / {topicsTotal}
-						</span>
-						<span className="border-b border-border/50 py-2 text-xs text-muted-foreground sm:text-[0.8125rem]">
-							Tests taken
-						</span>
-						<span className="border-b border-border/50 py-2 text-right text-sm font-medium tabular-nums text-foreground sm:text-[0.9375rem]">
-							{testsTaken}
-						</span>
-						<span className="py-2 text-xs text-muted-foreground sm:text-[0.8125rem]">Avg score</span>
 						<span
 							className={cn(
-								"py-2 text-right text-sm font-medium tabular-nums sm:text-[0.9375rem]",
-								config.scoreColor,
+								"border-b border-border/50 text-xs text-muted-foreground sm:text-[0.8125rem]",
+								compact ? "py-1.5" : "py-2",
 							)}
 						>
-							{avgScore}%
+							Topics
+						</span>
+						<span
+							className={cn(
+								"border-b border-border/50 text-right text-sm font-medium tabular-nums text-foreground sm:text-[0.9375rem]",
+								compact ? "py-1.5" : "py-2",
+							)}
+						>
+							{topicsAttempted} / {topicsTotal}
+						</span>
+						<span
+							className={cn(
+								"border-b border-border/50 text-xs text-muted-foreground sm:text-[0.8125rem]",
+								compact ? "py-1.5" : "py-2",
+							)}
+						>
+							Tests taken
+						</span>
+						<span
+							className={cn(
+								"border-b border-border/50 text-right text-sm font-medium tabular-nums text-foreground sm:text-[0.9375rem]",
+								compact ? "py-1.5" : "py-2",
+							)}
+						>
+							{testsTaken}
+						</span>
+						<span className={cn("text-xs text-muted-foreground sm:text-[0.8125rem]", compact ? "py-1.5" : "py-2")}>
+							Avg score
+						</span>
+						<span
+							className={cn(
+								"text-right text-sm font-medium tabular-nums sm:text-[0.9375rem]",
+								compact ? "py-1.5" : "py-2",
+								config.scoreColor,
+							)}
+							aria-label={avgScoreAria}
+						>
+							{showScorePercent ? `${avgScore}%` : "—"}
 						</span>
 					</div>
 				</div>
@@ -220,7 +354,7 @@ export function SubjectCard({
 					size="sm"
 					onClick={ctaRender ? undefined : onCtaClick}
 					render={ctaRender}
-					className={cn(dashboardSubjectCardCtaClassName, "mt-3 w-full")}
+					className={cn(dashboardSubjectCardCtaClassName, "mt-auto w-full shrink-0")}
 				>
 					{ctaLabel ?? config.defaultCta}
 				</Button>

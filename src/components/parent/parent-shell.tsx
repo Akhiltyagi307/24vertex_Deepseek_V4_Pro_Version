@@ -51,6 +51,7 @@ export function ParentShell({
 				organizationName={organizationName}
 				userDisplayName={childDisplayName}
 				shareableId={childLinkCode}
+				headerPortal="parent"
 			/>
 			<div
 				className={cn(

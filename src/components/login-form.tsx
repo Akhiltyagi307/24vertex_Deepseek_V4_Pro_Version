@@ -82,10 +82,10 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 			{...props}
 		>
 			<FieldGroup>
-				<div className="flex flex-col items-center gap-1 text-center">
-					<h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-					<p className="text-sm text-balance text-muted-foreground">
-						Sign in with the email and password you used when you registered for EduAI.
+				<div className="flex flex-col items-center gap-2 text-center">
+					<h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+					<p className="max-w-[42ch] text-balance text-sm leading-relaxed text-muted-foreground">
+						Use the same email and password you chose when you registered.
 					</p>
 				</div>
 				<AnimateFormAlert show={Boolean(emailVerified)} motionKey="login-email-verified">
@@ -109,7 +109,7 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 						id="email"
 						name="email"
 						type="email"
-						placeholder="m@example.com"
+						placeholder="you@example.com"
 						autoComplete="email"
 						required
 					/>
@@ -119,9 +119,9 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 						<FieldLabel htmlFor="password">Password</FieldLabel>
 						<Link
 							href="/forgot-password"
-							className="ml-auto text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+							className="ml-auto min-h-9 shrink-0 content-center text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
 						>
-							Forgot your password?
+							Forgot password?
 						</Link>
 					</div>
 					<Input
@@ -133,15 +133,15 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 					/>
 				</Field>
 				<Field>
-					<Button type="submit" className="w-full" disabled={pending}>
-						{pending ? "Please wait…" : "Log in"}
+					<Button type="submit" className="h-11 w-full text-base font-semibold" disabled={pending}>
+						{pending ? "Signing in…" : "Log in"}
 					</Button>
 				</Field>
-				<FieldDescription className="text-center text-muted-foreground">
-					No account?{" "}
+				<FieldDescription className="text-center text-sm text-muted-foreground">
+					No account yet?{" "}
 					<Link
 						href="/signup/role-picker"
-						className="text-foreground underline underline-offset-4 hover:text-foreground"
+						className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
 					>
 						Sign up
 					</Link>

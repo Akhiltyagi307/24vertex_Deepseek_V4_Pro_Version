@@ -9,13 +9,12 @@ import { motion, useReducedMotion } from "framer-motion";
 import { pageHeaderSubtextScrollClass, pageHeaderSubtextTextClass } from "@/components/student/page-header-subtext";
 import { SubjectCard, subjectStatusLabelToDashboardStatus } from "@/components/student/dashboard-subject-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
+	CardAction,
 	CardContent,
 	CardDescription,
-	CardFooter,
 	CardHeader,
 	CardTitle,
 	cardSurfaceFrameClassName,
@@ -98,6 +97,58 @@ function formatMinutesLabel(minutes: number): string {
 	return rem === 0 ? `${hours}h` : `${hours}h ${rem}m`;
 }
 
+function averageScorePrimaryDisplay(
+	average: number | null,
+	isParent: boolean,
+): { value: string; caption: string } {
+	if (average != null) {
+		return {
+			value: `${average}%`,
+			caption: isParent ? "From their graded tests in the last 30 days" : "From graded tests in the last 30 days",
+		};
+	}
+	return {
+		value: isParent ? "Not yet" : "Waiting",
+		caption: isParent
+			? "Their first graded test in this window unlocks a rolling average."
+			: "Complete a graded test to unlock your rolling average.",
+	};
+}
+
+function testsCompletedCaption(count: number, isParent: boolean): string {
+	if (count > 0) {
+		return isParent ? "Tests finished or graded for them" : "Tests you’ve finished or that are graded";
+	}
+	return isParent
+		? "Their first finished test will show up here."
+		: "Finish a test to watch this number climb.";
+}
+
+function timePracticingCaption(minutes: number, isParent: boolean): string {
+	if (minutes > 0) {
+		return isParent ? "Time they spent in timed tests, last 30 days" : "Time in timed tests, last 30 days";
+	}
+	return isParent
+		? "Timed minutes from the last 30 days appear here once they start."
+		: "Timed minutes stack here as you put in focused sessions.";
+}
+
+function topicProgressMotivation(
+	mastered: number,
+	needsWork: number,
+	isParent: boolean,
+): string | null {
+	if (needsWork <= 0) return null;
+	if (mastered === 0) {
+		return isParent
+			? "Each session they finish moves more of these toward on target."
+			: "Pick a subject below; each session you finish moves topics toward solid.";
+	}
+	return isParent
+		? "Extra practice still lifts the topics that are not on target yet."
+		: "Keep going; every revisit chips away at what is still building.";
+}
+
 function formatDurationLabel(seconds: number | null): string {
 	if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return "No duration logged";
 	const roundedMinutes = Math.max(1, Math.round(seconds / 60));
@@ -165,6 +216,13 @@ export function StudentDashboardView({
 		[subjectCards],
 	);
 
+	const averageScoreDisplay = averageScorePrimaryDisplay(performanceStats.averageScoreLast30Days, isParent);
+	const topicProgressBlurb = topicProgressMotivation(
+		performanceStats.topicsMasteredCount,
+		performanceStats.topicsNeedingImprovementCount,
+		isParent,
+	);
+
 	return (
 		<div className="flex flex-col gap-8 p-6">
 			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
@@ -190,92 +248,107 @@ export function StudentDashboardView({
 					At a glance
 				</h2>
 				<motion.div
-					className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+					className="grid gap-5 md:grid-cols-12 md:items-stretch"
 					initial="hidden"
 					animate="show"
 					variants={container}
 				>
-					<motion.div variants={item}>
-						<Card className="shadow-none">
-							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-								<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Tests completed</CardTitle>
-								<ActivityIcon
-									className="size-8 shrink-0 text-sky-600 dark:text-sky-400"
-									strokeWidth={2}
-									aria-hidden
-								/>
+					<motion.div className="flex min-h-0 min-w-0 md:col-span-8" variants={item}>
+						<Card className="h-full w-full min-w-0 shadow-none">
+							<CardHeader className="pb-2">
+								<CardTitle className="text-sm font-semibold leading-snug">
+									{isParent ? "Their practice signals" : "Practice signals"}
+								</CardTitle>
+								<CardDescription className="text-xs leading-snug">
+									Tests, timed minutes, and scores (averages use the last 30 days).
+								</CardDescription>
 							</CardHeader>
-							<CardContent>
-								<p className="font-semibold text-2xl tabular-nums">{performanceStats.testsCompleted}</p>
-								<p className="text-muted-foreground text-xs">
-									{isParent
-										? "Tests finished or graded for them"
-										: "Tests you’ve finished or that are graded"}
-								</p>
+							<CardContent className="grid gap-5 sm:grid-cols-3">
+								<div className="flex min-w-0 flex-col gap-2">
+									<div className="flex items-center gap-2">
+										<ActivityIcon
+											className="size-5 shrink-0 text-sky-600 dark:text-sky-400"
+											strokeWidth={2}
+											aria-hidden
+										/>
+										<span className="text-muted-foreground text-xs font-medium leading-snug">
+											Tests completed
+										</span>
+									</div>
+									<p className="font-semibold text-2xl tabular-nums text-foreground">
+										{performanceStats.testsCompleted}
+									</p>
+									<p className="text-muted-foreground text-xs leading-snug">
+										{testsCompletedCaption(performanceStats.testsCompleted, isParent)}
+									</p>
+								</div>
+								<div className="flex min-w-0 flex-col gap-2">
+									<div className="flex items-center gap-2">
+										<FlameIcon
+											className="size-5 shrink-0 text-orange-600 dark:text-orange-400"
+											strokeWidth={2}
+											aria-hidden
+										/>
+										<span className="text-muted-foreground text-xs font-medium leading-snug">
+											Time practicing
+										</span>
+									</div>
+									<p className="font-semibold text-2xl tabular-nums text-foreground">
+										{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
+									</p>
+									<p className="text-muted-foreground text-xs leading-snug">
+										{timePracticingCaption(performanceStats.timeSpentMinutesLast30Days, isParent)}
+									</p>
+								</div>
+								<div className="flex min-w-0 flex-col gap-2">
+									<div className="flex items-center gap-2">
+										<LineChartIcon
+											className="size-5 shrink-0 text-violet-600 dark:text-violet-400"
+											strokeWidth={2}
+											aria-hidden
+										/>
+										<span className="text-muted-foreground text-xs font-medium leading-snug">
+											Average score
+										</span>
+									</div>
+									<p className="font-semibold text-2xl tabular-nums text-foreground">{averageScoreDisplay.value}</p>
+									<p className="text-muted-foreground text-xs leading-snug">{averageScoreDisplay.caption}</p>
+								</div>
 							</CardContent>
 						</Card>
 					</motion.div>
-					<motion.div variants={item}>
-						<Card className="shadow-none">
-							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-								<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Average score</CardTitle>
-								<LineChartIcon
-									className="size-8 shrink-0 text-violet-600 dark:text-violet-400"
-									strokeWidth={2}
-									aria-hidden
-								/>
+					<motion.div className="flex min-h-0 min-w-0 md:col-span-4" variants={item}>
+						<Card className="h-full w-full min-w-0 shadow-none">
+							<CardHeader className="pb-2">
+								<CardTitle className="text-sm font-semibold leading-snug">Topic progress</CardTitle>
+								<CardAction>
+									<BookOpenIcon
+										className="size-7 text-subject-grid-icon"
+										strokeWidth={2}
+										aria-hidden
+									/>
+								</CardAction>
 							</CardHeader>
-							<CardContent>
-								<p className="font-semibold text-2xl tabular-nums">
-									{performanceStats.averageScoreLast30Days != null
-										? `${performanceStats.averageScoreLast30Days}%`
-										: "—"}
-								</p>
-								<p className="text-muted-foreground text-xs">
-									{isParent ? "From their graded tests in the last 30 days" : "From graded tests in the last 30 days"}
-								</p>
-							</CardContent>
-						</Card>
-					</motion.div>
-					<motion.div variants={item}>
-						<Card className="shadow-none">
-							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-								<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Topic mastery</CardTitle>
-								<BookOpenIcon
-									className="size-8 shrink-0 text-subject-grid-icon"
-									strokeWidth={2}
-									aria-hidden
-								/>
-							</CardHeader>
-							<CardContent>
-								<p className="font-semibold text-2xl tabular-nums">
-									{performanceStats.topicsMasteredCount}
-								</p>
-								<p className="text-muted-foreground text-xs tabular-nums">
-									{isParent
-										? `${performanceStats.topicsNeedingImprovementCount} topics they could strengthen`
-										: `${performanceStats.topicsNeedingImprovementCount} topics to revisit`}
-								</p>
-							</CardContent>
-						</Card>
-					</motion.div>
-					<motion.div variants={item}>
-						<Card className="shadow-none">
-							<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-								<CardTitle className="min-w-0 flex-1 font-medium text-sm">Time practicing</CardTitle>
-								<FlameIcon
-									className="size-8 shrink-0 text-orange-600 dark:text-orange-400"
-									strokeWidth={2}
-									aria-hidden
-								/>
-							</CardHeader>
-							<CardContent>
-								<p className="font-semibold text-2xl tabular-nums">
-									{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
-								</p>
-								<p className="text-muted-foreground text-xs">
-									{isParent ? "Time they spent in timed tests, last 30 days" : "Time in timed tests, last 30 days"}
-								</p>
+							<CardContent className="flex flex-1 flex-col gap-4">
+								<dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+									<div className="min-w-0">
+										<dt className="text-muted-foreground text-xs font-medium leading-snug">
+											{isParent ? "On target" : "Solid"}
+										</dt>
+										<dd className="font-semibold text-2xl tabular-nums text-foreground">
+											{performanceStats.topicsMasteredCount}
+										</dd>
+									</div>
+									<div className="min-w-0">
+										<dt className="text-muted-foreground text-xs font-medium leading-snug">Still building</dt>
+										<dd className="font-semibold text-2xl tabular-nums text-foreground">
+											{performanceStats.topicsNeedingImprovementCount}
+										</dd>
+									</div>
+								</dl>
+								{topicProgressBlurb ? (
+									<p className="mt-auto text-muted-foreground text-xs font-medium leading-snug">{topicProgressBlurb}</p>
+								) : null}
 							</CardContent>
 						</Card>
 					</motion.div>
@@ -350,7 +423,7 @@ export function StudentDashboardView({
 
 											return (
 												<motion.div key={s.subjectId} className="min-h-0" variants={item}>
-													{!hasAttempts ? (
+													{													!hasAttempts ? (
 														<SubjectCard
 															subject={s.subjectName}
 															lastTestDate=""
@@ -363,7 +436,7 @@ export function StudentDashboardView({
 															topicsTotal={s.topicTotal}
 															testsTaken={0}
 															avgScore={0}
-															status="in_progress"
+															status="ready_to_start"
 															ctaLabel={isParent ? "View performance" : "Start focus session"}
 															ctaRender={<Link href={s.practiceHref} />}
 															metricsIconSlot={subjectIcon}
@@ -399,7 +472,7 @@ export function StudentDashboardView({
 											All subjects · {restSubjects.length}
 										</p>
 									)}
-									<div className={cn(cardSurfaceFrameClassName, "overflow-hidden p-[22px]")}>
+									<div className={cn(cardSurfaceFrameClassName, "overflow-hidden p-5")}>
 										<DashboardOtherSubjectsTable
 											subjects={restSubjects}
 											motionContainer={container}

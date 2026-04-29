@@ -18,8 +18,8 @@ import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
 function SubmitForgotButton() {
 	const { pending } = useFormStatus();
 	return (
-		<Button type="submit" className="w-full" disabled={pending}>
-			{pending ? "Please wait…" : "Send reset link"}
+		<Button type="submit" className="h-11 w-full text-base font-semibold" disabled={pending}>
+			{pending ? "Sending…" : "Send reset link"}
 		</Button>
 	);
 }
@@ -30,10 +30,10 @@ export default function ForgotPasswordPage() {
 	return (
 		<form action={formAction} className="flex flex-col gap-6">
 			<FieldGroup>
-				<div className="flex flex-col items-center gap-1 text-center">
-					<h1 className="text-2xl font-semibold tracking-tight">Reset password</h1>
-					<p className="text-sm text-balance text-muted-foreground">
-						We will email you a link to choose a new password.
+				<div className="flex flex-col items-center gap-2 text-center">
+					<h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
+					<p className="max-w-[40ch] text-balance text-sm leading-relaxed text-muted-foreground">
+						We will email you a secure link to choose a new password.
 					</p>
 				</div>
 				<AnimateFormAlert show={Boolean(state.error)} motionKey="forgot-error">
@@ -46,8 +46,8 @@ export default function ForgotPasswordPage() {
 					<Alert>
 						<AlertTitle>Check your email</AlertTitle>
 						<AlertDescription>
-							If an account exists for that email, you will receive a reset link
-							shortly.
+							If that address is on file, a reset link is on the way. Check spam if nothing
+							arrives within a few minutes.
 						</AlertDescription>
 					</Alert>
 				</AnimateFormAlert>
@@ -59,6 +59,7 @@ export default function ForgotPasswordPage() {
 								id="email"
 								name="email"
 								type="email"
+								placeholder="you@example.com"
 								required
 								autoComplete="email"
 							/>
@@ -68,10 +69,10 @@ export default function ForgotPasswordPage() {
 						</Field>
 					</>
 				) : null}
-				<FieldDescription className="text-center text-muted-foreground">
+				<FieldDescription className="text-center text-sm text-muted-foreground">
 					<Link
 						href="/login"
-						className="text-foreground underline underline-offset-4 hover:text-foreground"
+						className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
 					>
 						Back to log in
 					</Link>

@@ -26,7 +26,10 @@ export function PriceDisplay({ amountPaise, period, compareAtPaise, className }:
 				<span className="font-heading text-3xl font-semibold tracking-tight tabular-nums text-foreground md:text-4xl">
 					{`\u20B9\u00A0${formatRupeeAmount(amountPaise)}`}
 				</span>
-				<span className="text-sm text-muted-foreground">/ {period}</span>
+				<span className="text-sm text-muted-foreground">
+					<span className="sr-only">per </span>
+					/ {period}
+				</span>
 			</div>
 			{showCompare ? (
 				<div className="flex flex-wrap items-center gap-2">
