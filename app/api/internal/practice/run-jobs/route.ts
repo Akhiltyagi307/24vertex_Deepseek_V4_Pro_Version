@@ -6,6 +6,7 @@ import {
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { pLimit } from "@/lib/practice/ai-retry";
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
+import { logPracticeObs } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -144,6 +145,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 	const url = new URL(request.url);
 	const limit = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get("limit") ?? "5", 10) || 5));
 	const workerId = `vercel-${process.env.VERCEL_REGION ?? "local"}-${crypto.randomUUID().slice(0, 8)}`;
+	const workerStarted = Date.now();
 
 	const admin = createServiceRoleClient();
 
@@ -201,6 +203,17 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 		jobWorkerConcurrency,
 		claimed.map((job) => () => processOne(job)),
 	);
+
+	const nOk = results.filter((r) => r.ok).length;
+	logPracticeObs({
+		phase: "practice_jobs_worker",
+		workerId,
+		claimed: claimed.length,
+		processed: results.length,
+		succeeded: nOk,
+		failed: results.length - nOk,
+		durationMs: Date.now() - workerStarted,
+	});
 
 	return Response.json({ ok: true, processed: results.length, results });
 }

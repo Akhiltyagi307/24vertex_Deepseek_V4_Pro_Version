@@ -11,7 +11,24 @@ import { createClient } from "@/lib/supabase/server";
  * Add columns here when a server route needs more fields from the same row.
  */
 export const CACHED_APP_PROFILE_SELECT =
-	"id, role, is_verified, full_name, school_name, avatar_url, grade, section, student_link_code, stream, elective_subject_id, phone, parent_email, parent_name, created_at" as const;
+	"id, role, is_verified, full_name, school_name, avatar_url, phone, grade, section, student_link_code, stream, elective_subject_id, parent_email, parent_name, created_at" as const;
+const CACHED_APP_PROFILE_SELECT_FALLBACK =
+	"id, role, is_verified, full_name, school_name, avatar_url, grade, section, student_link_code, stream, elective_subject_id, parent_email, parent_name, created_at" as const;
+
+function isMissingProfileColumnError(error: {
+	message: string;
+	code?: string;
+	details?: string | null;
+	hint?: string | null;
+} | null): boolean {
+	if (!error) return false;
+	if (error.code === "42703") return true;
+	const blob = [error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
+	return (
+		(blob.includes("column") && (blob.includes("does not exist") || blob.includes("undefined column"))) ||
+		(blob.includes("could not find") && blob.includes("column") && blob.includes("schema cache"))
+	);
+}
 
 export type AppProfileRow = {
 	id: string;
@@ -20,12 +37,12 @@ export type AppProfileRow = {
 	full_name: string;
 	school_name: string | null;
 	avatar_url: string | null;
+	phone: string | null;
 	grade: number | null;
 	section: string | null;
 	student_link_code: string | null;
 	stream: string | null;
 	elective_subject_id: string | null;
-	phone: string | null;
 	parent_email: string | null;
 	parent_name: string | null;
 	created_at: string | null;
@@ -41,6 +58,22 @@ export const getCachedAppProfileRow = cache(async (): Promise<AppProfileRow | nu
 		.select(CACHED_APP_PROFILE_SELECT)
 		.eq("id", user.id)
 		.maybeSingle();
+
+	if (error && isMissingProfileColumnError(error)) {
+		const { data: fallbackData, error: fallbackError } = await supabase
+			.from("profiles")
+			.select(CACHED_APP_PROFILE_SELECT_FALLBACK)
+			.eq("id", user.id)
+			.maybeSingle();
+		if (fallbackError) {
+			logSupabaseError("getCachedAppProfileRow.profiles.select_fallback", fallbackError, {
+				userId: user.id,
+			});
+			return null;
+		}
+		if (!fallbackData) return null;
+		return { ...fallbackData, phone: null } as AppProfileRow;
+	}
 
 	if (error) {
 		logSupabaseError("getCachedAppProfileRow.profiles.select", error, { userId: user.id });

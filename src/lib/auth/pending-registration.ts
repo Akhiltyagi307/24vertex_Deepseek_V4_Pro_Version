@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { z } from "zod";
 import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
+import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
 import { getProfile } from "@/lib/auth/routing";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
@@ -27,6 +28,7 @@ export type ConsumePendingRegistrationResult =
 	| "completed_profile"
 	| "no_pending"
 	| "failed"
+	| "failed_unsupported_teacher_signup"
 	| "failed_parent_email_mismatch"
 	| "failed_student_not_found";
 
@@ -49,6 +51,7 @@ type ParsedPending = z.infer<typeof pendingEnvelopeSchema>;
 type PendingParseResult =
 	| { status: "ok"; envelope: ParsedPending }
 	| { status: "none" }
+	| { status: "unsupported_teacher_signup" }
 	| { status: "failed" };
 
 /**
@@ -86,6 +89,14 @@ function parsePendingEnvelopeFromUser(user: User): PendingParseResult {
 
 	const parsed = pendingEnvelopeSchema.safeParse(json);
 	if (!parsed.success) {
+		const roleProbe = z
+			.object({
+				role: z.string(),
+			})
+			.safeParse(json);
+		if (roleProbe.success && roleProbe.data.role === "teacher") {
+			return { status: "unsupported_teacher_signup" };
+		}
 		// If we stored a string, a bad payload is likely real corruption — surface the error flow.
 		// If Auth gave us an object that does not match (e.g. older shape), fall back like before.
 		return typeof raw === "string" ? { status: "failed" } : { status: "none" };
@@ -120,6 +131,9 @@ export async function consumePendingRegistration(
 	if (pending.status === "failed") {
 		return "failed";
 	}
+	if (pending.status === "unsupported_teacher_signup") {
+		return "failed_unsupported_teacher_signup";
+	}
 
 	const envelope = pending.envelope;
 	if (user.email?.toLowerCase() !== envelope.payload.email.toLowerCase()) {
@@ -128,16 +142,16 @@ export async function consumePendingRegistration(
 
 	if (envelope.role === "student") {
 		const v = envelope.payload;
-		const streamVal = v.grade >= 11 && v.grade <= 12 ? v.stream : null;
-		const electiveVal = v.grade >= 11 && v.grade <= 12 ? v.electiveSubjectId : null;
-		const { error: rpcError } = await supabase.rpc("register_student", {
-			p_full_name: v.fullName,
-			p_grade: v.grade,
-			p_section: v.section.trim(),
-			p_stream: streamVal,
-			p_elective_subject_id: electiveVal,
-			p_parent_name: v.parentName ?? null,
-			p_parent_email: v.parentEmail ?? null,
+		const streamVal = v.grade >= 11 && v.grade <= 12 ? (v.stream ?? null) : null;
+		const electiveVal = v.grade >= 11 && v.grade <= 12 ? (v.electiveSubjectId ?? null) : null;
+		const { error: rpcError } = await registerStudentViaRpc(supabase, {
+			fullName: v.fullName,
+			grade: v.grade,
+			section: v.section.trim(),
+			stream: streamVal,
+			electiveSubjectId: electiveVal,
+			parentName: v.parentName ?? null,
+			parentEmail: v.parentEmail ?? null,
 		});
 		if (rpcError) {
 			if (/profile already exists/i.test(rpcError.message)) {

@@ -5,6 +5,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { generateObject } from "ai";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { consumeTest } from "@/lib/billing/entitlements";
 import { getOpenAIChatModel } from "@/lib/env";
 import {
 	buildPracticeGradingSystemPrompt,
@@ -28,7 +29,9 @@ import {
 } from "@/lib/practice/student-answer-write";
 import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { PracticeGradingPdfDocument } from "@/lib/student/practice-grading-pdf-document";
+import { createPhaseTimer, logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
+import { withPracticeSpan } from "@/lib/practice/sentry-tags";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -159,11 +162,47 @@ export async function gradePracticeTestWithAi(
 	elapsedSeconds: number,
 	workerContext?: { jobId?: string },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+	const correlationId = newPracticeCorrelationId();
+	const ctx: { correlationId: string; jobId?: string } = {
+		correlationId,
+		jobId: workerContext?.jobId,
+	};
+	return withPracticeSpan(
+		"grade_practice_test",
+		{
+			test_id: testId,
+			job_id: ctx.jobId ?? "",
+			correlation_id: correlationId,
+		},
+		() => gradePracticeTestWithAiInner(userId, testId, elapsedSeconds, ctx),
+	);
+}
+
+async function gradePracticeTestWithAiInner(
+	userId: string,
+	testId: string,
+	elapsedSeconds: number,
+	ctx: { correlationId: string; jobId?: string },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const trace = {
+		correlationId: ctx.correlationId,
+		testId,
+		jobId: ctx.jobId ?? null,
+		started: Date.now(),
+		timingsMs: {} as Record<string, number>,
+		chunks: { count: 0, maxChunkMs: 0, totalChunkMs: 0 },
+		questionCount: 0,
+		ok: false,
+	};
+	const mark = createPhaseTimer(trace.started);
+
+	try {
 	const supabase = createServiceRoleClient();
 	const logFail = (reason: string, message: string) => {
 		logServerError(`gradePracticeTestWithAi.${reason}`, new Error(message), {
 			testId,
-			jobId: workerContext?.jobId,
+			jobId: ctx.jobId,
+			correlationId: ctx.correlationId,
 		});
 	};
 
@@ -178,7 +217,10 @@ export async function gradePracticeTestWithAi(
 
 	if (testErr || !testRow) {
 		if (testErr) {
-			logSupabaseError("gradePracticeTestWithAi.tests.select", testErr, { testId });
+			logSupabaseError("gradePracticeTestWithAi.tests.select", testErr, {
+				testId,
+				correlationId: ctx.correlationId,
+			});
 		} else {
 			logFail("testRowMissing", "Could not load test.");
 		}
@@ -207,12 +249,17 @@ export async function gradePracticeTestWithAi(
 	const { data: questions, error: qErr } = questionsRes;
 	if (qErr || !questions?.length) {
 		if (qErr) {
-			logSupabaseError("gradePracticeTestWithAi.questions.select", qErr, { testId });
+			logSupabaseError("gradePracticeTestWithAi.questions.select", qErr, {
+				testId,
+				correlationId: ctx.correlationId,
+			});
 		} else {
 			logFail("questionsEmpty", "Could not load questions.");
 		}
 		return { ok: false, message: "Could not load questions." };
 	}
+
+	trace.questionCount = questions.length;
 
 	const topicIds = [
 		...new Set(questions.map((q) => q.topic_id as string | null).filter((id): id is string => Boolean(id))),
@@ -226,7 +273,10 @@ export async function gradePracticeTestWithAi(
 
 	const { data: answerRows, error: aErr } = answersRes;
 	if (aErr) {
-		logSupabaseError("gradePracticeTestWithAi.student_answers.select", aErr, { testId });
+		logSupabaseError("gradePracticeTestWithAi.student_answers.select", aErr, {
+			testId,
+			correlationId: ctx.correlationId,
+		});
 		return { ok: false, message: "Could not load answers." };
 	}
 
@@ -251,14 +301,21 @@ export async function gradePracticeTestWithAi(
 
 	const systemPrompt = buildPracticeGradingSystemPrompt({ subjectName, requireMathSteps });
 
+	trace.timingsMs.loadData = mark();
+
 	const chunks = chunkArray(gradingInputs, CHUNK_SIZE);
+	trace.chunks.count = chunks.length;
 	const merged: GradedQuestionItem[] = [];
 
 	try {
 		const tasks = chunks.map((part, ci) => async () => {
+			const c0 = Date.now();
 			const label = `part ${ci + 1} of ${chunks.length} (${part.length} questions)`;
 			const userPrompt = buildPracticeGradingUserPrompt(label, part);
 			const { questions: graded } = await runGradingChunk(systemPrompt, userPrompt, part.length);
+			const chunkMs = Date.now() - c0;
+			trace.chunks.totalChunkMs += chunkMs;
+			if (chunkMs > trace.chunks.maxChunkMs) trace.chunks.maxChunkMs = chunkMs;
 			return graded;
 		});
 		const chunkResults = await pLimit(getGradingConcurrency(), tasks);
@@ -267,9 +324,14 @@ export async function gradePracticeTestWithAi(
 		}
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "AI grading failed.";
-		logServerError("gradePracticeTestWithAi.runGradingChunk", e, { testId });
+		logServerError("gradePracticeTestWithAi.runGradingChunk", e, {
+			testId,
+			correlationId: ctx.correlationId,
+		});
 		return { ok: false, message: msg.length > 200 ? `${msg.slice(0, 200)}…` : msg };
 	}
+
+	trace.timingsMs.aiChunks = mark();
 
 	const expectedIds = new Set(questions.map((q) => q.id as string));
 	const seen = new Set<string>();
@@ -288,6 +350,8 @@ export async function gradePracticeTestWithAi(
 		logFail("validationIncompleteQ", "AI did not return every question.");
 		return { ok: false, message: "AI did not return every question." };
 	}
+
+	trace.timingsMs.validateMerge = mark();
 
 	const byTopic = new Map<
 		string,
@@ -339,9 +403,15 @@ export async function gradePracticeTestWithAi(
 		});
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "Summary generation failed.";
-		logServerError("gradePracticeTestWithAi.runSummaryObject", e, { testId, jobId: workerContext?.jobId });
+		logServerError("gradePracticeTestWithAi.runSummaryObject", e, {
+			testId,
+			jobId: ctx.jobId,
+			correlationId: ctx.correlationId,
+		});
 		return { ok: false, message: msg };
 	}
+
+	trace.timingsMs.aiSummary = mark();
 
 	const nowIso = new Date().toISOString();
 
@@ -367,10 +437,13 @@ export async function gradePracticeTestWithAi(
 	if (batchAnswerErr) {
 		logSupabaseError("gradePracticeTestWithAi.student_answers.upsert", batchAnswerErr, {
 			testId,
+			correlationId: ctx.correlationId,
 		});
 		logFail("studentAnswersSave", "Could not save graded answers.");
 		return { ok: false, message: "Could not save graded answers." };
 	}
+
+	trace.timingsMs.persistAnswers = mark();
 
 	const topicPerformancePayload = {
 		schema_version: 1 as const,
@@ -402,10 +475,15 @@ export async function gradePracticeTestWithAi(
 	);
 
 	if (repErr) {
-		logSupabaseError("gradePracticeTestWithAi.test_reports.upsert", repErr, { testId });
+		logSupabaseError("gradePracticeTestWithAi.test_reports.upsert", repErr, {
+			testId,
+			correlationId: ctx.correlationId,
+		});
 		logFail("testReportsSave", "Could not save report.");
 		return { ok: false, message: "Could not save report." };
 	}
+
+	trace.timingsMs.testReports = mark();
 
 	if (topicRollups.length > 0) {
 		const { error: bulkTrackerErr } = await supabase.rpc("practice_update_trackers_bulk", {
@@ -422,11 +500,26 @@ export async function gradePracticeTestWithAi(
 		if (bulkTrackerErr) {
 			logSupabaseError("gradePracticeTestWithAi.practice_update_trackers_bulk", bulkTrackerErr, {
 				testId,
+				correlationId: ctx.correlationId,
+				topicItems: topicRollups.length,
 			});
 		}
 	}
 
+	trace.timingsMs.trackersBulk = mark();
+
 	const totalScoreStr = formatScoreEarnedForDb(overallPercent);
+
+	const billingAfter = await consumeTest(supabase, userId);
+	if (!billingAfter.ok) {
+		logServerError("gradePracticeTestWithAi.consumeTest", new Error(billingAfter.message), {
+			testId,
+			jobId: ctx.jobId,
+			correlationId: ctx.correlationId,
+			code: billingAfter.code,
+		});
+		return { ok: false, message: billingAfter.message };
+	}
 
 	const { error: testUpErr } = await supabase
 		.from("tests")
@@ -446,12 +539,32 @@ export async function gradePracticeTestWithAi(
 		.eq("student_id", userId);
 
 	if (testUpErr) {
-		logSupabaseError("gradePracticeTestWithAi.tests.update", testUpErr, { testId });
+		logSupabaseError("gradePracticeTestWithAi.tests.update", testUpErr, {
+			testId,
+			correlationId: ctx.correlationId,
+		});
 		logFail("testsFinalize", "Could not finalize test.");
 		return { ok: false, message: "Could not finalize test." };
 	}
 
+	trace.timingsMs.finalizeTest = mark();
+	trace.ok = true;
 	return { ok: true };
+	} finally {
+		logPracticeObs({
+			phase: "grade_pipeline",
+			correlationId: trace.correlationId,
+			testId: trace.testId,
+			jobId: trace.jobId,
+			ok: trace.ok,
+			durationMs: Date.now() - trace.started,
+			timingsMs: trace.timingsMs,
+			chunkCount: trace.chunks.count,
+			maxChunkMs: trace.chunks.maxChunkMs,
+			totalChunkMs: trace.chunks.totalChunkMs,
+			questionCount: trace.questionCount > 0 ? trace.questionCount : undefined,
+		});
+	}
 }
 
 export type BuildPracticeGradingReportPdfResult =

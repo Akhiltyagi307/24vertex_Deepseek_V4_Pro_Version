@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { UIMessage } from "ai";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -223,10 +224,10 @@ export async function loadDoubtTokenSummaryForConversation(conversationId: strin
 	};
 }
 
-export async function loadDoubtMessagesForConversation(
+export async function loadDoubtMessagesForConversationWithClient(
+	supabase: SupabaseClient,
 	conversationId: string,
 ): Promise<UIMessage[]> {
-	const supabase = await createClient();
 	const { data, error } = await supabase
 		.from("doubt_messages")
 		.select("id, role, content, created_at")
@@ -234,7 +235,7 @@ export async function loadDoubtMessagesForConversation(
 		.in("role", ["user", "assistant"])
 		.order("created_at", { ascending: true });
 	if (error) {
-		logSupabaseError("loadDoubtMessagesForConversation", error, { conversationId });
+		logSupabaseError("loadDoubtMessagesForConversationWithClient", error, { conversationId });
 		return [];
 	}
 	return (data ?? []).map((r) => {
@@ -251,4 +252,9 @@ export async function loadDoubtMessagesForConversation(
 			],
 		} satisfies UIMessage;
 	});
+}
+
+export async function loadDoubtMessagesForConversation(conversationId: string): Promise<UIMessage[]> {
+	const supabase = await createClient();
+	return loadDoubtMessagesForConversationWithClient(supabase, conversationId);
 }

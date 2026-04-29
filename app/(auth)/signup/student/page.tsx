@@ -4,10 +4,20 @@ import { StudentSignupForm } from "./student-form";
 
 export const dynamic = "force-dynamic";
 
+function isTransientFetchError(error: { message?: string } | null): boolean {
+	if (!error?.message) return false;
+	const msg = error.message.toLowerCase();
+	return msg.includes("fetch failed") || msg.includes("network");
+}
+
 export default async function StudentSignupPage() {
 	const supabase = await createClient();
 	/** Prefer batch RPC from `20260424150000_signup_batch_rpcs.sql`; fall back if migration not applied. */
-	const batch = await supabase.rpc("get_electives_for_signup");
+	let batch = await supabase.rpc("get_electives_for_signup");
+	if (isTransientFetchError(batch.error)) {
+		// Single immediate retry for transient network failures in local dev.
+		batch = await supabase.rpc("get_electives_for_signup");
+	}
 	let electives = batch.data ?? [];
 
 	if (batch.error?.code === "PGRST202") {
@@ -24,7 +34,7 @@ export default async function StudentSignupPage() {
 			seen.add(r.id);
 			return true;
 		});
-	} else if (batch.error) {
+	} else if (batch.error && !isTransientFetchError(batch.error)) {
 		logSupabaseError("StudentSignupPage.get_electives_for_signup", batch.error, {});
 	}
 

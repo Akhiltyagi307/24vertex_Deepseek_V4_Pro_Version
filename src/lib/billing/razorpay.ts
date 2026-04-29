@@ -178,24 +178,67 @@ export async function fetchInvoice(invoiceId: string): Promise<RazorpayInvoice> 
 // Webhook verification
 // ------------------------------------------------------------
 
+function razorpayWebhookSecretList(): string[] {
+	const primary = getRazorpayWebhookSecret();
+	const extraRaw = process.env.RAZORPAY_WEBHOOK_SECRET_EXTRA?.trim() ?? "";
+	const extras = extraRaw
+		? extraRaw
+				.split(",")
+				.map((s) => s.trim())
+				.filter((s) => s.length > 0)
+		: [];
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const s of [primary, ...extras]) {
+		if (!seen.has(s)) {
+			seen.add(s);
+			out.push(s);
+		}
+	}
+	return out;
+}
+
+function timingSafeEqualDigest(mac: Buffer, signatureUtf8: string): boolean {
+	const sig = signatureUtf8.trim();
+	if (!sig) return false;
+	// Razorpay: hex-encoded HMAC-SHA256 (64 hex chars).
+	if (/^[0-9a-fA-F]+$/.test(sig) && sig.length === mac.length * 2) {
+		try {
+			const asHex = Buffer.from(sig, "hex");
+			if (asHex.length === mac.length && crypto.timingSafeEqual(asHex, mac)) return true;
+		} catch {
+			/* invalid hex */
+		}
+	}
+	// Some stacks send base64(raw digest); compare with constant-time equality on raw bytes.
+	try {
+		const asB64 = Buffer.from(sig, "base64");
+		if (asB64.length === mac.length && crypto.timingSafeEqual(asB64, mac)) return true;
+	} catch {
+		/* invalid base64 */
+	}
+	return false;
+}
+
 /**
  * Verifies the `X-Razorpay-Signature` header against the raw request body
  * using HMAC-SHA256(webhookSecret). Returns true when valid.
  *
  * IMPORTANT: pass the raw body bytes (or the exact string from `req.text()`);
  * never serialize from a parsed JSON object because that loses whitespace.
+ *
+ * Optional `RAZORPAY_WEBHOOK_SECRET_EXTRA` (comma-separated) adds more signing keys
+ * for local/staging harnesses — never use guessable values on internet-reachable hosts.
  */
 export function verifyWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
-	if (!signatureHeader) return false;
-	const expected = crypto
-		.createHmac("sha256", getRazorpayWebhookSecret())
-		.update(rawBody)
-		.digest("hex");
+	if (!signatureHeader?.trim()) return false;
+
 	try {
-		const a = Buffer.from(expected);
-		const b = Buffer.from(signatureHeader);
-		if (a.length !== b.length) return false;
-		return crypto.timingSafeEqual(a, b);
+		for (const secret of razorpayWebhookSecretList()) {
+			const mac = crypto.createHmac("sha256", secret).update(rawBody).digest();
+			if (timingSafeEqualDigest(mac, signatureHeader)) return true;
+		}
+		return false;
 	} catch {
 		return false;
 	}

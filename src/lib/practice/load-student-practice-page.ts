@@ -49,9 +49,19 @@ async function loadPracticeProgressBySubject(
 	progressBySubjectId: Record<string, PracticeSubjectProgress>;
 	loadError: string | null;
 }> {
-	const { data, error } = await supabase.rpc("practice_subject_progress", {
-		p_student_id: studentId,
-	});
+	const callWithParam = () =>
+		supabase.rpc("practice_subject_progress", {
+			p_student_id: studentId,
+		});
+	const callWithAuthUid = () => supabase.rpc("practice_subject_progress");
+
+	let { data, error } = await callWithParam();
+	if (error?.code === "PGRST202") {
+		// Some DBs expose the same RPC with a different arg name; fallback to auth.uid().
+		const fallback = await callWithAuthUid();
+		data = fallback.data;
+		error = fallback.error;
+	}
 
 	if (error) {
 		logSupabaseError("loadPracticeProgressBySubject.practice_subject_progress", error, {

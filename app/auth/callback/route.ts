@@ -95,6 +95,16 @@ export async function GET(request: Request) {
 		return NextResponse.redirect(u);
 	}
 
+	if (pending === "failed_unsupported_teacher_signup") {
+		await supabase.auth.signOut();
+		const u = new URL("/login", origin);
+		u.searchParams.set(
+			"error",
+			"Teacher signup is no longer available. Please sign up as a student or parent.",
+		);
+		return NextResponse.redirect(u);
+	}
+
 	if (pending === "failed") {
 		await supabase.auth.signOut();
 		const u = new URL("/login", origin);

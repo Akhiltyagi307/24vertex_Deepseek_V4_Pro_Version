@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { studentSignupSchema } from "@/lib/validations/auth";
 
@@ -50,17 +51,17 @@ export async function completeStudentRegistration(
 		return { error: "Email does not match the signed-in account." };
 	}
 
-	const streamVal = v.grade >= 11 && v.grade <= 12 ? v.stream : null;
-	const electiveVal = v.grade >= 11 && v.grade <= 12 ? v.electiveSubjectId : null;
+	const streamVal = v.grade >= 11 && v.grade <= 12 ? (v.stream ?? null) : null;
+	const electiveVal = v.grade >= 11 && v.grade <= 12 ? (v.electiveSubjectId ?? null) : null;
 
-	const { error: rpcError } = await supabase.rpc("register_student", {
-		p_full_name: v.fullName,
-		p_grade: v.grade,
-		p_section: v.section.trim(),
-		p_stream: streamVal,
-		p_elective_subject_id: electiveVal,
-		p_parent_name: v.parentName ?? null,
-		p_parent_email: v.parentEmail ?? null,
+	const { error: rpcError } = await registerStudentViaRpc(supabase, {
+		fullName: v.fullName,
+		grade: v.grade,
+		section: v.section.trim(),
+		stream: streamVal,
+		electiveSubjectId: electiveVal,
+		parentName: v.parentName ?? null,
+		parentEmail: v.parentEmail ?? null,
 	});
 
 	if (rpcError) {

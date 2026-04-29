@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { cancelSubscription } from "@/lib/billing/razorpay";
+import { isCouponSingleUseGlobalExhausted } from "@/lib/billing/coupon-policy";
 import { PLAN_CATALOG, tokenQuotaForGrade } from "@/lib/billing/plans";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -113,21 +114,18 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		return { ok: false, code: "exhausted", message: "This coupon has been fully redeemed." };
 	}
 
-	const { data: already } = await admin
+	const { data: alreadyAny } = await admin
 		.from("coupon_redemptions")
-		.select("id")
+		.select("id, profile_id")
 		.eq("coupon_id", coupon.id)
-		.eq("profile_id", targetProfileId)
 		.maybeSingle();
-	if (already) {
-		return {
-			ok: false,
-			code: "already_redeemed",
-			message:
-				targetProfileId === user.id
-					? "You have already redeemed this coupon."
-					: "This student has already redeemed this coupon.",
-		};
+	if (
+		isCouponSingleUseGlobalExhausted({
+			redemptionsCount: coupon.redemptions_count,
+			anyRedemptionExists: Boolean(alreadyAny),
+		})
+	) {
+		return { ok: false, code: "exhausted", message: "This coupon has already been redeemed." };
 	}
 
 	const { data: sub } = await admin
@@ -155,77 +153,50 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		.eq("id", targetProfileId)
 		.maybeSingle();
 
-	const now = new Date();
-	const end = new Date(now.getTime() + coupon.duration_days * 86_400_000);
-
-	let subId = sub?.id;
-	if (!subId) {
-		const { data: newSub, error: insErr } = await admin
-			.from("subscriptions")
-			.insert({
-				profile_id: targetProfileId,
-				plan_code: grant,
-				status: "coupon",
-				current_period_start: now.toISOString(),
-				current_period_end: end.toISOString(),
-			})
-			.select("id")
-			.single();
-		if (insErr || !newSub) {
-			logSupabaseError("billing.redeem_coupon.insert_sub", insErr, { profileId: targetProfileId });
-			return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
-		}
-		subId = newSub.id;
-	} else {
-		const { error: updErr } = await admin
-			.from("subscriptions")
-			.update({
-				plan_code: grant,
-				status: "coupon",
-				current_period_start: now.toISOString(),
-				current_period_end: end.toISOString(),
-				cancel_at_period_end: false,
-				updated_at: now.toISOString(),
-			})
-			.eq("id", subId);
-		if (updErr) {
-			logSupabaseError("billing.redeem_coupon.update_sub", updErr, { profileId: targetProfileId });
-			return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
-		}
-	}
-
-	await admin.from("usage_periods").upsert(
-		{
-			subscription_id: subId,
-			profile_id: targetProfileId,
-			period_start: now.toISOString(),
-			period_end: end.toISOString(),
-			tests_quota: plan.testsPerPeriod,
-			tests_used: 0,
-			tokens_quota: tokenQuotaForGrade(plan, profile?.grade ?? null),
-			tokens_used: 0,
-		},
-		{ onConflict: "subscription_id,period_start" },
-	);
-
-	// Single-use enforcement via UPDATE...WHERE so we never double-increment.
-	const { data: incResult, error: incErr } = await admin
-		.from("coupons")
-		.update({ redemptions_count: coupon.redemptions_count + 1 })
-		.eq("id", coupon.id)
-		.eq("redemptions_count", coupon.redemptions_count)
-		.select("id")
-		.maybeSingle();
-	if (incErr || !incResult) {
-		// Another concurrent redeem bumped the counter; retry-friendly.
-		return { ok: false, code: "exhausted", message: "This coupon was just fully redeemed. Please try another." };
-	}
-
-	await admin.from("coupon_redemptions").insert({
-		coupon_id: coupon.id,
-		profile_id: targetProfileId,
-		subscription_id: subId ?? null,
+	const { data: redeemRows, error: redeemErr } = await admin.rpc("billing_redeem_coupon_atomic", {
+		p_coupon_id: coupon.id,
+		p_profile_id: targetProfileId,
+		p_plan_code: grant,
+		p_duration_days: coupon.duration_days,
+		p_tests_quota: plan.testsPerPeriod,
+		p_tokens_quota: tokenQuotaForGrade(plan, profile?.grade ?? null),
 	});
+	if (redeemErr) {
+		logSupabaseError("billing.redeem_coupon.atomic_rpc", redeemErr, {
+			profileId: targetProfileId,
+			couponId: coupon.id,
+		});
+		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
+	}
+	const redeemRow = Array.isArray(redeemRows) ? redeemRows[0] : redeemRows;
+	if (!redeemRow?.ok) {
+		const errorCode = String(redeemRow?.error_code ?? "database_error");
+		if (errorCode === "invalid_code") return { ok: false, code: "invalid_code", message: INVALID };
+		if (errorCode === "inactive") return { ok: false, code: "inactive", message: "This coupon is no longer active." };
+		if (errorCode === "expired") return { ok: false, code: "expired", message: "This coupon has expired." };
+		if (errorCode === "exhausted") return { ok: false, code: "exhausted", message: "This coupon has been fully redeemed." };
+		if (errorCode === "already_redeemed") {
+			return {
+				ok: false,
+				code: "already_redeemed",
+				message:
+					targetProfileId === user.id
+						? "You have already redeemed this coupon."
+						: "This student has already redeemed this coupon.",
+			};
+		}
+		if (errorCode === "blocked_paid") {
+			return {
+				ok: false,
+				code: "blocked_paid",
+				message:
+					targetProfileId === user.id
+						? "You already have an active paid subscription. Cancel it first to redeem this coupon."
+						: "This student already has an active paid subscription. Cancel it first to redeem this coupon.",
+			};
+		}
+		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
+	}
 
 	void recordPracticeEvent(
 		supabase,

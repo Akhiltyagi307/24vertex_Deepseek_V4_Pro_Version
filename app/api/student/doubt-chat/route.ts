@@ -10,6 +10,7 @@ import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeDoubtChatRateLimit } from "@/lib/practice/practice-rate-limit";
 import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
+import { loadDoubtMessagesForConversationWithClient } from "@/lib/doubt/loaders";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 120;
@@ -142,7 +143,8 @@ export async function POST(req: Request) {
 		});
 	}
 
-	const forModel = messages.map((m) => {
+	const threadFromDb = await loadDoubtMessagesForConversationWithClient(supabase, conversationId);
+	const forModel = threadFromDb.map((m) => {
 		const { id: _i, ...rest } = m;
 		return rest;
 	}) as UIMessage[];

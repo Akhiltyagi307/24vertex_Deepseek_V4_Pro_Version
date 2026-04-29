@@ -6,6 +6,7 @@ import { loadDoubtTopicRows, type DoubtChatTopicRow } from "@/lib/doubt/loaders"
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
 import { getOpenAIChatModel } from "@/lib/env";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { getStudentSubjectsRpc } from "@/lib/student/get-student-subjects-rpc";
 import { createClient } from "@/lib/supabase/server";
 
 const createSchema = z.object({
@@ -94,7 +95,7 @@ export async function getDoubtTopicsForSubjectAction(input: unknown): Promise<Lo
 		return { ok: false, code: "not_student", message: "This action is only for students with a complete profile." };
 	}
 
-	const { data: subjectRpcRows, error: rpcErr } = await supabase.rpc("get_student_subjects", {
+	const { data: subjectRpcRows, error: rpcErr } = await getStudentSubjectsRpc<{ id: string }>(supabase, {
 		p_grade: profileRow.grade,
 		p_stream: profileRow.stream,
 		p_elective_id: profileRow.elective_subject_id,

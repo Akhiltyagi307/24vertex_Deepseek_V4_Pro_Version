@@ -13,6 +13,17 @@ import { createClient } from "@/lib/supabase/client";
 import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
 import { parentSignupSchema } from "@/lib/validations/auth";
 
+function resolveEmailRedirectTo(): string {
+	try {
+		return `${getAppUrl()}/auth/callback`;
+	} catch (error) {
+		if (typeof window !== "undefined" && window.location.origin) {
+			return `${window.location.origin}/auth/callback`;
+		}
+		throw error;
+	}
+}
+
 export default function ParentSignupPage() {
 	const [state, setState] = useState<ParentSignupState>({});
 	const [pending, setPending] = useState(false);
@@ -39,9 +50,10 @@ export default function ParentSignupPage() {
 		fd.delete("confirmPassword");
 		let emailRedirectTo: string;
 		try {
-			emailRedirectTo = `${getAppUrl()}/auth/callback`;
-		} catch {
-			setState({ error: "Account setup is unavailable until the app URL is configured." });
+			emailRedirectTo = resolveEmailRedirectTo();
+		} catch (error) {
+			const details = error instanceof Error ? ` (${error.message})` : "";
+			setState({ error: `Account setup is unavailable until the app URL is configured.${details}` });
 			setPending(false);
 			return;
 		}

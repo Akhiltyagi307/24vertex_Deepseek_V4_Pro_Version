@@ -131,7 +131,7 @@ export function getRazorpayWebhookSecret(): string {
 export function getPublicRazorpayKeyId(): string {
 	const key =
 		readTrimmedEnv("NEXT_PUBLIC_RAZORPAY_KEY_ID") || readTrimmedEnv("RAZORPAY_KEY_ID");
-	if (!key) throw new Error("Missing NEXT_PUBLIC_RAZORPAY_KEY_ID");
+	if (!key) throw new Error("Missing NEXT_PUBLIC_RAZORPAY_KEY_ID (or RAZORPAY_KEY_ID for server-only setups)");
 	return key;
 }
 

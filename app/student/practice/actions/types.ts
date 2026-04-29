@@ -8,7 +8,7 @@ import type {
 export type FinalizePracticeSuccess = {
 	ok: true;
 	code: "success";
-	/** Present only when PRACTICE_PROMPT_PREVIEW=true on the server. */
+	/** Present only when PRACTICE_PROMPT_PREVIEW=true and NODE_ENV is not production. */
 	userMessageJson?: string;
 	systemPrompt?: string;
 	canonicalTopics?: PracticeCanonicalTopic[];

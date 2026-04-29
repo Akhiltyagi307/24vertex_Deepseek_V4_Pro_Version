@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getStudentSubjectsRpc } from "@/lib/student/get-student-subjects-rpc";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 
 export type StudentSubjectsProfileRow = {
@@ -26,7 +27,7 @@ export async function loadStudentSubjects(
 	supabase: SupabaseClient,
 	profileRow: StudentSubjectsProfileRow,
 ): Promise<{ subjects: LoadedStudentSubject[]; loadError: string | null }> {
-	const { data, error } = await supabase.rpc("get_student_subjects", {
+	const { data, error } = await getStudentSubjectsRpc<RpcSubjectRow>(supabase, {
 		p_grade: profileRow.grade,
 		p_stream: profileRow.stream,
 		p_elective_id: profileRow.elective_subject_id,

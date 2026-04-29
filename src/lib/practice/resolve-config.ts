@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FinalizePracticeConfigInput } from "./schemas";
 import type { PracticeCanonicalTopic } from "./types";
 import type { PracticeRecentError } from "./user-message";
+import { getStudentSubjectsRpc } from "@/lib/student/get-student-subjects-rpc";
 
 export type PracticeConfigResolveFailure = {
 	ok: false;
@@ -76,7 +77,7 @@ export async function resolvePracticeConfigForStudent(
 		return { ok: false, code: "not_student", message: "This action is only available to students." };
 	}
 
-	const { data: subjectRpcRows, error: rpcErr } = await supabase.rpc("get_student_subjects", {
+	const { data: subjectRpcRows, error: rpcErr } = await getStudentSubjectsRpc<{ id: string; name: string }>(supabase, {
 		p_grade: profileRow.grade,
 		p_stream: profileRow.stream,
 		p_elective_id: profileRow.elective_subject_id,

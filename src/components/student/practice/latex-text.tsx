@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 function renderKatexFragment(tex: string, displayMode: boolean): string | null {
 	try {
+		// trust:false keeps \\url/\\href and raw HTML out of KaTeX output; bounds XSS if question text is compromised.
 		return katex.renderToString(tex, {
 			throwOnError: true,
 			displayMode,

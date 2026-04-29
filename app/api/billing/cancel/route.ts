@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { cancelSubscription } from "@/lib/billing/razorpay";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
@@ -8,6 +9,10 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const cancelBodySchema = z.object({
+	billingProfileId: z.string().uuid().optional(),
+});
 
 /**
  * Students call this to opt-out of renewal. Razorpay keeps the subscription
@@ -24,15 +29,12 @@ export async function POST(req: Request) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
-	let billingProfileId: string | undefined;
-	try {
-		const json = await req.json();
-		if (json && typeof json === "object" && typeof (json as { billingProfileId?: unknown }).billingProfileId === "string") {
-			billingProfileId = (json as { billingProfileId: string }).billingProfileId;
-		}
-	} catch {
-		/* no JSON body */
+	const rawBody = await req.json().catch(() => ({}));
+	const parsedBody = cancelBodySchema.safeParse(rawBody);
+	if (!parsedBody.success) {
+		return Response.json({ ok: false, message: "Invalid request." }, { status: 400 });
 	}
+	const billingProfileId = parsedBody.data.billingProfileId;
 
 	const admin = createServiceRoleClient();
 	const { data: callerProfile } = await admin

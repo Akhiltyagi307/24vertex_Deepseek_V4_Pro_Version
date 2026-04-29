@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getStudentSubjectsRpc } from "@/lib/student/get-student-subjects-rpc";
+
 export type DoubtScopeSuccess = {
 	ok: true;
 	userId: string;
@@ -67,7 +69,7 @@ export async function validateDoubtScope(
 
 	const studentGrade = profileRow.grade;
 
-	const { data: subjectRpcRows, error: rpcErr } = await supabase.rpc("get_student_subjects", {
+	const { data: subjectRpcRows, error: rpcErr } = await getStudentSubjectsRpc<RpcSubjectRow>(supabase, {
 		p_grade: profileRow.grade,
 		p_stream: profileRow.stream,
 		p_elective_id: profileRow.elective_subject_id,

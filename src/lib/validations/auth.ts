@@ -98,6 +98,22 @@ export const parentSignupSchema = parentRegistrationPayloadSchema.extend({
 	password: z.string().min(8),
 });
 
+export const teacherSignupSchema = z.object({
+	email: z.string().email(),
+	password: z.string().min(8),
+	fullName: z.string().min(1).max(200),
+	schoolName: z.string().min(1).max(300),
+	assignments: z
+		.array(
+			z.object({
+				grade: z.coerce.number().int().min(6).max(12),
+				section: z.string().trim().min(1).max(5),
+				subjectId: z.string().uuid(),
+			}),
+		)
+		.min(1),
+});
+
 const studentLinkCodePattern = /^[A-Za-z]{2}\d{4}$/;
 
 export const linkParentSchema = z.object({

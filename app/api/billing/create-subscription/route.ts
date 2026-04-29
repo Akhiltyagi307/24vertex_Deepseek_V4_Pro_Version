@@ -4,10 +4,11 @@ import {
 	createOrFetchCustomer,
 	createSubscription,
 } from "@/lib/billing/razorpay";
+import { getApiRequestUser } from "@/lib/auth/api-request-user";
 import { isPlanCode } from "@/lib/billing/plans";
+import { getPublicRazorpayKeyId } from "@/lib/env";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { logSupabaseError, logServerError } from "@/lib/server/log-supabase-error";
-import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -25,6 +26,21 @@ const bodySchema = z.object({
 	billingProfileId: z.string().uuid().optional(),
 });
 
+function isMissingProfileColumnError(error: {
+	message: string;
+	code?: string;
+	details?: string | null;
+	hint?: string | null;
+} | null): boolean {
+	if (!error) return false;
+	if (error.code === "42703") return true;
+	const blob = [error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
+	return (
+		(blob.includes("column") && (blob.includes("does not exist") || blob.includes("undefined column"))) ||
+		(blob.includes("could not find") && blob.includes("column") && blob.includes("schema cache"))
+	);
+}
+
 /**
  * Creates a Razorpay Subscription and returns the id + short_url so the client
  * can either open Razorpay Checkout in-page or redirect to the hosted flow.
@@ -36,12 +52,24 @@ export async function POST(req: Request) {
 		return Response.json({ ok: false, message: "Invalid request." }, { status: 400 });
 	}
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-	if (!user) {
+	const auth = await getApiRequestUser(req);
+	if (!auth) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+	}
+	const { supabase, user } = auth;
+
+	let publicRazorpayKeyId: string;
+	try {
+		publicRazorpayKeyId = getPublicRazorpayKeyId();
+	} catch {
+		return Response.json(
+			{
+				ok: false,
+				message:
+					"Billing is not fully configured: set NEXT_PUBLIC_RAZORPAY_KEY_ID (or RAZORPAY_KEY_ID) in the environment.",
+			},
+			{ status: 503 },
+		);
 	}
 
 	const admin = createServiceRoleClient();
@@ -54,15 +82,6 @@ export async function POST(req: Request) {
 	if (planErr || !plan) {
 		if (planErr) logSupabaseError("billing.create-subscription.plan", planErr, { planCode: parsed.data.planCode });
 		return Response.json({ ok: false, message: "Plan not found." }, { status: 400 });
-	}
-	if (!plan.razorpay_plan_id) {
-		return Response.json(
-			{
-				ok: false,
-				message: "This plan is not yet configured in Razorpay. Run pnpm razorpay:seed-plans and persist the returned plan id.",
-			},
-			{ status: 500 },
-		);
 	}
 	if (!isPlanCode(plan.code)) {
 		return Response.json({ ok: false, message: "Invalid plan code." }, { status: 500 });
@@ -100,11 +119,29 @@ export async function POST(req: Request) {
 		targetProfileId = parsed.data.billingProfileId;
 	}
 
-	const { data: profile } = await admin
+	const { data: profileWithPhone, error: profileErr } = await admin
 		.from("profiles")
 		.select("full_name, phone, parent_email")
 		.eq("id", targetProfileId)
 		.maybeSingle();
+	let profile = profileWithPhone;
+	if (profileErr && isMissingProfileColumnError(profileErr)) {
+		const { data: profileFallback, error: profileFallbackErr } = await admin
+			.from("profiles")
+			.select("full_name, parent_email")
+			.eq("id", targetProfileId)
+			.maybeSingle();
+		if (profileFallbackErr) {
+			logSupabaseError("billing.create-subscription.profile.select_fallback", profileFallbackErr, {
+				profileId: targetProfileId,
+			});
+		}
+		profile = profileFallback ? { ...profileFallback, phone: null } : null;
+	} else if (profileErr) {
+		logSupabaseError("billing.create-subscription.profile.select", profileErr, {
+			profileId: targetProfileId,
+		});
+	}
 
 	const { data: subRow, error: subErr } = await admin
 		.from("subscriptions")
@@ -114,6 +151,16 @@ export async function POST(req: Request) {
 	if (subErr || !subRow) {
 		if (subErr) logSupabaseError("billing.create-subscription.sub", subErr, { profileId: targetProfileId });
 		return Response.json({ ok: false, message: "Subscription record missing." }, { status: 500 });
+	}
+	if (!plan.razorpay_plan_id) {
+		return Response.json(
+			{
+				ok: false,
+				message:
+					"This plan is not linked to Razorpay yet. Run `pnpm razorpay:seed-plans`, copy each plan id from the Razorpay dashboard into the `plans.razorpay_plan_id` column in Supabase, then retry checkout.",
+			},
+			{ status: 503 },
+		);
 	}
 
 	const paidPipelineBlocking =
@@ -194,6 +241,6 @@ export async function POST(req: Request) {
 		ok: true,
 		subscriptionId: razorpaySubscription.id,
 		shortUrl: razorpaySubscription.short_url ?? null,
-		razorpayKeyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? process.env.RAZORPAY_KEY_ID ?? null,
+		razorpayKeyId: publicRazorpayKeyId,
 	});
 }

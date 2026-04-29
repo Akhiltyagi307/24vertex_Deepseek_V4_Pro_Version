@@ -114,7 +114,7 @@ function daysUntil(iso: string | null): number | null {
 	return trialDaysLeftFromEnd(iso);
 }
 
-function deriveReason(args: {
+export function deriveReason(args: {
 	status: SubscriptionStatus;
 	trialEndsAt: string | null;
 	periodEnd: string;
@@ -166,7 +166,7 @@ function syntheticFreeTierSnapshot(profileId: string): EntitlementSnapshot {
 	};
 }
 
-function buildEntitlementSnapshot(args: {
+export function buildEntitlementSnapshot(args: {
 	profileId: string;
 	planCode: PlanCode;
 	status: SubscriptionStatus;
@@ -180,10 +180,13 @@ function buildEntitlementSnapshot(args: {
 	tokensQuota: number;
 	tokensUsed: number;
 }): EntitlementSnapshot {
+	const periodExpired = new Date(args.currentPeriodEnd).getTime() <= Date.now();
+	const effectiveStatus: SubscriptionStatus =
+		periodExpired && args.status !== "cancelled" && args.status !== "expired" ? "expired" : args.status;
 	const testsLeft = Math.max(0, args.testsQuota - args.testsUsed);
 	const tokensLeft = Math.max(0, args.tokensQuota - args.tokensUsed);
 	const { reason, canStartTest, canChatDoubt } = deriveReason({
-		status: args.status,
+		status: effectiveStatus,
 		trialEndsAt: args.trialEndsAt,
 		periodEnd: args.currentPeriodEnd,
 		testsLeft,
@@ -196,7 +199,7 @@ function buildEntitlementSnapshot(args: {
 	return {
 		profileId: args.profileId,
 		planCode: args.planCode,
-		status: args.status,
+		status: effectiveStatus,
 		staffOverride: args.staffOverride,
 		trialEndsAt: args.trialEndsAt,
 		currentPeriodStart: args.currentPeriodStart,
@@ -208,7 +211,7 @@ function buildEntitlementSnapshot(args: {
 		tokensQuota: args.tokensQuota,
 		tokensUsed: args.tokensUsed,
 		tokensLeft,
-		trialDaysLeft: args.status === "trialing" ? daysUntil(args.trialEndsAt) : null,
+		trialDaysLeft: effectiveStatus === "trialing" ? daysUntil(args.trialEndsAt) : null,
 		canStartTest: finalCanStartTest,
 		canChatDoubt: finalCanChatDoubt,
 		reason,

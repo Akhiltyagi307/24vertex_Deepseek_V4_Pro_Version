@@ -72,6 +72,17 @@ type Props = {
 	electives: Elective[];
 };
 
+function resolveEmailRedirectTo(): string {
+	try {
+		return `${getAppUrl()}/auth/callback`;
+	} catch (error) {
+		if (typeof window !== "undefined" && window.location.origin) {
+			return `${window.location.origin}/auth/callback`;
+		}
+		throw error;
+	}
+}
+
 function formatStepErrors(err: z.ZodError): string {
 	const flat = err.flatten();
 	const fieldMsgs = Object.values(flat.fieldErrors).flat().filter(Boolean);
@@ -192,9 +203,10 @@ export function StudentSignupForm({ electives }: Props) {
 		const fd = buildFormData();
 		let emailRedirectTo: string;
 		try {
-			emailRedirectTo = `${getAppUrl()}/auth/callback`;
-		} catch {
-			setState({ error: "Account setup is unavailable until the app URL is configured." });
+			emailRedirectTo = resolveEmailRedirectTo();
+		} catch (error) {
+			const details = error instanceof Error ? ` (${error.message})` : "";
+			setState({ error: `Account setup is unavailable until the app URL is configured.${details}` });
 			setPending(false);
 			return;
 		}

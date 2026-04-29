@@ -15,7 +15,7 @@ import { mapResolveToFinalizeFailure, type FinalizePracticeResult } from "./type
 
 /**
  * Validates practice configuration server-side. Prompt text is returned only when
- * `PRACTICE_PROMPT_PREVIEW=true` (never rely on the client to request secrets).
+ * `PRACTICE_PROMPT_PREVIEW=true` and not in production (same rule as the practice page loader).
  */
 export async function finalizePracticeConfig(input: unknown): Promise<FinalizePracticeResult> {
 	const parsed = finalizePracticeConfigSchema.safeParse(input);
@@ -36,7 +36,8 @@ export async function finalizePracticeConfig(input: unknown): Promise<FinalizePr
 	}
 
 	const { subjectId, difficulty, durationSeconds } = parsed.data;
-	const previewEnabled = process.env.PRACTICE_PROMPT_PREVIEW === "true";
+	const previewEnabled =
+		process.env.PRACTICE_PROMPT_PREVIEW === "true" && process.env.NODE_ENV !== "production";
 
 	if (!previewEnabled) {
 		return { ok: true, code: "success" };

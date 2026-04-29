@@ -34,6 +34,21 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+function isMissingProfileColumnError(error: {
+	message: string;
+	code?: string;
+	details?: string | null;
+	hint?: string | null;
+} | null): boolean {
+	if (!error) return false;
+	if (error.code === "42703") return true;
+	const blob = [error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
+	return (
+		(blob.includes("column") && (blob.includes("does not exist") || blob.includes("undefined column"))) ||
+		(blob.includes("could not find") && blob.includes("column") && blob.includes("schema cache"))
+	);
+}
+
 export default async function ParentSubscriptionPage() {
 	const user = await getServerUser();
 	if (!user) redirect("/login");
@@ -47,11 +62,20 @@ export default async function ParentSubscriptionPage() {
 	if (!ok) redirect("/parent/select-student");
 
 	const supabase = await createClient();
-	const { data: studentProfile } = await supabase
+	const { data: studentProfileWithPhone, error: studentProfileErr } = await supabase
 		.from("profiles")
 		.select("full_name, grade, phone")
 		.eq("id", activeId)
 		.maybeSingle();
+	let studentProfile = studentProfileWithPhone;
+	if (studentProfileErr && isMissingProfileColumnError(studentProfileErr)) {
+		const { data: studentProfileFallback } = await supabase
+			.from("profiles")
+			.select("full_name, grade")
+			.eq("id", activeId)
+			.maybeSingle();
+		studentProfile = studentProfileFallback ? { ...studentProfileFallback, phone: null } : null;
+	}
 
 	if (!studentProfile) redirect("/parent/select-student");
 

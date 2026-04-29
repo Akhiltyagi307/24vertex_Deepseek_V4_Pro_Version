@@ -2,7 +2,7 @@ import { APICallError, generateObject, NoObjectGeneratedError, streamObject } fr
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { getOpenAIChatModel } from "@/lib/env";
-import { consumeTest, preflightPracticeTestQuota } from "@/lib/billing/entitlements";
+import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
 import {
 	mapResolveToGenerateFailure,
 	type GeneratePracticeFailure,
@@ -23,7 +23,7 @@ import {
 } from "@/lib/practice";
 import { getPracticeQuestionPlan, practiceTypeCountsToQuestionMixJson } from "@/lib/practice/constants";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
-import { tagTopicContextTruncated } from "@/lib/practice/sentry-tags";
+import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
 import { repeatPracticeAiResultUntilSuccessOrExhausted } from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import {
@@ -33,6 +33,7 @@ import {
 } from "@/lib/practice/dedup-embeddings";
 import { finalizePracticeConfigSchema, type FinalizePracticeConfigInput } from "@/lib/practice/schemas";
 import type { PracticeConfigResolveSuccess } from "@/lib/practice/resolve-config";
+import { logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -181,6 +182,39 @@ export async function runPracticeGenerationAfterResolve(
 	resolved: PracticeConfigResolveSuccess,
 	opts: RunGenerationPipelineOptions,
 ): Promise<GeneratePracticeResult> {
+	const correlationId = newPracticeCorrelationId();
+	const pipelineT0 = Date.now();
+	return withPracticeSpan(
+		"practice_generate",
+		{
+			correlation_id: correlationId,
+			student_id: resolved.userId,
+			subject_id: parsed.subjectId,
+		},
+		() =>
+			runPracticeGenerationAfterResolveCore(
+				supabase,
+				parsed,
+				resolved,
+				opts,
+				correlationId,
+				pipelineT0,
+			),
+	);
+}
+
+async function runPracticeGenerationAfterResolveCore(
+	supabase: ServerSupabase,
+	parsed: FinalizePracticeConfigInput,
+	resolved: PracticeConfigResolveSuccess,
+	opts: RunGenerationPipelineOptions,
+	correlationId: string,
+	pipelineT0: number,
+): Promise<GeneratePracticeResult> {
+	let cumulativeModelMs = 0;
+	let cumulativeValidationMs = 0;
+	const timingsMs: Record<string, number> = {};
+
 	void recordPracticeEvent(
 		supabase,
 		"practice_generate_clicked",
@@ -202,7 +236,9 @@ export async function runPracticeGenerationAfterResolve(
 
 	const topicIds = resolved.canonicalTopics.map((t) => t.topicId);
 	const admin = createServiceRoleClient();
+	const tc0 = Date.now();
 	const preFetchedTopicContext = await fetchTopicContextChunksByTopicIds(admin, topicIds);
+	timingsMs.topicContextFetch = Date.now() - tc0;
 
 	const userPayload = buildPracticeUserMessage({
 		studentGrade: resolved.studentGrade,
@@ -264,13 +300,17 @@ export async function runPracticeGenerationAfterResolve(
 		| { ok: true; object: PracticeGenerationOutput; public: ReturnType<typeof validateAndStripGeneration> }
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
+		const m0 = Date.now();
 		const r = await runModelOnce(systemPrompt, userPrompt, expectedCount, generationOutputSchema, opts);
+		cumulativeModelMs += Date.now() - m0;
 		if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
+		const v0 = Date.now();
 		const flattened = flattenPracticeGenerationOutput(r.object);
 		const out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
 			expectedDurationSeconds: durationSeconds,
 			expectedTypeCounts,
 		});
+		cumulativeValidationMs += Date.now() - v0;
 		if (!out.ok) {
 			const actualTypeCounts = summarizeGroupedQuestionTypeCounts(r.object);
 			logServerError("generatePracticeTest.validation", out.message, {
@@ -279,6 +319,7 @@ export async function runPracticeGenerationAfterResolve(
 				expectedCount,
 				expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
 				actualTypeCounts: formatTypeCounts(actualTypeCounts),
+				correlationId,
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
 		}
@@ -301,14 +342,39 @@ export async function runPracticeGenerationAfterResolve(
 					durationSeconds,
 					attemptNumber,
 					totalAttempts,
+					correlationId,
 				});
 			},
 		},
 	);
 	if (!attempt.ok) {
+		logPracticeObs({
+			phase: "practice_generation",
+			correlationId,
+			ok: false,
+			code: "generation_failed",
+			durationMs: Date.now() - pipelineT0,
+			timingsMs: {
+				...timingsMs,
+				modelMs: cumulativeModelMs,
+				validationMs: cumulativeValidationMs,
+			},
+		});
 		return { ok: false, code: "generation_failed", message: attempt.message };
 	}
 	if (!stripped || !stripped.ok) {
+		logPracticeObs({
+			phase: "practice_generation",
+			correlationId,
+			ok: false,
+			code: "generation_invalid",
+			durationMs: Date.now() - pipelineT0,
+			timingsMs: {
+				...timingsMs,
+				modelMs: cumulativeModelMs,
+				validationMs: cumulativeValidationMs,
+			},
+		});
 		return {
 			ok: false,
 			code: "generation_invalid",
@@ -321,6 +387,7 @@ export async function runPracticeGenerationAfterResolve(
 
 	const dedupThreshold = Number.parseInt(process.env.PRACTICE_DEDUP_MAX_REGENS ?? "1", 10);
 	if (Number.isFinite(dedupThreshold) && dedupThreshold > 0) {
+		const dedupT0 = Date.now();
 		try {
 			const texts = fullOutput.questions.map((q) => q.question_text);
 			const embeddings = await embedQuestionTexts(texts);
@@ -345,7 +412,10 @@ export async function runPracticeGenerationAfterResolve(
 		} catch (e) {
 			logServerError("generatePracticeTest.dedupEmbeddings", e, {
 				subjectId,
+				correlationId,
 			});
+		} finally {
+			timingsMs.dedup = Date.now() - dedupT0;
 		}
 	}
 
@@ -359,6 +429,7 @@ export async function runPracticeGenerationAfterResolve(
 		metadata: {},
 	}));
 
+	const rpcT0 = Date.now();
 	const { data: newTestId, error: rpcErr } = await supabase.rpc("practice_generate_test", {
 		p_subject_id: subjectId,
 		p_difficulty: difficulty,
@@ -367,11 +438,24 @@ export async function runPracticeGenerationAfterResolve(
 		p_question_mix: questionMixJson,
 		p_questions: questionsPayload,
 	});
+	timingsMs.rpcPersist = Date.now() - rpcT0;
 
 	if (rpcErr || !newTestId) {
 		if (rpcErr) {
-			logSupabaseError("generatePracticeTest.practice_generate_test", rpcErr);
+			logSupabaseError("generatePracticeTest.practice_generate_test", rpcErr, { correlationId });
 		}
+		logPracticeObs({
+			phase: "practice_generation",
+			correlationId,
+			ok: false,
+			code: "database_error",
+			durationMs: Date.now() - pipelineT0,
+			timingsMs: {
+				...timingsMs,
+				modelMs: cumulativeModelMs,
+				validationMs: cumulativeValidationMs,
+			},
+		});
 		return {
 			ok: false,
 			code: "database_error",
@@ -380,31 +464,6 @@ export async function runPracticeGenerationAfterResolve(
 	}
 
 	const testId = newTestId as string;
-
-	const billingAfter = await consumeTest(supabase, resolved.userId);
-	if (!billingAfter.ok) {
-		const { error: abandonErr } = await supabase.rpc("practice_abandon_test", { p_test_id: testId });
-		if (abandonErr) {
-			logSupabaseError("generatePracticeTest.abandon_after_billing_fail", abandonErr, { testId });
-		}
-		void recordPracticeEvent(
-			supabase,
-			"paywall_shown",
-			{ surface: "practice_generate", reason: billingAfter.code },
-			{ studentId: resolved.userId },
-		);
-		const mapBillingCode = (): GeneratePracticeFailure["code"] => {
-			if (billingAfter.code === "quota_tests") return "quota_tests";
-			if (billingAfter.code === "trial_expired") return "trial_expired";
-			return "subscription_expired";
-		};
-		return {
-			ok: false,
-			code: mapBillingCode(),
-			message: billingAfter.message,
-			paywall: true,
-		};
-	}
 
 	void recordPracticeEvent(
 		supabase,
@@ -442,12 +501,28 @@ export async function runPracticeGenerationAfterResolve(
 			} catch (e) {
 				logServerError("generatePracticeTest.persistQuestionEmbeddings", e, {
 					testId,
+					correlationId,
 				});
 			}
 		})().catch((e) => {
-			logServerError("generatePracticeTest.persistQuestionEmbeddings.unhandled", e, { testId });
+			logServerError("generatePracticeTest.persistQuestionEmbeddings.unhandled", e, { testId, correlationId });
 		});
 	}
+
+	logPracticeObs({
+		phase: "practice_generation_complete",
+		correlationId,
+		testId,
+		ok: true,
+		durationMs: Date.now() - pipelineT0,
+		timingsMs: {
+			...timingsMs,
+			modelMs: cumulativeModelMs,
+			validationMs: cumulativeValidationMs,
+		},
+		questionCount: totalQ,
+		topicCount: resolved.canonicalTopics.length,
+	});
 
 	return {
 		ok: true,

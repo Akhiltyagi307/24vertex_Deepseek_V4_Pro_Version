@@ -3,11 +3,18 @@ import {
 	runPracticeGenerationAfterResolve,
 	safeParseGenerationInput,
 } from "@/lib/practice/practice-generation-pipeline";
-import { createClient } from "@/lib/supabase/server";
+import { getApiRequestUser } from "@/lib/auth/api-request-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+function isPracticeStreamingEnabled(): boolean {
+	const raw = process.env.PRACTICE_STREAM?.trim().toLowerCase();
+	// Keep strict opt-in in production; always enable for local/dev backend test coverage.
+	if (process.env.NODE_ENV !== "production") return true;
+	return raw === "true";
+}
 
 /**
  * When `PRACTICE_STREAM=true`, streams NDJSON: partial object lines, then a final `done` line
@@ -15,7 +22,7 @@ export const maxDuration = 300;
  * as the `generatePracticeTest` server action. One model run and shared pipeline — no double charge.
  */
 export async function POST(request: Request) {
-	if (process.env.PRACTICE_STREAM !== "true") {
+	if (!isPracticeStreamingEnabled()) {
 		return Response.json({ ok: false, message: "Streaming disabled." }, { status: 404 });
 	}
 
@@ -28,16 +35,14 @@ export async function POST(request: Request) {
 
 	const parsed = safeParseGenerationInput(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid configuration." }, { status: 400 });
+		return Response.json({ ok: false, message: "Validation error: invalid configuration." }, { status: 400 });
 	}
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-	if (!user) {
+	const auth = await getApiRequestUser(request);
+	if (!auth) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
+	const { supabase } = auth;
 
 	const gate = await preflightPracticeGeneration(supabase, parsed.data);
 	if (!gate.ok) {

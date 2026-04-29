@@ -36,7 +36,10 @@ export function isPostgrestMissingColumnError(
 	if (!error) return false;
 	if (error.code === "42703") return true;
 	const blob = [error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
-	return blob.includes("column") && (blob.includes("does not exist") || blob.includes("undefined column"));
+	return (
+		(blob.includes("column") && (blob.includes("does not exist") || blob.includes("undefined column"))) ||
+		(blob.includes("could not find") && blob.includes("column") && blob.includes("schema cache"))
+	);
 }
 
 function buildInsertPayload(
