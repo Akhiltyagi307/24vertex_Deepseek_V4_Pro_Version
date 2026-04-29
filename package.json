@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": "22.x"
+    "node": ">=22 <26"
   },
   "scripts": {
     "dev": "node scripts/next-dev.mjs",
@@ -18,6 +18,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:repair-profile-prefs": "node scripts/repair-drifted-profile-prefs.mjs",
     "db:repair-profiles-pdr": "node scripts/repair-profiles-pdr-columns.mjs",
+    "db:reconcile-migration-ledger": "node -r dotenv/config scripts/reconcile-supabase-migration-ledger.mjs dotenv_config_path=.env.local",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "razorpay:seed-plans": "node scripts/seed-razorpay-plans.mjs"
