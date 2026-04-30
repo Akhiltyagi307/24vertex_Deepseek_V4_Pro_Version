@@ -2,12 +2,12 @@
 
 import * as React from "react"
 
+import { landingMarketingBadgeClassName } from "@/lib/marketing/landing-marketing-badge"
 import { cn } from "@/lib/utils"
 
 const STUDENT_AVATAR = "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=120&q=80"
 const PARENT_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=120&q=80"
 const TEACHER_AVATAR = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80"
-const COUNSELOR_AVATAR = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80"
 
 export type Customer = {
   id: number | string
@@ -54,37 +54,18 @@ const DEFAULT_CUSTOMERS: Customer[] = [
     avatar: TEACHER_AVATAR,
     outcome: "Class momentum improves with less admin overhead",
   },
-  {
-    id: 4,
-    role: "Counselor",
-    signal: "Risk",
-    statusVariant: "danger",
-    focus: "Escalation patterns are spotted early",
-    avatar: COUNSELOR_AVATAR,
-    outcome: "Support actions happen before confidence drops",
-  },
 ]
 
-const Badge = ({
-  children,
-  variant,
-}: {
-  children: React.ReactNode
-  variant: "success" | "danger" | "warning"
-}) => {
-  const styles =
-    variant === "success"
-      ? "bg-lime-500/15 text-lime-800 dark:text-lime-300"
-      : variant === "danger"
-        ? "bg-red-500/15 text-red-800 dark:text-red-300"
-        : "bg-yellow-500/15 text-yellow-800 dark:text-yellow-300"
-
-  return (
-    <span className={cn("rounded-full px-2 py-1 text-xs font-medium", styles)}>
-      {children}
-    </span>
-  )
-}
+const SignalBadge = ({ children }: { children: React.ReactNode }) => (
+  <span
+    className={cn(
+      "inline-flex items-center justify-center rounded-full font-medium",
+      landingMarketingBadgeClassName,
+    )}
+  >
+    {children}
+  </span>
+)
 
 export default function CustomersTableCard({
   title = "Cross-role clarity map",
@@ -130,7 +111,7 @@ export default function CustomersTableCard({
                 <td className="text-muted-foreground">{idx + 1}</td>
                 <td className="whitespace-nowrap">{customer.role}</td>
                 <td>
-                  <Badge variant={customer.statusVariant}>{customer.signal}</Badge>
+                  <SignalBadge>{customer.signal}</SignalBadge>
                 </td>
                 <td>
                   <div className="flex items-center gap-2">

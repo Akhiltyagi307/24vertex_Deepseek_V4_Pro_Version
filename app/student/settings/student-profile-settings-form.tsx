@@ -1032,7 +1032,7 @@ export function StudentProfileSettingsForm({
 	);
 
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+		<div className="flex w-full min-w-0 flex-col gap-8">
 			<PlacementFieldDialog
 				key={[
 					placementField ?? "closed",
@@ -1077,7 +1077,6 @@ export function StudentProfileSettingsForm({
 
 			<form action={formAction} className="flex flex-col gap-6">
 				<SmoothTab
-					className="max-w-none"
 					defaultTabId="school"
 					panelClassName="min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm md:px-8 md:py-8 dark:border-border dark:bg-muted/20"
 					persistContentPanels
@@ -1309,7 +1308,7 @@ export function StudentProfileSettingsForm({
 						"supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:items-center sm:justify-between",
 					)}
 				>
-					<p className="text-muted-foreground text-sm leading-relaxed sm:max-w-md">
+					<p className="text-muted-foreground text-sm leading-relaxed">
 						<strong className="font-medium text-foreground">Save changes</strong> only saves the Profile tab
 						(name, photo, phone). On School &amp; account, each field saves in its own pop-up. Use{" "}
 						<strong className="font-medium text-foreground">Update password</strong> on the Password tab.

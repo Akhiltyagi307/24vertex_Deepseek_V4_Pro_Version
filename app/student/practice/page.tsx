@@ -5,6 +5,7 @@ import { StudentPracticeAsync } from "./student-practice-async";
 import { StudentPracticeSkeleton } from "./student-practice-skeleton";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function StudentPracticePage() {
 	};
 
 	return (
-		<div className="w-full min-w-0">
+		<div className={studentHubPageShellClassName}>
 			<Suspense fallback={<StudentPracticeSkeleton />}>
 				<StudentPracticeAsync userId={user.id} profileRow={profileRow} />
 			</Suspense>

@@ -21,7 +21,7 @@ export function MotionPageEnter({ children, className }: MotionPageEnterProps) {
 
 	return (
 		<motion.div
-			className={cn("min-w-0", className)}
+			className={cn("min-w-0 w-full", className)}
 			initial={reduceMotion ? false : { opacity: 0, y }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration, ease: [0.25, 0.1, 0.25, 1] }}

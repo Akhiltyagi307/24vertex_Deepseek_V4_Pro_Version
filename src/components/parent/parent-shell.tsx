@@ -7,11 +7,8 @@ import { ParentAppSidebar } from "@/components/parent/parent-app-sidebar";
 import { StudentTopBar } from "@/components/student/student-top-bar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
+import { isParentDoubtChatPath } from "@/lib/navigation/shell-immersive-paths";
 import { cn } from "@/lib/utils";
-
-function isParentDoubtChatPath(pathname: string): boolean {
-	return pathname === "/parent/doubt-chat";
-}
 
 export type ParentShellProps = {
 	organizationName: string;
@@ -55,7 +52,7 @@ export function ParentShell({
 			/>
 			<div
 				className={cn(
-					"flex min-h-0 w-full min-w-0 flex-1",
+					"flex min-h-0 w-full min-w-0 flex-1 items-stretch",
 					doubtChat && "overflow-hidden",
 				)}
 			>
@@ -69,11 +66,11 @@ export function ParentShell({
 					entitlement={entitlement}
 				/>
 				<SidebarInset
-					className={
+					className={cn(
 						doubtChat
-							? "min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
-							: "min-h-0 flex-1 overflow-auto bg-background"
-					}
+							? "min-h-0 min-w-0 grow basis-0 overflow-hidden bg-background"
+							: "min-h-0 min-w-0 grow basis-0 overflow-auto bg-background px-4 md:px-6 lg:px-8",
+					)}
 				>
 					{children}
 				</SidebarInset>

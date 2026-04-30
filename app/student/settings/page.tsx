@@ -10,7 +10,9 @@ import type { AppProfileRow } from "@/lib/auth/cached-profile";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
+import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +64,12 @@ export default async function StudentSettingsPage() {
 		.filter((s: ResolvedSubjectForSettings) => Boolean(s.id && s.name));
 
 	return (
-		<div className="flex w-full min-w-0 flex-col gap-6 p-6 sm:p-8">
+		<div
+			className={cn(
+				"flex min-w-0 flex-col gap-6 py-6 sm:py-8",
+				studentHubPageShellClassName,
+			)}
+		>
 			<PageStaggerRoot
 				enableLift={false}
 				className="min-w-0"

@@ -15,13 +15,16 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import {
+	LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
+	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
+} from "@/lib/marketing/landing-copy";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
 	{ href: "#home", label: "Home" },
 	{ href: "#features", label: "Features" },
 	{ href: "#benefits", label: "Benefits" },
-	{ href: "#how-it-works", label: "How it works" },
 	{ href: "#pricing", label: "Pricing" },
 	{ href: "#voices", label: "Voices" },
 ] as const;
@@ -90,20 +93,25 @@ export function LandingSiteHeader() {
 				</nav>
 
 				<div className="flex shrink-0 items-center gap-2 sm:gap-3">
-					<Button
-						variant="ghost"
-						size="sm"
-						className="hidden h-10 rounded-full px-4 text-sm sm:inline-flex"
-						render={<Link href="/login" />}
+					<div
+						className={cn(
+							"hidden items-center sm:flex",
+							LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
+						)}
 					>
-						Log in
-					</Button>
-					<LandingPrimaryCtaButton className="hidden sm:inline-flex" render={<Link href="/signup/role-picker" />} />
+						<LandingPrimaryCtaButton render={<Link href="/signup/role-picker" />} />
+						<Button
+							variant="marketingSecondary"
+							className={LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME}
+							render={<Link href="/login" />}
+						>
+							Log in
+						</Button>
+					</div>
 
 					<Button
-						variant="ghost"
-						size="sm"
-						className="h-10 rounded-full px-4 text-sm sm:hidden"
+						variant="marketingSecondary"
+						className={cn(LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME, "sm:hidden")}
 						render={<Link href="/login" />}
 					>
 						Log in
@@ -114,7 +122,7 @@ export function LandingSiteHeader() {
 							type="button"
 							variant="outline"
 							size="icon-sm"
-							className="shrink-0 md:hidden"
+							className="border-zinc-400 bg-transparent text-foreground shadow-none hover:border-emerald-600 dark:border-zinc-500 shrink-0 md:hidden"
 							aria-label="Open menu"
 							onClick={() => setSheetOpen(true)}
 						>
@@ -143,18 +151,15 @@ export function LandingSiteHeader() {
 								))}
 							</nav>
 							<Separator />
-							<SheetFooter className="mt-0 flex-col gap-2 border-t border-border bg-muted/30 p-4 sm:flex-col">
+							<SheetFooter className="mt-0 flex-col items-center gap-3 border-t border-border bg-muted/30 p-4 sm:flex-col">
+								<LandingPrimaryCtaButton render={<Link href="/signup/role-picker" onClick={closeSheet} />} />
 								<Button
-									variant="outline"
-									className="h-10 w-full rounded-full px-4 text-sm"
+									variant="marketingSecondary"
+									className={LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME}
 									render={<Link href="/login" onClick={closeSheet} />}
 								>
 									Log in
 								</Button>
-								<LandingPrimaryCtaButton
-									className="w-full"
-									render={<Link href="/signup/role-picker" onClick={closeSheet} />}
-								/>
 							</SheetFooter>
 						</SheetContent>
 					</Sheet>

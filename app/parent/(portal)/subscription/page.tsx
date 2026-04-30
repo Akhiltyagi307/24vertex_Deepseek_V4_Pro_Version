@@ -115,11 +115,11 @@ export default async function ParentSubscriptionPage() {
 		: "";
 
 	return (
-		<div className="w-full min-w-0 p-6 sm:p-8">
+		<div className="w-full min-w-0 py-6 sm:py-8">
 			<main className="min-w-0">
 				<PageStaggerRoot
 					enableLift={false}
-					className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 sm:gap-8"
+					className="flex w-full min-w-0 flex-col gap-6 sm:gap-8"
 					sections={[
 						{
 							key: "header",
@@ -172,7 +172,7 @@ export default async function ParentSubscriptionPage() {
 								<section id="plans" className="flex flex-col gap-4">
 									<div>
 										<h2 className="font-heading text-lg font-medium tracking-tight">Choose a plan</h2>
-										<p className="max-w-[65ch] text-pretty text-sm text-muted-foreground">
+										<p className="text-pretty text-sm text-muted-foreground">
 											Upgrade when your family wants more practice tests or tutor-chat allowance for this child.
 										</p>
 									</div>
@@ -208,7 +208,7 @@ export default async function ParentSubscriptionPage() {
 											<TicketIcon className="size-4 text-muted-foreground" aria-hidden />
 											<CardTitle className="text-base">Have a coupon?</CardTitle>
 										</div>
-										<CardDescription className="max-w-[65ch] text-pretty">
+										<CardDescription className="text-pretty">
 											If you have a code from school or a campaign, apply it here for a complimentary Pro window
 											on this child&apos;s account, with no card needed.
 										</CardDescription>

@@ -21,10 +21,10 @@ export default async function ParentSettingsPage() {
 	const displayName = formatPersonDisplayName(row.full_name ?? "") || "Parent";
 
 	return (
-		<div className="w-full min-w-0 p-6 sm:p-8">
+		<div className="w-full min-w-0 py-6 sm:py-8">
 			<PageStaggerRoot
 				enableLift={false}
-				className="mx-auto flex max-w-2xl flex-col gap-8"
+				className="flex w-full min-w-0 flex-col gap-8"
 				sections={[
 					{
 						key: "header",

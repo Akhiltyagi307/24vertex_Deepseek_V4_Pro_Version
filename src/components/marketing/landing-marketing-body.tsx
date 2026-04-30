@@ -7,22 +7,32 @@ import { Footer7 } from "@/components/ui/footer-7";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DottedSurface } from "@/components/ui/dotted-surface";
-import { GridPattern } from "@/components/ui/grid-pattern";
 import Link from "next/link";
-import { LANDING_ROLE_SIGNUP_PRIMARY_CTA } from "@/lib/marketing/landing-copy";
+import { ChevronDown } from "lucide-react";
+
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
+import { landingFeatureBentoShell } from "@/lib/marketing/landing-feature-surface";
+import {
+	faqCardSurfaceClassName,
+	pricingSectionGridOverlayClassName,
+} from "@/lib/marketing/pricing-card-surface";
+import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
+import {
+	LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
+	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
+} from "@/lib/marketing/landing-copy";
+import { cn } from "@/lib/utils";
 
 const sectionShell = "w-full px-4 py-16 sm:px-6 sm:py-20 lg:px-8";
+/** Band for full-width sections (matches CTA inner `max-w-7xl`). */
+const sectionContentMax = "max-w-7xl";
 const sectionTitle = "text-3xl font-semibold tracking-tight text-foreground sm:text-4xl";
 const sectionLead = "mx-auto mt-3 max-w-2xl text-base text-muted-foreground sm:text-lg";
 
 export function LandingMarketingBody() {
 	return (
 		<>
-			<section
-				id="home"
-				className="w-full border-b border-foreground/20 bg-background pb-10 pt-6 sm:pb-12 sm:pt-8"
-			>
+			<section id="home" className="w-full bg-background pb-10 pt-6 sm:pb-12 sm:pt-8">
 				<AcmeHero />
 			</section>
 
@@ -30,71 +40,40 @@ export function LandingMarketingBody() {
 
 			<FeaturesSection />
 
-			<section id="how-it-works" className={`border-b border-foreground/20 ${sectionShell}`}>
-				<div className="mx-auto max-w-3xl text-center">
-					<Badge variant="outline" className="mb-4">
-						How it works
-					</Badge>
-					<h2 className={sectionTitle}>How it works</h2>
-					<p className={sectionLead}>
-						Sign up once, complete your profile, and land directly in the portal built for your role.
-					</p>
-				</div>
-				<ol className="mt-12 grid gap-10 sm:grid-cols-3 sm:gap-8">
-					{[
-						{
-							step: "1",
-							title: "Choose a role",
-							body: `Use ${LANDING_ROLE_SIGNUP_PRIMARY_CTA} in the header or above, or the direct student, parent, and teacher links in the hero when you already know your path.`,
-						},
-						{
-							step: "2",
-							title: "Complete your profile",
-							body: "Answer the prompts the product needs (grade, section, parent link codes where applicable) so dashboards and assignments line up correctly.",
-						},
-						{
-							step: "3",
-							title: "Start in the right portal",
-							body: "Students begin on the trial where eligible; everyone else lands in their portal with tasks surfaced first.",
-						},
-					].map((item) => (
-						<li key={item.step} className="flex min-w-0 flex-col gap-3">
-							<span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-semibold text-foreground shadow-sm">
-								{item.step}
-							</span>
-							<div>
-								<p className="text-base font-semibold text-foreground">{item.title}</p>
-								<p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
-							</div>
-						</li>
-					))}
-				</ol>
-			</section>
-
 			<Testimonials />
 
 			<Pricing />
 
-			<section id="faq" className={`relative overflow-hidden bg-background ${sectionShell}`}>
-				<GridPattern
-					width={32}
-					height={32}
-					x={-1}
-					y={-1}
-					className="fill-border/70 stroke-border/70 [mask-image:radial-gradient(ellipse_at_center,white,transparent_82%)]"
-				/>
-				<div className="relative z-10 mx-auto max-w-5xl">
-					<div className="mx-auto max-w-3xl text-center">
-						<Badge variant="outline" className="mb-4">
-							FAQ
-						</Badge>
-						<h2 className={sectionTitle}>Common Questions &amp; Answers</h2>
-						<p className={sectionLead}>
+			<section
+				id="faq"
+				className={cn("relative overflow-hidden bg-background", sectionShell)}
+			>
+				<div className={pricingSectionGridOverlayClassName} aria-hidden />
+				<div
+					className={cn(
+						"relative z-10 mx-auto w-full space-y-8 md:space-y-10",
+						sectionContentMax,
+					)}
+				>
+					<div className="mx-auto max-w-3xl space-y-4 text-center md:space-y-6">
+						<div className="flex justify-center">
+							<Badge variant="outline" className={landingMarketingSectionEyebrowBadgeClassName}>
+								FAQ
+							</Badge>
+						</div>
+						<h2 className={cn(sectionTitle, "text-center")}>Common questions and answers</h2>
+						<p
+							className={cn(
+								sectionLead,
+								"mt-4 text-center leading-relaxed sm:text-lg md:mt-6",
+							)}
+						>
 							Find essential details about EduAI and how each role can get the most from it.
 						</p>
 					</div>
 
-					<div className="mt-12 grid gap-x-10 gap-y-8 md:grid-cols-2">
+					<div className="w-full space-y-10">
+						<div className="grid gap-3 md:grid-cols-2 md:gap-6">
 						{[
 							{
 								id: "1",
@@ -141,57 +120,81 @@ export function LandingMarketingBody() {
 						].map((item) => (
 							<details
 								key={item.id}
-								className="group rounded-xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-accent/20 open:bg-accent/20"
+								className={cn(
+									"group relative z-10 overflow-hidden px-4 py-4 transition-shadow duration-200 ease-out md:px-6 md:py-6",
+									faqCardSurfaceClassName,
+									"open:shadow-[0_22px_55px_-28px_oklch(0.2_0.04_160/.55)]",
+								)}
 							>
-								<summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden">
-									<span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold text-muted-foreground">
+								<summary className="flex cursor-pointer list-none items-start gap-3 rounded-md outline-none [&::-webkit-details-marker]:hidden focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+									<span className="border-primary/35 bg-primary/10 text-primary mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums">
 										{item.id}
 									</span>
 									<div className="min-w-0 flex-1">
-										<span className="inline-flex rounded-full border border-border/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+										<Badge variant="secondary" className="text-[11px] font-medium">
 											{item.role}
-										</span>
-										<h3 className="mt-2 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+										</Badge>
+										<h3 className="text-foreground mt-2 text-lg font-semibold tracking-tight sm:text-xl">
 											{item.question}
 										</h3>
 									</div>
 									<span
 										aria-hidden
-										className="mt-1 text-muted-foreground transition-transform duration-200 ease-out group-open:rotate-180"
+										className="text-muted-foreground group-open:text-primary mt-1 transition-[transform,color] duration-200 ease-out group-open:rotate-180"
 									>
-										▾
+										<ChevronDown className="size-5" strokeWidth={2} />
 									</span>
 								</summary>
-								<p className="mt-3 pl-9 text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
+								<p className="text-muted-foreground mt-3 pl-10 text-sm leading-relaxed md:text-[15px]">
 									<span className="block max-w-[68ch] text-pretty">{item.answer}</span>
 								</p>
 							</details>
 						))}
-					</div>
-					<div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/70 bg-background/70 px-5 py-4">
-						<p className="text-sm text-muted-foreground sm:text-base">
-							Still have a question? Pick your role and we will route you to the right portal flow.
-						</p>
-						<Button size="sm" render={<Link href="/signup/role-picker" />}>
-							Start with role signup
-						</Button>
+						</div>
+						<div
+							className={cn(
+								"relative z-10 flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-6 md:py-6",
+								faqCardSurfaceClassName,
+							)}
+						>
+							<p className="text-muted-foreground text-sm sm:text-base">
+								Still have a question? Pick your role and we will route you to the right portal flow.
+							</p>
+							<Button
+								className="h-10 shrink-0 rounded-full px-5 text-sm font-semibold shadow-none"
+								render={<Link href="/signup/role-picker" />}
+							>
+								Start with role signup
+							</Button>
+						</div>
 					</div>
 				</div>
 			</section>
 
 			<section id="cta" className={`bg-background ${sectionShell}`}>
-				<div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl border border-border/70 bg-background px-6 py-16 text-center sm:px-10 sm:py-20">
-					<DottedSurface className="absolute inset-0 z-0" />
+				<div
+					className={cn(
+						"relative mx-auto overflow-hidden rounded-2xl px-6 py-16 text-center sm:px-10 sm:py-20",
+						sectionContentMax,
+						landingFeatureBentoShell,
+					)}
+				>
+					<DottedSurface className="absolute inset-0 z-0 opacity-90" />
 					<div className="relative z-10 mx-auto max-w-2xl">
-						<h2 className={sectionTitle}>Start Smarter Practice Today</h2>
+						<h2 className={cn(sectionTitle, "text-card-foreground")}>Start Smarter Practice Today</h2>
 						<p className={sectionLead}>
 							Adaptive tests, topic-level insights, and teacher-ready progress reports in one place.
 						</p>
-						<div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+						<div
+							className={cn(
+								"mt-8 flex flex-wrap items-center justify-center",
+								LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
+							)}
+						>
 							<LandingPrimaryCtaButton render={<Link href="/signup/role-picker" />} />
 							<Button
-								className="h-11 rounded-full border-primary bg-transparent px-6 text-sm font-semibold text-primary shadow-none hover:bg-primary/10 hover:text-primary"
-								variant="outline"
+								className={LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME}
+								variant="marketingSecondary"
 								render={<a href="#pricing" />}
 							>
 								Book a School Demo

@@ -268,7 +268,7 @@ function EmptyState({
 }) {
 	return (
 		<div className="flex flex-col items-start gap-4 pt-4 sm:pt-8">
-			<div className="max-w-xl min-w-0 w-full space-y-1.5">
+			<div className="min-w-0 w-full max-w-none space-y-1.5">
 				<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
 					{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
 				</h3>
@@ -436,7 +436,7 @@ function DoubtChatThread({
 	return (
 		<div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
 			<header className="border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-10 shrink-0 border-b px-4 py-2.5 backdrop-blur sm:px-6">
-				<div className="mx-auto flex w-full min-w-0 max-w-4xl items-center gap-3">
+				<div className="flex w-full min-w-0 items-center gap-3">
 					<div
 						aria-hidden
 						className="border-emerald-500/30 bg-emerald-500/10 flex size-8 shrink-0 items-center justify-center rounded-lg border text-emerald-600 dark:text-emerald-400"
@@ -470,7 +470,7 @@ function DoubtChatThread({
 					className="min-h-0 h-full overflow-y-auto overscroll-y-contain"
 					aria-label="Conversation messages"
 				>
-					<div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+					<div className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
 						{empty ? (
 							<EmptyState
 								topicName={topicName}
@@ -560,13 +560,13 @@ function DoubtChatThread({
 
 			<div className="shrink-0 px-4 pt-1 pb-4 sm:px-6">
 				{error ? (
-					<Alert variant="destructive" className="mx-auto mb-3 max-w-4xl rounded-xl">
+					<Alert variant="destructive" className="mb-3 w-full min-w-0 rounded-xl">
 						<AlertTitle>Something went wrong</AlertTitle>
 						<AlertDescription>{error.message}</AlertDescription>
 					</Alert>
 				) : null}
 
-				<form onSubmit={onSubmit} className="mx-auto max-w-4xl">
+				<form onSubmit={onSubmit} className="w-full min-w-0">
 					<div
 						className={cn(
 							"group/composer relative rounded-xl border shadow-sm transition-[border-color,box-shadow] duration-150",
@@ -661,7 +661,7 @@ function DoubtChatThread({
 					</div>
 				</form>
 
-				<div className="text-muted-foreground/80 mx-auto mt-2 flex max-w-4xl items-center justify-between gap-3 px-1 text-[11px] leading-snug">
+				<div className="text-muted-foreground/80 mt-2 flex w-full min-w-0 items-center justify-between gap-3 px-1 text-[11px] leading-snug">
 					<span className="truncate">
 						Tutor can be wrong — double-check important facts.
 					</span>
@@ -1149,7 +1149,7 @@ export function DoubtChatView(props: {
 							exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
 							transition={{ duration: panelDuration, ease: "easeOut" }}
 						>
-						<div className="flex w-full max-w-xl flex-col gap-6">
+						<div className="flex w-full min-w-0 flex-col gap-6 md:w-1/2">
 							{/* Hero */}
 							<div className="flex min-w-0 w-full flex-col items-start gap-3">
 								<div

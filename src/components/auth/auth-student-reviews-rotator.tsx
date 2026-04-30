@@ -1,24 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { TrendingUpIcon } from "lucide-react";
 
-import {
-	Avatar,
-	AvatarFallback,
-	AvatarGroup,
-	AvatarGroupCount,
-	AvatarImage,
-} from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-/**
- * Shared frosted panel shell for testimonial and avatar strip.
- * `transform-gpu` promotes a layer so `backdrop-filter` paints reliably once parent `overflow` is visible.
- */
-const AUTH_FROST_GLASS =
-	"isolate transform-gpu rounded-xl border border-white/12 ring-1 ring-white/[0.06] bg-black/[0.58] shadow-2xl shadow-black/45 backdrop-blur-xl backdrop-saturate-150 [-webkit-backdrop-filter:blur(24px)_saturate(1.5)] supports-[backdrop-filter]:bg-black/[0.38]";
+import { AUTH_FROST_GLASS, AuthTrustedStudentsGlassStrip } from "./auth-trusted-students-glass-strip";
 
 /** Slightly slower on auth so the strip feels calmer next to form work (critique: peripheral motion). */
 const ROTATE_MS = 7500;
@@ -187,36 +174,7 @@ export function AuthStudentReviewsRotator() {
 				/>
 			</div>
 
-			<div
-				className={cn(
-					AUTH_FROST_GLASS,
-					"flex w-full max-w-sm items-center justify-start gap-2 px-4 py-4 md:px-6 md:py-5",
-				)}
-			>
-				<AvatarGroup
-					className="grayscale -space-x-3"
-					aria-label="Example student avatars; illustrative only"
-				>
-					<Avatar size="lg">
-						<AvatarImage src="https://github.com/shadcn.png" alt="" />
-						<AvatarFallback>CN</AvatarFallback>
-					</Avatar>
-					<Avatar size="lg">
-						<AvatarImage src="https://github.com/maxleiter.png" alt="" />
-						<AvatarFallback>LR</AvatarFallback>
-					</Avatar>
-					<Avatar size="lg">
-						<AvatarImage src="https://github.com/evilrabbit.png" alt="" />
-						<AvatarFallback>ER</AvatarFallback>
-					</Avatar>
-					<AvatarGroupCount className="h-10 min-h-10 min-w-10 w-10 shrink-0 rounded-full border border-white/12 bg-black/55 px-0 text-lg font-bold leading-none tracking-tight text-card-foreground backdrop-blur-md [-webkit-backdrop-filter:blur(12px)] supports-[backdrop-filter]:bg-black/45">
-						<TrendingUpIcon className="size-4" aria-hidden />
-					</AvatarGroupCount>
-				</AvatarGroup>
-				<p className="text-xs font-medium tracking-[-0.01em] text-card-foreground/90">
-					Trusted by 40K+ students
-				</p>
-			</div>
+			<AuthTrustedStudentsGlassStrip />
 		</section>
 	);
 }

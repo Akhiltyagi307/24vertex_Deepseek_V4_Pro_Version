@@ -39,7 +39,7 @@ export function StudyTipsForm() {
 	}
 
 	return (
-		<div className="mx-auto flex max-w-lg flex-col gap-6">
+		<div className="flex w-full min-w-0 flex-col gap-6">
 			<form onSubmit={onSubmit} className="flex flex-col gap-4">
 				<Field>
 					<FieldLabel htmlFor="study-topic">Topic or goal</FieldLabel>

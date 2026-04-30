@@ -13,7 +13,7 @@ export default async function TeacherDashboardPage() {
 	}
 
 	return (
-		<div className="mx-auto max-w-3xl space-y-8">
+		<div className="w-full min-w-0 space-y-8">
 			<div className="flex items-center justify-between gap-4">
 				<div className="space-y-1">
 					<h1 className="text-2xl font-semibold tracking-tight">Teacher account</h1>

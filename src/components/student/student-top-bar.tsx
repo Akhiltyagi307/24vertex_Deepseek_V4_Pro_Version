@@ -6,7 +6,7 @@ import {
 	type HeaderPortal,
 } from "@/components/layout/app-header-brand-trail";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 /** Match theme / logout controls in `ThemeToggle` */
@@ -27,9 +27,6 @@ export function StudentTopBar({
 	shareableId,
 	headerPortal = "student",
 }: StudentTopBarProps) {
-	const { state, isMobile } = useSidebar();
-	const omitLogo = state === "expanded" && !isMobile;
-
 	return (
 		<header className="sticky top-0 z-50 flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-sidebar px-4">
 			<div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm md:gap-x-3">
@@ -45,7 +42,7 @@ export function StudentTopBar({
 					userDisplayName={userDisplayName}
 					shareableId={shareableId}
 					headerPortal={headerPortal}
-					omitLogo={omitLogo}
+					omitLogo={false}
 				/>
 			</div>
 			<ThemeToggle />

@@ -224,10 +224,10 @@ export function StudentDashboardView({
 	);
 
 	return (
-		<div className="flex flex-col gap-8 p-6">
+		<div className="mx-0 flex w-full min-w-0 max-w-none flex-col gap-8 py-6 md:py-8">
 			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<motion.div
-				className="flex shrink-0 flex-col gap-1.5"
+				className="flex w-full min-w-0 max-w-none shrink-0 flex-col gap-1.5"
 				initial="hidden"
 				animate="show"
 				variants={container}
@@ -243,12 +243,12 @@ export function StudentDashboardView({
 				</motion.div>
 			</motion.div>
 
-			<section aria-labelledby="stats-heading" className="flex flex-col gap-3">
+			<section aria-labelledby="stats-heading" className="flex w-full min-w-0 max-w-none flex-col gap-3">
 				<h2 id="stats-heading" className={SECTION_LABEL_CLASS}>
 					At a glance
 				</h2>
 				<motion.div
-					className="grid gap-5 md:grid-cols-12 md:items-stretch"
+					className="grid w-full min-w-0 max-w-none gap-5 md:grid-cols-12 md:items-stretch"
 					initial="hidden"
 					animate="show"
 					variants={container}
@@ -355,10 +355,10 @@ export function StudentDashboardView({
 				</motion.div>
 			</section>
 
-			<div className="grid min-h-0 gap-6 lg:grid-cols-3 lg:items-stretch">
+			<div className="grid min-h-0 w-full min-w-0 max-w-none gap-6 lg:grid-cols-3 lg:items-stretch">
 				<section
 					aria-labelledby="subjects-heading"
-					className="flex min-h-0 min-w-0 flex-col gap-3 lg:col-span-2"
+					className="flex min-h-0 min-w-0 max-w-none flex-col gap-3 lg:col-span-2"
 				>
 					<h2 id="subjects-heading" className={cn(SECTION_LABEL_CLASS, "shrink-0")}>
 						{isParent ? "Subjects" : "Subjects you study"}
@@ -392,7 +392,7 @@ export function StudentDashboardView({
 						<div className="flex flex-col gap-4">
 							{prioritySubjects.length > 0 ? (
 								<motion.div
-									className="grid gap-3.5 sm:grid-cols-2 sm:gap-4"
+									className="grid w-full min-w-0 max-w-none gap-3.5 sm:grid-cols-2 sm:gap-4"
 									initial="hidden"
 									animate="show"
 									variants={container}
@@ -486,7 +486,7 @@ export function StudentDashboardView({
 				</section>
 
 				<motion.div
-					className="flex min-h-0 flex-col gap-6 lg:h-full"
+					className="flex min-h-0 w-full min-w-0 max-w-none flex-col gap-6 lg:h-full"
 					initial="hidden"
 					animate="show"
 					variants={container}
@@ -539,11 +539,16 @@ export function StudentDashboardView({
 				</motion.div>
 			</div>
 
-			<section aria-labelledby="charts-heading" className="flex flex-col gap-3">
+			<section aria-labelledby="charts-heading" className="flex w-full min-w-0 max-w-none flex-col gap-3">
 				<h2 id="charts-heading" className={SECTION_LABEL_CLASS}>
 					{isParent ? "Progress charts" : "Trends & charts"}
 				</h2>
-				<motion.div initial="hidden" animate="show" variants={container}>
+				<motion.div
+					className="w-full min-w-0 max-w-none"
+					initial="hidden"
+					animate="show"
+					variants={container}
+				>
 					<motion.div variants={item}>
 						<StudentDashboardAnalytics payload={analytics} variant={isParent ? "parent" : "student"} />
 					</motion.div>

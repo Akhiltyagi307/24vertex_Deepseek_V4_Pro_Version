@@ -27,7 +27,9 @@ import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPlanCatalog } from "@/lib/cache/deterministic-lookups";
 import { getCachedEntitlements } from "@/lib/billing/entitlements";
+import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -74,11 +76,11 @@ export default async function StudentSubscriptionPage() {
 		: "";
 
 	return (
-		<div className="w-full min-w-0 p-6 sm:p-8">
+		<div className={cn("min-w-0 py-6 sm:py-8", studentHubPageShellClassName)}>
 			<main className="min-w-0">
 				<PageStaggerRoot
 					enableLift={false}
-					className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 sm:gap-8"
+					className="flex w-full min-w-0 flex-col gap-6 sm:gap-8"
 					sections={[
 						{
 							key: "header",
@@ -132,7 +134,7 @@ export default async function StudentSubscriptionPage() {
 								<section id="plans" className="flex flex-col gap-4">
 									<div>
 										<h2 className="font-heading text-lg font-medium tracking-tight">Choose a plan</h2>
-										<p className="max-w-[65ch] text-pretty text-sm text-muted-foreground">
+										<p className="text-pretty text-sm text-muted-foreground">
 											Pick what fits how often you’ll practice and use the AI tutor. Paid plans use Razorpay with
 											UPI Autopay or card; checkout is secure, and you can cancel from this page.
 										</p>
@@ -168,7 +170,7 @@ export default async function StudentSubscriptionPage() {
 											<TicketIcon className="size-4 text-muted-foreground" aria-hidden />
 											<CardTitle className="text-base">Have a coupon?</CardTitle>
 										</div>
-										<CardDescription className="max-w-[65ch] text-pretty">
+										<CardDescription className="text-pretty">
 											If your parent has a code from school or a campaign, you can apply it here for a free month
 											on Pro Monthly, with no card needed.
 										</CardDescription>

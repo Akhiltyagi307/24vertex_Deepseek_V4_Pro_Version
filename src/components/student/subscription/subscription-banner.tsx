@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { AlertCircleIcon, ArrowRightIcon, SparklesIcon } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
+import { isStudentImmersiveShellPath } from "@/lib/navigation/shell-immersive-paths";
 import { cn } from "@/lib/utils";
 
 type Tone = "info" | "warning" | "danger";
@@ -54,6 +58,9 @@ function chooseBanner(e: EntitlementSnapshot): null | {
 }
 
 export function SubscriptionBanner({ entitlement }: { entitlement: EntitlementSnapshot | null }) {
+	const pathname = usePathname();
+	const immersiveShell = isStudentImmersiveShellPath(pathname);
+
 	if (!entitlement) return null;
 	if (entitlement.staffOverride) return null;
 	if (!entitlement.enforcementActive && entitlement.status === "trialing" && entitlement.trialDaysLeft != null && entitlement.trialDaysLeft > 3) {
@@ -73,7 +80,8 @@ export function SubscriptionBanner({ entitlement }: { entitlement: EntitlementSn
 	return (
 		<div
 			className={cn(
-				"flex shrink-0 flex-col items-start gap-2 border-b px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4",
+				"flex shrink-0 flex-col items-start gap-2 border-b py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4",
+				immersiveShell ? "px-4" : "px-0",
 				toneClasses[banner.tone],
 			)}
 			role="status"

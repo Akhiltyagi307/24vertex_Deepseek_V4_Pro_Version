@@ -78,7 +78,14 @@ const nextConfig: NextConfig = {
 		optimizePackageImports: ["lucide-react", "recharts"],
 	},
 	images: {
-		remotePatterns: supabaseStorageRemotePatterns(),
+		remotePatterns: [
+			...supabaseStorageRemotePatterns(),
+			{
+				protocol: "https",
+				hostname: "images.unsplash.com",
+				pathname: "/**",
+			},
+		],
 	},
 	async headers() {
 		const base: { key: string; value: string }[] = [

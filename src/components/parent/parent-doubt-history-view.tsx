@@ -107,7 +107,7 @@ export function ParentDoubtHistoryView({
 					) : initialMessages.length === 0 ? (
 						<p className="text-muted-foreground text-sm">No messages in this thread.</p>
 					) : (
-						<div className="mx-auto flex max-w-3xl flex-col gap-4">
+						<div className="flex w-full min-w-0 flex-col gap-4">
 							{initialMessages.map((m) => {
 								const isUser = m.role === "user";
 								return (

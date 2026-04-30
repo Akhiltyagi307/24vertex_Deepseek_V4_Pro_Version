@@ -2,6 +2,7 @@ import { Building2, GraduationCap, HeartHandshake, ShieldCheck } from "lucide-re
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const testimonials = [
@@ -14,8 +15,6 @@ const testimonials = [
 		role: "Class 11 Student, Pune",
 		context: "CBSE · Physics · 6-week revision cycle",
 		roleTag: "Student",
-		accentClassName: "text-blue-300",
-		chipClassName: "border-blue-400/35 bg-blue-500/10 text-blue-200",
 		image:
 			"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
 		fallback: "AM",
@@ -31,8 +30,6 @@ const testimonials = [
 		role: "Parent, Delhi",
 		context: "Parent view · Grade 9 · Weekly check-ins",
 		roleTag: "Parent",
-		accentClassName: "text-amber-300",
-		chipClassName: "border-amber-400/35 bg-amber-500/10 text-amber-200",
 		image:
 			"https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=400&q=80",
 		fallback: "NS",
@@ -47,8 +44,6 @@ const testimonials = [
 		role: "Academic Coordinator, Bengaluru",
 		context: "ICSE school · Grades 8-10 · Section analytics",
 		roleTag: "School",
-		accentClassName: "text-violet-300",
-		chipClassName: "border-violet-400/35 bg-violet-500/10 text-violet-200",
 		image:
 			"https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=400&q=80",
 		fallback: "RI",
@@ -62,8 +57,6 @@ const testimonials = [
 		role: "Math Teacher, Kochi",
 		context: "State board · Grade 10 Math · Daily assignments",
 		roleTag: "Teacher",
-		accentClassName: "text-emerald-300",
-		chipClassName: "border-emerald-400/35 bg-emerald-500/10 text-emerald-200",
 		image:
 			"https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=400&q=80",
 		fallback: "PN",
@@ -77,8 +70,6 @@ const testimonials = [
 		role: "Parent, Nashik",
 		context: "SSC board · Grade 8 · Weekly test prep",
 		roleTag: "Parent",
-		accentClassName: "text-amber-300",
-		chipClassName: "border-amber-400/35 bg-amber-500/10 text-amber-200",
 		image:
 			"https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=400&q=80",
 		fallback: "AK",
@@ -88,10 +79,12 @@ const testimonials = [
 
 export default function Testimonials() {
 	return (
-		<section id="testimonials" className="border-b border-foreground/20 bg-background py-16 sm:py-20">
-			<div className="mx-auto max-w-6xl space-y-8 px-4 sm:px-6 lg:px-8 md:space-y-14">
+		<section id="testimonials" className="bg-background py-16 sm:py-20">
+			<div className="mx-auto w-full max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8 md:space-y-14">
 				<div className="mx-auto max-w-2xl space-y-4 text-center">
-					<Badge variant="outline">Voices</Badge>
+					<Badge variant="outline" className={landingMarketingSectionEyebrowBadgeClassName}>
+						Voices
+					</Badge>
 					<h2 className="pt-1 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
 						Built for Indian classrooms, trusted by students, parents, and teachers
 					</h2>
@@ -111,7 +104,7 @@ export default function Testimonials() {
 								<div className="flex items-center gap-3">
 									<item.icon
 										aria-hidden="true"
-										className={`size-4 ${item.featured ? "text-primary" : item.accentClassName}`}
+										className={`size-4 ${item.featured ? "text-primary" : "text-subject-grid-icon"}`}
 										strokeWidth={2.2}
 									/>
 									<p className="text-sm font-medium text-muted-foreground">
@@ -119,9 +112,7 @@ export default function Testimonials() {
 									</p>
 								</div>
 								<div className="flex flex-wrap items-center justify-end gap-1.5">
-									<span
-										className={`rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${item.chipClassName}`}
-									>
+									<span className="border-primary/25 bg-primary/10 text-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide">
 										{item.roleTag}
 									</span>
 									<span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

@@ -17,7 +17,7 @@ export default function StudentAiStudyTipsPage() {
 	return (
 		<PageStaggerRoot
 			enableLift={false}
-			className="flex flex-col gap-6 px-4 py-8 md:px-8"
+			className="flex flex-col gap-6 py-8"
 			sections={[
 				{
 					key: "intro",

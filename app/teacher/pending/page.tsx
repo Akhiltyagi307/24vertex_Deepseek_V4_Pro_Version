@@ -10,7 +10,7 @@ export default async function TeacherPendingPage() {
 	}
 
 	return (
-		<div className="mx-auto max-w-2xl space-y-6">
+		<div className="w-full min-w-0 space-y-6">
 			<div className="flex items-center justify-between gap-4">
 				<h1 className="text-xl font-semibold">Account pending</h1>
 				<SignOutButton />

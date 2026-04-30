@@ -36,6 +36,7 @@ yarn-error.log*
 *.tsbuildinfo
 
 # Temp / scratch
+tw-debug.css
 .tmp_*.json
 .mcp-github-push-batches/
 

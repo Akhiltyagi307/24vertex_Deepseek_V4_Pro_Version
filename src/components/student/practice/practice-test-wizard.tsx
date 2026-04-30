@@ -526,8 +526,6 @@ export function PracticeTestWizard({
 	} | null>(null);
 	const [generating, setGenerating] = React.useState(false);
 	const [generatingStatusIndex, setGeneratingStatusIndex] = React.useState(0);
-	const [generatingStartedAt, setGeneratingStartedAt] = React.useState<number | null>(null);
-	const [generatingElapsed, setGeneratingElapsed] = React.useState(0);
 	const generateAbortRef = React.useRef<AbortController | null>(null);
 	// Phase 4: preview payload (a fully-generated test ready for inspection).
 	const [generatedPreview, setGeneratedPreview] = React.useState<{
@@ -696,15 +694,6 @@ export function PracticeTestWizard({
 		markHandled(true);
 	}, [performanceRows, router, searchParams]);
 
-	// Phase 4: tick elapsed seconds on the generation overlay.
-	React.useEffect(() => {
-		if (!generating || generatingStartedAt == null) return;
-		const id = window.setInterval(() => {
-			setGeneratingElapsed(Math.floor((Date.now() - generatingStartedAt) / 1000));
-		}, 1000);
-		return () => window.clearInterval(id);
-	}, [generating, generatingStartedAt]);
-
 	React.useEffect(() => {
 		if (!generating) {
 			setGeneratingStatusIndex(0);
@@ -806,8 +795,6 @@ export function PracticeTestWizard({
 		const abort = new AbortController();
 		generateAbortRef.current = abort;
 		setGenerating(true);
-		setGeneratingStartedAt(Date.now());
-		setGeneratingElapsed(0);
 		try {
 			const payload = {
 				subjectId,
@@ -907,7 +894,6 @@ export function PracticeTestWizard({
 			}
 		} finally {
 			setGenerating(false);
-			setGeneratingStartedAt(null);
 			generateAbortRef.current = null;
 		}
 	};
@@ -1044,7 +1030,7 @@ export function PracticeTestWizard({
 
 	if (loadError) {
 		return (
-			<div className="p-6">
+			<div className="py-6 md:py-8">
 				<Alert variant="destructive">
 					<AlertTitle>Could not load practice data</AlertTitle>
 					<AlertDescription>{loadError}</AlertDescription>
@@ -1055,7 +1041,7 @@ export function PracticeTestWizard({
 
 	if (!enrolledSubjects.length) {
 		return (
-			<div className="p-6">
+			<div className="py-6 md:py-8">
 				<Alert>
 					<AlertTitle>No subjects found</AlertTitle>
 					<AlertDescription>
@@ -1068,8 +1054,8 @@ export function PracticeTestWizard({
 	}
 
 	return (
-		<div className="w-full p-6 sm:p-8">
-			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 sm:gap-8">
+		<div className="w-full py-6 sm:py-8">
+			<div className="flex w-full min-w-0 flex-col gap-6 sm:gap-8">
 				<div className="flex shrink-0 flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Practice</h1>
 					<PageHeaderSubtext>
@@ -1247,7 +1233,7 @@ export function PracticeTestWizard({
 							<h2 className="font-semibold text-foreground text-xl tracking-tight sm:text-[1.375rem]">
 								Topics
 							</h2>
-							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base max-w-2xl">
+							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
 								Select the chapters or topics you want in this test for{" "}
 								<span className="text-foreground font-medium">{selectedSubjectName}</span>. Need a refresher?{" "}
 								<Link
@@ -1890,9 +1876,8 @@ export function PracticeTestWizard({
 								>
 									{GENERATING_STATUS_MESSAGES[generatingStatusIndex]}
 								</p>
-								<p className="text-muted-foreground font-mono text-xs tabular-nums">
-									{generatingElapsed}s elapsed
-									{generatingElapsed >= 60 ? " · taking a bit longer than usual" : null}
+								<p className="text-muted-foreground px-4 text-center text-sm">
+									This might take a minute or two.
 								</p>
 								<Button
 									type="button"

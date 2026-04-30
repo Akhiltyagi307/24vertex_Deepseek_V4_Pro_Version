@@ -7,7 +7,7 @@ import { cardSurfaceFrameClassName } from "@/components/ui/card";
 /** RSC Suspense fallback while dashboard data loads. */
 export function StudentDashboardSkeleton() {
 	return (
-		<div className="flex flex-col gap-8 p-6" aria-busy aria-label="Loading dashboard">
+		<div className="flex flex-col gap-8 py-6 md:py-8" aria-busy aria-label="Loading dashboard">
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<Skeleton className="h-9 w-48 max-w-full" />
 				<div className={pageHeaderSubtextScrollClass}>

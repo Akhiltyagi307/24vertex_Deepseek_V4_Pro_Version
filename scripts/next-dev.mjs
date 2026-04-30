@@ -48,6 +48,14 @@ function buildDevEnv() {
 	if (hadProxy) {
 		console.warn("Detected proxy env vars; preserving them and setting NO_PROXY for localhost + Supabase.");
 	}
+	// macOS + Turbopack/Watchpack often hits EMFILE with default soft NOFILE; native fs.watch can wedge or 404 routes.
+	// Polling trades a little CPU for far fewer watch descriptors. Opt out if you have raised limits and prefer native watch.
+	const nativeFsWatch =
+		env.NEXT_DEV_NATIVE_FS_WATCH === "1" || env.NEXT_DEV_NATIVE_FS_WATCH === "true";
+	if (process.platform === "darwin" && !nativeFsWatch) {
+		if (!env.WATCHPACK_POLLING) env.WATCHPACK_POLLING = "true";
+		if (!env.CHOKIDAR_USEPOLLING) env.CHOKIDAR_USEPOLLING = "true";
+	}
 	return env;
 }
 
@@ -151,14 +159,26 @@ if (!fs.existsSync(nextCli)) {
 	process.exit(1);
 }
 
-const child = spawn(
-	process.execPath,
-	[nextCli, "dev", "-H", "localhost", "-p", String(port)],
-	{
-		stdio: "inherit",
-		env: buildDevEnv(),
-	},
-);
+const devArgs = ["dev", "-H", "localhost", "-p", String(port)];
+const env = buildDevEnv();
+
+/**
+ * macOS/Linux dev often hits EMFILE from Turbopack/Watchpack when the soft `ulimit -n`
+ * is low (256), which breaks file watching and can surface as 404s on normal routes.
+ * Bump NOFILE in the child shell when possible; Windows keeps a direct spawn.
+ * On macOS, `buildDevEnv` also sets Watchpack/Chokidar polling unless NEXT_DEV_NATIVE_FS_WATCH=1.
+ */
+function spawnNextDev() {
+	if (process.platform === "win32") {
+		return spawn(process.execPath, [nextCli, ...devArgs], { stdio: "inherit", env });
+	}
+	const q = (s) => JSON.stringify(s);
+	const shellCmd =
+		`ulimit -n 65536 2>/dev/null || ulimit -n 32768 2>/dev/null || ulimit -n 16384 2>/dev/null || ulimit -n 10240 2>/dev/null || ulimit -n 4096 2>/dev/null || true; exec ${q(process.execPath)} ${q(nextCli)} ${devArgs.map(q).join(" ")}`;
+	return spawn("sh", ["-c", shellCmd], { stdio: "inherit", env });
+}
+
+const child = spawnNextDev();
 
 child.on("exit", (code, signal) => {
 	if (signal) process.kill(process.pid, signal);

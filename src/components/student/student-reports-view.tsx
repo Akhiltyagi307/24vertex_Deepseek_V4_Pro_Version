@@ -251,7 +251,7 @@ export function StudentReportsView({
 	const { container, item } = useReportsStaggerVariants();
 
 	return (
-		<div className="flex flex-col gap-8 p-6 pb-28">
+		<div className="flex w-full min-w-0 flex-col gap-8 py-6 pb-28 md:py-8">
 			<motion.header
 				className="flex shrink-0 flex-col gap-1.5"
 				initial="hidden"
@@ -686,7 +686,7 @@ export function StudentReportsView({
 							{initialTests.length === 0 ? (
 								<tr>
 									<td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
-										<div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+										<div className="flex w-full min-w-0 flex-col items-center gap-2">
 											<Search className="size-8 opacity-40" aria-hidden />
 											<span>No submitted or graded tests yet. Finish a practice test to see it here.</span>
 										</div>

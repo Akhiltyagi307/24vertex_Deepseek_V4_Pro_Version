@@ -407,7 +407,7 @@ export function StudentPerformanceView({
 
 	if (loadError) {
 		return (
-			<div className="p-6">
+			<div className="py-6 md:py-8">
 				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">
@@ -429,7 +429,7 @@ export function StudentPerformanceView({
 
 	if (!loadError && enrolledSubjectCards.length === 0) {
 		return (
-			<div className="p-6">
+			<div className="py-6 md:py-8">
 				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">
@@ -465,7 +465,7 @@ export function StudentPerformanceView({
 	}
 
 	return (
-		<div className="flex flex-col gap-6 p-6 pb-24 sm:gap-7 sm:pb-28">
+		<div className="flex w-full min-w-0 flex-col gap-6 py-6 pb-24 sm:gap-7 md:py-8 sm:pb-28">
 			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<AnimatePresence mode="wait" initial={false}>
 				{!detailSubjectId ? (

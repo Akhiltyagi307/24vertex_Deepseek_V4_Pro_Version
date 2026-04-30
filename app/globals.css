@@ -174,7 +174,6 @@
     }
   body {
     @apply bg-background text-foreground;
-    padding-inline: 10%;
     }
   html {
     @apply scroll-smooth font-sans;
@@ -265,5 +264,36 @@
   }
   100% {
     offset-distance: 100%;
+  }
+}
+
+/* Landing hero: school names marquee (duplicated track; -50% = one full cycle). */
+@keyframes landing-schools-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-schools-marquee-track {
+  animation: landing-schools-marquee 70s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-schools-marquee-track {
+    animation: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 0.5rem;
+    column-gap: 2.5rem;
+    width: 100%;
+    max-width: 48rem;
+    margin-inline: auto;
+  }
+
+  .landing-schools-marquee-track > span {
+    margin-inline-end: 0;
   }
 }

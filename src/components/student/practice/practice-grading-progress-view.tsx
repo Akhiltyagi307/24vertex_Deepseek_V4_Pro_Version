@@ -216,7 +216,7 @@ export function PracticeGradingProgressView({
 	const showStuckNudge = phase === "grading" && elapsedSeconds >= STUCK_REQUEUE_AFTER_SECONDS;
 
 	return (
-		<div className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-lg flex-col justify-center gap-6 p-6 sm:p-8">
+		<div className="flex min-h-[calc(100dvh-8rem)] w-full min-w-0 flex-col justify-center gap-6 p-6 sm:p-8">
 			<Card className="bg-card/80 shadow-md dark:shadow-none">
 				<CardHeader className="gap-2 border-b border-border/60 pb-6">
 					<div className="flex items-center gap-2">

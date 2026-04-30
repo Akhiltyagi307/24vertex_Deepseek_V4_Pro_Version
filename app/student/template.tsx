@@ -4,7 +4,7 @@ import { SegmentPageTransition } from "@/components/motion/segment-page-transiti
 
 export default function StudentTemplate({ children }: { children: ReactNode }) {
 	return (
-		<SegmentPageTransition className="flex min-h-0 min-w-0 flex-1 flex-col">
+		<SegmentPageTransition className="flex min-h-0 min-w-0 max-w-none flex-1 basis-0 flex-col">
 			{children}
 		</SegmentPageTransition>
 	);

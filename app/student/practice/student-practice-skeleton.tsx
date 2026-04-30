@@ -6,7 +6,7 @@ import { pageHeaderSubtextScrollClass, pageHeaderSubtextTextClass } from "@/comp
 /** RSC Suspense fallback while practice hub data loads. */
 export function StudentPracticeSkeleton() {
 	return (
-		<div className="w-full min-w-0 p-6" aria-busy aria-label="Loading practice">
+		<div className="w-full min-w-0 py-6 md:py-8" aria-busy aria-label="Loading practice">
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<Skeleton className="h-9 w-44 max-w-full" />
 				<div className={pageHeaderSubtextScrollClass}>

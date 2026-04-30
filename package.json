@@ -8,6 +8,10 @@
   },
   "scripts": {
     "dev": "node scripts/next-dev.mjs",
+    "dev:pm2": "pnpm exec pm2 start ecosystem.config.cjs --update-env",
+    "dev:pm2:stop": "pnpm exec pm2 delete edu-ai-dev",
+    "dev:pm2:restart": "pnpm exec pm2 restart edu-ai-dev",
+    "dev:pm2:logs": "pnpm exec pm2 logs edu-ai-dev",
     "dev:clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\" && node scripts/next-dev.mjs",
     "build": "next build",
     "start": "next start",
@@ -111,6 +115,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "pm2": "^6.0.14",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.3"

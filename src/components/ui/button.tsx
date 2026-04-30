@@ -12,6 +12,9 @@ const buttonVariants = cva(
           "bg-emerald-600 text-white [a]:hover:bg-emerald-600/90 dark:bg-emerald-500 dark:[a]:hover:bg-emerald-500/90",
         outline:
           "border-2 border-emerald-600 bg-background text-emerald-800 shadow-none hover:bg-emerald-600 hover:text-white aria-expanded:bg-emerald-600 aria-expanded:text-white dark:border-emerald-500 dark:bg-input/30 dark:text-emerald-100 dark:hover:bg-emerald-500 dark:aria-expanded:bg-emerald-500 dark:aria-expanded:text-white [a]:hover:bg-emerald-600 [a]:hover:text-white dark:[a]:hover:bg-emerald-500",
+        /** Marketing “secondary” CTA: no green border until hover. */
+        marketingSecondary:
+          "border-2 border-zinc-400 bg-zinc-950 text-zinc-50 shadow-none hover:border-emerald-600 hover:bg-emerald-600 hover:text-white aria-expanded:border-emerald-600 aria-expanded:bg-emerald-600 aria-expanded:text-white dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:border-emerald-500 dark:hover:bg-emerald-500 dark:hover:text-white dark:aria-expanded:border-emerald-500 dark:aria-expanded:bg-emerald-500 dark:aria-expanded:text-white [a]:hover:border-emerald-600 [a]:hover:bg-emerald-600 [a]:hover:text-white dark:[a]:hover:border-emerald-500 dark:[a]:hover:bg-emerald-500 dark:[a]:hover:text-white",
         secondary:
           "bg-emerald-600 text-white hover:bg-emerald-600/90 aria-expanded:bg-emerald-600 aria-expanded:text-white dark:bg-emerald-500 dark:hover:bg-emerald-500/90 dark:aria-expanded:bg-emerald-500 [a]:hover:bg-emerald-600/90 dark:[a]:hover:bg-emerald-500/90",
         ghost:

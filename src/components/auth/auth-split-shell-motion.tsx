@@ -14,10 +14,13 @@ const enter =
  * Light enter animation without Framer (CSS via tw-animate), so the auth shell
  * does not pull motion into the client graph for this block.
  */
-const authMax = "mx-auto w-full max-w-4xl";
+const authMax = "mx-auto w-full min-w-0 max-w-none";
 
-/** Same width cap as `authMax`; `w-full` avoids `w-fit` shrink-wrap fighting `AuthStudioCard`’s `w-full`. */
-const authHitMax = "mx-auto w-full max-w-full min-w-0 md:max-w-4xl";
+/**
+ * Cap the split card at half the viewport on md+ so the panel does not span the full width.
+ * Mobile stays full width so the form column remains readable.
+ */
+const authHitMax = "mx-auto w-full min-w-0 md:max-w-[50dvw]";
 
 export function AuthSplitShellMotion({ logo, children }: AuthSplitShellMotionProps) {
 	return (
