@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { TrendingUpIcon } from "lucide-react";
 
 import {
 	Avatar,
@@ -189,7 +190,7 @@ export function AuthStudentReviewsRotator() {
 			<div
 				className={cn(
 					AUTH_FROST_GLASS,
-					"flex w-full max-w-sm items-center justify-center px-4 py-4 md:px-6 md:py-5",
+					"flex w-full max-w-sm items-center justify-start gap-2 px-4 py-4 md:px-6 md:py-5",
 				)}
 			>
 				<AvatarGroup
@@ -208,10 +209,13 @@ export function AuthStudentReviewsRotator() {
 						<AvatarImage src="https://github.com/evilrabbit.png" alt="" />
 						<AvatarFallback>ER</AvatarFallback>
 					</Avatar>
-					<AvatarGroupCount className="h-10 min-h-10 min-w-10 w-auto shrink-0 rounded-full border border-white/12 bg-black/55 px-2 text-xs font-semibold leading-none tracking-tight text-card-foreground backdrop-blur-md [-webkit-backdrop-filter:blur(12px)] supports-[backdrop-filter]:bg-black/45">
-						+40K
+					<AvatarGroupCount className="h-10 min-h-10 min-w-10 w-10 shrink-0 rounded-full border border-white/12 bg-black/55 px-0 text-lg font-bold leading-none tracking-tight text-card-foreground backdrop-blur-md [-webkit-backdrop-filter:blur(12px)] supports-[backdrop-filter]:bg-black/45">
+						<TrendingUpIcon className="size-4" aria-hidden />
 					</AvatarGroupCount>
 				</AvatarGroup>
+				<p className="text-xs font-medium tracking-[-0.01em] text-card-foreground/90">
+					Trusted by 40K+ students
+				</p>
 			</div>
 		</section>
 	);

@@ -1,0 +1,10 @@
+signup_student:200
+signup_teacher:200
+teacher_dashboard:307
+teacher_pending:307
+student_practice:307
+student_doubt:307
+student_subscription:307
+billing_create:400
+billing_cancel:401
+doubt_api:400

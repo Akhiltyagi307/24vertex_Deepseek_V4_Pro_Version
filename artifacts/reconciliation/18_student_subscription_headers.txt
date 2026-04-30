@@ -1,0 +1,16 @@
+HTTP/1.1 307 Temporary Redirect
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+X-Frame-Options: SAMEORIGIN
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://suwakggcbxmmvqzeudmq.supabase.co wss://suwakggcbxmmvqzeudmq.supabase.co https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://api.razorpay.com; img-src 'self' data: blob: https: https://suwakggcbxmmvqzeudmq.supabase.co; font-src 'self' data:; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+link: </_next/static/media/caa3a2e1cccd8315-s.p.16t1db8_9y2o~.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/%5Broot-of-the-server%5D__0l9fcvu._.css>; rel=preload; as="style"
+location: /login
+Cache-Control: no-cache, must-revalidate
+X-Powered-By: Next.js
+Content-Type: text/html; charset=utf-8
+Date: Wed, 29 Apr 2026 14:43:13 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

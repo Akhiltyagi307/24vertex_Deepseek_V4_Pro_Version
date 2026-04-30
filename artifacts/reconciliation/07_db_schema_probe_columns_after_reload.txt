@@ -1,0 +1,5 @@
+profiles.elective_subject_id
+profiles.phone
+profiles.stream
+student_answers.ai_reference_answer_summary
+student_answers.ai_user_answer_summary

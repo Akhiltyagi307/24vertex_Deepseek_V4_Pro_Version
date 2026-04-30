@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { LandingMarketingBody } from "@/components/marketing/landing-marketing-body";
-import { LandingSiteHeader } from "@/components/marketing/landing-site-header";
 
 export default async function HomePage() {
 	const supabase = await createClient();
@@ -23,7 +22,6 @@ export default async function HomePage() {
 			>
 				Skip to main content
 			</a>
-			<LandingSiteHeader />
 			<MotionPageEnter>
 				<main id="main-content" tabIndex={-1} className="outline-none">
 					<LandingMarketingBody />
