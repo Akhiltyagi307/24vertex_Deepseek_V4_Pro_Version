@@ -10,6 +10,9 @@ if (dsn) {
 		replaysOnErrorSampleRate: 0.1,
 		replaysSessionSampleRate: 0,
 		environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.NODE_ENV,
-		integrations: [],
+		enableLogs: true,
+		integrations: [
+			Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
+		],
 	});
 }

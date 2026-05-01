@@ -3,16 +3,42 @@
 import Link from "next/link";
 import { ArrowLeftIcon, InfoIcon, UserPlusIcon } from "lucide-react";
 import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { linkParentToStudent } from "./actions";
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import { SubmitButton } from "@/components/auth/submit-button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+function linkChildReasonMessage(reason: string | null): { title: string; body: string } | null {
+	switch (reason) {
+		case "guardian_email":
+			return {
+				title: "Guardian email must match",
+				body: "Your parent login email must match the guardian email on your student's EduAI profile. Ask them to open Profile and update it, or use the same email you used at parent signup.",
+			};
+		case "invalid_code":
+			return {
+				title: "Link code did not match a student",
+				body: "Double-check the six-character code from the student's Profile (two letters + four numbers), then try again below.",
+			};
+		case "link_error":
+			return {
+				title: "Could not attach your student automatically",
+				body: "Your parent account is ready. Enter your child's link code below to finish connecting them.",
+			};
+		default:
+			return null;
+	}
+}
+
 export function LinkChildForm() {
 	const [state, formAction] = useActionState(linkParentToStudent, {});
+	const searchParams = useSearchParams();
+	const reasonCopy = linkChildReasonMessage(searchParams.get("reason"));
 
 	const staggerSections = [
 		{
@@ -28,6 +54,12 @@ export function LinkChildForm() {
 							Enter their six-character link code from the student Profile, or paste their account UUID.
 						</p>
 					</div>
+					{reasonCopy ? (
+						<Alert variant="default" className="border-primary/25 bg-primary/5 text-left">
+							<AlertTitle>{reasonCopy.title}</AlertTitle>
+							<AlertDescription className="text-muted-foreground">{reasonCopy.body}</AlertDescription>
+						</Alert>
+					) : null}
 				</header>
 			),
 		},

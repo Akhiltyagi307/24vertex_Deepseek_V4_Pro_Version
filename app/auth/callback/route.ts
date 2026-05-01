@@ -105,6 +105,24 @@ export async function GET(request: Request) {
 		return NextResponse.redirect(u);
 	}
 
+	if (pending === "parent_portal_link_email_mismatch") {
+		const u = new URL("/parent/link-child", origin);
+		u.searchParams.set("reason", "guardian_email");
+		return NextResponse.redirect(u);
+	}
+
+	if (pending === "parent_portal_link_student_not_found") {
+		const u = new URL("/parent/link-child", origin);
+		u.searchParams.set("reason", "invalid_code");
+		return NextResponse.redirect(u);
+	}
+
+	if (pending === "parent_portal_link_unknown") {
+		const u = new URL("/parent/link-child", origin);
+		u.searchParams.set("reason", "link_error");
+		return NextResponse.redirect(u);
+	}
+
 	if (pending === "failed") {
 		await supabase.auth.signOut();
 		const u = new URL("/login", origin);

@@ -36,9 +36,18 @@ export function ParentShell({
 }: ParentShellProps) {
 	const pathname = usePathname();
 	const doubtChat = isParentDoubtChatPath(pathname);
+	const [sidebarOpen, setSidebarOpen] = React.useState(!doubtChat);
+
+	React.useEffect(() => {
+		if (isParentDoubtChatPath(pathname)) {
+			setSidebarOpen(false);
+		}
+	}, [pathname]);
 
 	return (
 		<SidebarProvider
+			open={sidebarOpen}
+			onOpenChange={setSidebarOpen}
 			className={cn(
 				"flex w-full flex-col",
 				doubtChat ? "h-dvh max-h-dvh min-h-0 overflow-hidden" : "min-h-svh",

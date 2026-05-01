@@ -6,6 +6,7 @@ import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registra
 import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
 import { getProfile } from "@/lib/auth/routing";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { classifyLinkParentRpc } from "@/lib/auth/link-parent-rpc-errors";
 import {
 	parentRegistrationPayloadSchema,
 	studentProfileBodySchema,
@@ -30,20 +31,48 @@ export type ConsumePendingRegistrationResult =
 	| "failed"
 	| "failed_unsupported_teacher_signup"
 	| "failed_parent_email_mismatch"
-	| "failed_student_not_found";
+	| "failed_student_not_found"
+	/** Parent row exists; keep session and finish linking from the portal. */
+	| "parent_portal_link_email_mismatch"
+	| "parent_portal_link_student_not_found"
+	| "parent_portal_link_unknown";
 
-function classifyLinkParentError(message: string):
-	| "parent_email_mismatch"
-	| "student_not_found"
-	| "generic" {
-	const m = message.toLowerCase();
-	if (m.includes("parent email does not match")) {
-		return "parent_email_mismatch";
+async function linkPendingParentToStudent(
+	supabase: SupabaseClient,
+	parentUserId: string,
+	studentLinkCode: string,
+): Promise<
+	| "completed_profile"
+	| "failed"
+	| "failed_parent_email_mismatch"
+	| "failed_student_not_found"
+	| "parent_portal_link_email_mismatch"
+	| "parent_portal_link_student_not_found"
+	| "parent_portal_link_unknown"
+> {
+	const { error: linkErr } = await supabase.rpc("link_parent_to_student", {
+		p_student_ref: studentLinkCode,
+	});
+	if (!linkErr) {
+		return "completed_profile";
 	}
-	if (m.includes("student not found")) {
-		return "student_not_found";
+	logSupabaseError("consumePendingRegistration.link_parent_to_student", linkErr);
+	const bucket = classifyLinkParentRpc(linkErr);
+
+	const { data: prof, error: profErr } = await supabase
+		.from("profiles")
+		.select("role")
+		.eq("id", parentUserId)
+		.maybeSingle();
+	const isParent = !profErr && prof?.role === "parent";
+
+	if (bucket === "parent_email_mismatch") {
+		return isParent ? "parent_portal_link_email_mismatch" : "failed_parent_email_mismatch";
 	}
-	return "generic";
+	if (bucket === "student_not_found") {
+		return isParent ? "parent_portal_link_student_not_found" : "failed_student_not_found";
+	}
+	return isParent ? "parent_portal_link_unknown" : "failed";
 }
 
 type ParsedPending = z.infer<typeof pendingEnvelopeSchema>;
@@ -120,14 +149,8 @@ export async function consumePendingRegistration(
 	}
 
 	const profile = await getProfile();
-	if (profile) {
-		return "no_pending";
-	}
-
 	const pending = parsePendingEnvelopeFromUser(user);
-	if (pending.status === "none") {
-		return "no_pending";
-	}
+
 	if (pending.status === "failed") {
 		return "failed";
 	}
@@ -135,11 +158,35 @@ export async function consumePendingRegistration(
 		return "failed_unsupported_teacher_signup";
 	}
 
+	if (pending.status === "none") {
+		return "no_pending";
+	}
+
 	const envelope = pending.envelope;
-	if (user.email?.toLowerCase() !== envelope.payload.email.toLowerCase()) {
+	const authEmail = user.email?.trim().toLowerCase() ?? "";
+	const pendingEmail = envelope.payload.email.trim().toLowerCase();
+	// After PKCE exchange, `user.email` can be briefly unset on some clients; do not block on empty.
+	if (authEmail && pendingEmail && authEmail !== pendingEmail) {
 		return "failed";
 	}
 
+	/** Parent row may exist while linking never ran (first callback failed after `register_parent`). */
+	if (profile) {
+		if (envelope.role === "student") {
+			if (profile.role === "student") {
+				return "no_pending";
+			}
+			return "failed";
+		}
+		// envelope.role === "parent"
+		if (profile.role !== "parent") {
+			return "failed";
+		}
+		const v = envelope.payload;
+		return linkPendingParentToStudent(supabase, user.id, v.studentLinkCode);
+	}
+
+	// No profile row yet — create then link (or register student).
 	if (envelope.role === "student") {
 		const v = envelope.payload;
 		const streamVal = v.grade >= 11 && v.grade <= 12 ? (v.stream ?? null) : null;
@@ -170,26 +217,13 @@ export async function consumePendingRegistration(
 		});
 		if (rpcError) {
 			if (/profile already exists/i.test(rpcError.message)) {
-				return "no_pending";
+				// Profile was created on a prior attempt; still run the link step.
+				return linkPendingParentToStudent(supabase, user.id, v.studentLinkCode);
 			}
 			logSupabaseError("consumePendingRegistration.register_parent", rpcError);
 			return "failed";
 		}
-		const { error: linkErr } = await supabase.rpc("link_parent_to_student", {
-			p_student_ref: v.studentLinkCode,
-		});
-		if (linkErr) {
-			logSupabaseError("consumePendingRegistration.link_parent_to_student", linkErr);
-			switch (classifyLinkParentError(linkErr.message ?? "")) {
-				case "parent_email_mismatch":
-					return "failed_parent_email_mismatch";
-				case "student_not_found":
-					return "failed_student_not_found";
-				default:
-					return "failed";
-			}
-		}
-		return "completed_profile";
+		return linkPendingParentToStudent(supabase, user.id, v.studentLinkCode);
 	}
 
 	return "failed";

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { ParentPortalStandaloneShell } from "@/components/parent/parent-portal-standalone-shell";
 
 import { LinkChildForm } from "./link-child-form";
@@ -5,7 +7,9 @@ import { LinkChildForm } from "./link-child-form";
 export default function LinkChildPage() {
 	return (
 		<ParentPortalStandaloneShell>
-			<LinkChildForm />
+			<Suspense fallback={null}>
+				<LinkChildForm />
+			</Suspense>
 		</ParentPortalStandaloneShell>
 	);
 }

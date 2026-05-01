@@ -246,7 +246,11 @@ export function AcmeHero() {
           >
             <SchoolsMarquee />
             <div className="mx-auto mt-10 flex w-full max-w-2xl justify-center px-1 sm:mt-12">
-              <AuthTrustedStudentsGlassStrip prominence="hero" className="w-full sm:w-auto" />
+              <AuthTrustedStudentsGlassStrip
+                prominence="hero"
+                surface="soft"
+                className="w-full sm:w-auto"
+              />
             </div>
           </motion.div>
         </section>

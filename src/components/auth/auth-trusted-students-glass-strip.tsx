@@ -24,18 +24,22 @@ type AuthTrustedStudentsGlassStripProps = {
 	className?: string;
 	/** Marketing hero: larger type, centered row, roomier padding. Default is compact (e.g. auth rotator). */
 	prominence?: "default" | "hero";
+	/** `frost` matches auth testimonial card; `soft` is a lighter muted panel (e.g. landing hero). */
+	surface?: "frost" | "soft";
 };
 
 export function AuthTrustedStudentsGlassStrip({
 	className,
 	prominence = "default",
+	surface = "frost",
 }: AuthTrustedStudentsGlassStripProps) {
 	const hero = prominence === "hero";
+	const panelShell = surface === "frost" ? AUTH_FROST_GLASS : AUTH_SOFT_PANEL;
 
 	return (
 		<div
 			className={cn(
-				AUTH_SOFT_PANEL,
+				panelShell,
 				hero
 					? "flex w-full max-w-xl flex-col items-center gap-3 rounded-2xl px-5 py-4 sm:flex-row sm:justify-center sm:gap-5 sm:px-7 sm:py-4"
 					: "flex w-full max-w-sm items-center justify-start gap-2 px-4 py-4 md:px-6 md:py-5",

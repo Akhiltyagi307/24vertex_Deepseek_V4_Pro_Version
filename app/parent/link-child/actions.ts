@@ -1,8 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import {
+	classifyLinkParentRpc,
+	formatLinkParentRpcDevDetails,
+	userMessageForLinkParentRpcFailure,
+} from "@/lib/auth/link-parent-rpc-errors";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { createClient } from "@/lib/supabase/server";
 import { linkParentSchema } from "@/lib/validations/auth";
 
 export type LinkChildState = { error?: string; success?: boolean };
@@ -25,10 +30,15 @@ export async function linkParentToStudent(
 
 	if (error) {
 		logSupabaseError("linkParentToStudent.link_parent_to_student", error);
-		return {
-			error:
-				"We couldn't link that account. Check the link code or student ID. If their profile lists a guardian email, your parent login email must match it.",
-		};
+		const kind = classifyLinkParentRpc(error);
+		let message = userMessageForLinkParentRpcFailure(kind);
+		if (kind === "generic" && process.env.NODE_ENV === "development") {
+			const detail = formatLinkParentRpcDevDetails(error);
+			if (detail) {
+				message = `${message} [dev: ${detail}]`;
+			}
+		}
+		return { error: message };
 	}
 
 	redirect("/parent/dashboard");

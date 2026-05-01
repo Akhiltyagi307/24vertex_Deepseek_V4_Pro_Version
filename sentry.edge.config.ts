@@ -8,5 +8,9 @@ if (dsn) {
 		dsn,
 		tracesSampleRate: Number.parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE ?? defaultTraceRate),
 		environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+		enableLogs: true,
+		integrations: [
+			Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
+		],
 	});
 }
