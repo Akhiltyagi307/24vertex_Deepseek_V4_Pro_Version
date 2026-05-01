@@ -543,30 +543,30 @@ export function StudentPerformanceView({
 								);
 
 								if (!hasTopics) {
+									const noTopicsHint = parentViewer
+										? "No catalog topics for this grade yet."
+										: "No catalog topics for your grade yet.";
 									return (
 										<motion.div key={s.subjectId} className="min-h-0" variants={item}>
 											<Link
 												href={href}
 												scroll
-												aria-label={`Open ${s.subjectName} performance`}
+												aria-label={`Open ${s.subjectName} performance. ${noTopicsHint}`}
 												className={cn(
-													"block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+													"group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 												)}
 											>
 												<SubjectCard
 													subject={s.subjectName}
 													lastTestDate=""
-													subtitle={
-														parentViewer
-															? "Topics for this grade are not in the catalog yet. Curriculum may still be updating."
-															: "No topics in the catalog for this grade yet. When they appear, open this subject and start with any topic."
-													}
+													subtitle={undefined}
 													topicsAttempted={0}
 													topicsTotal={0}
 													testsTaken={0}
 													avgScore={0}
 													status="ready_to_start"
 													showCta={false}
+													showTileHint
 													metricsIconSlot={iconEl}
 													density="compact"
 												/>
@@ -576,30 +576,30 @@ export function StudentPerformanceView({
 								}
 
 								if (!hasTrackerRows) {
+									const trackerHint = parentViewer
+										? "Topics load after curriculum links."
+										: "Topics load after curriculum is linked.";
 									return (
 										<motion.div key={s.subjectId} className="min-h-0" variants={item}>
 											<Link
 												href={href}
 												scroll
-												aria-label={`Open ${s.subjectName} performance`}
+												aria-label={`Open ${s.subjectName} performance. ${trackerHint}`}
 												className={cn(
-													"block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+													"group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 												)}
 											>
 												<SubjectCard
 													subject={s.subjectName}
 													lastTestDate=""
-													subtitle={
-														parentViewer
-															? "Their topic list appears once curriculum is linked. Open the subject to see what loads next."
-															: "Your topic list appears once curriculum is linked. Open the subject to get started."
-													}
+													subtitle={undefined}
 													topicsAttempted={0}
 													topicsTotal={s.topicTotal}
 													testsTaken={0}
 													avgScore={0}
 													status="ready_to_start"
 													showCta={false}
+													showTileHint
 													metricsIconSlot={iconEl}
 													density="compact"
 												/>
@@ -608,34 +608,42 @@ export function StudentPerformanceView({
 									);
 								}
 
+								const noTestsHint = parentViewer
+									? "No tests yet. Open subject to view topics."
+									: "No tests yet. Open subject to start.";
+								const subjectLinkAria = !hasAttempts
+									? st.lastTestDate
+										? `Open ${s.subjectName} performance. Last test ${lastLabel}.`
+										: `Open ${s.subjectName} performance. ${noTestsHint}`
+									: `Open ${s.subjectName} performance`;
+
 								return (
 									<motion.div key={s.subjectId} className="min-h-0" variants={item}>
 										<Link
 											href={href}
 											scroll
-											aria-label={`Open ${s.subjectName} performance`}
+											aria-label={subjectLinkAria}
 											className={cn(
-												"block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+												"group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 											)}
 										>
 											<SubjectCard
 												subject={s.subjectName}
-												lastTestDate={hasAttempts ? lastLabel : ""}
-												subtitle={
-													!hasAttempts
-														? st.lastTestDate
-															? `Last test · ${lastLabel}`
-															: parentViewer
-																? "No tests yet. Open the subject to see topics and encourage their next attempt."
-																: "No tests yet. Open this subject when you are ready; your first run starts the scoreboard."
-														: undefined
-												}
+												lastTestDate={lastLabel}
+												subtitle={undefined}
 												topicsAttempted={s.attemptedCount}
 												topicsTotal={s.topicTotal}
 												testsTaken={st.testsTakenTotal}
 												avgScore={hasAttempts ? avgScore : 0}
 												status={!hasAttempts ? "ready_to_start" : cardStatus}
 												showCta={false}
+												showTileHint
+												topicStatusCounts={{
+													good: st.good,
+													satisfactory: st.satisfactory,
+													bad: st.bad,
+													notTested: st.notTested,
+												}}
 												metricsIconSlot={iconEl}
 												density="compact"
 											/>

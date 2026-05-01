@@ -37,6 +37,8 @@ export const doubtMessages = pgTable(
 			.notNull()
 			.references(() => doubtConversations.id, { onDelete: "cascade" }),
 		role: varchar("role", { length: 20 }).notNull(),
+		/** User messages: tutor mode when sent. Assistant rows leave null. */
+		tutorMode: varchar("tutor_mode", { length: 20 }),
 		content: text("content").notNull(),
 		promptTokens: integer("prompt_tokens"),
 		completionTokens: integer("completion_tokens"),

@@ -444,7 +444,7 @@ export default function SmoothTab({
       aria-label="Smooth tabs"
       className={cn(
         "relative flex items-center justify-between gap-1 py-1",
-        "mx-auto w-full max-w-3xl bg-background",
+        "w-full bg-background",
         "rounded-xl border border-border ring-1 ring-foreground/10 transition-colors hover:border-border/80",
         "transition-all duration-200",
         tabListPosition === "bottom" ? "mt-auto" : "mb-4",

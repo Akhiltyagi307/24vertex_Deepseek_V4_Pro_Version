@@ -2,14 +2,14 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ActivityIcon, BookOpenIcon, FlameIcon, LineChartIcon } from "lucide-react";
+import { ActivityIcon, FlameIcon, LineChartIcon } from "lucide-react";
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
+import { SubjectTopicRadarChart } from "@/components/charts/subject-topic-radar-chart";
 import { pageHeaderSubtextScrollClass, pageHeaderSubtextTextClass } from "@/components/student/page-header-subtext";
 import { SubjectCard, subjectStatusLabelToDashboardStatus } from "@/components/student/dashboard-subject-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardAction,
@@ -23,15 +23,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardOtherSubjectsTable } from "@/components/student/dashboard-other-subjects-table";
 import type { StudentDashboardAnalyticsPayload } from "@/lib/student/dashboard-analytics";
 import type { DashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
+import type { SubjectTopicRadarDatum } from "@/lib/charts/subject-topic-radar-config";
 import { partitionDashboardSubjectsByPriority } from "@/lib/student/dashboard-subject-priority";
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
-import { getSubjectCardIconConfig } from "@/lib/student/subject-lucide-icon";
+import { getSubjectCardIconConfig, getTopicProgressCardIconConfig } from "@/lib/student/subject-lucide-icon";
 import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
 import { cn } from "@/lib/utils";
 
 /** Major section labels + in-column sub-labels: same type scale and alignment. */
 const SECTION_LABEL_CLASS =
 	"font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground";
+
+const topicProgressHeaderIcon = getTopicProgressCardIconConfig();
+const TopicProgressHeaderIcon = topicProgressHeaderIcon.Icon;
 
 const StudentDashboardAnalytics = dynamic(
 	() =>
@@ -70,14 +74,6 @@ export type StudentDashboardSubjectCard = {
 	status: SubjectStatusLabel;
 	scorePercent: number | null;
 	practiceHref: string;
-};
-
-export type StudentDashboardRecentTest = {
-	id: string;
-	subjectName: string;
-	scorePercent: number | null;
-	testDateIso: string | null;
-	durationSeconds: number | null;
 };
 
 function formatLastTest(iso: string | null): string {
@@ -140,19 +136,11 @@ function topicProgressMotivation(
 ): string | null {
 	if (needsWork <= 0) return null;
 	if (mastered === 0) {
-		return isParent
-			? "Each session they finish moves more of these toward on target."
-			: "Pick a subject below; each session you finish moves topics toward solid.";
+		return isParent ? "Each session they finish moves more of these toward on target." : null;
 	}
 	return isParent
 		? "Extra practice still lifts the topics that are not on target yet."
 		: "Keep going; every revisit chips away at what is still building.";
-}
-
-function formatDurationLabel(seconds: number | null): string {
-	if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return "No duration logged";
-	const roundedMinutes = Math.max(1, Math.round(seconds / 60));
-	return `${roundedMinutes} min`;
 }
 
 function useStaggerVariants() {
@@ -190,9 +178,9 @@ export type StudentDashboardViewProps = {
 	headerGreeting: string;
 	performanceStats: DashboardPerformanceStats;
 	subjectCards: StudentDashboardSubjectCard[];
+	topicProgressRadar: SubjectTopicRadarDatum[];
 	subjectsLoadError: string | null;
 	analytics: StudentDashboardAnalyticsPayload;
-	recentTests: StudentDashboardRecentTest[];
 	trackerNeedsHydration?: boolean;
 	/** Parent portal reuses this view with read-only messaging and links under `/parent`. */
 	variant?: "student" | "parent";
@@ -202,9 +190,9 @@ export function StudentDashboardView({
 	headerGreeting,
 	performanceStats,
 	subjectCards,
+	topicProgressRadar,
 	subjectsLoadError,
 	analytics,
-	recentTests,
 	trackerNeedsHydration = false,
 	variant = "student",
 }: StudentDashboardViewProps) {
@@ -243,126 +231,28 @@ export function StudentDashboardView({
 				</motion.div>
 			</motion.div>
 
-			<section aria-labelledby="stats-heading" className="flex w-full min-w-0 max-w-none flex-col gap-3">
-				<h2 id="stats-heading" className={SECTION_LABEL_CLASS}>
-					At a glance
-				</h2>
-				<motion.div
-					className="grid w-full min-w-0 max-w-none gap-5 md:grid-cols-12 md:items-stretch"
-					initial="hidden"
-					animate="show"
-					variants={container}
+			{/* `sm` aligns with inner subject cards: 640–767px is “mobile” shell but full-width main (< `md`). */}
+			{/* Row 1: section label (left) + empty cell (right) so Topic progress lines up with subject cards, not the label. */}
+			<div
+				className={cn(
+					"grid w-full min-w-0 max-w-none grid-cols-1 gap-4 sm:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] sm:gap-x-5 sm:gap-y-4",
+					prioritySubjects.length > 0 ? "sm:items-stretch" : "sm:items-start",
+				)}
+			>
+				<h2
+					id="subjects-heading"
+					className={cn(SECTION_LABEL_CLASS, "shrink-0 sm:col-start-1 sm:row-start-1")}
 				>
-					<motion.div className="flex min-h-0 min-w-0 md:col-span-8" variants={item}>
-						<Card className="h-full w-full min-w-0 shadow-none">
-							<CardHeader className="pb-2">
-								<CardTitle className="text-sm font-semibold leading-snug">
-									{isParent ? "Their practice signals" : "Practice signals"}
-								</CardTitle>
-								<CardDescription className="text-xs leading-snug">
-									Tests, timed minutes, and scores (averages use the last 30 days).
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="grid gap-5 sm:grid-cols-3">
-								<div className="flex min-w-0 flex-col gap-2">
-									<div className="flex items-center gap-2">
-										<ActivityIcon
-											className="size-5 shrink-0 text-sky-600 dark:text-sky-400"
-											strokeWidth={2}
-											aria-hidden
-										/>
-										<span className="text-muted-foreground text-xs font-medium leading-snug">
-											Tests completed
-										</span>
-									</div>
-									<p className="font-semibold text-2xl tabular-nums text-foreground">
-										{performanceStats.testsCompleted}
-									</p>
-									<p className="text-muted-foreground text-xs leading-snug">
-										{testsCompletedCaption(performanceStats.testsCompleted, isParent)}
-									</p>
-								</div>
-								<div className="flex min-w-0 flex-col gap-2">
-									<div className="flex items-center gap-2">
-										<FlameIcon
-											className="size-5 shrink-0 text-orange-600 dark:text-orange-400"
-											strokeWidth={2}
-											aria-hidden
-										/>
-										<span className="text-muted-foreground text-xs font-medium leading-snug">
-											Time practicing
-										</span>
-									</div>
-									<p className="font-semibold text-2xl tabular-nums text-foreground">
-										{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
-									</p>
-									<p className="text-muted-foreground text-xs leading-snug">
-										{timePracticingCaption(performanceStats.timeSpentMinutesLast30Days, isParent)}
-									</p>
-								</div>
-								<div className="flex min-w-0 flex-col gap-2">
-									<div className="flex items-center gap-2">
-										<LineChartIcon
-											className="size-5 shrink-0 text-violet-600 dark:text-violet-400"
-											strokeWidth={2}
-											aria-hidden
-										/>
-										<span className="text-muted-foreground text-xs font-medium leading-snug">
-											Average score
-										</span>
-									</div>
-									<p className="font-semibold text-2xl tabular-nums text-foreground">{averageScoreDisplay.value}</p>
-									<p className="text-muted-foreground text-xs leading-snug">{averageScoreDisplay.caption}</p>
-								</div>
-							</CardContent>
-						</Card>
-					</motion.div>
-					<motion.div className="flex min-h-0 min-w-0 md:col-span-4" variants={item}>
-						<Card className="h-full w-full min-w-0 shadow-none">
-							<CardHeader className="pb-2">
-								<CardTitle className="text-sm font-semibold leading-snug">Topic progress</CardTitle>
-								<CardAction>
-									<BookOpenIcon
-										className="size-7 text-subject-grid-icon"
-										strokeWidth={2}
-										aria-hidden
-									/>
-								</CardAction>
-							</CardHeader>
-							<CardContent className="flex flex-1 flex-col gap-4">
-								<dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-									<div className="min-w-0">
-										<dt className="text-muted-foreground text-xs font-medium leading-snug">
-											{isParent ? "On target" : "Solid"}
-										</dt>
-										<dd className="font-semibold text-2xl tabular-nums text-foreground">
-											{performanceStats.topicsMasteredCount}
-										</dd>
-									</div>
-									<div className="min-w-0">
-										<dt className="text-muted-foreground text-xs font-medium leading-snug">Still building</dt>
-										<dd className="font-semibold text-2xl tabular-nums text-foreground">
-											{performanceStats.topicsNeedingImprovementCount}
-										</dd>
-									</div>
-								</dl>
-								{topicProgressBlurb ? (
-									<p className="mt-auto text-muted-foreground text-xs font-medium leading-snug">{topicProgressBlurb}</p>
-								) : null}
-							</CardContent>
-						</Card>
-					</motion.div>
-				</motion.div>
-			</section>
-
-			<div className="grid min-h-0 w-full min-w-0 max-w-none gap-6 lg:grid-cols-3 lg:items-stretch">
+					{isParent ? "Subjects" : "Subjects you study"}
+				</h2>
+				<div
+					className="hidden sm:block sm:col-start-2 sm:row-start-1"
+					aria-hidden
+				/>
 				<section
 					aria-labelledby="subjects-heading"
-					className="flex min-h-0 min-w-0 max-w-none flex-col gap-3 lg:col-span-2"
+					className="flex min-w-0 flex-col gap-4 sm:col-start-1 sm:row-start-2"
 				>
-					<h2 id="subjects-heading" className={cn(SECTION_LABEL_CLASS, "shrink-0")}>
-						{isParent ? "Subjects" : "Subjects you study"}
-					</h2>
 					{subjectsLoadError ? (
 						<Alert variant="destructive">
 							<AlertTitle>Could not load tracker data</AlertTitle>
@@ -389,75 +279,79 @@ export function StudentDashboardView({
 							</CardHeader>
 						</Card>
 					) : (
-						<div className="flex flex-col gap-4">
+						<>
 							{prioritySubjects.length > 0 ? (
 								<motion.div
-									className="grid w-full min-w-0 max-w-none gap-3.5 sm:grid-cols-2 sm:gap-4"
+									className="grid w-full min-w-0 max-w-none grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4"
 									initial="hidden"
 									animate="show"
 									variants={container}
 								>
 									{prioritySubjects.map((s) => {
-											const lastLabel = formatLastTest(s.lastTestDateIso);
-											const hasAttempts = s.attemptedCount > 0;
-											const cardStatus = subjectStatusLabelToDashboardStatus(s.status);
-											const avgScore = s.scorePercent ?? 0;
-											const { Icon, iconClassName, shellClassName } = getSubjectCardIconConfig(
-												s.subjectName,
-											);
-											const subjectIcon = (
-												<span
-													className={cn(
-														"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
-														"border-border/80 ring-1",
-														shellClassName,
-													)}
-													aria-hidden
-												>
-													<Icon
-														className={cn("size-5 sm:size-[1.375rem]", iconClassName)}
-														strokeWidth={1.25}
-													/>
-												</span>
-											);
+										const lastLabel = formatLastTest(s.lastTestDateIso);
+										const hasAttempts = s.attemptedCount > 0;
+										const cardStatus = subjectStatusLabelToDashboardStatus(s.status);
+										const avgScore = s.scorePercent ?? 0;
+										const { Icon, iconClassName, shellClassName } = getSubjectCardIconConfig(s.subjectName);
+										const subjectIcon = (
+											<span
+												className={cn(
+													"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+													"border-border/80 ring-1",
+													shellClassName,
+												)}
+												aria-hidden
+											>
+												<Icon
+													className={cn("size-5 sm:size-[1.375rem]", iconClassName)}
+													strokeWidth={1.25}
+												/>
+											</span>
+										);
 
-											return (
-												<motion.div key={s.subjectId} className="min-h-0" variants={item}>
-													{													!hasAttempts ? (
-														<SubjectCard
-															subject={s.subjectName}
-															lastTestDate=""
-															subtitle={
-																s.lastTestDateIso
-																	? `Last test · ${lastLabel}`
-																	: "No tests recorded yet"
-															}
-															topicsAttempted={0}
-															topicsTotal={s.topicTotal}
-															testsTaken={0}
-															avgScore={0}
-															status="ready_to_start"
-															ctaLabel={isParent ? "View performance" : "Start focus session"}
-															ctaRender={<Link href={s.practiceHref} />}
-															metricsIconSlot={subjectIcon}
-														/>
-													) : (
-														<SubjectCard
-															subject={s.subjectName}
-															lastTestDate={lastLabel}
-															topicsAttempted={s.attemptedCount}
-															topicsTotal={s.topicTotal}
-															testsTaken={s.testsTaken}
-															avgScore={avgScore}
-															status={cardStatus}
-															ctaLabel={isParent ? "View performance" : "Start focus session"}
-															ctaRender={<Link href={s.practiceHref} />}
-															metricsIconSlot={subjectIcon}
-														/>
-													)}
-												</motion.div>
-											);
-										})}
+										return (
+											<motion.div
+												key={s.subjectId}
+												className="flex min-h-0 min-w-0 sm:h-full"
+												variants={item}
+											>
+												{!hasAttempts ? (
+													<SubjectCard
+														subject={s.subjectName}
+														lastTestDate=""
+														subtitle={
+															s.lastTestDateIso
+																? `Last test · ${lastLabel}`
+																: "No tests recorded yet"
+														}
+														topicsAttempted={0}
+														topicsTotal={s.topicTotal}
+														testsTaken={0}
+														avgScore={0}
+														status="ready_to_start"
+														ctaLabel={isParent ? "View performance" : "Start focus session"}
+														ctaRender={<Link href={s.practiceHref} />}
+														metricsIconSlot={subjectIcon}
+														className="min-h-0 w-full flex-1"
+													/>
+												) : (
+													<SubjectCard
+														subject={s.subjectName}
+														lastTestDate={lastLabel}
+														topicsAttempted={s.attemptedCount}
+														topicsTotal={s.topicTotal}
+														testsTaken={s.testsTaken}
+														avgScore={avgScore}
+														status={cardStatus}
+														ctaLabel={isParent ? "View performance" : "Start focus session"}
+														ctaRender={<Link href={s.practiceHref} />}
+														metricsIconSlot={subjectIcon}
+														className="min-h-0 w-full flex-1"
+													/>
+												)}
+											</motion.div>
+										);
+									})}
 								</motion.div>
 							) : null}
 
@@ -472,66 +366,151 @@ export function StudentDashboardView({
 											All subjects · {restSubjects.length}
 										</p>
 									)}
-									<div className={cn(cardSurfaceFrameClassName, "overflow-hidden p-5")}>
-										<DashboardOtherSubjectsTable
-											subjects={restSubjects}
-											motionContainer={container}
-											motionItem={item}
-										/>
-									</div>
+									<Card className="min-w-0 overflow-hidden shadow-none">
+										<CardContent className="p-4 sm:p-5">
+											<DashboardOtherSubjectsTable
+												subjects={restSubjects}
+												motionContainer={container}
+												motionItem={item}
+											/>
+										</CardContent>
+									</Card>
 								</div>
 							) : null}
-						</div>
+						</>
 					)}
 				</section>
 
 				<motion.div
-					className="flex min-h-0 w-full min-w-0 max-w-none flex-col gap-6 lg:h-full"
+					className="flex min-h-0 w-full min-w-0 flex-col gap-3 sm:col-start-2 sm:row-start-2 sm:h-full sm:min-h-0"
 					initial="hidden"
 					animate="show"
 					variants={container}
 				>
+					<motion.div variants={item} className="flex min-h-0 min-w-0 flex-1 flex-col sm:min-h-0">
+						<Card className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-2 py-5 shadow-none">
+							<CardHeader className="px-5 pb-1 pt-0">
+								<CardTitle className="text-sm font-semibold leading-snug">Topic progress</CardTitle>
+								<CardAction className="pt-0.5">
+									<span
+										className={cn(
+											"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+											"border-border/80 ring-1",
+											topicProgressHeaderIcon.shellClassName,
+										)}
+										aria-hidden
+									>
+										<TopicProgressHeaderIcon
+											className={cn("size-5 sm:size-[1.375rem]", topicProgressHeaderIcon.iconClassName)}
+											strokeWidth={1.25}
+											aria-hidden
+										/>
+									</span>
+								</CardAction>
+							</CardHeader>
+							<CardContent className="flex min-h-0 flex-1 flex-col gap-1.5 px-5 pb-0 pt-0">
+								{topicProgressRadar.length > 0 ? (
+									<div className="flex min-h-0 min-w-0 flex-1 flex-col [&_[data-slot=chart]]:min-h-0 [&_[data-slot=chart]]:min-w-0 [&_[data-slot=chart]]:w-full">
+										<SubjectTopicRadarChart
+											data={topicProgressRadar}
+											variant="dashboard"
+											fillHeight
+										/>
+									</div>
+								) : (
+									<p className="text-muted-foreground text-xs font-medium leading-snug">
+										{isParent
+											? "Subject breakdown appears once their class lists subjects."
+											: "Subject breakdown appears once your class lists subjects."}
+									</p>
+								)}
+								{topicProgressBlurb ? (
+									<p className="mt-auto shrink-0 text-muted-foreground text-xs font-medium leading-snug">
+										{topicProgressBlurb}
+									</p>
+								) : null}
+							</CardContent>
+						</Card>
+					</motion.div>
+
 					<section
-						aria-labelledby="activity-heading"
-						className="flex min-h-0 flex-col gap-3 lg:flex-1 lg:min-h-0"
+						aria-labelledby="stats-heading"
+						className="flex w-full min-w-0 max-w-none shrink-0 flex-col gap-3"
 					>
-						<h2 id="activity-heading" className={SECTION_LABEL_CLASS}>
-							{isParent ? "Their recent tests" : "Recent tests"}
+						<h2 id="stats-heading" className={SECTION_LABEL_CLASS}>
+							At a glance
 						</h2>
-						<motion.div variants={item} className="flex min-h-0 flex-1 flex-col">
-							<Card className="flex min-h-0 flex-1 flex-col shadow-none">
-								<CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-6">
-									{recentTests.length === 0 ? (
-										<p className="text-muted-foreground text-sm">
-											{isParent
-												? "No completed tests yet. When they finish a timed practice test, it will show here."
-												: "No completed tests yet. Finish a practice attempt to see it here."}
-										</p>
-									) : (
-										recentTests.map((row) => (
-											<div
-												key={row.id}
-												className="flex items-center justify-between gap-3 border-border border-b pb-3 last:border-0 last:pb-0"
-											>
-												<div className="min-w-0">
-													<p className="truncate font-medium text-sm">{row.subjectName}</p>
-													<p className="text-muted-foreground text-xs">
-														{formatLastTest(row.testDateIso)} · {formatDurationLabel(row.durationSeconds)}
-													</p>
-												</div>
-												<span className="shrink-0 font-mono text-sm tabular-nums">
-													{row.scorePercent != null ? `${row.scorePercent}%` : "—"}
+						<motion.div variants={item} className="w-full min-w-0">
+							<Card size="sm" className="w-full min-w-0 shadow-none">
+								<CardHeader className="pb-2">
+									<CardTitle className="text-sm font-semibold leading-snug">
+										{isParent ? "Their practice signals" : "Practice signals"}
+									</CardTitle>
+									<CardDescription className="text-xs leading-snug">
+										Tests, timed minutes, and scores (last 30 days for averages).
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="flex flex-col divide-y divide-border/70 px-3 pb-4 pt-0 sm:px-4">
+									<div className="flex min-w-0 flex-col gap-1.5 py-3 first:pt-0">
+										<div className="flex min-w-0 items-start justify-between gap-3">
+											<div className="flex min-w-0 items-center gap-2">
+												<ActivityIcon
+													className="size-4 shrink-0 text-sky-600 dark:text-sky-400"
+													strokeWidth={2}
+													aria-hidden
+												/>
+												<span className="text-muted-foreground text-xs font-medium leading-snug">
+													Tests completed
 												</span>
 											</div>
-										))
-									)}
-									<Button
-										variant="link"
-										className="mt-auto h-auto px-0 pt-1 text-primary"
-										render={<Link href={isParent ? "/parent/reports" : "/student/reports"} />}
-									>
-										{isParent ? "View test reports" : "Open reports"}
-									</Button>
+											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground sm:text-2xl">
+												{performanceStats.testsCompleted}
+											</p>
+										</div>
+										<p className="text-muted-foreground text-[0.6875rem] leading-snug sm:text-xs">
+											{testsCompletedCaption(performanceStats.testsCompleted, isParent)}
+										</p>
+									</div>
+									<div className="flex min-w-0 flex-col gap-1.5 py-3">
+										<div className="flex min-w-0 items-start justify-between gap-3">
+											<div className="flex min-w-0 items-center gap-2">
+												<FlameIcon
+													className="size-4 shrink-0 text-orange-600 dark:text-orange-400"
+													strokeWidth={2}
+													aria-hidden
+												/>
+												<span className="text-muted-foreground text-xs font-medium leading-snug">
+													Time practicing
+												</span>
+											</div>
+											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground sm:text-2xl">
+												{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
+											</p>
+										</div>
+										<p className="text-muted-foreground text-[0.6875rem] leading-snug sm:text-xs">
+											{timePracticingCaption(performanceStats.timeSpentMinutesLast30Days, isParent)}
+										</p>
+									</div>
+									<div className="flex min-w-0 flex-col gap-1.5 py-3 pb-0">
+										<div className="flex min-w-0 items-start justify-between gap-3">
+											<div className="flex min-w-0 items-center gap-2">
+												<LineChartIcon
+													className="size-4 shrink-0 text-violet-600 dark:text-violet-400"
+													strokeWidth={2}
+													aria-hidden
+												/>
+												<span className="text-muted-foreground text-xs font-medium leading-snug">
+													Average score
+												</span>
+											</div>
+											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground sm:text-2xl">
+												{averageScoreDisplay.value}
+											</p>
+										</div>
+										<p className="text-muted-foreground text-[0.6875rem] leading-snug sm:text-xs">
+											{averageScoreDisplay.caption}
+										</p>
+									</div>
 								</CardContent>
 							</Card>
 						</motion.div>

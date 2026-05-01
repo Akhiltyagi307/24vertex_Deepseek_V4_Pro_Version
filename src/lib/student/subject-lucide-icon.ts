@@ -14,6 +14,7 @@ import {
 	Music,
 	NotebookPen,
 	Palette,
+	Radar,
 	Scale,
 	Sigma,
 } from "lucide-react";
@@ -35,6 +36,11 @@ function brandSubjectConfig(icon: LucideIcon): SubjectCardIconConfig {
 		shellClassName: SUBJECT_CARD_ICON_SHELL,
 		iconClassName: SUBJECT_CARD_ICON_GLYPH,
 	};
+}
+
+/** Icon for the dashboard Topic progress card; same shell styling as subject tiles. */
+export function getTopicProgressCardIconConfig(): SubjectCardIconConfig {
+	return brandSubjectConfig(Radar);
 }
 
 /** Icon plus brand-green well + glyph; icon shape still follows the subject name. */

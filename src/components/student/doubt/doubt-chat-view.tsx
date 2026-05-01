@@ -11,7 +11,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
 	ArrowDown,
-	ArrowUp,
 	BookMarked,
 	BookOpen,
 	Check,
@@ -24,7 +23,6 @@ import {
 	MoreHorizontal,
 	PlusIcon,
 	Sparkles,
-	Square,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -36,6 +34,7 @@ import {
 	getDoubtTopicsForSubjectAction,
 	getDoubtUsageSummaryAction,
 } from "@/lib/doubt/doubt-actions";
+import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { chapterKeyFromRow, groupTopicRowsByChapter } from "@/lib/doubt/chapter-group";
 import type { DoubtChatTopicRow, DoubtChatConversationRow } from "@/lib/doubt/loaders";
 import { cn } from "@/lib/utils";
@@ -56,6 +55,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TopicChatComposer } from "@/components/ui/multimodal-ai-chat-input";
 
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 
@@ -182,6 +182,7 @@ type DoubtChatThreadProps = {
 	chapterName: string | null;
 	initialMessages: UIMessage[];
 	initialUsage: UsageSummary;
+	initialTutorMode: DoubtTutorMode;
 };
 
 const SUGGESTED_PROMPTS = [
@@ -267,16 +268,18 @@ function EmptyState({
 	onPick: (text: string) => void;
 }) {
 	return (
-		<div className="flex flex-col items-start gap-4 pt-4 sm:pt-8">
-			<div className="min-w-0 w-full max-w-none space-y-1.5">
-				<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
-					{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
-				</h3>
-				<PageHeaderSubtext variant="wrap">
-					Ask about concepts, worked examples, or practice questions—answers stay scoped to your curriculum for this chapter.
-				</PageHeaderSubtext>
-			</div>
-			<div className="flex flex-wrap gap-2">
+		<div className="flex w-full flex-col items-center gap-4 pt-4 sm:pt-8">
+			<div className="flex w-full min-w-0 max-w-[50%] flex-col items-center gap-4 text-center">
+				<div className="min-w-0 w-full space-y-1.5">
+					<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
+						{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
+					</h3>
+					<PageHeaderSubtext variant="wrap" className="text-center">
+						Ask about concepts, worked examples, or practice questions. Answers stay scoped to your
+						curriculum for this chapter.
+					</PageHeaderSubtext>
+				</div>
+				<div className="flex flex-wrap justify-center gap-2">
 				{SUGGESTED_PROMPTS.map((p) => (
 					<button
 						key={p}
@@ -290,6 +293,7 @@ function EmptyState({
 						{p}
 					</button>
 				))}
+				</div>
 			</div>
 		</div>
 	);
@@ -304,9 +308,11 @@ function DoubtChatThread({
 	chapterName,
 	initialMessages,
 	initialUsage,
+	initialTutorMode,
 }: DoubtChatThreadProps) {
 	const router = useRouter();
 	const [input, setInput] = useState("");
+	const [tutorMode, setTutorMode] = useState<DoubtTutorMode>(initialTutorMode ?? "explain");
 	const [usage, setUsage] = useState<UsageSummary>(initialUsage);
 	const [showScrollDown, setShowScrollDown] = useState(false);
 	const paywall = usePaywall();
@@ -323,9 +329,10 @@ function DoubtChatThread({
 					subjectId,
 					topicId,
 					conversationId,
+					tutorMode,
 				}),
 			}),
-		[subjectId, topicId, conversationId],
+		[subjectId, topicId, conversationId, tutorMode],
 	);
 
 	const { messages, sendMessage, status, error, stop } = useChat({
@@ -369,14 +376,6 @@ function DoubtChatThread({
 	const thinking = status === "submitted";
 	const streaming = status === "streaming";
 
-	// Autoresize the composer up to ~10 lines.
-	useEffect(() => {
-		const el = textareaRef.current;
-		if (!el) return;
-		el.style.height = "auto";
-		el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-	}, [input]);
-
 	// Track scroll position to toggle the "scroll to latest" button.
 	useEffect(() => {
 		const el = scrollRef.current;
@@ -417,15 +416,14 @@ function DoubtChatThread({
 		submit(input);
 	}
 
-	function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-		if (e.key !== "Enter" || e.shiftKey) return;
-		e.preventDefault();
-		submit(input);
-	}
-
-	const placeholder = topicName
-		? `Ask anything about ${topicName}…`
-		: "Ask a question about this topic…";
+	const placeholder =
+		tutorMode === "solve_with_me"
+			? topicName
+				? `Work through a problem on ${topicName}…`
+				: "Describe a problem to solve together…"
+			: topicName
+				? `Ask anything about ${topicName}…`
+				: "Ask a question about this topic…";
 
 	const empty = messages.length === 0;
 	const lastAssistantIsStreaming =
@@ -559,112 +557,57 @@ function DoubtChatThread({
 			</div>
 
 			<div className="shrink-0 px-4 pt-1 pb-4 sm:px-6">
-				{error ? (
-					<Alert variant="destructive" className="mb-3 w-full min-w-0 rounded-xl">
-						<AlertTitle>Something went wrong</AlertTitle>
-						<AlertDescription>{error.message}</AlertDescription>
-					</Alert>
-				) : null}
+				<div className="mx-auto w-full min-w-0 max-w-full">
+					{error ? (
+						<Alert variant="destructive" className="mb-3 w-full min-w-0 rounded-xl">
+							<AlertTitle>Something went wrong</AlertTitle>
+							<AlertDescription>{error.message}</AlertDescription>
+						</Alert>
+					) : null}
 
-				<form onSubmit={onSubmit} className="w-full min-w-0">
-					<div
-						className={cn(
-							"group/composer relative rounded-xl border shadow-sm transition-[border-color,box-shadow] duration-150",
-							"border-border/70 bg-muted/40",
-							"dark:border-zinc-600/50 dark:bg-zinc-900/55",
-							"focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/15",
-							"dark:focus-within:border-emerald-400/50 dark:focus-within:ring-emerald-400/10",
-						)}
-					>
-						<label htmlFor="doubt-chat-composer" className="sr-only">
-							Message to tutor
-						</label>
-						<textarea
-							id="doubt-chat-composer"
-							ref={textareaRef}
-							value={input}
-							onChange={(e) => setInput(e.target.value)}
-							onKeyDown={onComposerKeyDown}
-							placeholder={placeholder}
-							disabled={busy}
-							rows={1}
-							data-gramm="false"
-							data-gramm_editor="false"
-							data-enable-grammarly="false"
-							spellCheck
-							className={cn(
-								"block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent py-3.5 pr-14 pl-4 text-[15px] leading-relaxed",
-								"text-foreground placeholder:text-muted-foreground/75",
-								"outline-none focus-visible:outline-none",
-								"disabled:cursor-not-allowed disabled:opacity-60",
-							)}
-						/>
-
-						<div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-							{busy ? (
-								<Tooltip>
-									<TooltipTrigger
-										render={
-											<button
-												type="button"
-												onClick={() => void stop()}
-												aria-label="Stop response"
-												className={cn(
-													"border-border/70 bg-background text-foreground inline-flex size-9 items-center justify-center rounded-lg border transition-colors",
-													"hover:bg-muted",
-													"focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
-												)}
-											/>
-										}
-									>
-										<Square className="size-3.5 fill-current" aria-hidden />
-									</TooltipTrigger>
-									<TooltipContent>Stop</TooltipContent>
-								</Tooltip>
-							) : null}
-							<Tooltip>
-								<TooltipTrigger
-									render={
-										<button
-											type="submit"
-											aria-label="Send message"
-											disabled={busy || !input.trim()}
-											className={cn(
-												"inline-flex size-9 items-center justify-center rounded-lg font-medium shadow-sm transition-[background-color,transform] duration-150",
-												"bg-emerald-600 text-white hover:bg-emerald-600/90 active:scale-[0.97]",
-												"disabled:pointer-events-none disabled:opacity-40",
-												"focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:outline-none",
-												"dark:bg-emerald-600 dark:hover:bg-emerald-600/90",
-											)}
-										/>
-									}
+					<TopicChatComposer
+						id="doubt-chat-composer"
+						textareaRef={textareaRef}
+						value={input}
+						onChange={setInput}
+						onSubmit={onSubmit}
+						busy={busy}
+						onStop={() => void stop()}
+						placeholder={placeholder}
+						toolbar={
+							<div className="flex min-w-0 flex-nowrap items-center gap-2">
+								<span className="text-muted-foreground shrink-0 text-[12px] font-medium">
+									Mode
+								</span>
+								<Select
+									value={tutorMode}
+									onValueChange={(v) => setTutorMode(v as DoubtTutorMode)}
+									disabled={busy}
 								>
-									{busy ? (
-										<Loader2 className="size-4 animate-spin" aria-hidden />
-									) : (
-										<ArrowUp className="size-4" strokeWidth={2.5} aria-hidden />
-									)}
-								</TooltipTrigger>
-								<TooltipContent>
-									<span>
-										<kbd
-											data-slot="kbd"
-											className="bg-background/15 mr-1 rounded px-1 py-px text-[10px] font-medium"
-										>
-											Enter
-										</kbd>
-										Send
-									</span>
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					</div>
-				</form>
+									<SelectTrigger
+										id="doubt-tutor-mode"
+										aria-label="Tutor mode"
+										className="border-input bg-background h-9 min-w-0 max-w-[10.5rem] shrink sm:min-w-[9.5rem] sm:max-w-[14rem]"
+									>
+										<SelectValue placeholder="Explain">
+											{(v) =>
+												v === "solve_with_me" ? "Solve with me" : "Explain"
+											}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="explain">Explain</SelectItem>
+										<SelectItem value="solve_with_me">Solve with me</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+						}
+					/>
 
-				<div className="text-muted-foreground/80 mt-2 flex w-full min-w-0 items-center justify-between gap-3 px-1 text-[11px] leading-snug">
-					<span className="truncate">
-						Tutor can be wrong — double-check important facts.
-					</span>
+					<div className="text-muted-foreground/80 mt-2.5 flex w-full min-w-0 items-center justify-between gap-3 text-[11px] leading-snug">
+						<span className="min-w-0 truncate">
+							Tutor can be wrong; double-check important facts.
+						</span>
 					<Tooltip>
 						<TooltipTrigger
 							render={
@@ -685,6 +628,7 @@ function DoubtChatThread({
 							</span>
 						</TooltipContent>
 					</Tooltip>
+				</div>
 				</div>
 			</div>
 		</div>
@@ -775,6 +719,7 @@ export function DoubtChatView(props: {
 		};
 		messages: UIMessage[];
 		usage: UsageSummary;
+		initialTutorMode: DoubtTutorMode;
 	};
 }) {
 	const router = useRouter();
@@ -1394,6 +1339,7 @@ export function DoubtChatView(props: {
 								chapterName={props.initialFromUrl.conversation.chapterName}
 								initialMessages={props.initialFromUrl.messages}
 								initialUsage={props.initialFromUrl.usage}
+								initialTutorMode={props.initialFromUrl.initialTutorMode}
 							/>
 						</motion.div>
 					) : null}

@@ -6,7 +6,7 @@ import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
 import { getOpenAIChatModel } from "@/lib/env";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeDoubtChatRateLimit } from "@/lib/practice/practice-rate-limit";
 import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
@@ -22,6 +22,7 @@ const bodySchema = z.object({
 	subjectId: z.string().uuid("Invalid subject."),
 	topicId: z.string().uuid("Invalid topic."),
 	conversationId: z.string().uuid("Open or start a chat before sending a message."),
+	tutorMode: z.enum(["explain", "solve_with_me"]).default("explain"),
 });
 
 function toUIMessageList(raw: unknown[]): UIMessage[] {
@@ -38,7 +39,13 @@ export async function POST(req: Request) {
 		);
 	}
 
-	const { messages: rawMessages, subjectId, topicId, conversationId: rawConvId } = parsed.data;
+	const {
+		messages: rawMessages,
+		subjectId,
+		topicId,
+		conversationId: rawConvId,
+		tutorMode,
+	} = parsed.data;
 	const messages = toUIMessageList(rawMessages);
 	const headers = new Headers();
 	const supabase = await createClient();
@@ -99,7 +106,7 @@ export async function POST(req: Request) {
 	}
 
 	const modelId = getOpenAIChatModel();
-	const system = buildDoubtSystemPrompt(scope);
+	const system = buildDoubtSystemPrompt(scope, tutorMode);
 
 	const { data: existing, error: findErr } = await supabase
 		.from("doubt_conversations")
@@ -127,14 +134,20 @@ export async function POST(req: Request) {
 	}
 	const conversationId = existing.id;
 
-	const { error: userMsgErr } = await supabase.from("doubt_messages").insert({
+	const userMessageBase = {
 		conversation_id: conversationId,
-		role: "user",
+		role: "user" as const,
 		content: lastUserText,
 		prompt_tokens: null,
 		completion_tokens: null,
 		model: null,
-	});
+	};
+	let { error: userMsgErr } = await supabase
+		.from("doubt_messages")
+		.insert({ ...userMessageBase, tutor_mode: tutorMode });
+	if (userMsgErr && isPostgresUndefinedColumnError(userMsgErr)) {
+		({ error: userMsgErr } = await supabase.from("doubt_messages").insert(userMessageBase));
+	}
 	if (userMsgErr) {
 		logSupabaseError("doubt_chat.insert_user_message", userMsgErr, { conversationId });
 		return new Response(JSON.stringify({ error: "Could not save your message." }), {

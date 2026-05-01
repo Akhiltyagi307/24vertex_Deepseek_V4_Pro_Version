@@ -1,9 +1,7 @@
 import "server-only";
 
-import type {
-	StudentDashboardRecentTest,
-	StudentDashboardSubjectCard,
-} from "@/components/student/student-dashboard-view";
+import type { SubjectTopicRadarDatum } from "@/lib/charts/subject-topic-radar-config";
+import type { StudentDashboardSubjectCard } from "@/components/student/student-dashboard-view";
 import { buildStudentDashboardAnalyticsPayload } from "@/lib/student/dashboard-analytics";
 import { buildDashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
 import {
@@ -39,22 +37,6 @@ type DashboardCompletedTestRow = {
 	/** Populated via FK embed (same pattern as `app/student/reports/page.tsx`). */
 	subjects?: { id?: string; name?: string | null } | null;
 };
-
-function subjectNameFromCompletedTestRow(
-	t: DashboardCompletedTestRow,
-	enrolledNameBySubjectId: Map<string, string>,
-): string {
-	const joined = t.subjects?.name;
-	if (typeof joined === "string" && joined.trim()) return joined.trim();
-	return enrolledNameBySubjectId.get(t.subject_id) ?? "Subject";
-}
-
-
-function parsePercent(v: string | number | null | undefined): number | null {
-	if (v == null || v === "") return null;
-	const parsed = typeof v === "number" ? v : Number.parseFloat(String(v));
-	return Number.isFinite(parsed) ? Math.round(parsed) : null;
-}
 
 function statusPriority(status: "good" | "satisfactory" | "bad" | "not_tested"): number {
 	if (status === "bad") return 0;
@@ -96,9 +78,10 @@ export type StudentDashboardViewPayload = {
 	headerGreeting: string;
 	performanceStats: ReturnType<typeof buildDashboardPerformanceStats>;
 	subjectCards: StudentDashboardSubjectCard[];
+	/** Per enrolled subject: curriculum coverage vs solid topics (same series as marketing radar). */
+	topicProgressRadar: SubjectTopicRadarDatum[];
 	subjectsLoadError: string | null;
 	analytics: ReturnType<typeof buildStudentDashboardAnalyticsPayload>;
-	recentTests: StudentDashboardRecentTest[];
 	trackerNeedsHydration: boolean;
 };
 
@@ -212,16 +195,13 @@ export async function loadStudentDashboardViewPayload(
 		};
 	});
 
-	const subjectNameById = new Map(enrolledSubjects.map((s) => [s.id, s.name]));
-	const recentTests: StudentDashboardRecentTest[] = ((completedTestRows ?? []) as DashboardCompletedTestRow[])
-		.slice(0, 5)
-		.map((t) => ({
-			id: t.id,
-			subjectName: subjectNameFromCompletedTestRow(t, subjectNameById),
-			testDateIso: t.test_date,
-			scorePercent: parsePercent(t.total_score),
-			durationSeconds: t.duration_seconds,
-		}));
+	const topicProgressRadar: SubjectTopicRadarDatum[] = enrolledSubjectCards.map((c) => {
+		const st = trackerMap.get(c.subjectId) ?? emptySubjectCardTrackerStats;
+		const topicTotal = c.topicTotal;
+		const coverage = c.percentCovered;
+		const perfected = topicTotal ? Math.round((st.good / topicTotal) * 100) : 0;
+		return { subject: c.subjectName, coverage, perfected };
+	});
 
 	const headerGreeting =
 		opts?.viewerRole === "parent"
@@ -232,9 +212,9 @@ export async function loadStudentDashboardViewPayload(
 		headerGreeting,
 		performanceStats,
 		subjectCards,
+		topicProgressRadar,
 		subjectsLoadError: loadError,
 		analytics,
-		recentTests,
 		trackerNeedsHydration,
 	};
 }

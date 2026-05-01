@@ -10,6 +10,11 @@ type SupabaseErrorLike = {
 	hint?: string | null;
 };
 
+/** Postgres `undefined_column` — e.g. app deployed before a migration was applied. */
+export function isPostgresUndefinedColumnError(error: SupabaseErrorLike | null | undefined): boolean {
+	return error?.code === "42703";
+}
+
 function formatLogMetadata(metadata?: LogMetadata): string {
 	if (!metadata) return "";
 	return Object.entries(metadata)

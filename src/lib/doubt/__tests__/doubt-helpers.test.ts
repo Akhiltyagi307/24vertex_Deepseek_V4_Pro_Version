@@ -24,12 +24,37 @@ const sampleScope: DoubtScopeSuccess = {
 };
 
 describe("buildDoubtSystemPrompt", () => {
-	it("includes subject, topic, and grade in the system prompt", () => {
-		const s = buildDoubtSystemPrompt(sampleScope);
+	it("explain mode includes scope and EXPLAIN MODE", () => {
+		const s = buildDoubtSystemPrompt(sampleScope, "explain");
 		expect(s).toContain("Mathematics");
 		expect(s).toContain("Irrational Numbers");
 		expect(s).toContain("Grade 9");
 		expect(s).toContain("Short description for tests.");
+		expect(s).toContain("EXPLAIN MODE");
+		expect(s).toContain("- Identify irrational numbers");
+	});
+
+	it("solve_with_me mode includes scope and SOLVE-WITH-ME MODE", () => {
+		const s = buildDoubtSystemPrompt(sampleScope, "solve_with_me");
+		expect(s).toContain("Mathematics");
+		expect(s).toContain("Irrational Numbers");
+		expect(s).toContain("Grade 9");
+		expect(s).toContain("SOLVE-WITH-ME MODE");
+		expect(s).toContain("Short description for tests.");
+	});
+
+	it("uses catalog fallbacks when description and objectives are empty", () => {
+		const sparse: DoubtScopeSuccess = {
+			...sampleScope,
+			topic: {
+				...sampleScope.topic,
+				description: "   ",
+				learningObjectives: [],
+			},
+		};
+		const explain = buildDoubtSystemPrompt(sparse, "explain");
+		expect(explain).toContain("(no description in catalog");
+		expect(explain).toContain("(none listed)");
 	});
 });
 

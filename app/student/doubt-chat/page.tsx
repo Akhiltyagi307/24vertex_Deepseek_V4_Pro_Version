@@ -7,6 +7,7 @@ import {
 	loadDoubtMessagesForConversation,
 	loadDoubtPageBundle,
 	loadDoubtTokenSummaryForConversation,
+	loadLastDoubtTutorModeForConversation,
 } from "@/lib/doubt/loaders";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
@@ -37,9 +38,10 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 	if (cParam) {
 		const conv = await loadDoubtConversationForStudent(cParam, user.id);
 		if (conv) {
-			const [messages, usage] = await Promise.all([
+			const [messages, usage, lastTutorMode] = await Promise.all([
 				loadDoubtMessagesForConversation(conv.id),
 				loadDoubtTokenSummaryForConversation(conv.id),
+				loadLastDoubtTutorModeForConversation(conv.id),
 			]);
 			initialFromUrl = {
 				conversation: {
@@ -53,6 +55,7 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 				},
 				messages,
 				usage,
+				initialTutorMode: lastTutorMode ?? "explain",
 			};
 		}
 	}

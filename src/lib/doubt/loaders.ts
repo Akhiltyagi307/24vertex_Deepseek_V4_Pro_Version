@@ -3,8 +3,9 @@ import "server-only";
 import type { UIMessage } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isDoubtTutorMode, type DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { createClient } from "@/lib/supabase/server";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { loadStudentSubjects, type StudentSubjectsProfileRow } from "@/lib/student/load-student-subjects";
 
 export type DoubtChatTopicRow = {
@@ -222,6 +223,37 @@ export async function loadDoubtTokenSummaryForConversation(conversationId: strin
 		lastPromptTokens: lastP,
 		lastCompletionTokens: lastC,
 	};
+}
+
+/**
+ * Tutor mode from the latest user message that persisted `tutor_mode` (for rehydrating the mode selector).
+ */
+export async function loadLastDoubtTutorModeForConversation(
+	conversationId: string,
+): Promise<DoubtTutorMode | null> {
+	const supabase = await createClient();
+	const { data, error } = await supabase
+		.from("doubt_messages")
+		.select("tutor_mode")
+		.eq("conversation_id", conversationId)
+		.eq("role", "user")
+		.not("tutor_mode", "is", null)
+		.order("created_at", { ascending: false })
+		.limit(1)
+		.maybeSingle();
+
+	if (error) {
+		if (isPostgresUndefinedColumnError(error)) {
+			return null;
+		}
+		logSupabaseError("loadLastDoubtTutorModeForConversation", error, { conversationId });
+		return null;
+	}
+	const raw = data?.tutor_mode;
+	if (typeof raw !== "string" || !isDoubtTutorMode(raw)) {
+		return null;
+	}
+	return raw;
 }
 
 export async function loadDoubtMessagesForConversationWithClient(
