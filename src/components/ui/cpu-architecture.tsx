@@ -75,28 +75,28 @@ const CpuArchitecture = ({
       </g>
 
       <g mask="url(#cpu-mask-1)">
-        <circle className="cpu-architecture cpu-line-1" cx="0" cy="0" r="8" fill="url(#cpu-blue-grad)" />
+        <circle className="cpu-architecture cpu-line-1" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-2)">
-        <circle className="cpu-architecture cpu-line-2" cx="0" cy="0" r="8" fill="url(#cpu-yellow-grad)" />
+        <circle className="cpu-architecture cpu-line-2" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-3)">
-        <circle className="cpu-architecture cpu-line-3" cx="0" cy="0" r="8" fill="url(#cpu-pinkish-grad)" />
+        <circle className="cpu-architecture cpu-line-3" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-4)">
-        <circle className="cpu-architecture cpu-line-4" cx="0" cy="0" r="8" fill="url(#cpu-white-grad)" />
+        <circle className="cpu-architecture cpu-line-4" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-5)">
-        <circle className="cpu-architecture cpu-line-5" cx="0" cy="0" r="8" fill="url(#cpu-green-grad)" />
+        <circle className="cpu-architecture cpu-line-5" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-6)">
-        <circle className="cpu-architecture cpu-line-6" cx="0" cy="0" r="8" fill="url(#cpu-orange-grad)" />
+        <circle className="cpu-architecture cpu-line-6" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-7)">
-        <circle className="cpu-architecture cpu-line-7" cx="0" cy="0" r="8" fill="url(#cpu-cyan-grad)" />
+        <circle className="cpu-architecture cpu-line-7" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
       <g mask="url(#cpu-mask-8)">
-        <circle className="cpu-architecture cpu-line-8" cx="0" cy="0" r="8" fill="url(#cpu-rose-grad)" />
+        <circle className="cpu-architecture cpu-line-8" cx="0" cy="0" r="8" fill="url(#cpu-brand-flow-grad)" />
       </g>
 
       <g>
@@ -158,40 +158,11 @@ const CpuArchitecture = ({
         <mask id="cpu-mask-8">
           <path d="M 30 30 h 25 q 5 0 5 5 v 6.5 q 0 5 5 5 h 20" strokeWidth="0.5" stroke="white" />
         </mask>
-        <radialGradient id="cpu-blue-grad" fx="1">
-          <stop offset="0%" stopColor="#00E8ED" />
-          <stop offset="50%" stopColor="#08F" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-yellow-grad" fx="1">
-          <stop offset="0%" stopColor="#FFD800" />
-          <stop offset="50%" stopColor="#FFD800" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-pinkish-grad" fx="1">
-          <stop offset="0%" stopColor="#830CD1" />
-          <stop offset="50%" stopColor="#FF008B" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-white-grad" fx="1">
-          <stop offset="0%" stopColor="white" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-green-grad" fx="1">
-          <stop offset="0%" stopColor="#22c55e" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-orange-grad" fx="1">
-          <stop offset="0%" stopColor="#f97316" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-cyan-grad" fx="1">
-          <stop offset="0%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="transparent" />
-        </radialGradient>
-        <radialGradient id="cpu-rose-grad" fx="1">
-          <stop offset="0%" stopColor="#f43f5e" />
-          <stop offset="100%" stopColor="transparent" />
+        {/* Marketing accent (landing features bento). */}
+        <radialGradient id="cpu-brand-flow-grad" fx="1">
+          <stop offset="0%" stopColor="#3ECF8E" />
+          <stop offset="55%" stopColor="#3ECF8E" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="#3ECF8E" stopOpacity="0" />
         </radialGradient>
         <filter id="cpu-light-shadow" x="-50%" y="-50%" width="200%" height="200%">
           <feDropShadow dx="1.5" dy="1.5" stdDeviation="1" floodColor="black" floodOpacity="0.1" />
@@ -209,8 +180,8 @@ const CpuArchitecture = ({
           </circle>
         </marker>
         <linearGradient id="cpu-connection-gradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#4F4F4F" />
-          <stop offset="60%" stopColor="#121214" />
+          <stop offset="0%" stopColor="#3ECF8E" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#3ECF8E" stopOpacity="0.2" />
         </linearGradient>
         <linearGradient id="cpu-text-gradient" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#666666">

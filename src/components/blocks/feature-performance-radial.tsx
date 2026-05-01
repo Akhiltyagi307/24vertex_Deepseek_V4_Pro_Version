@@ -17,15 +17,15 @@ const chartData = [{ topics: 78, sessions: 82, readiness: 76 }] as const;
 const chartConfig = {
 	topics: {
 		label: "Topics",
-		color: "color-mix(in oklab, var(--muted-foreground) 78%, var(--subject-grid-icon) 22%)",
+		color: "color-mix(in oklab, var(--muted-foreground) 78%, #3ECF8E 22%)",
 	},
 	sessions: {
 		label: "Session quality",
-		color: "color-mix(in oklab, var(--muted-foreground) 34%, var(--subject-grid-icon) 66%)",
+		color: "color-mix(in oklab, var(--muted-foreground) 34%, #3ECF8E 66%)",
 	},
 	readiness: {
 		label: "Readiness",
-		color: "var(--subject-grid-icon)",
+		color: "#3ECF8E",
 	},
 } satisfies ChartConfig;
 
@@ -44,31 +44,47 @@ const segmentLabel: Record<(typeof segmentKeys)[number], string> = {
 	readiness: "Readiness",
 };
 
-export function FeaturePerformanceRadial() {
+type FeaturePerformanceRadialProps = {
+	/** Tighter chart + legend for narrow bento cells (e.g. 2-column span). */
+	compact?: boolean;
+};
+
+export function FeaturePerformanceRadial({ compact = false }: FeaturePerformanceRadialProps) {
 	const row = chartData[0];
 	const center = meanScore(row);
 
 	return (
-		<div className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center gap-1.5">
+		<div
+			className={cn(
+				"flex h-full min-h-0 w-full flex-col items-center justify-center gap-1.5",
+				compact ? "gap-2" : "flex-1",
+			)}
+		>
 			<ChartContainer
 				config={chartConfig}
 				className={cn(
-					"mx-auto aspect-auto h-full min-h-[12.5rem] w-full max-w-full flex-1 sm:min-h-[13.5rem]",
-					"[&_.recharts-polar-radius-axis-tick]:hidden",
-					"[&_.recharts-polar-grid]:opacity-100",
+					"mx-auto w-full max-w-full [&_.recharts-polar-radius-axis-tick]:hidden [&_.recharts-polar-grid]:opacity-100",
+					compact
+						? "aspect-auto min-h-[9rem] w-full max-w-[min(100%,17.5rem)] sm:min-h-[10rem] sm:max-w-[min(100%,18.5rem)]"
+						: "aspect-auto h-full min-h-[12.5rem] flex-1 sm:min-h-[13.5rem]",
 				)}
-				initialDimension={{ width: 320, height: 220 }}
+				initialDimension={compact ? { width: 260, height: 168 } : { width: 320, height: 220 }}
 				aria-label="Illustrative chart: topic, session, and readiness mix with an overall index."
 			>
 				<RadialBarChart
 					data={[...chartData]}
 					cx="50%"
-					cy="82%"
+					/* Default 82% sits low in the frame; compact bento reads better with the arc optically centered. */
+					cy={compact ? "72%" : "82%"}
 					startAngle={180}
 					endAngle={0}
 					innerRadius="56%"
 					outerRadius="100%"
-					margin={{ top: 0, right: 2, bottom: 0, left: 2 }}
+					margin={
+						compact
+							? { top: 4, right: 0, bottom: 2, left: 0 }
+							: { top: 0, right: 2, bottom: 0, left: 2 }
+					}
 				>
 					<PolarGrid
 						gridType="circle"
@@ -155,11 +171,22 @@ export function FeaturePerformanceRadial() {
 				</RadialBarChart>
 			</ChartContainer>
 			<div
-				className="text-muted-foreground flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-0.5 px-1 text-[10px] font-medium tracking-tight sm:text-[11px]"
+				className={cn(
+					"flex shrink-0 flex-nowrap items-center justify-center gap-y-0.5 px-0.5 tracking-tight",
+					compact
+						? "gap-x-2 sm:gap-x-2.5 text-xs text-[rgb(250,250,250)]"
+						: "text-muted-foreground gap-x-3 text-[11px] font-medium sm:text-xs",
+				)}
 				aria-hidden
 			>
 				{segmentKeys.map((key) => (
-					<span key={key} className="inline-flex items-center gap-1.5">
+					<span
+						key={key}
+						className={cn(
+							"inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap",
+							compact && "font-normal",
+						)}
+					>
 						<span
 							className="size-1.5 shrink-0 rounded-full ring-1 ring-border/60"
 							style={{ backgroundColor: chartConfig[key].color }}

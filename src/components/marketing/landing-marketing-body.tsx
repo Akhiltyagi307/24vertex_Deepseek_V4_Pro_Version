@@ -16,7 +16,10 @@ import {
 	faqCardSurfaceClassName,
 	pricingSectionGridOverlayClassName,
 } from "@/lib/marketing/pricing-card-surface";
-import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
+import {
+	landingMarketingFaqRoleBadgeClassName,
+	landingMarketingSectionEyebrowBadgeClassName,
+} from "@/lib/marketing/landing-marketing-badge";
 import {
 	LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
 	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
@@ -131,7 +134,7 @@ export function LandingMarketingBody() {
 										{item.id}
 									</span>
 									<div className="min-w-0 flex-1">
-										<Badge variant="secondary" className="text-[11px] font-medium">
+										<Badge variant="secondary" className={cn("text-[11px] font-medium", landingMarketingFaqRoleBadgeClassName)}>
 											{item.role}
 										</Badge>
 										<h3 className="text-foreground mt-2 text-lg font-semibold tracking-tight sm:text-xl">
@@ -161,7 +164,7 @@ export function LandingMarketingBody() {
 								Still have a question? Pick your role and we will route you to the right portal flow.
 							</p>
 							<Button
-								className="h-10 shrink-0 rounded-full px-5 text-sm font-semibold shadow-none"
+								className="h-10 shrink-0 rounded-full bg-[#63BB95] px-5 text-sm font-semibold text-white shadow-none [a]:hover:bg-[#63BB95]/90 dark:bg-[#63BB95] dark:[a]:hover:bg-[#63BB95]/90"
 								render={<Link href="/signup/role-picker" />}
 							>
 								Start with role signup

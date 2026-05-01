@@ -174,7 +174,7 @@ export function AcmeHero() {
                   variant="outline"
                   className={cn(
                     landingMarketingSectionEyebrowBadgeClassName,
-                    "h-auto min-h-7 max-w-full gap-1.5 rounded-full px-3 py-1.5 text-center font-medium whitespace-normal leading-snug [a]:hover:bg-primary/14 [a]:hover:text-subject-grid-icon dark:[a]:hover:bg-primary/20",
+                    "h-auto min-h-7 max-w-full gap-1.5 rounded-full px-3 py-1.5 text-center font-medium whitespace-normal leading-snug [a]:hover:bg-[#3ECF8E]/14 [a]:hover:text-[#3ECF8E] dark:[a]:hover:bg-[#3ECF8E]/20",
                   )}
                   render={
                     <Link
@@ -198,7 +198,7 @@ export function AcmeHero() {
                 transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
                 <span className="block whitespace-nowrap">Practice smarter</span>
-                <span className="text-primary mt-2 block whitespace-nowrap sm:mt-2.5">
+                <span className="mt-2 block whitespace-nowrap text-[#3ECF8E] sm:mt-2.5">
                   <span className="sm:hidden">Stay aligned, every role</span>
                   <span className="hidden sm:inline">Stay aligned across every role</span>
                 </span>

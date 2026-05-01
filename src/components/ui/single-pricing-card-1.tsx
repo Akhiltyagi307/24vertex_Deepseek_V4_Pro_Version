@@ -100,22 +100,15 @@ export function Pricing() {
               <div
                 className={cn(
                   pricingTierCardSurfaceClassName,
-                  'relative isolate order-1 flex h-full w-full flex-col md:order-2',
-                  'bg-transparent',
+                  'relative z-10 order-1 flex h-full w-full flex-col overflow-hidden md:order-2',
+                  // Frosted tier: blur grid/section behind the card (yearly is the only translucent tier).
+                  'border-primary/40 bg-[color-mix(in_oklch,var(--card)_72%,transparent)]',
+                  'backdrop-blur-xl backdrop-saturate-150',
                   'shadow-[0_20px_56px_-32px_oklch(0.52_0.14_170/.68)]',
+                  'ring-1 ring-inset ring-primary/35',
                 )}
               >
-                <div
-                  aria-hidden
-                  className={cn(
-                    'pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-lg',
-                    'bg-[color-mix(in_oklch,var(--card)_80%,transparent)]',
-                    'backdrop-blur-md backdrop-saturate-150',
-                    'shadow-[inset_0_1px_0_0_color-mix(in_oklch,var(--card-foreground)_8%,transparent)]',
-                    'ring-1 ring-inset ring-primary/35',
-                  )}
-                />
-                <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-6">
+                <div className="relative flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-6">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                       <h3 className="text-lg leading-none font-semibold md:text-xl">Yearly</h3>

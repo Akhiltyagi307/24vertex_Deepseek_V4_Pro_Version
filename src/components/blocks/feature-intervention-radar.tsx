@@ -24,11 +24,11 @@ const chartData = [
 const chartConfig = {
 	coverage: {
 		label: "Topic coverage",
-		color: "color-mix(in oklab, var(--subject-grid-icon) 32%, var(--muted-foreground))",
+		color: "color-mix(in oklab, #3ECF8E 32%, var(--muted-foreground))",
 	},
 	perfected: {
 		label: "Topics perfected",
-		color: "var(--subject-grid-icon)",
+		color: "#3ECF8E",
 	},
 } satisfies ChartConfig;
 
@@ -40,7 +40,7 @@ export function FeatureInterventionRadar() {
 				"mx-auto w-full max-w-[min(100%,260px)]",
 				"aspect-[5/4] max-h-[200px] sm:max-h-[220px]",
 				"[&_.recharts-polar-angle-axis-tick_text]:fill-muted-foreground",
-				"[&_.recharts-legend-item-text]:text-muted-foreground",
+				"[&_.recharts-legend-item-text]:text-[rgb(250,250,250)]",
 			)}
 			initialDimension={{ width: 280, height: 220 }}
 		>
@@ -100,7 +100,7 @@ export function FeatureInterventionRadar() {
 				/>
 				<ChartLegend
 					verticalAlign="bottom"
-					className="mt-1 gap-4 text-[10px] sm:text-[11px]"
+					className="mt-1 gap-3 text-xs text-[rgb(250,250,250)] sm:gap-4"
 					content={<ChartLegendContent />}
 				/>
 			</RadarChart>

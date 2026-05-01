@@ -16,13 +16,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Matches badge icon green (`--subject-grid-icon`); animates on `GlowCard`’s `group` hover. */
+/** Marketing accent #3ECF8E; animates on `GlowCard`’s `group` hover. */
 const featureCardTitleClassName =
-	"text-card-foreground transition-colors duration-200 group-hover:text-subject-grid-icon";
+	"text-card-foreground transition-colors duration-200 group-hover:text-[#3ECF8E]";
 
-/** Top-left pill on each bento card; `self-start` / `justify-self-start` avoid full-width stretch in grid/flex parents. */
+/** Top-left pill on each bento card; label uses neutrals—only Lucide icons use `#3ECF8E` via their own classes. */
 const featureBentoCardEyebrowClassName =
-	"border-border bg-muted/35 inline-flex w-fit shrink-0 items-center gap-2 self-start justify-self-start rounded-full border px-3 py-1 text-xs text-muted-foreground";
+	"border-border bg-muted/35 inline-flex min-h-[2.25rem] w-fit shrink-0 items-center gap-2 self-start justify-self-start rounded-full border px-3 py-1 text-xs text-muted-foreground";
 
 export function Features() {
 	return (
@@ -45,7 +45,102 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"relative bg-transparent md:col-span-2 min-h-[190px] sm:min-h-[210px] overflow-hidden rounded-[12px] border",
+							"h-full md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
+							featureBentoCardSurfaceClassName,
+						)}
+					>
+						<div className="relative z-10 flex h-full min-h-0 flex-col gap-3">
+							<div className={featureBentoCardEyebrowClassName}>
+								<BarChart3 className="size-3.5 text-[#3ECF8E]" />
+								Progress analytics
+							</div>
+							<div className="border-border bg-muted/45 relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[15px] border p-2 sm:p-3">
+								<div className="absolute left-2 top-1.5 flex gap-1 sm:left-3 sm:top-2">
+									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
+									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
+									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
+								</div>
+								<div className="flex min-h-0 flex-1 items-center justify-center px-1 py-2 sm:px-2 sm:py-3">
+									<FeaturePerformanceRadial compact />
+								</div>
+							</div>
+							<div className="shrink-0">
+								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+									Performance clarity
+								</h3>
+								<p className="text-muted-foreground mt-2 text-sm">
+									Track topics, session quality, and readiness trends in one place.
+								</p>
+							</div>
+						</div>
+					</GlowCard>
+
+					<GlowCard
+						glowColor="green"
+						customSize
+						className={cn(
+							"h-full md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
+							featureBentoCardSurfaceClassName,
+						)}
+					>
+						<div className="relative z-10 flex h-full min-h-0 flex-col gap-3">
+							<div className={featureBentoCardEyebrowClassName}>
+								<ShieldCheck className="size-3.5 text-[#3ECF8E]" />
+								Security mesh
+							</div>
+							<div className="border-border bg-muted/45 relative min-h-0 flex-1 overflow-hidden rounded-[15px] border p-1.5">
+								{/* inset-[5%] → graphic uses ~90% of width and height of the panel */}
+								<div className="absolute inset-[5%] flex items-center justify-center">
+									<CpuArchitecture
+										className="text-muted-foreground h-full w-full max-h-full max-w-full"
+										text="SAFE"
+										lineMarkerSize={22}
+									/>
+								</div>
+							</div>
+							<div className="shrink-0">
+								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+									Secure by default
+								</h3>
+								<p className="text-muted-foreground mt-2 text-sm">
+									Role-based permissions, parent linkage checks, and safer student defaults in every flow.
+								</p>
+							</div>
+						</div>
+					</GlowCard>
+
+					<GlowCard
+						glowColor="green"
+						customSize
+						className={cn(
+							"h-full md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
+							featureBentoCardSurfaceClassName,
+						)}
+					>
+						<div className="relative z-10 flex h-full min-h-0 flex-col gap-3">
+							<div className={featureBentoCardEyebrowClassName}>
+								<Sparkles className="size-3.5 text-[#3ECF8E]" />
+								Adaptive insight signals
+							</div>
+							<div className="border-border bg-muted/25 flex min-h-0 flex-1 items-center justify-center rounded-[15px] border px-1 py-2">
+								<FeatureInterventionRadar />
+							</div>
+							<div className="shrink-0">
+								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+									Faster intervention loops
+								</h3>
+								<p className="text-muted-foreground mt-2 text-sm">
+									Teachers spot drift sooner, students get targeted practice before exams.
+								</p>
+							</div>
+						</div>
+					</GlowCard>
+
+					<GlowCard
+						glowColor="green"
+						customSize
+						className={cn(
+							"relative bg-transparent md:col-span-3 min-h-[240px] sm:min-h-[260px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -68,96 +163,6 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"md:col-span-2 min-h-[190px] sm:min-h-[210px] overflow-hidden rounded-[12px] border",
-							featureBentoCardSurfaceClassName,
-						)}
-					>
-						<div className="relative z-10 grid h-full gap-4">
-							<div className={featureBentoCardEyebrowClassName}>
-								<ShieldCheck className="text-subject-grid-icon size-3.5" />
-								Security mesh
-							</div>
-							<div className="border-border bg-muted/45 h-[112px] w-full rounded-[15px] border p-1.5">
-								<CpuArchitecture className="text-muted-foreground h-full w-full" text="SAFE" lineMarkerSize={16} />
-							</div>
-							<div>
-								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
-									Secure by default
-								</h3>
-								<p className="text-muted-foreground mt-2 text-sm">
-									Role-based permissions, parent linkage checks, and safer student defaults in every flow.
-								</p>
-							</div>
-						</div>
-					</GlowCard>
-
-					<GlowCard
-						glowColor="green"
-						customSize
-						className={cn(
-							"md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
-							featureBentoCardSurfaceClassName,
-						)}
-					>
-						<div className="relative z-10 flex h-full flex-col gap-4">
-							<div className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs">
-								<Sparkles className="text-subject-grid-icon size-4" />
-								Adaptive insight signals
-							</div>
-							<div className="border-border bg-muted/25 flex min-h-0 flex-1 items-center justify-center rounded-[15px] border px-1 py-2">
-								<FeatureInterventionRadar />
-							</div>
-							<div className="shrink-0">
-								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
-									Faster intervention loops
-								</h3>
-								<p className="text-muted-foreground mt-2 text-sm">
-									Teachers spot drift sooner, students get targeted practice before exams.
-								</p>
-							</div>
-						</div>
-					</GlowCard>
-
-					<GlowCard
-						glowColor="green"
-						customSize
-						className={cn(
-							"md:col-span-3 min-h-[240px] sm:min-h-[260px] overflow-hidden rounded-[12px] border",
-							featureBentoCardSurfaceClassName,
-						)}
-					>
-						<div className="relative z-10 grid h-full min-h-0 gap-5 sm:grid-cols-2">
-							<div className="flex min-h-0 flex-col justify-between">
-								<div className={featureBentoCardEyebrowClassName}>
-									<BarChart3 className="text-subject-grid-icon size-3.5" />
-									Progress analytics
-								</div>
-								<div>
-									<h3 className={cn("mt-4 text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
-										Performance clarity
-									</h3>
-									<p className="text-muted-foreground mt-2 text-sm">
-										Track topics, session quality, and readiness trends in one place.
-									</p>
-								</div>
-							</div>
-							<div className="border-border bg-muted/45 relative flex h-full w-full min-h-[188px] flex-col overflow-hidden rounded-[15px] border p-3 sm:min-h-[200px]">
-								<div className="absolute left-3 top-2 flex gap-1">
-									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
-									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
-									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
-								</div>
-								<div className="flex min-h-0 flex-1 flex-col items-center justify-center pt-5 pb-1">
-									<FeaturePerformanceRadial />
-								</div>
-							</div>
-						</div>
-					</GlowCard>
-
-					<GlowCard
-						glowColor="green"
-						customSize
-						className={cn(
 							"md:col-span-3 min-h-[240px] sm:min-h-[260px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
@@ -165,7 +170,7 @@ export function Features() {
 						<div className="relative z-10 grid h-full gap-5 sm:grid-cols-2">
 							<div className="flex flex-col justify-between">
 								<div className={featureBentoCardEyebrowClassName}>
-									<Users className="text-subject-grid-icon size-3.5" />
+									<Users className="size-3.5 text-[#3ECF8E]" />
 									Student-parent-teacher sync
 								</div>
 								<div>
@@ -188,7 +193,7 @@ export function Features() {
 											className="ring-border bg-muted/50 flex size-7 items-center justify-center rounded-full ring-2"
 											aria-hidden
 										>
-											<GraduationCap className="text-subject-grid-icon size-3.5 shrink-0" strokeWidth={2} />
+											<GraduationCap className="size-3.5 shrink-0 text-[#3ECF8E]" strokeWidth={2} />
 										</div>
 									</div>
 									<div className="relative ml-[calc(50%-1rem)] flex items-center gap-2">
@@ -196,7 +201,7 @@ export function Features() {
 											className="ring-border bg-muted/50 flex size-8 items-center justify-center rounded-full ring-2"
 											aria-hidden
 										>
-											<UserRound className="text-subject-grid-icon size-4 shrink-0" strokeWidth={2} />
+											<UserRound className="size-4 shrink-0 text-[#3ECF8E]" strokeWidth={2} />
 										</div>
 										<span className="border-border bg-muted/50 text-card-foreground rounded border px-2 py-1 text-xs">
 											Parent
@@ -210,7 +215,7 @@ export function Features() {
 											className="ring-border bg-muted/50 flex size-7 items-center justify-center rounded-full ring-2"
 											aria-hidden
 										>
-											<Presentation className="text-subject-grid-icon size-3.5 shrink-0" strokeWidth={2} />
+											<Presentation className="size-3.5 shrink-0 text-[#3ECF8E]" strokeWidth={2} />
 										</div>
 									</div>
 								</div>
