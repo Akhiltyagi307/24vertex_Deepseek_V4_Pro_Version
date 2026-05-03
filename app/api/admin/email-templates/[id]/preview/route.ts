@@ -8,6 +8,7 @@ import { emailTemplates } from "@/db/schema/email-templates";
 import { compileMjmlToHtml } from "@/lib/email/mjml-compile";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function adminHeaders(): HeadersInit {
 	return { "X-Robots-Tag": "noindex, nofollow" };
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	const vars = parsed.data.variables ?? {};
 
 	const subject = interpolate(row.subjectTmpl, vars);
-	const { html, errors } = compileMjmlToHtml(row.bodyMjml);
+	const { html, errors } = await compileMjmlToHtml(row.bodyMjml);
 	const bodyHtml = interpolate(html, vars);
 
 	return NextResponse.json({ subject, html: bodyHtml, mjml_errors: errors }, { headers: adminHeaders() });

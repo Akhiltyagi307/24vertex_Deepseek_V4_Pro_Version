@@ -9,6 +9,7 @@ import { emailTemplates } from "@/db/schema/email-templates";
 import { compileMjmlToHtml } from "@/lib/email/mjml-compile";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function adminHeaders(): HeadersInit {
 	return { "X-Robots-Tag": "noindex, nofollow" };
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
 	}
 
-	const { html, errors } = compileMjmlToHtml(parsed.data.body_mjml);
+	const { html, errors } = await compileMjmlToHtml(parsed.data.body_mjml);
 	if (errors.length && !html?.trim()) {
 		return NextResponse.json({ error: "MJML compile failed", mjml_errors: errors }, { status: 400, headers: adminHeaders() });
 	}

@@ -10,6 +10,7 @@ import { compileMjmlToHtml } from "@/lib/email/mjml-compile";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function adminHeaders(): HeadersInit {
 	return { "X-Robots-Tag": "noindex, nofollow" };
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	}
 
 	const subject = interpolate(row.subjectTmpl, vars);
-	const { html } = compileMjmlToHtml(row.bodyMjml);
+	const { html } = await compileMjmlToHtml(row.bodyMjml);
 	const bodyHtml = interpolate(html, vars);
 
 	await writeAdminAction({ action: "email_template_test_send", targetType: "email_template", targetId: id });
