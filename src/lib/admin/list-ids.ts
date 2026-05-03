@@ -32,4 +32,9 @@ export const ADMIN_LIST_ID = {
 	performanceTracker: "performance.tracker",
 	performanceTools: "performance.tools",
 	billingCoupons: "billing.coupons",
+	billingPlans: "billing.plans",
+	billingSubscriptions: "billing.subscriptions",
+	billingEvents: "billing.events",
+	billingPayments: "billing.payments",
+	billingTrialClaims: "billing.trial_claims",
 } as const;

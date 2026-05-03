@@ -7,17 +7,31 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "node:path";
 
-const USER_EMAIL = process.env.PLAYWRIGHT_USER_EMAIL ?? "";
-const USER_PASSWORD = process.env.PLAYWRIGHT_USER_PASSWORD ?? "";
+function playwrightUserEmail(): string {
+	return (
+		process.env.PLAYWRIGHT_USER_EMAIL?.trim() ||
+		process.env["playwright_user_email"]?.trim() ||
+		""
+	);
+}
+
+function playwrightUserPassword(): string {
+	return (
+		process.env.PLAYWRIGHT_USER_PASSWORD?.trim() ||
+		process.env["playwright_user_password"]?.trim() ||
+		""
+	);
+}
 
 export const STORAGE_STATE_PATH = path.join(__dirname, "../../playwright/.auth/user.json");
 
 setup("authenticate", async ({ page }) => {
-	if (!USER_EMAIL || !USER_PASSWORD) {
-		throw new Error(
-			"PLAYWRIGHT_USER_EMAIL / PLAYWRIGHT_USER_PASSWORD must be set in .env.local for the auth setup to run.",
-		);
-	}
+	const USER_EMAIL = playwrightUserEmail();
+	const USER_PASSWORD = playwrightUserPassword();
+	setup.skip(
+		!USER_EMAIL || !USER_PASSWORD,
+		"Set PLAYWRIGHT_USER_EMAIL and PLAYWRIGHT_USER_PASSWORD (or playwright_user_email / playwright_user_password) in .env.local for student E2E.",
+	);
 
 	await page.goto("/login");
 	await page.getByLabel(/email/i).first().fill(USER_EMAIL);

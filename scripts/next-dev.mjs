@@ -159,7 +159,9 @@ if (!fs.existsSync(nextCli)) {
 	process.exit(1);
 }
 
-const devArgs = ["dev", "-H", "localhost", "-p", String(port)];
+// Bind IPv4 so `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001` (and Playwright’s localhost→127.0.0.1 normalize) can connect.
+// `-H localhost` alone often listens only on ::1, which yields ECONNREFUSED from IPv4 clients.
+const devArgs = ["dev", "-H", "127.0.0.1", "-p", String(port)];
 // Turbopack default in Next 16 can leave `.next/dev` in a bad state (e.g. missing
 // `chunks/ssr/[turbopack]_runtime.js` while `pages/_document.js` still requires it).
 // `pnpm run dev:clean` fixes that; `NEXT_DEV_WEBPACK=1` opts into webpack dev instead.

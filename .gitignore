@@ -40,6 +40,10 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 
+# Local dev logs (do not commit)
+.cursor-dev-server.log
+dev-nohup.log
+
 # Temp / scratch
 tw-debug.css
 .tmp_*.json
@@ -54,6 +58,7 @@ playwright/.auth/
 # Agent/cursor metadata and references (non-production)
 .agents/
 .cursor/
+.claude/
 docs/
 testsprite_tests/
 EduAI_PRD_v3_2_TestSprite_Backend.md

@@ -20,6 +20,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:student": "playwright test tests/e2e/auth.setup.ts tests/e2e/smoke.spec.ts tests/e2e/post-login.spec.ts tests/e2e/playwright-env.spec.ts",
+    "test:e2e:student:local": "PLAYWRIGHT_START_WEBSERVER=1 pnpm run test:e2e:student",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "perf:check": "node scripts/perf-check.mjs",
@@ -33,7 +35,8 @@
     "db:studio": "drizzle-kit studio",
     "razorpay:seed-plans": "node scripts/seed-razorpay-plans.mjs",
     "admin:security-phase6": "node scripts/admin-security-phase6.mjs",
-    "admin:password-hash-b64": "node scripts/admin-password-hash-b64.mjs"
+    "admin:password-hash-b64": "node scripts/admin-password-hash-b64.mjs",
+    "admin:totp-secret": "node scripts/admin-totp-secret.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.53",

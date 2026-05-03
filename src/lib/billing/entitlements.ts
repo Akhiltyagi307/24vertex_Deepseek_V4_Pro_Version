@@ -7,6 +7,7 @@ import { getServerUser } from "@/lib/auth/get-server-user";
 import { isSaasEnforcementEnabled } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { consumeNextQuotaTestGrant } from "@/lib/billing/quota-grant-consume";
 import { PLAN_CATALOG, type PlanCode, tokenQuotaForGrade } from "@/lib/billing/plans";
 import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
 
@@ -429,6 +430,10 @@ export async function consumeTest(
 
 	const gate = await evaluatePracticeTestBilling(supabase, profileId);
 	if (!gate.ok) return gate;
+
+	if (await consumeNextQuotaTestGrant(profileId)) {
+		return { ok: true };
+	}
 
 	const { data, error } = await supabase.rpc("billing_consume_test", { p_profile_id: profileId });
 	if (error) {

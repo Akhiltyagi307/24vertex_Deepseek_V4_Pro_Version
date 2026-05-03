@@ -8,6 +8,9 @@
 
 export type PlanCode = "free" | "pro_monthly" | "pro_annual";
 
+/** Plans that can be purchased via Razorpay checkout (checkout_discount coupons apply here). */
+export const PAID_CHECKOUT_PLAN_CODES: PlanCode[] = ["pro_monthly", "pro_annual"];
+
 export type PlanInterval = "trial" | "month" | "year";
 
 export type PlanCatalogEntry = {

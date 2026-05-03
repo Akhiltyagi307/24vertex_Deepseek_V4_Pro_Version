@@ -42,7 +42,12 @@ export const COMMAND_PALETTE_JUMPS: CommandPaletteJump[] = [
 	{ id: "teachers", label: "Users · Teachers", href: "/admin/users/teachers" },
 	{ id: "tests", label: "Assessments · Tests", href: "/admin/assessments/tests" },
 	{ id: "live", label: "Assessments · Live", href: "/admin/assessments/live" },
+	{ id: "billing_plans", label: "Billing · Plans", href: "/admin/billing/plans" },
+	{ id: "billing_subs", label: "Billing · Subscriptions", href: "/admin/billing/subscriptions" },
+	{ id: "billing_payments", label: "Billing · Payments", href: "/admin/billing/payments" },
+	{ id: "billing_events", label: "Billing · Webhook events", href: "/admin/billing/events" },
 	{ id: "coupons", label: "Billing · Coupons", href: "/admin/billing/coupons" },
+	{ id: "billing_trial_claims", label: "Billing · Trial claims", href: "/admin/billing/trial-claims" },
 	{ id: "sql", label: "System · SQL console", href: "/admin/system/sql-console" },
 	{ id: "sessions", label: "System · Active sessions", href: "/admin/system/active-sessions" },
 	{ id: "maintenance", label: "System · Maintenance readiness", href: "/admin/system/maintenance-readiness" },
@@ -65,8 +70,8 @@ export const COMMAND_PALETTE_ACTIONS: CommandPaletteAction[] = [
 	{
 		id: "coupons_ops",
 		kind: "nav",
-		label: "Coupons (read-only list)",
-		description: "Codes are managed in Razorpay / billing ops; this panel is for search and export.",
+		label: "Coupons",
+		description: "Create, edit, disable codes and view redemptions.",
 		href: "/admin/billing/coupons",
 	},
 	{
