@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
@@ -7,13 +8,16 @@ import { emailLog } from "@/db/schema/comms-audit";
 
 export const runtime = "nodejs";
 
+/**
+ * Constant-time string equality. Length check is fine to short-circuit (it's
+ * not part of the secret), but the byte comparison must be timing-safe so a
+ * remote attacker cannot leak the secret one character at a time via response
+ * latency. Node's crypto.timingSafeEqual requires equal-length buffers — the
+ * length guard above ensures that invariant.
+ */
 function timingSafeEqual(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
-	let out = 0;
-	for (let i = 0; i < a.length; i++) {
-		out |= a.charCodeAt(i)! ^ b.charCodeAt(i)!;
-	}
-	return out === 0;
+	return crypto.timingSafeEqual(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
 }
 
 /**
