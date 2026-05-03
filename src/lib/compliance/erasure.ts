@@ -1,5 +1,6 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
 import { eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -7,6 +8,7 @@ import { aiCalls } from "@/db/schema/ai-calls";
 import { adminTestMessages, performanceTracker, questionFlags, studentAnswers, testReports, tests } from "@/db/schema/assessment";
 import { assignmentSubmissions } from "@/db/schema/teaching";
 import { notifications, userPreferences } from "@/db/schema/comms-audit";
+import { complianceRequests } from "@/db/schema/compliance-requests";
 import { doubtConversations, doubtMessages } from "@/db/schema/doubt";
 import { profiles, parentStudentLinks } from "@/db/schema/profiles";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -108,13 +110,77 @@ export async function countErasureImpact(userId: string): Promise<ErasureCounts>
 }
 
 /**
+ * Append a structured saga-state line to compliance_requests.notes. Each line is
+ * a `[YYYY-MM-DDTHH:mm:ss.sssZ] tag: detail` row so the audit trail is grep-able.
+ * Failures here are best-effort — never block the saga itself on a notes write.
+ */
+async function appendDsrNote(complianceRequestId: string, tag: string, detail?: string): Promise<void> {
+	const line = `[${new Date().toISOString()}] ${tag}${detail ? `: ${detail}` : ""}`;
+	try {
+		await db
+			.update(complianceRequests)
+			.set({
+				notes: sql`coalesce(${complianceRequests.notes} || E'\n', '') || ${line}`,
+			})
+			.where(eq(complianceRequests.id, complianceRequestId));
+	} catch (e) {
+		Sentry.captureException(e, {
+			tags: { component: "compliance.erasure", phase: "append_note" },
+			extra: { complianceRequestId, tag },
+		});
+	}
+}
+
+async function setDsrInProgress(complianceRequestId: string): Promise<void> {
+	try {
+		await db
+			.update(complianceRequests)
+			.set({ status: "in_progress" })
+			.where(eq(complianceRequests.id, complianceRequestId));
+	} catch (e) {
+		// Don't block the saga on a status flip — the route handler will still
+		// see the DSR row, and the notes append below records the actual progress.
+		Sentry.captureException(e, {
+			tags: { component: "compliance.erasure", phase: "set_in_progress" },
+			extra: { complianceRequestId },
+		});
+	}
+}
+
+/**
  * Applies compliance erasure for a subject user. Dry-run returns counts only.
  * Retains `tests` / `questions` rows (FERPA), `payments`, `audit_logs`, `admin_action_log`.
+ *
+ * Saga shape (committed-then-side-effect, with traceable progress):
+ *
+ *   1. (optional) Mark DSR `in_progress` and append `saga_started`.
+ *   2. Run DB transaction: delete subject rows, pseudonymize profile.
+ *      → On success, append `db_committed` to DSR notes.
+ *   3. Pseudonymize Auth identity (email).
+ *      → On success, append `auth_pseudonymized` to DSR notes.
+ *      → On failure, append `auth_failed: <reason>` and throw. The DB
+ *        transaction is already committed; recovery is to re-run this
+ *        function (the DELETEs are idempotent and the pseudo-email is
+ *        deterministic per userId, so a retry is safe).
+ *
+ * `complianceRequestId` is optional for backward compatibility but should
+ * always be passed by admin DSR routes so the saga progress is recorded
+ * against the request row.
  */
-export async function performComplianceErasure(userId: string, opts: { dryRun: boolean }): Promise<ErasureCounts> {
+export async function performComplianceErasure(
+	userId: string,
+	opts: { dryRun: boolean; complianceRequestId?: string },
+): Promise<ErasureCounts> {
 	const snapshot = await countErasureImpact(userId);
 	if (opts.dryRun) {
 		return snapshot;
+	}
+
+	const dsrId = opts.complianceRequestId;
+
+	if (dsrId) {
+		await setDsrInProgress(dsrId);
+		await appendDsrNote(dsrId, "saga_started", `subject=${userId}`);
 	}
 
 	const testIds = await loadTestIdsForStudent(userId);
@@ -122,49 +188,82 @@ export async function performComplianceErasure(userId: string, opts: { dryRun: b
 		await db.select({ id: doubtConversations.id }).from(doubtConversations).where(eq(doubtConversations.studentId, userId))
 	).map((c) => c.id);
 
-	await db.transaction(async (tx) => {
-		if (testIds.length) {
-			await tx.delete(studentAnswers).where(inArray(studentAnswers.testId, testIds));
-			await tx.delete(testReports).where(inArray(testReports.testId, testIds));
-			await tx.delete(adminTestMessages).where(inArray(adminTestMessages.testId, testIds));
-		}
-		await tx.delete(questionFlags).where(eq(questionFlags.studentId, userId));
-		await tx.delete(performanceTracker).where(eq(performanceTracker.studentId, userId));
-		await tx.delete(assignmentSubmissions).where(eq(assignmentSubmissions.studentId, userId));
-		await tx.delete(notifications).where(eq(notifications.recipientId, userId));
-		await tx.delete(userPreferences).where(eq(userPreferences.userId, userId));
-		await tx
-			.delete(parentStudentLinks)
-			.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId))!);
-		if (convoIds.length) {
-			await tx.delete(doubtMessages).where(inArray(doubtMessages.conversationId, convoIds));
-			await tx.delete(doubtConversations).where(eq(doubtConversations.studentId, userId));
-		}
-		await tx.delete(aiCalls).where(eq(aiCalls.userId, userId));
+	try {
+		await db.transaction(async (tx) => {
+			if (testIds.length) {
+				await tx.delete(studentAnswers).where(inArray(studentAnswers.testId, testIds));
+				await tx.delete(testReports).where(inArray(testReports.testId, testIds));
+				await tx.delete(adminTestMessages).where(inArray(adminTestMessages.testId, testIds));
+			}
+			await tx.delete(questionFlags).where(eq(questionFlags.studentId, userId));
+			await tx.delete(performanceTracker).where(eq(performanceTracker.studentId, userId));
+			await tx.delete(assignmentSubmissions).where(eq(assignmentSubmissions.studentId, userId));
+			await tx.delete(notifications).where(eq(notifications.recipientId, userId));
+			await tx.delete(userPreferences).where(eq(userPreferences.userId, userId));
+			await tx
+				.delete(parentStudentLinks)
+				.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId))!);
+			if (convoIds.length) {
+				await tx.delete(doubtMessages).where(inArray(doubtMessages.conversationId, convoIds));
+				await tx.delete(doubtConversations).where(eq(doubtConversations.studentId, userId));
+			}
+			await tx.delete(aiCalls).where(eq(aiCalls.userId, userId));
 
-		const now = new Date();
-		await tx
-			.update(profiles)
-			.set({
-				fullName: "Erased User",
-				parentName: null,
-				parentEmail: null,
-				avatarUrl: null,
-				bio: null,
-				phone: null,
-				website: null,
-				schoolName: null,
-				deletedAt: now,
-				updatedAt: now,
-			})
-			.where(eq(profiles.id, userId));
-	});
+			const now = new Date();
+			await tx
+				.update(profiles)
+				.set({
+					fullName: "Erased User",
+					parentName: null,
+					parentEmail: null,
+					avatarUrl: null,
+					bio: null,
+					phone: null,
+					website: null,
+					schoolName: null,
+					deletedAt: now,
+					updatedAt: now,
+				})
+				.where(eq(profiles.id, userId));
+		});
+	} catch (e) {
+		if (dsrId) {
+			await appendDsrNote(dsrId, "db_failed", e instanceof Error ? e.message : String(e));
+		}
+		Sentry.captureException(e, {
+			tags: { component: "compliance.erasure", phase: "db_transaction" },
+			extra: { userId, complianceRequestId: dsrId ?? null },
+		});
+		throw e;
+	}
+
+	if (dsrId) {
+		await appendDsrNote(dsrId, "db_committed");
+	}
 
 	const auth = createServiceRoleClient().auth.admin;
 	const pseudoEmail = `erased+${userId.replace(/-/g, "").slice(0, 12)}@eduai.invalid`;
 	const { error: authErr } = await auth.updateUserById(userId, { email: pseudoEmail });
 	if (authErr) {
+		// DB is already erased; Auth identity still original. Recovery: re-run the
+		// route — DB ops are idempotent, the pseudo-email is deterministic, and
+		// supabase auth.updateUserById is a no-op when the email already matches.
+		if (dsrId) {
+			await appendDsrNote(dsrId, "auth_failed", authErr.message);
+		}
+		Sentry.captureException(new Error(`Compliance erasure auth pseudonymize failed: ${authErr.message}`), {
+			tags: {
+				component: "compliance.erasure",
+				phase: "auth_pseudonymize",
+				severity: "high",
+			},
+			extra: { userId, complianceRequestId: dsrId ?? null, authError: authErr.message },
+		});
 		throw new Error(`Auth pseudonymize failed: ${authErr.message}`);
+	}
+
+	if (dsrId) {
+		await appendDsrNote(dsrId, "auth_pseudonymized", pseudoEmail);
 	}
 
 	return snapshot;

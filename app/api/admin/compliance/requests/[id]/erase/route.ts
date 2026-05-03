@@ -77,7 +77,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		totpUsed: totpRequired,
 	});
 
-	const counts = await performComplianceErasure(subjectUserId, { dryRun: parsed.data.dry_run });
+	const counts = await performComplianceErasure(subjectUserId, {
+		dryRun: parsed.data.dry_run,
+		complianceRequestId: uuid.data,
+	});
 
 	if (!parsed.data.dry_run) {
 		await db
