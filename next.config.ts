@@ -72,9 +72,9 @@ const nextConfig: NextConfig = {
 		],
 	},
 	async headers() {
-		// `Content-Security-Policy` is set per-request in `middleware.ts` so we can issue a fresh
+		// `Content-Security-Policy` is set per-request in `proxy.ts` so we can issue a fresh
 		// nonce for `script-src 'strict-dynamic' 'nonce-…'`. Static security headers stay here so
-		// they're applied even on routes the middleware matcher excludes (static assets, images).
+		// they're applied even on routes the proxy matcher excludes (static assets, images).
 		const base: { key: string; value: string }[] = [
 			{ key: "X-Content-Type-Options", value: "nosniff" },
 			{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

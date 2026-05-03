@@ -40,7 +40,7 @@ jobs:
         run: pnpm exec tsc --noEmit
 
       - name: Vitest (admin unit tests)
-        run: pnpm vitest run tests/admin/auth.test.ts tests/admin/middleware.test.ts tests/admin/maintenance-routing.test.ts tests/admin/datatable-export.test.ts tests/admin/admin-data-table-mobile.test.tsx tests/admin/admin-data-table-states.test.tsx tests/admin/csv-import-diff.test.ts tests/admin/sql-read-only.test.ts tests/admin/sql-write-guard.test.ts tests/admin/digest-week-key.test.ts
+        run: pnpm vitest run tests/admin/auth.test.ts tests/admin/proxy-gate.test.ts tests/admin/maintenance-routing.test.ts tests/admin/datatable-export.test.ts tests/admin/admin-data-table-mobile.test.tsx tests/admin/admin-data-table-states.test.tsx tests/admin/csv-import-diff.test.ts tests/admin/sql-read-only.test.ts tests/admin/sql-write-guard.test.ts tests/admin/digest-week-key.test.ts
 
       - name: Migration drift (local sql files vs remote ledger)
         if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}

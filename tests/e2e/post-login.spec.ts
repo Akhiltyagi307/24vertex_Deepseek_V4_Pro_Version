@@ -61,7 +61,7 @@ test.describe("Authenticated flow (storageState loaded by auth-setup)", () => {
 		test.info().annotations.push({ type: "post-auth-path", description: path });
 	});
 
-	test("`/legal/privacy` reachable while signed in (middleware-skipped + force-static)", async ({ page }) => {
+	test("`/legal/privacy` reachable while signed in (proxy-skipped + force-static)", async ({ page }) => {
 		await page.goto("/legal/privacy");
 		await expect(page.getByRole("heading", { name: /privacy/i }).first()).toBeVisible();
 	});

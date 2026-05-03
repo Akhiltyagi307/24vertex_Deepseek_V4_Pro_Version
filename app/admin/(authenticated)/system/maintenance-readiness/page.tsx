@@ -25,7 +25,7 @@ export default function AdminMaintenanceReadinessPage() {
 						<strong className="text-foreground">Env var:</strong> <code className="text-xs">MAINTENANCE_MODE</code>{" "}
 						— when set to <code className="text-xs">true</code>, non-admin HTML routes are redirected to{" "}
 						<code className="text-xs">/maintenance</code> (see{" "}
-						<code className="text-xs">middleware.ts</code> +{" "}
+						<code className="text-xs">proxy.ts</code> +{" "}
 						<code className="text-xs">src/lib/admin/maintenance-routing.ts</code>).
 					</li>
 					<li>

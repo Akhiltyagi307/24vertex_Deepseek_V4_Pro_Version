@@ -5,8 +5,7 @@ import { adminProxyGate } from "@/lib/admin/proxy-guard";
 import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
 import { updateSession } from "@/lib/supabase/session";
 
-/** Node.js runtime: matches prior `proxy.ts` behavior and ensures dev emits `server/middleware.js` (Turbopack + `loadNodeMiddleware`). */
-export const runtime = "nodejs";
+/** Root request proxy (Next.js `proxy.ts` convention). Runs on the Node.js runtime. */
 
 export const REQUEST_ID_HEADER = "x-request-id";
 
@@ -25,7 +24,7 @@ function resolveRequestId(request: NextRequest): string {
 	return crypto.randomUUID();
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
 	const requestId = resolveRequestId(request);
