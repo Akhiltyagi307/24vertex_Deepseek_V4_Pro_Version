@@ -9,11 +9,11 @@ import {
 	ilike,
 	isNull,
 	or,
-	sql,
 	type SQL,
 } from "drizzle-orm";
 
 import { db } from "@/db";
+import { authUsers } from "@/db/schema/auth-users";
 import { profiles } from "@/db/schema/profiles";
 
 export type AdminUserListRole = "student" | "parent" | "teacher";
@@ -66,8 +66,6 @@ export async function adminListUsers(params: AdminUserListParams): Promise<{ row
 	const pageSize = Math.min(250, Math.max(1, params.pageSize));
 	const offset = (page - 1) * pageSize;
 
-	const emailSql = sql<string>`(select u.email::text from auth.users u where u.id = ${profiles.id} limit 1)`.as("email");
-
 	const conditions: SQL[] = [eq(profiles.role, params.role)];
 	if (!params.includeDeleted) {
 		conditions.push(isNull(profiles.deletedAt));
@@ -92,20 +90,28 @@ export async function adminListUsers(params: AdminUserListParams): Promise<{ row
 				ilike(profiles.fullName, pattern),
 				ilike(profiles.schoolName, pattern),
 				ilike(profiles.parentEmail, pattern),
-				sql`(select u.email::text from auth.users u where u.id = ${profiles.id} limit 1) ilike ${pattern}`,
+				ilike(authUsers.email, pattern),
 			)!,
 		);
 	}
 
 	const whereSql = and(...conditions);
 
-	const [countRow] = await db.select({ c: count() }).from(profiles).where(whereSql);
+	// Single LEFT JOIN auth.users replaces the previous correlated subquery
+	// inside SELECT and WHERE — was running 500+ subquery evaluations per page
+	// of 250 rows. The JOIN is 1:1 (profiles.id references auth.users.id) so
+	// cardinality is unchanged.
+	const [countRow] = await db
+		.select({ c: count() })
+		.from(profiles)
+		.leftJoin(authUsers, eq(authUsers.id, profiles.id))
+		.where(whereSql);
 	const total = Number(countRow?.c ?? 0);
 
 	const rows = await db
 		.select({
 			id: profiles.id,
-			email: emailSql,
+			email: authUsers.email,
 			full_name: profiles.fullName,
 			role: profiles.role,
 			grade: profiles.grade,
@@ -118,6 +124,7 @@ export async function adminListUsers(params: AdminUserListParams): Promise<{ row
 			created_at: profiles.createdAt,
 		})
 		.from(profiles)
+		.leftJoin(authUsers, eq(authUsers.id, profiles.id))
 		.where(whereSql)
 		.orderBy(orderClause(params.sort))
 		.limit(pageSize)
@@ -143,11 +150,10 @@ export async function adminListUsers(params: AdminUserListParams): Promise<{ row
 }
 
 export async function adminGetUserById(id: string): Promise<AdminUserDetailRow | null> {
-	const emailSql = sql<string>`(select u.email::text from auth.users u where u.id = ${profiles.id} limit 1)`.as("email");
 	const rows = await db
 		.select({
 			id: profiles.id,
-			email: emailSql,
+			email: authUsers.email,
 			full_name: profiles.fullName,
 			role: profiles.role,
 			grade: profiles.grade,
@@ -164,6 +170,7 @@ export async function adminGetUserById(id: string): Promise<AdminUserDetailRow |
 			created_at: profiles.createdAt,
 		})
 		.from(profiles)
+		.leftJoin(authUsers, eq(authUsers.id, profiles.id))
 		.where(eq(profiles.id, id))
 		.limit(1);
 	const r = rows[0];
