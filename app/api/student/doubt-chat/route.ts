@@ -11,6 +11,15 @@ import { getOpenAIChatModel } from "@/lib/env";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeDoubtChatRateLimit } from "@/lib/practice/practice-rate-limit";
 import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
+
+/**
+ * Conservative reservation debited at the gate so concurrent turns can't bypass
+ * the tokens-left check. Reconciled in onFinish: a normal-length turn debits the
+ * delta on top; a short turn keeps the small over-debit. ~150 output tokens is
+ * roughly 0.3% of a typical period budget — small enough that the friction is
+ * acceptable, large enough that 5 simultaneous turns can't all sneak past.
+ */
+const DOUBT_CHAT_PRE_DEBIT_TOKENS = 150;
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { loadDoubtMessagesForConversationWithClient } from "@/lib/doubt/loaders";
 import { createClient } from "@/lib/supabase/server";
@@ -82,6 +91,12 @@ export async function POST(req: Request) {
 			{ status: 402, headers: { "content-type": "application/json" } },
 		);
 	}
+
+	// Reserve a conservative chunk of tokens BEFORE we start streaming so
+	// concurrent turns observed before any onFinish runs cannot all pass the
+	// canStartDoubtChat gate while having only one turn's worth of quota left.
+	// Reconciled in onFinish below.
+	await consumeTokens(supabase, user.id, DOUBT_CHAT_PRE_DEBIT_TOKENS);
 
 	const scope = await validateDoubtScope(supabase, { subjectId, topicId });
 	if (!scope.ok) {
@@ -185,6 +200,9 @@ export async function POST(req: Request) {
 		model: getOpenAIProvider().chat(modelId),
 		system,
 		messages: modelMessages,
+		// Cancel the OpenAI HTTP call when the client disconnects so we stop
+		// paying for tokens after the user closes the tab.
+		abortSignal: req.signal,
 		onFinish: async ({ text, totalUsage, finishReason }) => {
 			const promptT = totalUsage?.inputTokens ?? null;
 			const compT = totalUsage?.outputTokens ?? null;
@@ -218,9 +236,13 @@ export async function POST(req: Request) {
 			if (updErr) {
 				logSupabaseError("doubt_chat.touch_conversation", updErr, { conversationId });
 			}
+			// Reconcile against the pre-debit. If actual output exceeded the
+			// reservation, top up the difference. If it was lower, keep the small
+			// over-debit (we don't refund — keeps the gate strict against
+			// short-turn flooding and the magnitude is bounded by the constant).
 			const outputTokens = compT ?? 0;
-			if (billableTurn && !asstErr && outputTokens > 0) {
-				await consumeTokens(supabase, user.id, outputTokens);
+			if (billableTurn && !asstErr && outputTokens > DOUBT_CHAT_PRE_DEBIT_TOKENS) {
+				await consumeTokens(supabase, user.id, outputTokens - DOUBT_CHAT_PRE_DEBIT_TOKENS);
 			}
 		},
 	});
