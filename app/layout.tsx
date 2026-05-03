@@ -15,7 +15,7 @@ const geist = Geist({
 // Allows Next to resolve relative URLs (og:image, twitter:image) against a real
 // origin instead of falling back to localhost in production builds.
 const siteUrl =
-	process.env.NEXT_PUBLIC_SITE_URL ??
+	process.env.NEXT_PUBLIC_APP_URL ??
 	(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
