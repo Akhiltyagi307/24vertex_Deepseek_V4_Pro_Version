@@ -6,7 +6,11 @@ import Testimonials from "@/components/ui/testimonials";
 import { Footer7 } from "@/components/ui/footer-7";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DottedSurface } from "@/components/ui/dotted-surface";
+// three.js (~180KB) is loaded lazily on the client only — DottedSurface is a
+// pure-decorative WebGL background; SSR can't render it and shipping it in the
+// initial bundle inflates marketing-page TTI. The client wrapper handles the
+// dynamic() call since `ssr: false` is restricted to client components.
+import { DottedSurfaceLazy as DottedSurface } from "@/components/marketing/dotted-surface-lazy";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
