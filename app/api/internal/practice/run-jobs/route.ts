@@ -13,6 +13,32 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+/**
+ * Per-job wall-clock cap. The function-level maxDuration is 300s; without a
+ * per-job cap, one stuck AI grading call can starve the rest of the batch by
+ * eating the whole budget. 90s is generous (typical grade chunk is 10-25s)
+ * but fast enough that the worker can move on and reschedule the stuck job.
+ */
+const PER_JOB_TIMEOUT_MS = 90_000;
+
+class JobTimeoutError extends Error {
+	constructor(jobType: string, ms: number) {
+		super(`Job ${jobType} exceeded ${ms}ms timeout`);
+		this.name = "JobTimeoutError";
+	}
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, jobType: string): Promise<T> {
+	let t: ReturnType<typeof setTimeout>;
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		t = setTimeout(() => reject(new JobTimeoutError(jobType, ms)), ms);
+	});
+	return Promise.race([
+		promise.finally(() => clearTimeout(t)),
+		timeoutPromise,
+	]);
+}
+
 type ClaimedJob = {
 	id: string;
 	job_type: "grade" | "pdf" | "auto_submit";
@@ -174,10 +200,15 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 
 	const processOne = async (job: ClaimedJob) => {
 		try {
-			const out =
-				job.job_type === "grade" ? await handleGradeJob(job)
-				: job.job_type === "pdf" ? await handlePdfJob(job)
-				: { ok: false as const, message: `Unsupported job_type ${job.job_type}` };
+			const handlerPromise =
+				job.job_type === "grade" ? handleGradeJob(job)
+				: job.job_type === "pdf" ? handlePdfJob(job)
+				: Promise.resolve({ ok: false as const, message: `Unsupported job_type ${job.job_type}` });
+
+			// Per-job timeout: a stuck AI call cannot block the whole worker
+			// invocation. Timed-out jobs land in markJobFailure and get retried
+			// with the existing exponential backoff.
+			const out = await withTimeout(handlerPromise, PER_JOB_TIMEOUT_MS, job.job_type);
 
 			if (out.ok) {
 				await markJobDone(job.id);
