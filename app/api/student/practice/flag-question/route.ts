@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { db } from "@/db";
+import { moderationFlags } from "@/db/schema/moderation-flags";
 import { createClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
@@ -56,6 +58,22 @@ export async function POST(request: Request) {
 			console.error("[flag-question]", error.message, error.code, error.details);
 		}
 		return Response.json({ ok: false, message: "Could not submit your report." }, { status: 500 });
+	}
+
+	try {
+		await db.insert(moderationFlags).values({
+			entityType: "question",
+			entityId: parsed.data.questionId,
+			reportedBy: user.id,
+			source: "user",
+			reason: parsed.data.notes ? `${parsed.data.reason} — ${parsed.data.notes}` : parsed.data.reason,
+			severity: "medium",
+			status: "open",
+		});
+	} catch (e) {
+		if (process.env.NODE_ENV === "development") {
+			console.error("[flag-question] moderation_flags", e);
+		}
 	}
 
 	return Response.json({ ok: true });

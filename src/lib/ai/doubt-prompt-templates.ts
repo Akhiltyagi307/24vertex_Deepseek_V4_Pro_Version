@@ -34,8 +34,21 @@ function extractTemplateFromDoc(filePath: string): string {
 	return fromBody.slice(0, endIdx).trim();
 }
 
+/** Resolves the repo root that contains `docs/explain-mode-prompt.md` (supports linked git worktrees). */
+function resolveRepoRootWithDocs(): string {
+	const marker = path.join("docs", "explain-mode-prompt.md");
+	let dir = path.resolve(process.cwd());
+	for (let i = 0; i < 12; i++) {
+		if (fs.existsSync(path.join(dir, marker))) return dir;
+		const parent = path.dirname(dir);
+		if (parent === dir) break;
+		dir = parent;
+	}
+	return path.resolve(process.cwd());
+}
+
 function loadTemplatesFromDisk(): Record<DoubtTutorMode, string> {
-	const root = process.cwd();
+	const root = resolveRepoRootWithDocs();
 	return {
 		explain: extractTemplateFromDoc(path.join(root, DOC_PATH.explain)),
 		solve_with_me: extractTemplateFromDoc(path.join(root, DOC_PATH.solve_with_me)),

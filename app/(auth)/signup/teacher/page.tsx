@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export default async function TeacherSignupPage() {
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-col gap-2 text-center md:text-left">
+			<div className="flex flex-col gap-2 text-center medium:text-left">
 				<h1 className="text-2xl font-bold tracking-tight">Teacher sign up unavailable</h1>
 				<p className="text-balance text-sm text-muted-foreground">
 					Teacher accounts are no longer supported. Please sign up as a student or parent.

@@ -57,6 +57,17 @@
     --text-4xl: 2.53125rem;
     --text-5xl: 3.375rem;
     --text-6xl: 4.21875rem;
+
+    /*
+     * Responsive layout: three tiers (mobile-first).
+     * - Small (phones): default, viewport < 768px — unprefixed utilities
+     * - Medium (tablets): `medium:` from 768px (48rem)
+     * - XL (laptops): `xl:` from 1024px (64rem)
+     * Default Tailwind breakpoints (sm/md/lg/2xl) are removed; only `medium:` and `xl:` exist.
+     */
+    --breakpoint-*: initial;
+    --breakpoint-medium: 48rem;
+    --breakpoint-xl: 64rem;
 }
 
 :root {

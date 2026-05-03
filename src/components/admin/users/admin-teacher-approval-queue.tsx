@@ -1,0 +1,176 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { AdminExportButton } from "@/components/admin/data-table/export-button";
+import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
+import { Button } from "@/components/ui/button";
+import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
+
+type Row = { id: string; email: string | null; full_name: string; school_name: string | null; created_at: string | null };
+
+export function AdminTeacherApprovalQueue() {
+	const [rows, setRows] = useState<Row[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [busy, setBusy] = useState<string | null>(null);
+
+	const load = async () => {
+		setLoading(true);
+		const res = await fetch("/api/admin/teachers/pending", { credentials: "include" });
+		if (res.ok) {
+			const j = (await res.json()) as { data: Row[] };
+			setRows(j.data ?? []);
+		}
+		setLoading(false);
+	};
+
+	useEffect(() => {
+		void load();
+	}, []);
+
+	const approve = async (id: string) => {
+		setBusy(id);
+		try {
+			const res = await fetch(`/api/admin/teachers/${id}/approve`, { method: "POST", credentials: "include" });
+			if (!res.ok) throw new Error(await res.text());
+			await load();
+		} catch (e) {
+			alert(e instanceof Error ? e.message : "Failed");
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const reject = async (id: string) => {
+		const reason = window.prompt("Rejection reason (required):")?.trim();
+		if (!reason) return;
+		setBusy(id);
+		try {
+			const res = await fetch(`/api/admin/teachers/${id}/reject`, {
+				method: "POST",
+				credentials: "include",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ reason }),
+			});
+			if (!res.ok) throw new Error(await res.text());
+			await load();
+		} catch (e) {
+			alert(e instanceof Error ? e.message : "Failed");
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const requestInfo = async (id: string) => {
+		const raw = window.prompt("Questions for teacher (one per line):")?.trim();
+		if (!raw) return;
+		const questions = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+		if (questions.length === 0) return;
+		setBusy(id);
+		try {
+			const res = await fetch(`/api/admin/teachers/${id}/request-info`, {
+				method: "POST",
+				credentials: "include",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ questions }),
+			});
+			if (!res.ok) throw new Error(await res.text());
+			await load();
+		} catch (e) {
+			alert(e instanceof Error ? e.message : "Failed");
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const exportRows = rows.map((r) => ({
+		id: r.id,
+		email: r.email ?? "",
+		full_name: r.full_name,
+		school_name: r.school_name ?? "",
+		created_at: r.created_at ?? "",
+	}));
+
+	if (loading) {
+		return (
+			<div className="space-y-3">
+				<div className="flex flex-wrap justify-end gap-2">
+					<AdminSavedViews listId={ADMIN_LIST_ID.teacherApprovals} />
+					<AdminExportButton
+						filenameBase="teacher-approvals"
+						headers={["id", "email", "full_name", "school_name", "created_at"]}
+						rows={[]}
+						disabled
+					/>
+				</div>
+				<p className="text-sm text-muted-foreground">Loading queue…</p>
+			</div>
+		);
+	}
+
+	if (rows.length === 0) {
+		return (
+			<div className="space-y-3">
+				<div className="flex flex-wrap justify-end gap-2">
+					<AdminSavedViews listId={ADMIN_LIST_ID.teacherApprovals} />
+					<AdminExportButton
+						filenameBase="teacher-approvals"
+						headers={["id", "email", "full_name", "school_name", "created_at"]}
+						rows={[]}
+						disabled
+					/>
+				</div>
+				<p className="text-sm text-muted-foreground">No pending teacher approvals.</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="space-y-3">
+			<div className="flex flex-wrap justify-end gap-2">
+				<AdminSavedViews listId={ADMIN_LIST_ID.teacherApprovals} />
+				<AdminExportButton
+					filenameBase="teacher-approvals"
+					headers={["id", "email", "full_name", "school_name", "created_at"]}
+					rows={exportRows}
+				/>
+			</div>
+			{rows.map((r) => (
+				<div key={r.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 medium:flex-row medium:items-center medium:justify-between">
+					<div>
+						<p className="font-medium">{r.full_name}</p>
+						<p className="text-sm text-muted-foreground">{r.email ?? "—"}</p>
+						<p className="text-xs text-muted-foreground">{r.school_name ?? "School not set"}</p>
+					</div>
+					<div className="flex flex-wrap gap-2">
+						<Button type="button" size="sm" disabled={busy !== null} onClick={() => void approve(r.id)}>
+							Approve
+						</Button>
+						<Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => void requestInfo(r.id)}>
+							Request info
+						</Button>
+						<Button type="button" size="sm" variant="destructive" disabled={busy !== null} onClick={() => void reject(r.id)}>
+							Reject
+						</Button>
+						{r.school_name ?
+							<Button
+								type="button"
+								size="sm"
+								variant="secondary"
+								render={
+									<a
+										href={`https://www.google.com/search?q=${encodeURIComponent(r.school_name)}`}
+										target="_blank"
+										rel="noreferrer"
+									/>
+								}
+							>
+								Search school
+							</Button>
+						:	null}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}

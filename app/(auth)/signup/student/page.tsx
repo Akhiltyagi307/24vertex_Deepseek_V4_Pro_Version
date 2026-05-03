@@ -40,7 +40,7 @@ export default async function StudentSignupPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-col gap-2 text-center md:text-left">
+			<div className="flex flex-col gap-2 text-center medium:text-left">
 				<h1 className="text-2xl font-bold tracking-tight">Student sign up</h1>
 				<p className="text-balance text-sm text-muted-foreground">
 					Create your profile; a parent connects later with the link code shown on your Profile after you sign

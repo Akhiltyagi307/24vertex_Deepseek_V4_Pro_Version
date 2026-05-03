@@ -1,6 +1,5 @@
-import { Resend } from "resend";
-
-import { getAppUrl, getResendApiKey, getResendFrom } from "@/lib/env";
+import { getAppUrl } from "@/lib/env";
+import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 
 function escapeHtml(s: string): string {
 	return s
@@ -32,8 +31,6 @@ export type ParentEmailChangeParams = {
 export async function sendParentEmailChangeNotifications(
 	params: ParentEmailChangeParams,
 ): Promise<{ error: string | null }> {
-	const resend = new Resend(getResendApiKey());
-	const from = getResendFrom();
 	const name = params.studentDisplayName.trim() || "A student";
 
 	const removalHtml = wrapHtml("Guardian email removed from EduAI", [
@@ -47,25 +44,27 @@ export async function sendParentEmailChangeNotifications(
 	]);
 
 	const [removed, added] = await Promise.all([
-		resend.emails.send({
-			from,
+		sendHtmlEmailLogged({
 			to: params.oldEmail,
 			subject: "Your email was removed from an EduAI student profile",
 			html: removalHtml,
+			templateSlug: "parent-email-removed",
+			templateVariables: { student_name: name },
 		}),
-		resend.emails.send({
-			from,
+		sendHtmlEmailLogged({
 			to: params.newEmail,
 			subject: "You were added as a guardian on EduAI",
 			html: additionHtml,
+			templateSlug: "parent-invitation",
+			templateVariables: { student_name: name },
 		}),
 	]);
 
 	if (removed.error) {
-		return { error: removed.error.message };
+		return { error: removed.error };
 	}
 	if (added.error) {
-		return { error: added.error.message };
+		return { error: added.error };
 	}
 	return { error: null };
 }
@@ -78,23 +77,19 @@ export type ParentEmailAddedParams = {
 export async function sendParentEmailAddedNotification(
 	params: ParentEmailAddedParams,
 ): Promise<{ error: string | null }> {
-	const resend = new Resend(getResendApiKey());
-	const from = getResendFrom();
 	const name = params.studentDisplayName.trim() || "A student";
 	const html = wrapHtml("Guardian email added to EduAI", [
 		`<strong>${escapeHtml(name)}</strong> listed this address as their guardian or parent contact on EduAI.`,
 		"You may receive account-related messages about their learning progress.",
 	]);
 
-	const { error } = await resend.emails.send({
-		from,
+	return sendHtmlEmailLogged({
 		to: params.newEmail,
 		subject: "You were added as a guardian on EduAI",
 		html,
+		templateSlug: "parent-invitation",
+		templateVariables: { student_name: name },
 	});
-
-	if (error) return { error: error.message };
-	return { error: null };
 }
 
 export type ParentEmailRemovedParams = {
@@ -105,21 +100,17 @@ export type ParentEmailRemovedParams = {
 export async function sendParentEmailRemovedNotification(
 	params: ParentEmailRemovedParams,
 ): Promise<{ error: string | null }> {
-	const resend = new Resend(getResendApiKey());
-	const from = getResendFrom();
 	const name = params.studentDisplayName.trim() || "A student";
 	const html = wrapHtml("Guardian email removed from EduAI", [
 		`The guardian or parent email on <strong>${escapeHtml(name)}</strong>'s EduAI profile was cleared or replaced.`,
 		"If you did not expect this change, contact your school or EduAI support.",
 	]);
 
-	const { error } = await resend.emails.send({
-		from,
+	return sendHtmlEmailLogged({
 		to: params.oldEmail,
 		subject: "Your email was removed from an EduAI student profile",
 		html,
+		templateSlug: "parent-email-removed",
+		templateVariables: { student_name: name },
 	});
-
-	if (error) return { error: error.message };
-	return { error: null };
 }

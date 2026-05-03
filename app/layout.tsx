@@ -14,6 +14,12 @@ export const metadata: Metadata = {
 	},
 };
 
+// Per-request rendering is required so the CSP nonce generated in `middleware.ts` lands on the
+// framework script tags Next.js emits. With statically pre-rendered pages, the build-time HTML
+// has no nonce, but the middleware sets a CSP that requires one — modern browsers then block
+// every script on those pages.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
 	children,
 }: Readonly<{

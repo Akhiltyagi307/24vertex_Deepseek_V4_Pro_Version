@@ -1,4 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import { APICallError, generateObject, NoObjectGeneratedError, streamObject } from "ai";
+
+import { insertHeuristicModerationFlag, moderatePracticeGenerationText } from "@/lib/ai/moderation";
+import { recordAiCall } from "@/lib/ai/record-ai-call";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { getOpenAIChatModel } from "@/lib/env";
@@ -43,6 +48,8 @@ export type RunGenerationPipelineOptions = {
 	useStreamObject: boolean;
 	/** Fires for each partial object when `useStreamObject` is true. */
 	onPartialObject?: (partial: unknown) => void;
+	/** Cancel the OpenAI HTTP call (and downstream model retries) when fired. */
+	abortSignal?: AbortSignal;
 };
 
 function formatGenerationError(e: unknown): string {
@@ -120,9 +127,14 @@ async function runModelOnce(
 	userPrompt: string,
 	estimatedQuestionCount: number,
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
-	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject">,
+	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
+	studentUserId: string,
 ): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
-	const maxOutputTokens = Math.min(32_000, Math.max(6_000, estimatedQuestionCount * 900));
+	// Hard-cap output tokens at 12k regardless of question count. The previous
+	// scaling could request up to 32k for high-question tests, which exceeds
+	// per-request limits on some models and produces unpredictable cost. 12k
+	// fits a 40-question schema comfortably.
+	const maxOutputTokens = Math.min(12_000, Math.max(6_000, estimatedQuestionCount * 900));
 	const model = getOpenAIProvider()(getOpenAIChatModel());
 	const baseParams = {
 		model,
@@ -131,6 +143,7 @@ async function runModelOnce(
 		prompt: userPrompt,
 		maxOutputTokens,
 		maxRetries: 2,
+		abortSignal: opts.abortSignal,
 		providerOptions: {
 			openai: {
 				strictJsonSchema: false,
@@ -138,8 +151,11 @@ async function runModelOnce(
 		},
 	};
 
+	const chatModelId = getOpenAIChatModel();
+
 	if (opts.useStreamObject) {
 		try {
+			const t0 = Date.now();
 			const result = streamObject(baseParams);
 			const streamPartial = (async () => {
 				if (!opts.onPartialObject) {
@@ -150,6 +166,16 @@ async function runModelOnce(
 				}
 			})();
 			const [object] = await Promise.all([result.object, streamPartial]);
+			const usage = await result.usage;
+			void recordAiCall({
+				feature: "practice.generation",
+				model: chatModelId,
+				userId: studentUserId,
+				inputTokens: usage?.inputTokens ?? 0,
+				outputTokens: usage?.outputTokens ?? 0,
+				latencyMs: Date.now() - t0,
+				status: "ok",
+			});
 			return { ok: true, object: object as PracticeGenerationGroupedOutput };
 		} catch (e) {
 			logServerError("runPracticeGeneration.streamObject", e);
@@ -161,7 +187,17 @@ async function runModelOnce(
 	}
 
 	try {
-		const { object } = await generateObject(baseParams);
+		const t0 = Date.now();
+		const { object, usage } = await generateObject(baseParams);
+		void recordAiCall({
+			feature: "practice.generation",
+			model: chatModelId,
+			userId: studentUserId,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
+		});
 		return { ok: true, object: object as PracticeGenerationGroupedOutput };
 	} catch (e) {
 		logServerError("generatePracticeTest.generateObject", e);
@@ -301,7 +337,14 @@ async function runPracticeGenerationAfterResolveCore(
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
 		const m0 = Date.now();
-		const r = await runModelOnce(systemPrompt, userPrompt, expectedCount, generationOutputSchema, opts);
+		const r = await runModelOnce(
+			systemPrompt,
+			userPrompt,
+			expectedCount,
+			generationOutputSchema,
+			opts,
+			resolved.userId,
+		);
 		cumulativeModelMs += Date.now() - m0;
 		if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
 		const v0 = Date.now();
@@ -323,6 +366,24 @@ async function runPracticeGenerationAfterResolveCore(
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
 		}
+
+		const modBlob = JSON.stringify(flattened.questions);
+		const mod = await moderatePracticeGenerationText(modBlob);
+		if (!mod.ok) {
+			try {
+				await insertHeuristicModerationFlag({
+					entityType: "practice_generation",
+					entityId: randomUUID(),
+					source: mod.source,
+					reason: mod.reason,
+					severity: mod.source === "profanity" ? "high" : "medium",
+				});
+			} catch (e) {
+				logServerError("generatePracticeTest.moderation_flag", e, { correlationId });
+			}
+			return { ok: false, message: "Output blocked by moderation filters.", code: "generation_invalid" };
+		}
+
 		return { ok: true, object: flattened, public: out };
 	}
 
@@ -390,7 +451,7 @@ async function runPracticeGenerationAfterResolveCore(
 		const dedupT0 = Date.now();
 		try {
 			const texts = fullOutput.questions.map((q) => q.question_text);
-			const embeddings = await embedQuestionTexts(texts);
+			const embeddings = await embedQuestionTexts(texts, { userId: resolved.userId });
 			const dupes = await findDuplicatesAgainstStudent(
 				supabase,
 				resolved.userId,
@@ -398,9 +459,11 @@ async function runPracticeGenerationAfterResolveCore(
 				embeddings,
 			);
 			if (dupes.length > 0) {
-				if (process.env.NODE_ENV === "development") {
-					console.log(`[generatePracticeTest] dedup: ${dupes.length} duplicate(s), regenerating`);
-				}
+				logPracticeObs({
+					phase: "generation_dedup_regen",
+					correlation_id: correlationId,
+					duplicates: dupes.length,
+				});
 				const regen = await generateAndStrip();
 				if (regen.ok) {
 					stripped = regen.public;

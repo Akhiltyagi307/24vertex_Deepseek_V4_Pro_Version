@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import {
@@ -6,6 +7,7 @@ import {
 	type SessionStudentAnswer,
 } from "@/components/student/practice/practice-test-session";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +53,7 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 
 	const { data: test, error: tErr } = await supabase
 		.from("tests")
-		.select("id, student_id, subject_id, status, time_limit_seconds, started_at")
+		.select("id, student_id, subject_id, status, time_limit_seconds, started_at, last_ip")
 		.eq("id", testId)
 		.maybeSingle();
 
@@ -77,13 +79,24 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 
 	// Stamp `started_at` the first time the student opens the session page.
 	// Used by `practice_start_grading` to clamp client-reported elapsed time.
+	const hdrs = await headers();
+	const clientIp = clientIpFromHeaders(hdrs);
 	if (!test.started_at) {
+		const patch: Record<string, string> = { started_at: new Date().toISOString() };
+		if (clientIp) patch.last_ip = clientIp;
 		await supabase
 			.from("tests")
-			.update({ started_at: new Date().toISOString() })
+			.update(patch)
 			.eq("id", testId)
 			.eq("student_id", user.id)
 			.is("started_at", null);
+	} else if (!test.last_ip && clientIp) {
+		await supabase
+			.from("tests")
+			.update({ last_ip: clientIp, updated_at: new Date().toISOString() })
+			.eq("id", testId)
+			.eq("student_id", user.id)
+			.is("last_ip", null);
 	}
 
 	const { data: sub } = await supabase

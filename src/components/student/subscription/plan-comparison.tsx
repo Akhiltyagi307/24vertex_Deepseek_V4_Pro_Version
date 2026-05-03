@@ -135,7 +135,7 @@ export function PlanComparison({
 	];
 
 	return (
-		<div className="grid gap-4 md:grid-cols-2 md:gap-5">
+		<div className="grid gap-4 medium:grid-cols-2 medium:gap-5">
 			{cards.map((c) => {
 				const isCurrent = currentPlanCode === c.code;
 				return (
@@ -144,7 +144,7 @@ export function PlanComparison({
 						className={cn(
 							"relative h-full transition-[transform,box-shadow] duration-200 ease-out",
 							c.elevated
-								? "shadow-sm md:shadow-md ring-1 ring-primary/30 md:-translate-y-1"
+								? "shadow-sm medium:shadow-md ring-1 ring-primary/30 medium:-translate-y-1"
 								: "",
 							isCurrent ? "ring-2 ring-primary" : "",
 						)}
@@ -157,7 +157,7 @@ export function PlanComparison({
 						<CardHeader
 							className={cn(
 								"gap-2",
-								c.elevated && !isCurrent ? "pr-24 sm:pr-28" : "",
+								c.elevated && !isCurrent ? "pr-24 medium:pr-28" : "",
 							)}
 						>
 							<div className="flex items-start justify-between gap-3">

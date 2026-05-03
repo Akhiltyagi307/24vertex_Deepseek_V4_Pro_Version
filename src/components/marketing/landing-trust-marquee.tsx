@@ -7,13 +7,13 @@ import { Si1Password, SiGithub, SiMozilla } from "react-icons/si";
 import { cn } from "@/lib/utils";
 
 const logoIconClass =
-  "h-6 w-auto shrink-0 text-muted-foreground opacity-[0.55] sm:h-7";
+  "h-6 w-auto shrink-0 text-muted-foreground opacity-[0.55] medium:h-7";
 
 function TrustLogoStrip({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-x-14 sm:gap-x-20 md:gap-x-24 [&_svg]:block",
+        "flex shrink-0 items-center gap-x-14 medium:gap-x-20 medium:gap-x-24 [&_svg]:block",
         className,
       )}
     >
@@ -22,7 +22,7 @@ function TrustLogoStrip({ className }: { className?: string }) {
       <Si1Password className={logoIconClass} aria-hidden title="1Password" />
       <span
         className={cn(
-          "select-none text-[1.125rem] font-semibold tracking-[0.12em] text-muted-foreground opacity-[0.55] sm:text-xl",
+          "select-none text-[1.125rem] font-semibold tracking-[0.12em] text-muted-foreground opacity-[0.55] medium:text-xl",
         )}
       >
         PwC
@@ -57,8 +57,8 @@ export function LandingTrustMarquee() {
         className="flex w-max animate-landing-trust-marquee will-change-transform group-hover:[animation-play-state:paused]"
         aria-hidden
       >
-        <TrustLogoStrip className="pr-14 sm:pr-20 md:pr-24" />
-        <TrustLogoStrip className="pr-14 sm:pr-20 md:pr-24" />
+        <TrustLogoStrip className="pr-14 medium:pr-20 medium:pr-24" />
+        <TrustLogoStrip className="pr-14 medium:pr-20 medium:pr-24" />
       </div>
     </div>
   );

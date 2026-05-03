@@ -1,0 +1,38 @@
+name: Admin E2E (optional)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install chromium
+
+      - name: Run Playwright (requires secrets + running app)
+        if: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL != '' && secrets.PLAYWRIGHT_ADMIN_PASSWORD != '' && secrets.PLAYWRIGHT_E2E_TARGET_USER_ID != '' }}
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
+          PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
+          PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
+          PLAYWRIGHT_E2E_TARGET_USER_ID: ${{ secrets.PLAYWRIGHT_E2E_TARGET_USER_ID }}
+        run: pnpm run test:e2e
+
+      - name: Skip notice (no Playwright secrets)
+        if: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL == '' || secrets.PLAYWRIGHT_ADMIN_PASSWORD == '' || secrets.PLAYWRIGHT_E2E_TARGET_USER_ID == '' }}
+        run: echo "Skipping E2E — set PLAYWRIGHT_* repository secrets and ensure PLAYWRIGHT_BASE_URL points at a running app."

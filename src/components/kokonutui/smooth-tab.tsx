@@ -504,7 +504,7 @@ export default function SmoothTab({
               {Icon ? (
                 <Icon
                   aria-hidden
-                  className="hidden size-4 shrink-0 sm:block"
+                  className="hidden size-4 shrink-0 medium:block"
                 />
               ) : null}
               <span className="truncate">{item.title}</span>

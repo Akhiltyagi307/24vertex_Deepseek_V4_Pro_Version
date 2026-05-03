@@ -54,7 +54,7 @@ const StudentDashboardAnalytics = dynamic(
 			>
 				<Skeleton className="h-5 w-40" />
 				<Skeleton className="h-[200px] w-full rounded-lg" />
-				<div className="grid gap-3 sm:grid-cols-2">
+				<div className="grid gap-3 medium:grid-cols-2">
 					<Skeleton className="h-32 w-full rounded-lg" />
 					<Skeleton className="h-32 w-full rounded-lg" />
 				</div>
@@ -212,7 +212,7 @@ export function StudentDashboardView({
 	);
 
 	return (
-		<div className="mx-0 flex w-full min-w-0 max-w-none flex-col gap-8 py-6 md:py-8">
+		<div className="mx-0 flex w-full min-w-0 max-w-none flex-col gap-8 py-6 medium:py-8">
 			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<motion.div
 				className="flex w-full min-w-0 max-w-none shrink-0 flex-col gap-1.5"
@@ -235,23 +235,23 @@ export function StudentDashboardView({
 			{/* Row 1: section label (left) + empty cell (right) so Topic progress lines up with subject cards, not the label. */}
 			<div
 				className={cn(
-					"grid w-full min-w-0 max-w-none grid-cols-1 gap-4 sm:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] sm:gap-x-5 sm:gap-y-4",
-					prioritySubjects.length > 0 ? "sm:items-stretch" : "sm:items-start",
+					"grid w-full min-w-0 max-w-none grid-cols-1 gap-4 medium:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] medium:gap-x-5 medium:gap-y-4",
+					prioritySubjects.length > 0 ? "medium:items-stretch" : "medium:items-start",
 				)}
 			>
 				<h2
 					id="subjects-heading"
-					className={cn(SECTION_LABEL_CLASS, "shrink-0 sm:col-start-1 sm:row-start-1")}
+					className={cn(SECTION_LABEL_CLASS, "shrink-0 medium:col-start-1 medium:row-start-1")}
 				>
 					{isParent ? "Subjects" : "Subjects you study"}
 				</h2>
 				<div
-					className="hidden sm:block sm:col-start-2 sm:row-start-1"
+					className="hidden medium:block medium:col-start-2 medium:row-start-1"
 					aria-hidden
 				/>
 				<section
 					aria-labelledby="subjects-heading"
-					className="flex min-w-0 flex-col gap-4 sm:col-start-1 sm:row-start-2"
+					className="flex min-w-0 flex-col gap-4 medium:col-start-1 medium:row-start-2"
 				>
 					{subjectsLoadError ? (
 						<Alert variant="destructive">
@@ -282,7 +282,7 @@ export function StudentDashboardView({
 						<>
 							{prioritySubjects.length > 0 ? (
 								<motion.div
-									className="grid w-full min-w-0 max-w-none grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4"
+									className="grid w-full min-w-0 max-w-none grid-cols-1 gap-3.5 medium:grid-cols-2 medium:gap-4"
 									initial="hidden"
 									animate="show"
 									variants={container}
@@ -296,14 +296,14 @@ export function StudentDashboardView({
 										const subjectIcon = (
 											<span
 												className={cn(
-													"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+													"flex size-10 shrink-0 items-center justify-center rounded-lg border medium:size-11",
 													"border-border/80 ring-1",
 													shellClassName,
 												)}
 												aria-hidden
 											>
 												<Icon
-													className={cn("size-5 sm:size-[1.375rem]", iconClassName)}
+													className={cn("size-5 medium:size-[1.375rem]", iconClassName)}
 													strokeWidth={1.25}
 												/>
 											</span>
@@ -312,7 +312,7 @@ export function StudentDashboardView({
 										return (
 											<motion.div
 												key={s.subjectId}
-												className="flex min-h-0 min-w-0 sm:h-full"
+												className="flex min-h-0 min-w-0 medium:h-full"
 												variants={item}
 											>
 												{!hasAttempts ? (
@@ -367,7 +367,7 @@ export function StudentDashboardView({
 										</p>
 									)}
 									<Card className="min-w-0 overflow-hidden shadow-none">
-										<CardContent className="p-4 sm:p-5">
+										<CardContent className="p-4 medium:p-5">
 											<DashboardOtherSubjectsTable
 												subjects={restSubjects}
 												motionContainer={container}
@@ -382,26 +382,26 @@ export function StudentDashboardView({
 				</section>
 
 				<motion.div
-					className="flex min-h-0 w-full min-w-0 flex-col gap-3 sm:col-start-2 sm:row-start-2 sm:h-full sm:min-h-0"
+					className="flex min-h-0 w-full min-w-0 flex-col gap-3 medium:col-start-2 medium:row-start-2 medium:h-full medium:min-h-0"
 					initial="hidden"
 					animate="show"
 					variants={container}
 				>
-					<motion.div variants={item} className="flex min-h-0 min-w-0 flex-1 flex-col sm:min-h-0">
+					<motion.div variants={item} className="flex min-h-0 min-w-0 flex-1 flex-col medium:min-h-0">
 						<Card className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-2 py-5 shadow-none">
 							<CardHeader className="px-5 pb-1 pt-0">
 								<CardTitle className="text-sm font-semibold leading-snug">Topic progress</CardTitle>
 								<CardAction className="pt-0.5">
 									<span
 										className={cn(
-											"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+											"flex size-10 shrink-0 items-center justify-center rounded-lg border medium:size-11",
 											"border-border/80 ring-1",
 											topicProgressHeaderIcon.shellClassName,
 										)}
 										aria-hidden
 									>
 										<TopicProgressHeaderIcon
-											className={cn("size-5 sm:size-[1.375rem]", topicProgressHeaderIcon.iconClassName)}
+											className={cn("size-5 medium:size-[1.375rem]", topicProgressHeaderIcon.iconClassName)}
 											strokeWidth={1.25}
 											aria-hidden
 										/>
@@ -450,7 +450,7 @@ export function StudentDashboardView({
 										Tests, timed minutes, and scores (last 30 days for averages).
 									</CardDescription>
 								</CardHeader>
-								<CardContent className="flex flex-col divide-y divide-border/70 px-3 pb-4 pt-0 sm:px-4">
+								<CardContent className="flex flex-col divide-y divide-border/70 px-3 pb-4 pt-0 medium:px-4">
 									<div className="flex min-w-0 flex-col gap-1.5 py-3 first:pt-0">
 										<div className="flex min-w-0 items-start justify-between gap-3">
 											<div className="flex min-w-0 items-center gap-2">
@@ -463,11 +463,11 @@ export function StudentDashboardView({
 													Tests completed
 												</span>
 											</div>
-											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground sm:text-2xl">
+											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground medium:text-2xl">
 												{performanceStats.testsCompleted}
 											</p>
 										</div>
-										<p className="text-muted-foreground text-[0.6875rem] leading-snug sm:text-xs">
+										<p className="text-muted-foreground text-[0.6875rem] leading-snug medium:text-xs">
 											{testsCompletedCaption(performanceStats.testsCompleted, isParent)}
 										</p>
 									</div>
@@ -483,11 +483,11 @@ export function StudentDashboardView({
 													Time practicing
 												</span>
 											</div>
-											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground sm:text-2xl">
+											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground medium:text-2xl">
 												{formatMinutesLabel(performanceStats.timeSpentMinutesLast30Days)}
 											</p>
 										</div>
-										<p className="text-muted-foreground text-[0.6875rem] leading-snug sm:text-xs">
+										<p className="text-muted-foreground text-[0.6875rem] leading-snug medium:text-xs">
 											{timePracticingCaption(performanceStats.timeSpentMinutesLast30Days, isParent)}
 										</p>
 									</div>
@@ -503,11 +503,11 @@ export function StudentDashboardView({
 													Average score
 												</span>
 											</div>
-											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground sm:text-2xl">
+											<p className="shrink-0 text-right font-semibold text-xl tabular-nums text-foreground medium:text-2xl">
 												{averageScoreDisplay.value}
 											</p>
 										</div>
-										<p className="text-muted-foreground text-[0.6875rem] leading-snug sm:text-xs">
+										<p className="text-muted-foreground text-[0.6875rem] leading-snug medium:text-xs">
 											{averageScoreDisplay.caption}
 										</p>
 									</div>

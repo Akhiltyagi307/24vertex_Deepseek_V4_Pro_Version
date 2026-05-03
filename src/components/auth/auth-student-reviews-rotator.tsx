@@ -39,7 +39,7 @@ const REVIEWS = [
 ] as const;
 
 const quoteMarkFlankClass =
-	"select-none text-[1.65rem] font-semibold leading-none text-primary md:text-4xl";
+	"select-none text-[1.65rem] font-semibold leading-none text-primary medium:text-4xl";
 
 function ReviewQuoteBlock({
 	text,
@@ -62,7 +62,7 @@ function ReviewQuoteBlock({
 			)}
 			key={contentKey}
 		>
-			<blockquote className="m-0 grid min-w-0 grid-cols-[auto_1fr_auto] items-stretch gap-x-2.5 md:gap-x-3">
+			<blockquote className="m-0 grid min-w-0 grid-cols-[auto_1fr_auto] items-stretch gap-x-2.5 medium:gap-x-3">
 				<span
 					aria-hidden
 					className={cn(quoteMarkFlankClass, "pointer-events-none pt-0.5 leading-none")}
@@ -70,11 +70,11 @@ function ReviewQuoteBlock({
 					&ldquo;
 				</span>
 				<div className="min-w-0">
-					<p className="text-[0.9375rem] font-normal leading-relaxed tracking-[-0.01em] text-card-foreground md:text-base">
+					<p className="text-[0.9375rem] font-normal leading-relaxed tracking-[-0.01em] text-card-foreground medium:text-base">
 						{text}
 					</p>
-					<footer className="mt-4 md:mt-5">
-						<cite className="text-[0.8125rem] font-medium italic leading-snug text-card-foreground/90 md:text-sm">
+					<footer className="mt-4 medium:mt-5">
+						<cite className="text-[0.8125rem] font-medium italic leading-snug text-card-foreground/90 medium:text-sm">
 							{attribution}
 						</cite>
 					</footer>
@@ -146,14 +146,14 @@ export function AuthStudentReviewsRotator() {
 	return (
 		<section
 			aria-label="Student perspectives"
-			className="pointer-events-auto absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 px-3 py-6 md:px-5"
+			className="pointer-events-auto absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 px-3 py-6 medium:px-5"
 			onPointerEnter={() => setHoverPaused(true)}
 			onPointerLeave={() => setHoverPaused(false)}
 		>
 			<div
 				className={cn(
 					AUTH_FROST_GLASS,
-					"relative w-full max-w-sm px-5 pb-5 pt-10 text-card-foreground md:px-6 md:pb-6 md:pt-11",
+					"relative w-full max-w-sm px-5 pb-5 pt-10 text-card-foreground medium:px-6 medium:pb-6 medium:pt-11",
 				)}
 			>
 				<Badge

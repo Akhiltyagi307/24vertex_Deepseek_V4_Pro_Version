@@ -31,7 +31,7 @@ export function LandingMarketingNav() {
         <nav
           className={cn(
             landingFeatureBentoShell,
-            "flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3",
+            "flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 medium:px-4 medium:py-3",
             "shadow-[0_12px_40px_-16px_rgba(0,0,0,0.45)] dark:shadow-[0_16px_48px_-20px_rgba(0,0,0,0.55)]",
           )}
           aria-label="Primary"
@@ -39,13 +39,13 @@ export function LandingMarketingNav() {
           <div className="flex min-w-0 items-center">
             <Link
               href="/#home"
-              className="text-card-foreground ring-ring/40 hover:text-card-foreground inline-flex min-w-0 items-center gap-2.5 rounded-lg text-lg font-semibold tracking-tight outline-none transition-colors focus-visible:ring-2 sm:gap-3 sm:text-xl"
+              className="text-card-foreground ring-ring/40 hover:text-card-foreground inline-flex min-w-0 items-center gap-2.5 rounded-lg text-lg font-semibold tracking-tight outline-none transition-colors focus-visible:ring-2 medium:gap-3 medium:text-xl"
             >
-              <img src="/brand/logo-icon.png" alt="" className="size-8 shrink-0 object-contain sm:size-10" />
+              <img src="/brand/logo-icon.png" alt="" className="size-8 shrink-0 object-contain medium:size-10" />
               <span className="truncate">24vertex</span>
             </Link>
           </div>
-          <div className="hidden flex-1 items-center justify-center gap-1 md:flex">
+          <div className="hidden flex-1 items-center justify-center gap-1 medium:flex">
             <a
               href="#features"
               className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-3 py-2 text-sm transition-colors"
@@ -65,7 +65,7 @@ export function LandingMarketingNav() {
               Benefits
             </a>
           </div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 medium:gap-3">
             <div className="border-border bg-muted/40 inline-flex shrink-0 items-center justify-center rounded-lg border p-1 shadow-sm">
               {mounted ? (
                 <AnimatedToggle
@@ -89,7 +89,7 @@ export function LandingMarketingNav() {
             </div>
             <div
               className={cn(
-                "hidden md:flex md:items-center",
+                "hidden medium:flex medium:items-center",
                 LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
               )}
             >
@@ -104,18 +104,18 @@ export function LandingMarketingNav() {
             </div>
             <Sheet>
               <SheetTrigger
-                render={<Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Open menu" />}
+                render={<Button variant="ghost" size="icon-sm" className="medium:hidden" aria-label="Open menu" />}
               >
                 <Menu className="size-[15px]" />
                 <span className="sr-only">Open menu</span>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[240px] sm:w-[300px]">
+              <SheetContent side="right" className="w-[240px] medium:w-[300px]">
                 <nav className="flex flex-col gap-4">
                   <Link
                     href="/#home"
                     className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-foreground"
                   >
-                    <img src="/brand/logo-icon.png" alt="" className="size-8 shrink-0 object-contain sm:size-9" />
+                    <img src="/brand/logo-icon.png" alt="" className="size-8 shrink-0 object-contain medium:size-9" />
                     <span>24vertex</span>
                   </Link>
                   <a href="#features" className="text-muted-foreground hover:text-foreground text-sm transition-colors">

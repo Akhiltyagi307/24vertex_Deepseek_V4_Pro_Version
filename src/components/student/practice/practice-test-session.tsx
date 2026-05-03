@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 
 import { submitPracticeTest } from "../../../../app/student/practice/session-actions";
+import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
+import { useTestRowRealtimePoll } from "@/lib/practice/use-test-row-realtime-poll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -504,6 +506,30 @@ export function PracticeTestSession({
 	const [flagNotice, setFlagNotice] = React.useState<string | null>(null);
 	const [pauseRemainingSec, setPauseRemainingSec] = React.useState(0);
 	const [paused, setPaused] = React.useState(false);
+	const serverRow = useTestRowRealtimePoll(testId, timeLimitSeconds);
+	const [adminMessage, setAdminMessage] = React.useState<string | null>(null);
+	const lastTabBlurSentRef = React.useRef(0);
+
+	React.useEffect(() => {
+		let fp = "";
+		try {
+			const key = "eduai_practice_fp_v1";
+			fp = sessionStorage.getItem(key) ?? "";
+			if (!fp) {
+				fp = crypto.randomUUID().replace(/-/g, "").slice(0, 40);
+				sessionStorage.setItem(key, fp);
+			}
+		} catch {
+			fp = `t${Date.now().toString(36)}`;
+		}
+		const deviceFingerprint = `${testId.replace(/-/g, "").slice(0, 8)}${fp}`.slice(0, 64);
+		void fetch("/api/student/practice/session-meta", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ testId, deviceFingerprint }),
+			keepalive: true,
+		}).catch(() => {});
+	}, [testId]);
 	// Per-question timing
 	const questionEnterRef = React.useRef<number | null>(null);
 	const perQuestionMsRef = React.useRef<Record<string, number>>({});
@@ -565,15 +591,58 @@ export function PracticeTestSession({
 
 	React.useEffect(() => {
 		if (sessionStartedAt == null) return;
-		if (paused) return;
+		if (paused || serverRow.isPaused) return;
 		const tick = () => {
-			const elapsed = Math.floor((Date.now() - sessionStartedAt) / 1000);
-			setRemainingSec(Math.max(0, timeLimitSeconds - elapsed));
+			const wallElapsed = Math.floor((Date.now() - sessionStartedAt) / 1000);
+			const effectiveElapsed = Math.max(0, wallElapsed - serverRow.accumulatedPauseSeconds);
+			setRemainingSec(Math.max(0, serverRow.timeLimitSeconds - effectiveElapsed));
 		};
 		tick();
 		const id = window.setInterval(tick, 1000);
 		return () => window.clearInterval(id);
-	}, [timeLimitSeconds, sessionStartedAt, paused]);
+	}, [serverRow.timeLimitSeconds, serverRow.accumulatedPauseSeconds, serverRow.isPaused, sessionStartedAt, paused]);
+
+	React.useEffect(() => {
+		if (sessionStartedAt == null) return;
+		writePracticeSessionStart(testId, sessionStartedAt, serverRow.timeLimitSeconds);
+	}, [testId, sessionStartedAt, serverRow.timeLimitSeconds]);
+
+	React.useEffect(() => {
+		const supabase = createBrowserSupabase();
+		let cancelled = false;
+		const channel = supabase
+			.channel(`admin-test-messages-${testId}`)
+			.on(
+				"postgres_changes",
+				{ event: "INSERT", schema: "public", table: "admin_test_messages", filter: `test_id=eq.${testId}` },
+				(payload) => {
+					if (cancelled) return;
+					const body = (payload.new as { body?: string } | null)?.body;
+					if (typeof body === "string") setAdminMessage(body);
+				},
+			)
+			.subscribe();
+		return () => {
+			cancelled = true;
+			void supabase.removeChannel(channel);
+		};
+	}, [testId]);
+
+	React.useEffect(() => {
+		const onVis = () => {
+			if (document.visibilityState !== "hidden") return;
+			const now = Date.now();
+			if (now - lastTabBlurSentRef.current < 25_000) return;
+			lastTabBlurSentRef.current = now;
+			void fetch("/api/student/practice/tab-blur", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ testId }),
+			}).catch(() => {});
+		};
+		document.addEventListener("visibilitychange", onVis);
+		return () => document.removeEventListener("visibilitychange", onVis);
+	}, [testId]);
 
 	// Phase 5: "Last saved Xs ago" ticker.
 	React.useEffect(() => {
@@ -855,10 +924,9 @@ export function PracticeTestSession({
 				return;
 			}
 
-			const elapsed = Math.min(
-				timeLimitSeconds,
-				Math.floor((Date.now() - sessionStartedAt) / 1000),
-			);
+			const wallElapsed = Math.floor((Date.now() - sessionStartedAt) / 1000);
+			const effectiveElapsed = Math.max(0, wallElapsed - serverRow.accumulatedPauseSeconds);
+			const elapsed = Math.min(serverRow.timeLimitSeconds, effectiveElapsed);
 			const res = await submitPracticeTest({ testId, elapsedSeconds: elapsed });
 			if (!res.ok) {
 				setSubmitError(res.message);
@@ -882,7 +950,8 @@ export function PracticeTestSession({
 		flushSave,
 		router,
 		testId,
-		timeLimitSeconds,
+		serverRow.timeLimitSeconds,
+		serverRow.accumulatedPauseSeconds,
 		sessionStartedAt,
 		active,
 	]);
@@ -1073,9 +1142,9 @@ export function PracticeTestSession({
 	}
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:gap-6">
+		<div className="flex min-h-0 flex-1 flex-col gap-4 p-4 medium:p-6 xl:flex-row xl:gap-6">
 			<div
-				className="border-border bg-muted hidden w-full shrink-0 rounded-xl border-2 p-4 shadow-sm dark:bg-muted/60 lg:block lg:w-72"
+				className="border-border bg-muted hidden w-full shrink-0 rounded-xl border-2 p-4 shadow-sm dark:bg-muted/60 xl:block xl:w-72"
 				aria-label="Question list"
 			>
 				<div className="mb-3 flex items-center gap-2">
@@ -1106,20 +1175,20 @@ export function PracticeTestSession({
 			</div>
 
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-				<header className="border-border bg-muted/70 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] flex flex-col gap-4 rounded-2xl border px-4 py-4 sm:px-5 sm:py-4 dark:bg-card/90 dark:border-border">
-					<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
-						<div className="min-w-0 space-y-1.5 lg:max-w-[min(100%,42rem)]">
+				<header className="border-border bg-muted/70 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] flex flex-col gap-4 rounded-2xl border px-4 py-4 medium:px-5 medium:py-4 dark:bg-card/90 dark:border-border">
+					<div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between xl:gap-6">
+						<div className="min-w-0 space-y-1.5 xl:max-w-[min(100%,42rem)]">
 							<p className="text-foreground/55 text-[11px] font-semibold uppercase tracking-[0.08em]">Practice session</p>
-							<h1 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl">{subjectName}</h1>
+							<h1 className="text-foreground text-2xl font-semibold tracking-tight medium:text-3xl">{subjectName}</h1>
 						</div>
 
-						<div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-end sm:gap-2 lg:shrink-0">
+						<div className="flex flex-col gap-2 medium:flex-row medium:items-stretch medium:justify-end medium:gap-2 xl:shrink-0">
 							<Sheet open={navOpen} onOpenChange={setNavOpen}>
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
-									className="gap-1.5 sm:shrink-0 lg:hidden"
+									className="gap-1.5 medium:shrink-0 xl:hidden"
 									onClick={() => setNavOpen(true)}
 								>
 									<MenuIcon className="size-4" aria-hidden />
@@ -1169,12 +1238,12 @@ export function PracticeTestSession({
 									cardSurfaceFrameClassName,
 									"flex w-full overflow-hidden shadow-sm",
 									"bg-background dark:bg-card",
-									"flex-col divide-y divide-border/90 sm:w-auto sm:min-w-[min(100%,28rem)] sm:flex-row sm:divide-x sm:divide-y-0",
+									"flex-col divide-y divide-border/90 medium:w-auto medium:min-w-[min(100%,28rem)] medium:flex-row medium:divide-x medium:divide-y-0",
 								)}
 							>
-								<div className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-4 py-3.5 sm:max-w-md sm:py-3 sm:pr-5 sm:pl-4">
+								<div className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-4 py-3.5 medium:max-w-md medium:py-3 medium:pr-5 medium:pl-4">
 									<div className="flex items-baseline justify-between gap-3">
-										<p className="text-foreground text-sm font-semibold tabular-nums sm:text-base">
+										<p className="text-foreground text-sm font-semibold tabular-nums medium:text-base">
 											{answeredCount}/{sorted.length} answered
 										</p>
 										<span className="text-foreground/65 shrink-0 text-sm font-semibold tabular-nums">{progressPct}%</span>
@@ -1229,7 +1298,7 @@ export function PracticeTestSession({
 
 								<div
 									className={cn(
-										"flex flex-col justify-center gap-1 px-4 py-3.5 sm:min-w-[10.25rem] sm:shrink-0 sm:py-3 sm:pl-5 sm:pr-4",
+										"flex flex-col justify-center gap-1 px-4 py-3.5 medium:min-w-[10.25rem] medium:shrink-0 medium:py-3 medium:pl-5 medium:pr-4",
 										warnTime ?
 											"bg-amber-500/[0.12] dark:bg-amber-500/15"
 										:	"bg-muted/40 dark:bg-muted/25",
@@ -1241,7 +1310,7 @@ export function PracticeTestSession({
 										<ClockIcon className="size-3.5 shrink-0 opacity-80" aria-hidden />
 										Time left
 									</span>
-									<span className="font-mono text-3xl font-semibold tabular-nums tracking-tight sm:text-[2rem] sm:leading-none">
+									<span className="font-mono text-3xl font-semibold tabular-nums tracking-tight medium:text-[2rem] medium:leading-none">
 										{remainingSec <= 0 ? "0:00" : timeLabel}
 									</span>
 									{warnTime ?
@@ -1262,6 +1331,30 @@ export function PracticeTestSession({
 							</div>
 						</div>
 					</div>
+					{serverRow.isPaused && !paused ? (
+						<div
+							className="rounded-lg border-2 border-sky-500/40 bg-sky-500/10 px-4 py-3 text-center"
+							role="alert"
+						>
+							<p className="text-sky-950 dark:text-sky-100 text-sm font-semibold">
+								Test paused by an operator. Your timer is frozen until they resume.
+							</p>
+						</div>
+					) : null}
+					{adminMessage ? (
+						<div className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+							<span className="text-foreground/90">
+								<strong>Admin:</strong> {adminMessage}
+							</span>
+							<button
+								type="button"
+								className="text-foreground/70 shrink-0 text-xs underline"
+								onClick={() => setAdminMessage(null)}
+							>
+								Dismiss
+							</button>
+						</div>
+					) : null}
 					{paused ? (
 						<div
 							className="rounded-lg border-2 border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center"
@@ -1273,7 +1366,7 @@ export function PracticeTestSession({
 							</p>
 						</div>
 					) : null}
-					{!paused && finalCountdown ? (
+					{!paused && !serverRow.isPaused && finalCountdown ? (
 						<div
 							className="border-destructive/60 bg-destructive/10 rounded-lg border-2 px-4 py-2 text-center"
 							role="alert"
@@ -1287,7 +1380,7 @@ export function PracticeTestSession({
 
 				{saveError ?
 					<div
-						className="border-destructive/50 bg-destructive/10 flex flex-col gap-2 rounded-lg border-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+						className="border-destructive/50 bg-destructive/10 flex flex-col gap-2 rounded-lg border-2 px-3 py-2 medium:flex-row medium:items-center medium:justify-between"
 						role="alert"
 					>
 						<p className="text-destructive text-sm">{saveError}</p>
@@ -1299,7 +1392,7 @@ export function PracticeTestSession({
 
 				{submitError && !submitOpen ?
 					<div
-						className="border-destructive/50 bg-destructive/10 flex flex-col gap-2 rounded-lg border-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+						className="border-destructive/50 bg-destructive/10 flex flex-col gap-2 rounded-lg border-2 px-3 py-2 medium:flex-row medium:items-center medium:justify-between"
 						role="alert"
 					>
 						<p className="text-destructive text-sm font-medium">{submitError}</p>
@@ -1429,7 +1522,7 @@ export function PracticeTestSession({
 									</Button>
 								</div>
 							</div>
-							<CardTitle className="text-foreground max-w-prose text-balance text-base font-semibold leading-relaxed tracking-tight sm:text-lg">
+							<CardTitle className="text-foreground max-w-prose text-balance text-base font-semibold leading-relaxed tracking-tight medium:text-lg">
 								<LatexText text={active.question_text} />
 							</CardTitle>
 						</CardHeader>
@@ -1558,7 +1651,7 @@ export function PracticeTestSession({
 							type="button"
 							variant="outline"
 							size="sm"
-							className="w-full sm:ms-auto sm:w-auto"
+							className="w-full medium:ms-auto medium:w-auto"
 							onClick={() => setSubmitOpen(true)}
 							disabled={submitting}
 						>
@@ -1592,12 +1685,12 @@ export function PracticeTestSession({
 							className="h-1 w-full shrink-0 rounded-t-[0.9rem] bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 dark:from-emerald-500 dark:via-emerald-400 dark:to-teal-400"
 							aria-hidden
 						/>
-						<div className="flex flex-col gap-6 p-6 sm:gap-7 sm:p-8">
+						<div className="flex flex-col gap-6 p-6 medium:gap-7 medium:p-8">
 							<Button
 								type="button"
 								variant="ghost"
 								size="icon-lg"
-								className="absolute top-5 right-4 shrink-0 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground sm:top-6 sm:right-5"
+								className="absolute top-5 right-4 shrink-0 rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground medium:top-6 medium:right-5"
 								onClick={() => setSubmitOpen(false)}
 								disabled={submitting}
 								aria-label="Close"
@@ -1605,28 +1698,28 @@ export function PracticeTestSession({
 								<XIcon />
 							</Button>
 
-							<div className="flex flex-col gap-3 pe-10 sm:pe-12">
+							<div className="flex flex-col gap-3 pe-10 medium:pe-12">
 								<p className="text-emerald-700 dark:text-emerald-400/90 text-[11px] font-semibold uppercase tracking-[0.14em]">
 									Practice test
 								</p>
 								<Dialog.Title
 									id={submitDialogTitleId}
-									className="font-heading text-foreground text-2xl font-bold tracking-tight sm:text-3xl"
+									className="font-heading text-foreground text-2xl font-bold tracking-tight medium:text-3xl"
 								>
 									Finish and submit?
 								</Dialog.Title>
 								<Dialog.Description
 									id={submitDialogDescId}
-									className="text-muted-foreground text-sm leading-relaxed sm:text-base"
+									className="text-muted-foreground text-sm leading-relaxed medium:text-base"
 								>
 									You&apos;re about to hand in this test. Review the summary below — you can still go back
 									and edit answers until you confirm.
 								</Dialog.Description>
 							</div>
 
-							<div className="from-muted/40 border-border/80 bg-gradient-to-b to-muted/15 flex flex-col gap-4 rounded-2xl border p-4 sm:p-5">
+							<div className="from-muted/40 border-border/80 bg-gradient-to-b to-muted/15 flex flex-col gap-4 rounded-2xl border p-4 medium:p-5">
 								<div className="flex flex-wrap items-center justify-between gap-2">
-									<h2 className="text-foreground text-sm font-semibold tracking-tight sm:text-base">
+									<h2 className="text-foreground text-sm font-semibold tracking-tight medium:text-base">
 										Your progress
 									</h2>
 									<Badge
@@ -1649,14 +1742,14 @@ export function PracticeTestSession({
 										style={{ width: `${progressPct}%` }}
 									/>
 								</div>
-								<div className="grid gap-3 sm:grid-cols-3">
-									<div className="border-border/70 bg-background/60 flex gap-3 rounded-xl border px-3 py-3 sm:flex-col sm:px-3.5 sm:py-3.5">
+								<div className="grid gap-3 medium:grid-cols-3">
+									<div className="border-border/70 bg-background/60 flex gap-3 rounded-xl border px-3 py-3 medium:flex-col medium:px-3.5 medium:py-3.5">
 										<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600/12 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
 											<CheckIcon className="size-4" strokeWidth={2.5} aria-hidden />
 										</div>
 										<div className="min-w-0">
 											<p className="text-muted-foreground text-xs font-medium">Answered</p>
-											<p className="text-foreground mt-0.5 text-xl font-bold tabular-nums leading-none sm:text-2xl">
+											<p className="text-foreground mt-0.5 text-xl font-bold tabular-nums leading-none medium:text-2xl">
 												{answeredCount}
 												<span className="text-muted-foreground text-base font-semibold">
 													/{sorted.length}
@@ -1666,7 +1759,7 @@ export function PracticeTestSession({
 									</div>
 									<div
 										className={cn(
-											"border-border/70 bg-background/60 flex gap-3 rounded-xl border px-3 py-3 sm:flex-col sm:px-3.5 sm:py-3.5",
+											"border-border/70 bg-background/60 flex gap-3 rounded-xl border px-3 py-3 medium:flex-col medium:px-3.5 medium:py-3.5",
 											unansweredCount > 0 ?
 												"border-amber-500/35 bg-amber-500/[0.06] dark:border-amber-400/30 dark:bg-amber-400/[0.07]"
 											:	null,
@@ -1684,7 +1777,7 @@ export function PracticeTestSession({
 										</div>
 										<div className="min-w-0">
 											<p className="text-muted-foreground text-xs font-medium">Still blank</p>
-											<p className="text-foreground mt-0.5 text-xl font-bold tabular-nums leading-none sm:text-2xl">
+											<p className="text-foreground mt-0.5 text-xl font-bold tabular-nums leading-none medium:text-2xl">
 												{unansweredCount}
 											</p>
 											{unansweredCount === 0 ?
@@ -1696,7 +1789,7 @@ export function PracticeTestSession({
 									</div>
 									<div
 										className={cn(
-											"border-border/70 bg-background/60 flex gap-3 rounded-xl border px-3 py-3 sm:flex-col sm:px-3.5 sm:py-3.5",
+											"border-border/70 bg-background/60 flex gap-3 rounded-xl border px-3 py-3 medium:flex-col medium:px-3.5 medium:py-3.5",
 											flaggedCount > 0 ?
 												"border-amber-600/25 bg-amber-500/[0.04] dark:border-amber-400/25"
 											:	null,
@@ -1714,7 +1807,7 @@ export function PracticeTestSession({
 										</div>
 										<div className="min-w-0">
 											<p className="text-muted-foreground text-xs font-medium">For review</p>
-											<p className="text-foreground mt-0.5 text-xl font-bold tabular-nums leading-none sm:text-2xl">
+											<p className="text-foreground mt-0.5 text-xl font-bold tabular-nums leading-none medium:text-2xl">
 												{flaggedCount}
 											</p>
 											<p className="text-muted-foreground mt-1 text-[11px] leading-snug">
@@ -1727,31 +1820,31 @@ export function PracticeTestSession({
 								</div>
 							</div>
 
-							<p className="text-muted-foreground border-border/60 -mt-1 border-t pt-5 text-sm leading-relaxed sm:text-[0.9375rem]">
+							<p className="text-muted-foreground border-border/60 -mt-1 border-t pt-5 text-sm leading-relaxed medium:text-[0.9375rem]">
 								After you submit, we grade your work and open your report for this subject, with this
 								attempt highlighted.
 							</p>
 
 							{submitError ?
-								<p className="text-destructive -mt-2 text-sm font-semibold sm:text-base" role="alert">
+								<p className="text-destructive -mt-2 text-sm font-semibold medium:text-base" role="alert">
 									{submitError}
 								</p>
 							:	null}
 
-							<div className="border-border/70 flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:pt-6">
-								<p className="text-muted-foreground hidden text-center text-[11px] leading-snug sm:me-auto sm:block sm:text-left">
+							<div className="border-border/70 flex flex-col-reverse gap-3 border-t pt-5 medium:flex-row medium:items-center medium:justify-end medium:gap-3 medium:pt-6">
+								<p className="text-muted-foreground hidden text-center text-[11px] leading-snug medium:me-auto medium:block medium:text-left">
 									<span className="font-medium text-foreground/80">Tip:</span>{" "}
 									<kbd className="bg-muted border-border rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold">
 										Esc
 									</kbd>{" "}
 									returns to the test.
 								</p>
-								<div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:gap-3">
+								<div className="flex flex-col-reverse gap-2.5 medium:flex-row medium:gap-3">
 									<Button
 										type="button"
 										variant="outline"
 										size="lg"
-										className="h-11 min-h-11 rounded-xl px-6 text-base font-semibold sm:min-w-[10.5rem]"
+										className="h-11 min-h-11 rounded-xl px-6 text-base font-semibold medium:min-w-[10.5rem]"
 										onClick={() => setSubmitOpen(false)}
 										disabled={submitting}
 									>
@@ -1762,7 +1855,7 @@ export function PracticeTestSession({
 										size="lg"
 										className={cn(
 											confirmSubmitCta,
-											"h-11 min-h-11 rounded-xl px-6 text-base font-semibold shadow-sm sm:min-w-[10.5rem]",
+											"h-11 min-h-11 rounded-xl px-6 text-base font-semibold shadow-sm medium:min-w-[10.5rem]",
 										)}
 										disabled={submitting}
 										onClick={() => void runSubmit()}
@@ -1791,20 +1884,20 @@ export function PracticeTestSession({
 					/>
 					<Dialog.Popup
 						className={cn(
-							"fixed top-1/2 left-1/2 z-50 flex w-[min(calc(100vw-2rem),28rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-2xl border-2 bg-popover p-6 text-popover-foreground shadow-xl sm:gap-6 sm:p-8",
+							"fixed top-1/2 left-1/2 z-50 flex w-[min(calc(100vw-2rem),28rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-2xl border-2 bg-popover p-6 text-popover-foreground shadow-xl medium:gap-6 medium:p-8",
 							"data-ending-style:opacity-0 data-starting-style:opacity-0",
 						)}
 					>
 						<div className="flex flex-col gap-2 pe-8">
 							<Dialog.Title
 								id={exitDialogTitleId}
-								className="font-heading text-foreground text-xl font-bold tracking-tight sm:text-2xl"
+								className="font-heading text-foreground text-xl font-bold tracking-tight medium:text-2xl"
 							>
 								Leave practice session?
 							</Dialog.Title>
 							<Dialog.Description
 								id={exitDialogDescId}
-								className="text-foreground/85 text-sm font-medium leading-relaxed sm:text-base"
+								className="text-foreground/85 text-sm font-medium leading-relaxed medium:text-base"
 							>
 								{unsyncedCount > 0 ? (
 									<>
@@ -1819,12 +1912,12 @@ export function PracticeTestSession({
 								)}
 							</Dialog.Description>
 						</div>
-						<div className="border-border flex flex-col-reverse gap-3 border-t-2 pt-5 sm:flex-row sm:justify-end sm:gap-3 sm:pt-6">
+						<div className="border-border flex flex-col-reverse gap-3 border-t-2 pt-5 medium:flex-row medium:justify-end medium:gap-3 medium:pt-6">
 							<Button
 								type="button"
 								variant="outline"
 								size="lg"
-								className="h-11 min-h-11 px-6 text-base font-semibold sm:min-w-[10rem]"
+								className="h-11 min-h-11 px-6 text-base font-semibold medium:min-w-[10rem]"
 								onClick={cancelExitSession}
 							>
 								Stay
@@ -1833,7 +1926,7 @@ export function PracticeTestSession({
 								type="button"
 								variant="destructive"
 								size="lg"
-								className="h-11 min-h-11 px-6 text-base font-semibold sm:min-w-[10rem]"
+								className="h-11 min-h-11 px-6 text-base font-semibold medium:min-w-[10rem]"
 								onClick={() => void confirmExitSession()}
 							>
 								Leave

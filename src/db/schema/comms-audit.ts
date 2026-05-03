@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { topics } from "./academic";
+import { broadcasts } from "./broadcasts";
 
 export const notifications = pgTable(
 	"notifications",
@@ -40,18 +41,26 @@ export const notifications = pgTable(
 	],
 );
 
-export const emailLog = pgTable("email_log", {
-	id: uuid("id").defaultRandom().primaryKey(),
-	recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
-	recipientId: uuid("recipient_id"),
-	subject: varchar("subject", { length: 500 }).notNull(),
-	template: varchar("template", { length: 100 }),
-	status: varchar("status", { length: 20 }).default("queued"),
-	providerMessageId: varchar("provider_message_id", { length: 200 }),
-	errorMessage: text("error_message"),
-	createdAt: timestamp("created_at").defaultNow(),
-	sentAt: timestamp("sent_at"),
-});
+export const emailLog = pgTable(
+	"email_log",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
+		recipientId: uuid("recipient_id"),
+		subject: varchar("subject", { length: 500 }).notNull(),
+		template: varchar("template", { length: 100 }),
+		status: varchar("status", { length: 20 }).default("queued"),
+		providerMessageId: varchar("provider_message_id", { length: 200 }),
+		errorMessage: text("error_message"),
+		createdAt: timestamp("created_at").defaultNow(),
+		sentAt: timestamp("sent_at"),
+		providerPayload: jsonb("provider_payload"),
+		openedAt: timestamp("opened_at"),
+		clickedAt: timestamp("clicked_at"),
+		broadcastId: uuid("broadcast_id").references(() => broadcasts.id, { onDelete: "set null" }),
+	},
+	(t) => [index("idx_email_log_created").on(t.createdAt), index("idx_email_log_broadcast").on(t.broadcastId)],
+);
 
 export const resources = pgTable("resources", {
 	id: uuid("id").defaultRandom().primaryKey(),

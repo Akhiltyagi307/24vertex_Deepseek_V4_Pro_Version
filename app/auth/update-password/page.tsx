@@ -50,7 +50,7 @@ export default function UpdatePasswordPage() {
 	return (
 		<form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-6">
 			<FieldGroup>
-				<div className="flex flex-col gap-2 text-center md:text-left">
+				<div className="flex flex-col gap-2 text-center medium:text-left">
 					<h1 className="text-2xl font-bold tracking-tight">Set a new password</h1>
 					<p className="text-balance text-sm text-muted-foreground">
 						Use the link from your email to reach this page.
@@ -101,7 +101,7 @@ export default function UpdatePasswordPage() {
 						</Field>
 					</>
 				) : null}
-				<FieldDescription className="text-center md:text-left">
+				<FieldDescription className="text-center medium:text-left">
 					<Link
 						href="/login"
 						className="text-foreground underline underline-offset-4 hover:text-foreground"

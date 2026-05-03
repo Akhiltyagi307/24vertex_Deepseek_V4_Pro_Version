@@ -2,6 +2,7 @@ import { embedMany } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 
 const EMBEDDING_MODEL_ID = process.env.PRACTICE_EMBEDDING_MODEL?.trim() || "text-embedding-3-small";
@@ -14,13 +15,30 @@ export type GeneratedForDedup = {
 	question_text: string;
 };
 
-export async function embedQuestionTexts(texts: string[]): Promise<number[][]> {
+export async function embedQuestionTexts(
+	texts: string[],
+	opts?: { userId?: string | null },
+): Promise<number[][]> {
 	if (texts.length === 0) return [];
+	const t0 = Date.now();
 	const provider = getOpenAIProvider();
 	const model = provider.textEmbeddingModel(EMBEDDING_MODEL_ID);
-	const { embeddings } = await embedMany({
+	const result = await embedMany({
 		model,
 		values: texts,
+	});
+	const embeddings = result.embeddings;
+	const usage = result.usage as { tokens?: number } | undefined;
+	const approxTokens =
+		usage?.tokens ?? Math.max(1, Math.ceil(texts.join("").length / 4));
+	void recordAiCall({
+		feature: "embeddings.dedup",
+		model: EMBEDDING_MODEL_ID,
+		userId: opts?.userId ?? null,
+		inputTokens: approxTokens,
+		outputTokens: 0,
+		latencyMs: Date.now() - t0,
+		status: "ok",
 	});
 	return embeddings;
 }

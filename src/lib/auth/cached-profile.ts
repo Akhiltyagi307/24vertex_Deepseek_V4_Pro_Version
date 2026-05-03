@@ -11,9 +11,9 @@ import { createClient } from "@/lib/supabase/server";
  * Add columns here when a server route needs more fields from the same row.
  */
 export const CACHED_APP_PROFILE_SELECT =
-	"id, role, is_verified, full_name, school_name, avatar_url, phone, grade, section, student_link_code, stream, elective_subject_id, parent_email, parent_name, created_at" as const;
+	"id, role, is_verified, is_suspended, full_name, school_name, avatar_url, phone, grade, section, student_link_code, stream, elective_subject_id, parent_email, parent_name, created_at" as const;
 const CACHED_APP_PROFILE_SELECT_FALLBACK =
-	"id, role, is_verified, full_name, school_name, avatar_url, grade, section, student_link_code, stream, elective_subject_id, parent_email, parent_name, created_at" as const;
+	"id, role, is_verified, is_suspended, full_name, school_name, avatar_url, grade, section, student_link_code, stream, elective_subject_id, parent_email, parent_name, created_at" as const;
 
 function isMissingProfileColumnError(error: {
 	message: string;
@@ -34,6 +34,7 @@ export type AppProfileRow = {
 	id: string;
 	role: string;
 	is_verified: boolean | null;
+	is_suspended: boolean | null;
 	full_name: string;
 	school_name: string | null;
 	avatar_url: string | null;
@@ -72,7 +73,7 @@ export const getCachedAppProfileRow = cache(async (): Promise<AppProfileRow | nu
 			return null;
 		}
 		if (!fallbackData) return null;
-		return { ...fallbackData, phone: null } as AppProfileRow;
+		return { ...fallbackData, phone: null, is_suspended: (fallbackData as { is_suspended?: boolean }).is_suspended ?? false } as AppProfileRow;
 	}
 
 	if (error) {
@@ -80,7 +81,8 @@ export const getCachedAppProfileRow = cache(async (): Promise<AppProfileRow | nu
 		return null;
 	}
 	if (!data) return null;
-	return data as AppProfileRow;
+	const d = data as AppProfileRow & { is_suspended?: boolean | null };
+	return { ...d, is_suspended: d.is_suspended ?? false };
 });
 
 /**

@@ -1,17 +1,14 @@
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function AdminHomePage() {
-	return (
-		<div className="w-full min-w-0 space-y-6">
-			<div className="flex items-center justify-between gap-4">
-				<div className="space-y-1">
-					<h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
-					<p className="text-sm text-muted-foreground">
-						Signed in with an admin role. Extend this area when admin tooling ships.
-					</p>
-				</div>
-				<SignOutButton />
-			</div>
-		</div>
-	);
+import { verifyAdminJwt } from "@/lib/admin/auth";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
+
+export default async function AdminIndexPage() {
+	const jar = await cookies();
+	const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
+	if (token && (await verifyAdminJwt(token))) {
+		redirect("/admin/dashboard");
+	}
+	redirect("/admin/login");
 }

@@ -6,7 +6,12 @@ node_modules
 .pnp.js
 
 # Next.js
-.next/
+.next
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report//
 out/
 build/
 

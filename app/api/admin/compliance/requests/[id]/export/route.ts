@@ -1,0 +1,104 @@
+import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { requireAdminApi } from "@/lib/admin/api-auth";
+import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { writeAdminAction } from "@/lib/admin/audit";
+import { buildComplianceExportZip } from "@/lib/compliance/export-user-data";
+import { getComplianceExportsBucket } from "@/lib/env";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { db } from "@/db";
+import { complianceRequests } from "@/db/schema/compliance-requests";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+function adminHeaders(): HeadersInit {
+	return { "X-Robots-Tag": "noindex, nofollow" };
+}
+
+export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+	const gate = await requireAdminApi();
+	if (gate instanceof NextResponse) return gate;
+
+	const { id } = await ctx.params;
+	const uuid = z.string().uuid().safeParse(id);
+	if (!uuid.success) {
+		return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
+	}
+
+	const [reqRow] = await db.select().from(complianceRequests).where(eq(complianceRequests.id, uuid.data)).limit(1);
+	if (!reqRow) {
+		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+	}
+	if (!reqRow.identityVerified) {
+		return NextResponse.json({ error: "Identity must be verified before export" }, { status: 409, headers: adminHeaders() });
+	}
+	if (!reqRow.subjectUserId) {
+		return NextResponse.json({ error: "subject_user_id is required for export" }, { status: 409, headers: adminHeaders() });
+	}
+
+	const subjectUserId = reqRow.subjectUserId;
+
+	await writeAdminAction({
+		action: "compliance_export_started",
+		targetType: "compliance_request",
+		targetId: uuid.data,
+		payload: { subject_user_id: subjectUserId },
+		ipAddress: clientIpFromRequest(request),
+		userAgent: userAgentFromRequest(request),
+	});
+
+	const { buffer, manifest } = await buildComplianceExportZip({
+		subjectUserId: subjectUserId,
+		complianceRequestId: uuid.data,
+	});
+
+	const bucket = getComplianceExportsBucket();
+	const storagePath = `dsr/${uuid.data}/${Date.now()}.zip`;
+	const admin = createServiceRoleClient();
+	const { error: upErr } = await admin.storage.from(bucket).upload(storagePath, buffer, {
+		contentType: "application/zip",
+		upsert: false,
+	});
+	if (upErr) {
+		await writeAdminAction({
+			action: "compliance_export_failed",
+			targetType: "compliance_request",
+			targetId: uuid.data,
+			payload: { error: upErr.message, storage_path: storagePath },
+			ipAddress: clientIpFromRequest(request),
+			userAgent: userAgentFromRequest(request),
+		});
+		return NextResponse.json({ error: upErr.message }, { status: 500, headers: adminHeaders() });
+	}
+
+	const signedTtl = 60 * 60 * 24 * 7;
+	const { data: signed, error: signErr } = await admin.storage.from(bucket).createSignedUrl(storagePath, signedTtl);
+	if (signErr || !signed?.signedUrl) {
+		return NextResponse.json({ error: signErr?.message ?? "Could not sign URL" }, { status: 500, headers: adminHeaders() });
+	}
+
+	await writeAdminAction({
+		action: "compliance_export_ready",
+		targetType: "compliance_request",
+		targetId: uuid.data,
+		payload: { storage_path: storagePath, manifest, signed_ttl_seconds: signedTtl },
+		ipAddress: clientIpFromRequest(request),
+		userAgent: userAgentFromRequest(request),
+	});
+
+	await db
+		.update(complianceRequests)
+		.set({
+			evidenceUrl: JSON.stringify({ type: "export", storage_path: storagePath, manifest }),
+			status: reqRow.status === "open" ? "in_progress" : reqRow.status,
+		})
+		.where(eq(complianceRequests.id, uuid.data));
+
+	return NextResponse.json(
+		{ signed_url: signed.signedUrl, storage_path: storagePath, manifest, expires_in_seconds: signedTtl },
+		{ headers: adminHeaders() },
+	);
+}

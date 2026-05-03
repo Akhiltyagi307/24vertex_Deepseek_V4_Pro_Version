@@ -66,7 +66,7 @@ export default async function StudentSettingsPage() {
 	return (
 		<div
 			className={cn(
-				"flex min-w-0 flex-col gap-6 py-6 sm:py-8",
+				"flex min-w-0 flex-col gap-6 py-6 medium:py-8",
 				studentHubPageShellClassName,
 			)}
 		>

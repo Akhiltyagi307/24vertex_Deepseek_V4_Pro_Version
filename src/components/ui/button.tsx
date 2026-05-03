@@ -8,27 +8,25 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "bg-emerald-600 text-white [a]:hover:bg-emerald-600/90 dark:bg-emerald-500 dark:[a]:hover:bg-emerald-500/90",
+        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         outline:
-          "border-2 border-emerald-600 bg-background text-emerald-800 shadow-none hover:bg-emerald-600 hover:text-white aria-expanded:bg-emerald-600 aria-expanded:text-white dark:border-emerald-500 dark:bg-input/30 dark:text-emerald-100 dark:hover:bg-emerald-500 dark:aria-expanded:bg-emerald-500 dark:aria-expanded:text-white [a]:hover:bg-emerald-600 [a]:hover:text-white dark:[a]:hover:bg-emerald-500",
-        /** Marketing “secondary” CTA: no green border until hover. */
-        marketingSecondary:
-          "border-2 border-zinc-400 bg-zinc-950 text-zinc-50 shadow-none hover:border-emerald-600 hover:bg-emerald-600 hover:text-white aria-expanded:border-emerald-600 aria-expanded:bg-emerald-600 aria-expanded:text-white dark:border-zinc-500 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:border-emerald-500 dark:hover:bg-emerald-500 dark:hover:text-white dark:aria-expanded:border-emerald-500 dark:aria-expanded:bg-emerald-500 dark:aria-expanded:text-white [a]:hover:border-emerald-600 [a]:hover:bg-emerald-600 [a]:hover:text-white dark:[a]:hover:border-emerald-500 dark:[a]:hover:bg-emerald-500 dark:[a]:hover:text-white",
+          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
-          "bg-emerald-600 text-white hover:bg-emerald-600/90 aria-expanded:bg-emerald-600 aria-expanded:text-white dark:bg-emerald-500 dark:hover:bg-emerald-500/90 dark:aria-expanded:bg-emerald-500 [a]:hover:bg-emerald-600/90 dark:[a]:hover:bg-emerald-500/90",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
-          "text-foreground hover:bg-emerald-600/12 hover:text-emerald-900 aria-expanded:bg-emerald-600/12 aria-expanded:text-emerald-900 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-50 dark:aria-expanded:bg-emerald-500/15 dark:aria-expanded:text-emerald-50 [a]:hover:bg-emerald-600/12 dark:[a]:hover:bg-emerald-500/15",
+          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link:
-          "text-emerald-700 underline-offset-4 hover:text-emerald-800 hover:underline dark:text-emerald-400 dark:hover:text-emerald-300",
+        link: "text-primary underline-offset-4 hover:underline",
+        /** Landing / marketing secondary pill (same base treatment as outline; size/shape from callers). */
+        marketingSecondary:
+          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
       },
       size: {
         default:
           "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.9rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         icon: "size-8",
         "icon-xs":
@@ -49,20 +47,22 @@ function Button({
   className,
   variant = "default",
   size = "default",
-  nativeButton,
   render,
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // Base UI defaults `nativeButton` to true; polymorphic `render` (e.g. Next.js Link → <a>)
+  // must use false or dev warns. Coalesce so `undefined` never loses to a later spread.
   const effectiveNativeButton =
-    nativeButton ?? (render == null ? true : false)
+    render != null ? (nativeButton ?? false) : (nativeButton ?? true);
 
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size }), className)}
-      nativeButton={effectiveNativeButton}
-      render={render}
+      className={cn(buttonVariants({ variant, size, className }))}
       {...props}
+      render={render}
+      nativeButton={effectiveNativeButton}
     />
   )
 }

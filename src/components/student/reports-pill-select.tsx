@@ -59,7 +59,7 @@ export function ReportsPillSelect({
 						variant="outline"
 						size="sm"
 						className={cn(
-							"h-8 min-w-[12rem] shrink-0 justify-start gap-1.5 rounded-full border-border px-3 font-normal shadow-none sm:w-56 sm:max-w-[min(100%,18rem)]",
+							"h-8 min-w-[12rem] shrink-0 justify-start gap-1.5 rounded-full border-border px-3 font-normal shadow-none medium:w-56 medium:max-w-[min(100%,18rem)]",
 							"[&_svg]:text-emerald-700 dark:[&_svg]:text-emerald-400",
 							"hover:[&_svg]:text-white data-[popup-open]:[&_svg]:text-white",
 							"[&_span]:text-emerald-900 dark:[&_span]:text-emerald-200",

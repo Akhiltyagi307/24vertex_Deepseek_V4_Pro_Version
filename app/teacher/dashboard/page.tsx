@@ -24,7 +24,7 @@ export default async function TeacherDashboardPage() {
 				<SignOutButton />
 			</div>
 
-			<div className="grid gap-4 md:grid-cols-3">
+			<div className="grid gap-4 medium:grid-cols-3">
 				<Card className="shadow-none">
 					<CardHeader className="pb-2">
 						<CardDescription>Verification</CardDescription>

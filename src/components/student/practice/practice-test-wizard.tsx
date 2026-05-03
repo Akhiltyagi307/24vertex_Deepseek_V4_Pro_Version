@@ -416,7 +416,7 @@ function PracticeReviewSummaryCard({
 							)}
 						</dd>
 					</div>
-					<div className="grid gap-5 sm:grid-cols-2">
+					<div className="grid gap-5 medium:grid-cols-2">
 						<div>
 							<dt className="text-muted-foreground text-sm font-medium">Difficulty</dt>
 							<dd className="mt-1.5 text-foreground text-base leading-snug">
@@ -452,7 +452,7 @@ function PracticeStepIndicator({
 			className="w-full"
 		>
 			<div
-				className="flex w-full gap-1.5 sm:gap-2"
+				className="flex w-full gap-1.5 medium:gap-2"
 				aria-hidden
 				role="presentation"
 			>
@@ -463,7 +463,7 @@ function PracticeStepIndicator({
 						<div
 							key={`practice-step-seg-${i}`}
 							className={cn(
-								"h-1.5 min-h-0 flex-1 rounded-full transition-colors sm:h-2",
+								"h-1.5 min-h-0 flex-1 rounded-full transition-colors medium:h-2",
 								isDone && "bg-emerald-600 dark:bg-emerald-500",
 								isCurrent &&
 									"bg-emerald-600 ring-1 ring-emerald-500/45 ring-offset-1 ring-offset-background dark:bg-emerald-500",
@@ -1030,7 +1030,7 @@ export function PracticeTestWizard({
 
 	if (loadError) {
 		return (
-			<div className="py-6 md:py-8">
+			<div className="py-6 medium:py-8">
 				<Alert variant="destructive">
 					<AlertTitle>Could not load practice data</AlertTitle>
 					<AlertDescription>{loadError}</AlertDescription>
@@ -1041,7 +1041,7 @@ export function PracticeTestWizard({
 
 	if (!enrolledSubjects.length) {
 		return (
-			<div className="py-6 md:py-8">
+			<div className="py-6 medium:py-8">
 				<Alert>
 					<AlertTitle>No subjects found</AlertTitle>
 					<AlertDescription>
@@ -1054,8 +1054,8 @@ export function PracticeTestWizard({
 	}
 
 	return (
-		<div className="w-full py-6 sm:py-8">
-			<div className="flex w-full min-w-0 flex-col gap-6 sm:gap-8">
+		<div className="w-full py-6 medium:py-8">
+			<div className="flex w-full min-w-0 flex-col gap-6 medium:gap-8">
 				<div className="flex shrink-0 flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Practice</h1>
 					<PageHeaderSubtext>
@@ -1070,12 +1070,12 @@ export function PracticeTestWizard({
 
 					<div className="flex flex-col gap-7 pr-1">
 						{step === 0 ? (
-					<div className={cn(cardSurfaceFrameClassName, "space-y-6 p-5 sm:p-7")}>
+					<div className={cn(cardSurfaceFrameClassName, "space-y-6 p-5 medium:p-7")}>
 						<div className="space-y-1.5">
-							<h2 className="font-semibold text-foreground text-xl tracking-tight sm:text-[1.375rem]">
+							<h2 className="font-semibold text-foreground text-xl tracking-tight medium:text-[1.375rem]">
 								Choose a subject
 							</h2>
-							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
+							<p className="text-muted-foreground text-sm leading-relaxed medium:text-base">
 								Choose the subject you want to revise. We’ll use your performance tracker for that subject—you
 								can go back and change it before you start the test.
 							</p>
@@ -1104,7 +1104,7 @@ export function PracticeTestWizard({
 												</p>
 											</div>
 										) : null}
-										<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+										<div className="grid grid-cols-1 gap-3 medium:grid-cols-2">
 											{cluster.items.map((s) => {
 												const selected = subjectId === s.id;
 												const {
@@ -1120,7 +1120,7 @@ export function PracticeTestWizard({
 														aria-pressed={selected}
 														onClick={() => setSubjectId(s.id)}
 														className={cn(
-															"flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow] sm:gap-4 sm:px-4",
+															"flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow] medium:gap-4 medium:px-4",
 															"focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
 															selected
 																? "border-emerald-600 bg-emerald-600/[0.09] dark:border-emerald-500 dark:bg-emerald-500/12"
@@ -1129,7 +1129,7 @@ export function PracticeTestWizard({
 													>
 														<span
 															className={cn(
-																"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+																"flex size-10 shrink-0 items-center justify-center rounded-lg border medium:size-11",
 																selected
 																	? "border-emerald-600/35 bg-emerald-600/12 text-emerald-800 ring-1 ring-emerald-600/25 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-500/30"
 																	: cn("border-border/80 ring-1", shellClassName),
@@ -1138,7 +1138,7 @@ export function PracticeTestWizard({
 														>
 															<SubjectIcon
 																className={cn(
-																	"size-[1.125rem] sm:size-5",
+																	"size-[1.125rem] medium:size-5",
 																	selected ?
 																		"text-emerald-800 dark:text-emerald-200"
 																	:	iconClassName,
@@ -1147,7 +1147,7 @@ export function PracticeTestWizard({
 															/>
 														</span>
 														<div className="min-w-0 flex-1">
-															<span className="block text-[1.0546875rem] font-medium leading-snug sm:text-base">
+															<span className="block text-[1.0546875rem] font-medium leading-snug medium:text-base">
 																{s.name}
 															</span>
 															{progress ?
@@ -1207,7 +1207,7 @@ export function PracticeTestWizard({
 														</div>
 														<span
 															className={cn(
-																"flex size-8 shrink-0 items-center justify-center rounded-full border sm:size-9",
+																"flex size-8 shrink-0 items-center justify-center rounded-full border medium:size-9",
 																selected
 																	? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
 																	: "border-border/70 bg-transparent",
@@ -1228,12 +1228,12 @@ export function PracticeTestWizard({
 				) : null}
 
 				{step === 1 && subjectId ? (
-					<div className={cn(cardSurfaceFrameClassName, "flex flex-col gap-6 p-5 sm:p-7")}>
+					<div className={cn(cardSurfaceFrameClassName, "flex flex-col gap-6 p-5 medium:p-7")}>
 						<div className="space-y-1.5 shrink-0">
-							<h2 className="font-semibold text-foreground text-xl tracking-tight sm:text-[1.375rem]">
+							<h2 className="font-semibold text-foreground text-xl tracking-tight medium:text-[1.375rem]">
 								Topics
 							</h2>
-							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
+							<p className="text-muted-foreground text-sm leading-relaxed medium:text-base">
 								Select the chapters or topics you want in this test for{" "}
 								<span className="text-foreground font-medium">{selectedSubjectName}</span>. Need a refresher?{" "}
 								<Link
@@ -1364,7 +1364,7 @@ export function PracticeTestWizard({
 										className={cn("rounded-lg", practiceTopicMatrixSurfaceClass)}
 										onWheel={forwardWheelToWizardStepScroll}
 									>
-										<div className="flex flex-col gap-2.5 p-2 sm:p-2.5">
+										<div className="flex flex-col gap-2.5 p-2 medium:p-2.5">
 													{practiceChapterSections.map(({ sectionKey, unitName, chapter }, ci) => {
 														const chapterIds = trackerIdsForChapter(chapter);
 														const chSel = selectionFlagsForIds(selectedTrackerIds, chapterIds);
@@ -1384,7 +1384,7 @@ export function PracticeTestWizard({
 																defaultOpen={defaultOpen}
 																className="rounded-lg border border-border/80 bg-muted/20 dark:bg-muted/10"
 															>
-																<div className="flex w-full items-center gap-1.5 px-3 sm:px-3.5">
+																<div className="flex w-full items-center gap-1.5 px-3 medium:px-3.5">
 																	<div
 																		className="flex shrink-0 items-center"
 																		onClick={(e) => e.stopPropagation()}
@@ -1413,7 +1413,7 @@ export function PracticeTestWizard({
 																			className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
 																			aria-hidden
 																		/>
-																		<span className="min-w-0 flex-1 truncate text-base font-bold leading-snug tracking-tight text-foreground sm:text-lg">
+																		<span className="min-w-0 flex-1 truncate text-base font-bold leading-snug tracking-tight text-foreground medium:text-lg">
 																			Chapter {chapter.chapterNumber}: {chapter.chapterName}
 																		</span>
 																		{selectedCountInChapter > 0 ? (
@@ -1433,7 +1433,7 @@ export function PracticeTestWizard({
 																		</span>
 																	</CollapsibleTrigger>
 																</div>
-																<CollapsibleContent className="p-3 sm:p-3.5">
+																<CollapsibleContent className="p-3 medium:p-3.5">
 																	<div className="overflow-x-auto overflow-y-hidden rounded-lg border border-border/90 bg-background/70 p-3 shadow-sm dark:bg-background/50">
 																		<table className="w-full min-w-[42rem] text-sm">
 																			<caption className="sr-only">
@@ -1514,7 +1514,7 @@ export function PracticeTestWizard({
 																												</td>
 																												<th
 																													scope="row"
-																													className="max-w-[20rem] px-3 py-2.5 text-start align-middle text-sm text-foreground/95 leading-snug font-normal sm:text-[15px]"
+																													className="max-w-[20rem] px-3 py-2.5 text-start align-middle text-sm text-foreground/95 leading-snug font-normal medium:text-[15px]"
 																												>
 																													{row.topicName}
 																												</th>
@@ -1574,17 +1574,17 @@ export function PracticeTestWizard({
 
 				{step === 2 && subjectId ? (
 					<section
-						className={cn(cardSurfaceFrameClassName, "space-y-6 p-5 sm:p-7")}
+						className={cn(cardSurfaceFrameClassName, "space-y-6 p-5 medium:p-7")}
 						aria-labelledby="practice-wizard-step-2-title"
 					>
 						<header className="space-y-1.5">
 							<h2
 								id="practice-wizard-step-2-title"
-								className="font-semibold text-foreground text-xl tracking-tight sm:text-[1.375rem]"
+								className="font-semibold text-foreground text-xl tracking-tight medium:text-[1.375rem]"
 							>
 								Difficulty &amp; time
 							</h2>
-							<p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
+							<p className="text-muted-foreground text-sm leading-relaxed medium:text-base">
 								Set how hard the questions should feel and how long you have—closer to an exam, or a quick
 								sprint.
 							</p>
@@ -1776,12 +1776,12 @@ export function PracticeTestWizard({
 					</div>
 
 					{!isResultStep ? (
-					<div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+					<div className="flex shrink-0 flex-col gap-3 medium:flex-row medium:flex-wrap medium:items-center">
 						{step > 0 ? (
 							<Button
 								type="button"
 								variant="ghost"
-								className="order-2 h-11 min-h-11 w-full px-5 text-base text-muted-foreground hover:text-foreground sm:order-1 sm:mr-auto sm:w-auto sm:min-w-32"
+								className="order-2 h-11 min-h-11 w-full px-5 text-base text-muted-foreground hover:text-foreground medium:order-1 medium:mr-auto medium:w-auto medium:min-w-32"
 								onClick={goBack}
 								disabled={pending}
 							>
@@ -1794,7 +1794,7 @@ export function PracticeTestWizard({
 							</Button>
 						) : null}
 						{isSubmitStep ? (
-							<div className="order-1 w-full sm:order-2 sm:ml-auto sm:w-auto sm:min-w-52">
+							<div className="order-1 w-full medium:order-2 medium:ml-auto medium:w-auto medium:min-w-52">
 								<SubmitButton
 									label="Save configuration"
 									pendingLabel="Working…"
@@ -1809,7 +1809,7 @@ export function PracticeTestWizard({
 							<Button
 								type="button"
 								className={cn(
-									"order-1 h-11 min-h-11 w-full px-6 text-base sm:order-2 sm:ml-auto sm:w-auto sm:min-w-52",
+									"order-1 h-11 min-h-11 w-full px-6 text-base medium:order-2 medium:ml-auto medium:w-auto medium:min-w-52",
 									practiceSolidCtaClassName,
 								)}
 								variant="default"
@@ -1822,7 +1822,7 @@ export function PracticeTestWizard({
 							<Button
 								type="button"
 								className={cn(
-									"order-1 h-11 min-h-11 w-full px-6 text-base sm:order-2 sm:ml-auto sm:w-auto sm:min-w-52",
+									"order-1 h-11 min-h-11 w-full px-6 text-base medium:order-2 medium:ml-auto medium:w-auto medium:min-w-52",
 									practiceSolidCtaClassName,
 								)}
 								variant="default"
@@ -1837,11 +1837,11 @@ export function PracticeTestWizard({
 						)}
 					</div>
 				) : !generatedPreview ? (
-					<div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+					<div className="flex shrink-0 flex-col gap-3 medium:flex-row medium:flex-wrap medium:items-center">
 						<Button
 							type="button"
 							variant="ghost"
-							className="order-3 h-11 min-h-11 w-full px-5 text-base text-muted-foreground hover:text-foreground sm:order-1 sm:mr-auto sm:w-auto sm:min-w-32"
+							className="order-3 h-11 min-h-11 w-full px-5 text-base text-muted-foreground hover:text-foreground medium:order-1 medium:mr-auto medium:w-auto medium:min-w-32"
 							onClick={goBack}
 							disabled={pending || generating}
 						>
@@ -1851,7 +1851,7 @@ export function PracticeTestWizard({
 						<Button
 							type="button"
 							className={cn(
-								"order-1 h-11 min-h-11 w-full px-6 text-base sm:order-2 sm:ml-auto sm:w-auto sm:min-w-52",
+								"order-1 h-11 min-h-11 w-full px-6 text-base medium:order-2 medium:ml-auto medium:w-auto medium:min-w-52",
 								practiceSolidCtaClassName,
 							)}
 							onClick={() => void runGenerate()}
@@ -1897,9 +1897,9 @@ export function PracticeTestWizard({
 								aria-labelledby="practice-ready-title"
 								className="border-border/80 w-full max-w-md shadow-lg"
 							>
-								<CardHeader className="gap-3 text-center sm:text-left">
+								<CardHeader className="gap-3 text-center medium:text-left">
 									<div
-										className="mx-auto flex size-14 items-center justify-center rounded-full border border-emerald-600/35 bg-emerald-600/10 sm:mx-0"
+										className="mx-auto flex size-14 items-center justify-center rounded-full border border-emerald-600/35 bg-emerald-600/10 medium:mx-0"
 										aria-hidden
 									>
 										<CheckIcon className="size-7 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />

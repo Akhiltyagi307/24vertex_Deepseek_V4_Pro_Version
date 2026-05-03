@@ -60,7 +60,7 @@ export function LandingSiteHeader() {
 
 	return (
 		<header className="sticky top-0 z-50 border-b border-border bg-background">
-			<div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+			<div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 medium:px-6 xl:px-8">
 				<Link
 					href="/#home"
 					className="inline-flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
@@ -69,21 +69,21 @@ export function LandingSiteHeader() {
 					<img
 						src="/brand/logo-icon.png"
 						alt="24vertex logo"
-						className="size-9 shrink-0 object-contain sm:size-10"
+						className="size-9 shrink-0 object-contain medium:size-10"
 					/>
-					<span className="truncate text-base font-semibold tracking-tight text-foreground sm:text-lg">
+					<span className="truncate text-base font-semibold tracking-tight text-foreground medium:text-lg">
 						24vertex
 					</span>
 				</Link>
 
-				<nav className="hidden items-center gap-5 md:flex md:text-[0.8125rem] lg:gap-6 lg:text-sm" aria-label="Primary">
+				<nav className="hidden items-center gap-5 medium:flex medium:text-[0.8125rem] xl:gap-6 xl:text-sm" aria-label="Primary">
 					<Link
 						href="/#home"
 						className="inline-flex items-center gap-2 rounded-md text-sm font-semibold text-foreground transition-colors hover:text-foreground/85"
 						aria-label="24vertex home from navigation"
 					>
 						<img src="/brand/logo-icon.png" alt="24vertex logo" className="size-5 shrink-0 object-contain" />
-						<span className="hidden lg:inline">24vertex</span>
+						<span className="hidden xl:inline">24vertex</span>
 					</Link>
 					{NAV_LINKS.map((item) => (
 						<NavAnchor key={item.href} href={item.href}>
@@ -92,10 +92,10 @@ export function LandingSiteHeader() {
 					))}
 				</nav>
 
-				<div className="flex shrink-0 items-center gap-2 sm:gap-3">
+				<div className="flex shrink-0 items-center gap-2 medium:gap-3">
 					<div
 						className={cn(
-							"hidden items-center sm:flex",
+							"hidden items-center medium:flex",
 							LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
 						)}
 					>
@@ -111,7 +111,7 @@ export function LandingSiteHeader() {
 
 					<Button
 						variant="marketingSecondary"
-						className={cn(LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME, "sm:hidden")}
+						className={cn(LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME, "medium:hidden")}
 						render={<Link href="/login" />}
 					>
 						Log in
@@ -122,7 +122,7 @@ export function LandingSiteHeader() {
 							type="button"
 							variant="outline"
 							size="icon-sm"
-							className="border-zinc-400 bg-transparent text-foreground shadow-none hover:border-emerald-600 dark:border-zinc-500 shrink-0 md:hidden"
+							className="border-zinc-400 bg-transparent text-foreground shadow-none hover:border-emerald-600 dark:border-zinc-500 shrink-0 medium:hidden"
 							aria-label="Open menu"
 							onClick={() => setSheetOpen(true)}
 						>
@@ -151,7 +151,7 @@ export function LandingSiteHeader() {
 								))}
 							</nav>
 							<Separator />
-							<SheetFooter className="mt-0 flex-col items-center gap-3 border-t border-border bg-muted/30 p-4 sm:flex-col">
+							<SheetFooter className="mt-0 flex-col items-center gap-3 border-t border-border bg-muted/30 p-4 medium:flex-col">
 								<LandingPrimaryCtaButton render={<Link href="/signup/role-picker" onClick={closeSheet} />} />
 								<Button
 									variant="marketingSecondary"

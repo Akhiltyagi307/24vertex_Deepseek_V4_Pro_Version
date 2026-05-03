@@ -36,23 +36,23 @@ export function AcmeHero() {
         <nav
           className={cn(
             landingFeatureBentoShell,
-            "flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 shadow-lg sm:px-5 sm:py-3",
+            "flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 shadow-lg medium:px-5 medium:py-3",
           )}
         >
           <div className="flex items-center">
-            <a
+            <Link
               href="/#home"
-              className="text-card-foreground inline-flex items-center gap-2.5 text-lg font-semibold tracking-tight sm:gap-3 sm:text-xl"
+              className="text-card-foreground inline-flex items-center gap-2.5 text-lg font-semibold tracking-tight medium:gap-3 medium:text-xl"
             >
               <img
                 src="/brand/logo-icon.png"
                 alt="24vertex logo"
-                className="size-8 shrink-0 object-contain sm:size-10"
+                className="size-8 shrink-0 object-contain medium:size-10"
               />
               <span>24vertex</span>
-            </a>
+            </Link>
           </div>
-          <div className="hidden flex-1 items-center justify-center gap-6 md:flex">
+          <div className="hidden flex-1 items-center justify-center gap-6 medium:flex">
             <a
               href="#features"
               className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
@@ -67,7 +67,7 @@ export function AcmeHero() {
             </a>
             <a
               href="#benefits"
-              className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 hidden rounded-lg px-2 py-1 text-sm transition-colors lg:inline-flex"
+              className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 hidden rounded-lg px-2 py-1 text-sm transition-colors xl:inline-flex"
             >
               Benefits
             </a>
@@ -94,10 +94,10 @@ export function AcmeHero() {
                 />
               )}
             </div>
-            <Separator orientation="vertical" className="bg-border h-7 sm:h-8" />
+            <Separator orientation="vertical" className="bg-border h-7 medium:h-8" />
             <div
               className={cn(
-                "hidden md:flex md:items-center",
+                "hidden medium:flex medium:items-center",
                 LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
               )}
             >
@@ -112,17 +112,17 @@ export function AcmeHero() {
             </div>
             <Sheet>
               <SheetTrigger
-                render={<Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Open menu" />}
+                render={<Button variant="ghost" size="icon-sm" className="medium:hidden" aria-label="Open menu" />}
               >
                 <Menu className="size-[15px]" />
                 <span className="sr-only">Open menu</span>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[240px] sm:w-[300px]">
+              <SheetContent side="right" className="w-[240px] medium:w-[300px]">
                 <nav className="flex flex-col gap-4">
-                  <a href="/#home" className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-foreground">
-                    <img src="/brand/logo-icon.png" alt="24vertex logo" className="size-8 shrink-0 object-contain sm:size-9" />
+                  <Link href="/#home" className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-foreground">
+                    <img src="/brand/logo-icon.png" alt="24vertex logo" className="size-8 shrink-0 object-contain medium:size-9" />
                     <span>24vertex</span>
-                  </a>
+                  </Link>
                   <Separator />
                   <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                     Features
@@ -156,14 +156,14 @@ export function AcmeHero() {
       </header>
 
       <div className="relative w-full">
-        <section className="w-full overflow-x-hidden py-16 md:py-24 lg:py-28">
+        <section className="w-full overflow-x-hidden py-16 medium:py-24 xl:py-28">
           <motion.div
-            className="mx-auto flex w-full max-w-5xl flex-col items-center px-4 sm:px-6"
+            className="mx-auto flex w-full max-w-5xl flex-col items-center px-4 medium:px-6"
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="flex w-full flex-col items-center gap-8 text-center sm:gap-10 md:gap-11">
+            <div className="flex w-full flex-col items-center gap-8 text-center medium:gap-10 medium:gap-11">
               <motion.div
                 className="mx-auto flex w-full max-w-4xl justify-center px-0.5"
                 initial={{ opacity: 0, y: -6 }}
@@ -192,19 +192,19 @@ export function AcmeHero() {
                 </Badge>
               </motion.div>
               <motion.h1
-                className="mx-auto w-full max-w-4xl text-center text-pretty text-4xl font-medium leading-[1.08] tracking-tight text-foreground sm:text-6xl sm:leading-[1.06] md:text-7xl md:leading-[1.05]"
+                className="mx-auto w-full max-w-4xl text-center text-pretty text-4xl font-medium leading-[1.08] tracking-tight text-foreground medium:text-6xl medium:leading-[1.06] medium:text-7xl medium:leading-[1.05]"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
                 <span className="block whitespace-nowrap">Practice smarter</span>
-                <span className="mt-2 block whitespace-nowrap text-[#3ECF8E] sm:mt-2.5">
-                  <span className="sm:hidden">Stay aligned, every role</span>
-                  <span className="hidden sm:inline">Stay aligned across every role</span>
+                <span className="mt-2 block whitespace-nowrap text-[#3ECF8E] medium:mt-2.5">
+                  <span className="medium:hidden">Stay aligned, every role</span>
+                  <span className="hidden medium:inline">Stay aligned across every role</span>
                 </span>
               </motion.h1>
               <motion.p
-                className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-2.5 text-center text-[0.9375rem] leading-relaxed text-muted-foreground sm:gap-3 sm:text-lg sm:leading-[1.65] md:text-[1.0625rem]"
+                className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-2.5 text-center text-[0.9375rem] leading-relaxed text-muted-foreground medium:gap-3 medium:text-lg medium:leading-[1.65] medium:text-[1.0625rem]"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.18, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -219,7 +219,7 @@ export function AcmeHero() {
               </motion.p>
               <motion.div
                 className={cn(
-                  "flex w-full max-w-4xl flex-col items-center sm:flex-row sm:items-center sm:justify-center",
+                  "flex w-full max-w-4xl flex-col items-center medium:flex-row medium:items-center medium:justify-center",
                   LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
                 )}
                 initial={{ opacity: 0, y: 12 }}
@@ -239,17 +239,17 @@ export function AcmeHero() {
           </motion.div>
 
           <motion.div
-            className="relative left-1/2 mt-14 w-screen max-w-[100vw] -translate-x-1/2 sm:mt-16"
+            className="relative left-1/2 mt-14 w-screen max-w-[100vw] -translate-x-1/2 medium:mt-16"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.32, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           >
             <SchoolsMarquee />
-            <div className="mx-auto mt-10 flex w-full max-w-2xl justify-center px-1 sm:mt-12">
+            <div className="mx-auto mt-10 flex w-full max-w-2xl justify-center px-1 medium:mt-12">
               <AuthTrustedStudentsGlassStrip
                 prominence="hero"
                 surface="soft"
-                className="w-full sm:w-auto"
+                className="w-full medium:w-auto"
               />
             </div>
           </motion.div>

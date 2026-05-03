@@ -44,6 +44,7 @@ describe("consumePendingRegistration", () => {
 			id: "parent-uid",
 			role: "parent",
 			is_verified: true,
+			is_suspended: false,
 		});
 		const rpc = vi.fn(async (name: string, _args: { p_student_ref: string }) => {
 			if (name === "link_parent_to_student") {

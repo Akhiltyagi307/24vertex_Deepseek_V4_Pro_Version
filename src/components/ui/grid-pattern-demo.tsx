@@ -5,7 +5,7 @@ import { GridPattern } from "@/components/ui/grid-pattern";
 
 function GridPatternDemo() {
 	return (
-		<div className="relative flex h-[500px] w-full flex-col items-center justify-center overflow-hidden rounded-lg border bg-background md:shadow-xl">
+		<div className="relative flex h-[500px] w-full flex-col items-center justify-center overflow-hidden rounded-lg border bg-background medium:shadow-xl">
 			<p className="z-10 whitespace-pre-wrap text-center text-5xl font-medium tracking-tighter text-black dark:text-white">
 				Grid Pattern
 			</p>
@@ -35,7 +35,7 @@ function GridPatternDemo() {
 
 function GridPatternLinearGradient() {
 	return (
-		<div className="relative flex size-full items-center justify-center overflow-hidden rounded-lg border bg-background p-20 md:shadow-xl">
+		<div className="relative flex size-full items-center justify-center overflow-hidden rounded-lg border bg-background p-20 medium:shadow-xl">
 			<p className="z-10 whitespace-pre-wrap text-center text-5xl font-medium tracking-tighter text-black dark:text-white">
 				Grid Pattern
 			</p>
@@ -54,7 +54,7 @@ function GridPatternLinearGradient() {
 
 function GridPatternDashed() {
 	return (
-		<div className="relative flex size-full items-center justify-center overflow-hidden rounded-lg border bg-background p-20 md:shadow-xl">
+		<div className="relative flex size-full items-center justify-center overflow-hidden rounded-lg border bg-background p-20 medium:shadow-xl">
 			<p className="z-10 whitespace-pre-wrap text-center text-5xl font-medium tracking-tighter text-black dark:text-white">
 				Grid Pattern
 			</p>

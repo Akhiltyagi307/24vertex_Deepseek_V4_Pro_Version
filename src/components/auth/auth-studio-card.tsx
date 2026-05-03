@@ -26,12 +26,12 @@ export function AuthStudioCard({
 		<div className={cn("flex w-full flex-col gap-4", className)}>
 			{/* overflow-visible so nested panels can use backdrop-filter (Card defaults to overflow-hidden). */}
 			<Card className="gap-0 overflow-visible p-0 py-0 shadow-lg shadow-black/20">
-				<CardContent className="grid gap-0 overflow-visible p-0 px-0 group-data-[size=sm]/card:px-0 md:grid-cols-2">
-					<div className="flex min-h-0 flex-col overflow-hidden rounded-l-xl p-6 sm:p-7 md:p-8">
+				<CardContent className="grid gap-0 overflow-visible p-0 px-0 group-data-[size=sm]/card:px-0 medium:grid-cols-2">
+					<div className="flex min-h-0 flex-col overflow-hidden rounded-l-xl p-6 medium:p-7 medium:p-8">
 						{children}
 					</div>
-					<div className="relative hidden min-h-0 bg-muted md:block md:min-h-[min(52vh,28rem)] md:rounded-r-xl">
-						<div className="absolute inset-0 z-0 overflow-hidden md:rounded-r-xl">
+					<div className="relative hidden min-h-0 bg-muted medium:block medium:min-h-[min(52vh,28rem)] medium:rounded-r-xl">
+						<div className="absolute inset-0 z-0 overflow-hidden medium:rounded-r-xl">
 							<Image
 								src="/brand/auth-fractal-glass.png"
 								alt=""
@@ -50,7 +50,7 @@ export function AuthStudioCard({
 				</CardContent>
 			</Card>
 			{showLegalFooter ? (
-				<FieldDescription className="mx-auto max-w-prose px-2 text-center text-xs leading-relaxed text-muted-foreground md:px-6">
+				<FieldDescription className="mx-auto max-w-prose px-2 text-center text-xs leading-relaxed text-muted-foreground medium:px-6">
 					By continuing, you agree to our{" "}
 					<Link
 						href="/legal/terms"

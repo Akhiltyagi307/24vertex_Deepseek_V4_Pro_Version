@@ -5,6 +5,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { generateObject } from "ai";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { consumeTest } from "@/lib/billing/entitlements";
 import { getOpenAIChatModel } from "@/lib/env";
 import {
@@ -47,7 +48,10 @@ function resolvePracticePdfLogoPath(): string | null {
 	return null;
 }
 
-const CHUNK_SIZE = 8;
+// 5 questions per grading call keeps each chunk's output budget under ~6k
+// tokens (≈1.2k per question payload). Smaller chunks also mean a stuck or
+// timing-out chunk fails one batch instead of a third of the test.
+const CHUNK_SIZE = 5;
 
 function getGradingConcurrency(): number {
 	const raw = process.env.PRACTICE_WORKER_CONCURRENCY;
@@ -95,11 +99,16 @@ async function runGradingChunk(
 	systemPrompt: string,
 	userPrompt: string,
 	nQuestions: number,
+	userId: string,
 ): Promise<{ questions: GradedQuestionItem[] }> {
-	const maxOutputTokens = Math.min(32_000, Math.max(4_000, nQuestions * 1_200));
+	// Hard-cap output tokens at 12k. CHUNK_SIZE=5 means at most ~6k expected
+	// tokens per chunk (~1.2k per question grading payload), well within budget.
+	const maxOutputTokens = Math.min(12_000, Math.max(4_000, nQuestions * 1_200));
+	const modelId = getOpenAIChatModel();
 	return withPracticeAiAttempts("gradePracticeTest.chunk", async () => {
-		const { object } = await generateObject({
-			model: getOpenAIProvider()(getOpenAIChatModel()),
+		const t0 = Date.now();
+		const { object, usage } = await generateObject({
+			model: getOpenAIProvider()(modelId),
 			schema: gradingChunkSchema,
 			system: systemPrompt,
 			prompt: userPrompt,
@@ -109,17 +118,29 @@ async function runGradingChunk(
 				openai: { strictJsonSchema: false },
 			},
 		});
+		void recordAiCall({
+			feature: "practice.grade.chunk",
+			model: modelId,
+			userId,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
+		});
 		return { questions: object.questions };
 	});
 }
 
-async function runSummaryObject(stats: {
-	overallPercent: number;
-	topicLines: string[];
-	nCorrect: number;
-	nPartial: number;
-	nIncorrect: number;
-}): Promise<PracticeGradingSummary> {
+async function runSummaryObject(
+	stats: {
+		overallPercent: number;
+		topicLines: string[];
+		nCorrect: number;
+		nPartial: number;
+		nIncorrect: number;
+	},
+	userId: string,
+): Promise<PracticeGradingSummary> {
 	const prompt = [
 		"You write concise student-facing summaries for a graded practice test.",
 		"Use plain language. No markdown.",
@@ -130,8 +151,10 @@ async function runSummaryObject(stats: {
 	].join("\n");
 
 	return withPracticeAiAttempts("gradePracticeTest.summary", async () => {
-		const { object } = await generateObject({
-			model: getOpenAIProvider()(getOpenAIChatModel()),
+		const t0 = Date.now();
+		const modelId = getOpenAIChatModel();
+		const { object, usage } = await generateObject({
+			model: getOpenAIProvider()(modelId),
 			schema: practiceGradingSummarySchema,
 			system:
 				"Return structured summary fields only. strengths, improvement_areas, and recommendations should be short bullet phrases (each array item one bullet).",
@@ -141,6 +164,15 @@ async function runSummaryObject(stats: {
 			providerOptions: {
 				openai: { strictJsonSchema: false },
 			},
+		});
+		void recordAiCall({
+			feature: "practice.grade.summary",
+			model: modelId,
+			userId,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
 		});
 		return object;
 	});
@@ -312,7 +344,7 @@ async function gradePracticeTestWithAiInner(
 			const c0 = Date.now();
 			const label = `part ${ci + 1} of ${chunks.length} (${part.length} questions)`;
 			const userPrompt = buildPracticeGradingUserPrompt(label, part);
-			const { questions: graded } = await runGradingChunk(systemPrompt, userPrompt, part.length);
+			const { questions: graded } = await runGradingChunk(systemPrompt, userPrompt, part.length, userId);
 			const chunkMs = Date.now() - c0;
 			trace.chunks.totalChunkMs += chunkMs;
 			if (chunkMs > trace.chunks.maxChunkMs) trace.chunks.maxChunkMs = chunkMs;
@@ -391,16 +423,19 @@ async function gradePracticeTestWithAiInner(
 
 	let summary: PracticeGradingSummary;
 	try {
-		summary = await runSummaryObject({
-			overallPercent,
-			topicLines: topicRollups.map(
-				(t) =>
-					`${t.topic_name}: avg ${t.average_score.toFixed(1)}% → ${t.status} (C${t.n_correct}/P${t.n_partial}/I${t.n_incorrect})`,
-			),
-			nCorrect,
-			nPartial,
-			nIncorrect,
-		});
+		summary = await runSummaryObject(
+			{
+				overallPercent,
+				topicLines: topicRollups.map(
+					(t) =>
+						`${t.topic_name}: avg ${t.average_score.toFixed(1)}% → ${t.status} (C${t.n_correct}/P${t.n_partial}/I${t.n_incorrect})`,
+				),
+				nCorrect,
+				nPartial,
+				nIncorrect,
+			},
+			userId,
+		);
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "Summary generation failed.";
 		logServerError("gradePracticeTestWithAi.runSummaryObject", e, {

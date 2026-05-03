@@ -23,7 +23,7 @@ export function PriceDisplay({ amountPaise, period, compareAtPaise, className }:
 	return (
 		<div className={cn("flex flex-col gap-1.5", className)}>
 			<div className="flex items-baseline gap-2">
-				<span className="font-heading text-3xl font-semibold tracking-tight tabular-nums text-foreground md:text-4xl">
+				<span className="font-heading text-3xl font-semibold tracking-tight tabular-nums text-foreground medium:text-4xl">
 					{`\u20B9\u00A0${formatRupeeAmount(amountPaise)}`}
 				</span>
 				<span className="text-sm text-muted-foreground">

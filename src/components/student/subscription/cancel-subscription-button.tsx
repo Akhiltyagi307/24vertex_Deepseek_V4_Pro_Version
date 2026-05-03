@@ -102,7 +102,7 @@ export function CancelSubscriptionButton({
 									: "Your plan will remain active until the current billing period ends. You can still renew again before that date."}
 							</Dialog.Description>
 						</div>
-						<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+						<div className="flex flex-col-reverse gap-2 medium:flex-row medium:justify-end">
 							<Button
 								type="button"
 								variant="outline"

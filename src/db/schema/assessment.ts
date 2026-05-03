@@ -69,6 +69,15 @@ export const tests = pgTable(
 		abandonedAt: timestamp("abandoned_at"),
 		questionCount: integer("question_count"),
 		questionMix: jsonb("question_mix"),
+		/** Operator pause — student UI freezes timer while true (PDR §4.28). */
+		isPaused: boolean("is_paused").notNull().default(false),
+		/** Count of admin timer extensions (audit). */
+		adminExtensions: integer("admin_extensions").notNull().default(0),
+		deviceFingerprint: varchar("device_fingerprint", { length: 64 }),
+		lastIp: varchar("last_ip", { length: 45 }),
+		tabBlurCount: integer("tab_blur_count").notNull().default(0),
+		pausedAt: timestamp("paused_at", { withTimezone: true }),
+		accumulatedPauseSeconds: integer("accumulated_pause_seconds").notNull().default(0),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},
@@ -76,7 +85,21 @@ export const tests = pgTable(
 		index("idx_tests_student").on(t.studentId),
 		index("idx_tests_status").on(t.status),
 		index("idx_tests_type").on(t.testType),
+		index("idx_tests_status_updated").on(t.status, t.updatedAt),
 	],
+);
+
+export const adminTestMessages = pgTable(
+	"admin_test_messages",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		testId: uuid("test_id")
+			.notNull()
+			.references(() => tests.id, { onDelete: "cascade" }),
+		body: text("body").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [index("idx_admin_test_messages_test_created").on(t.testId, t.createdAt)],
 );
 
 export const questions = pgTable(

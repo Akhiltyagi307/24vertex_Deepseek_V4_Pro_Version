@@ -263,7 +263,7 @@ export function SubjectCard({
 		<div
 			className={cn(
 				dashboardSubjectCardSurfaceClassName,
-				compact ? "p-4 sm:p-[1.125rem]" : "p-5",
+				compact ? "p-4 medium:p-[1.125rem]" : "p-5",
 				"flex h-full flex-col",
 				compact ? "gap-3" : "gap-3",
 				className,
@@ -280,7 +280,7 @@ export function SubjectCard({
 						id={titleId}
 						className={cn(
 							"m-0 truncate font-semibold leading-snug tracking-tight text-foreground",
-							compact ? "text-base sm:text-[1.0625rem]" : "text-sm",
+							compact ? "text-base medium:text-[1.0625rem]" : "text-sm",
 						)}
 						title={subject}
 					>
@@ -301,7 +301,7 @@ export function SubjectCard({
 				<div className="flex shrink-0 items-start gap-2 self-start pt-0.5 min-[360px]:gap-2.5">
 					<div
 						className={cn(
-							"flex min-w-0 max-w-[11rem] items-center justify-end gap-1.5 sm:max-w-[13.5rem]",
+							"flex min-w-0 max-w-[11rem] items-center justify-end gap-1.5 medium:max-w-[13.5rem]",
 							statusPill &&
 								cn(
 									"rounded-full border px-2.5 py-1",
@@ -317,10 +317,10 @@ export function SubjectCard({
 						/>
 						<span
 							className={cn(
-								"text-right text-[0.6875rem] font-medium leading-tight sm:text-xs",
+								"text-right text-[0.6875rem] font-medium leading-tight medium:text-xs",
 								config.sentenceCaseLabel
 									? "normal-case tracking-tight"
-									: "uppercase tracking-[0.05em] sm:tracking-[0.06em]",
+									: "uppercase tracking-[0.05em] medium:tracking-[0.06em]",
 								config.textColor,
 							)}
 						>
@@ -331,23 +331,23 @@ export function SubjectCard({
 										<>
 											<span
 												aria-hidden
-												className="inline min-[360px]:hidden sm:hidden"
+												className="inline min-[360px]:hidden medium:hidden"
 											>
 												{config.extraNarrowLabel}
 											</span>
 											<span
 												aria-hidden
-												className="hidden min-[360px]:inline sm:hidden"
+												className="hidden min-[360px]:inline medium:hidden"
 											>
 												{config.narrowLabel}
 											</span>
 										</>
 									) : (
-										<span aria-hidden className="sm:hidden">
+										<span aria-hidden className="medium:hidden">
 											{config.narrowLabel}
 										</span>
 									)}
-									<span aria-hidden className="hidden sm:inline">
+									<span aria-hidden className="hidden medium:inline">
 										{config.label}
 									</span>
 								</>
@@ -364,14 +364,14 @@ export function SubjectCard({
 
 			<div
 				className={cn(
-					"flex min-w-0 flex-1 flex-col gap-3 min-[400px]:gap-3 sm:gap-4",
+					"flex min-w-0 flex-1 flex-col gap-3 min-[400px]:gap-3 medium:gap-4",
 					compact ? "min-h-0" : "min-h-[118px]",
 					!compact && "flex-row items-center",
 				)}
 			>
 				<div
 					className={cn(
-						"flex min-w-0 flex-1 gap-2 min-[400px]:gap-3 sm:gap-4",
+						"flex min-w-0 flex-1 gap-2 min-[400px]:gap-3 medium:gap-4",
 						compact && performanceTile ? "items-stretch" : "items-center",
 						compact && performanceTile
 							? "rounded-xl border border-border/60 bg-muted/[0.62] p-3 dark:border-white/[0.11] dark:bg-muted/[0.36]"
@@ -419,7 +419,7 @@ export function SubjectCard({
 					>
 						{compact ? (
 							<>
-								<span className="font-semibold leading-none text-foreground tabular-nums text-sm sm:text-[0.9375rem]">
+								<span className="font-semibold leading-none text-foreground tabular-nums text-sm medium:text-[0.9375rem]">
 									{topicsTotal === 0 ? 0 : topicsAttempted} / {topicsTotal}
 								</span>
 								<span className="max-w-[5.5rem] text-center text-[0.625rem] leading-tight tracking-tight text-muted-foreground">
@@ -431,7 +431,7 @@ export function SubjectCard({
 								<span
 									className={cn(
 										"font-semibold leading-none text-foreground tabular-nums",
-										"text-2xl sm:text-[1.65rem]",
+										"text-2xl medium:text-[1.65rem]",
 									)}
 								>
 									{coverage}%
@@ -447,7 +447,7 @@ export function SubjectCard({
 				<div
 					className={cn(
 						"flex min-w-0 flex-1 self-stretch",
-						compact && performanceTile && "border-border/50 border-s ps-3 ms-0.5 sm:ps-4 sm:ms-1",
+						compact && performanceTile && "border-border/50 border-s ps-3 ms-0.5 medium:ps-4 medium:ms-1",
 					)}
 				>
 					<div
@@ -474,7 +474,7 @@ export function SubjectCard({
 												<span className="text-[0.6875rem] font-medium leading-none text-muted-foreground">
 													Tests taken
 												</span>
-												<span className="text-lg font-semibold tabular-nums leading-none text-foreground sm:text-xl">
+												<span className="text-lg font-semibold tabular-nums leading-none text-foreground medium:text-xl">
 													{testsTaken}
 												</span>
 											</div>
@@ -483,7 +483,7 @@ export function SubjectCard({
 													Avg score
 												</span>
 												<span
-													className="text-lg font-semibold tabular-nums leading-none text-muted-foreground sm:text-xl"
+													className="text-lg font-semibold tabular-nums leading-none text-muted-foreground medium:text-xl"
 													aria-label={avgScoreAria}
 												>
 													—
@@ -502,7 +502,7 @@ export function SubjectCard({
 											<span className="text-[0.6875rem] font-medium leading-none text-muted-foreground">
 												Last test
 											</span>
-											<span className="truncate text-sm font-semibold tabular-nums text-foreground sm:text-[0.9375rem]">
+											<span className="truncate text-sm font-semibold tabular-nums text-foreground medium:text-[0.9375rem]">
 												{lastTestDate.trim() ? lastTestDate : "—"}
 											</span>
 										</div>
@@ -510,7 +510,7 @@ export function SubjectCard({
 											<span className="text-[0.6875rem] font-medium leading-none text-muted-foreground">
 												Coverage
 											</span>
-											<span className="text-sm font-semibold tabular-nums text-foreground sm:text-[0.9375rem]">
+											<span className="text-sm font-semibold tabular-nums text-foreground medium:text-[0.9375rem]">
 												{topicsTotal > 0 ? `${coverage}%` : "—"}
 											</span>
 										</div>
@@ -518,7 +518,7 @@ export function SubjectCard({
 											<span className="text-[0.6875rem] font-medium leading-none text-muted-foreground">
 												Tests
 											</span>
-											<span className="text-sm font-semibold tabular-nums text-foreground sm:text-[0.9375rem]">
+											<span className="text-sm font-semibold tabular-nums text-foreground medium:text-[0.9375rem]">
 												{testsTaken}
 											</span>
 										</div>
@@ -528,7 +528,7 @@ export function SubjectCard({
 											</span>
 											<span
 												className={cn(
-													"text-sm font-semibold tabular-nums sm:text-[0.9375rem]",
+													"text-sm font-semibold tabular-nums medium:text-[0.9375rem]",
 													showScorePercent ? config.scoreColor : "text-muted-foreground",
 												)}
 												aria-label={avgScoreAria}
@@ -549,10 +549,10 @@ export function SubjectCard({
 											"py-0.5",
 										)}
 									>
-										<span className="shrink-0 text-xs text-muted-foreground sm:text-[0.8125rem]">
+										<span className="shrink-0 text-xs text-muted-foreground medium:text-[0.8125rem]">
 											Topics
 										</span>
-										<span className="min-w-0 truncate text-right text-sm font-medium tabular-nums text-foreground sm:text-[0.9375rem]">
+										<span className="min-w-0 truncate text-right text-sm font-medium tabular-nums text-foreground medium:text-[0.9375rem]">
 											{topicsAttempted} / {topicsTotal}
 										</span>
 									</div>
@@ -562,7 +562,7 @@ export function SubjectCard({
 										<span className="text-[0.6875rem] font-medium leading-none text-muted-foreground">
 											Tests taken
 										</span>
-										<span className="text-sm font-semibold tabular-nums text-foreground sm:text-[0.9375rem]">
+										<span className="text-sm font-semibold tabular-nums text-foreground medium:text-[0.9375rem]">
 											{testsTaken}
 										</span>
 									</div>
@@ -573,10 +573,10 @@ export function SubjectCard({
 											"py-0.5",
 										)}
 									>
-										<span className="shrink-0 text-xs text-muted-foreground sm:text-[0.8125rem]">
+										<span className="shrink-0 text-xs text-muted-foreground medium:text-[0.8125rem]">
 											Tests taken
 										</span>
-										<span className="min-w-0 text-right text-sm font-medium tabular-nums text-foreground sm:text-[0.9375rem]">
+										<span className="min-w-0 text-right text-sm font-medium tabular-nums text-foreground medium:text-[0.9375rem]">
 											{testsTaken}
 										</span>
 									</div>
@@ -589,7 +589,7 @@ export function SubjectCard({
 											</span>
 											<span
 												className={cn(
-													"text-sm font-semibold tabular-nums sm:text-[0.9375rem]",
+													"text-sm font-semibold tabular-nums medium:text-[0.9375rem]",
 													config.scoreColor,
 												)}
 												aria-label={avgScoreAria}
@@ -604,12 +604,12 @@ export function SubjectCard({
 												"py-0.5",
 											)}
 										>
-											<span className="shrink-0 text-xs text-muted-foreground sm:text-[0.8125rem]">
+											<span className="shrink-0 text-xs text-muted-foreground medium:text-[0.8125rem]">
 												Avg score
 											</span>
 											<span
 												className={cn(
-													"text-right text-sm font-medium tabular-nums sm:text-[0.9375rem]",
+													"text-right text-sm font-medium tabular-nums medium:text-[0.9375rem]",
 													config.scoreColor,
 												)}
 												aria-label={avgScoreAria}
@@ -639,7 +639,7 @@ export function SubjectCard({
 			) : showLinkedTileHint ? (
 				<div
 					className={cn(
-						"mt-auto flex shrink-0 items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/[0.62] px-3 py-2.5 sm:px-3.5 dark:border-white/[0.11] dark:bg-muted/[0.36]",
+						"mt-auto flex shrink-0 items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/[0.62] px-3 py-2.5 medium:px-3.5 dark:border-white/[0.11] dark:bg-muted/[0.36]",
 						"motion-safe:transition-[color,background-color,border-color,box-shadow] motion-safe:duration-200 motion-safe:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
 						"group-hover/tile:border-emerald-500/40 group-hover/tile:bg-emerald-500/[0.06] group-hover/tile:shadow-[0_1px_0_0_rgba(16,185,129,0.12)]",
 						"dark:group-hover/tile:border-emerald-400/35 dark:group-hover/tile:bg-emerald-400/[0.07]",
