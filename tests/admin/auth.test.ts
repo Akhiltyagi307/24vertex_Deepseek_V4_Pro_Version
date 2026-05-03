@@ -78,10 +78,8 @@ describe("admin auth", () => {
 	});
 
 	describe("production bcrypt minimum cost (§10.6)", () => {
-		const prevNode = process.env.NODE_ENV;
-
 		afterEach(() => {
-			process.env.NODE_ENV = prevNode;
+			vi.unstubAllEnvs();
 			process.env.ADMIN_PASSWORD = "correct-horse-battery";
 			delete process.env.ADMIN_PASSWORD_HASH;
 			delete process.env.ADMIN_PASSWORD_HASH_B64;
@@ -89,7 +87,7 @@ describe("admin auth", () => {
 		});
 
 		it("rejects bcrypt cost < 12 when NODE_ENV is production", async () => {
-			process.env.NODE_ENV = "production";
+			vi.stubEnv("NODE_ENV", "production");
 			delete process.env.ADMIN_PASSWORD;
 			process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("weakcost", 8);
 			vi.resetModules();
@@ -98,7 +96,7 @@ describe("admin auth", () => {
 		});
 
 		it("accepts bcrypt cost 12 when NODE_ENV is production", async () => {
-			process.env.NODE_ENV = "production";
+			vi.stubEnv("NODE_ENV", "production");
 			delete process.env.ADMIN_PASSWORD;
 			process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("strongcost", 12);
 			vi.resetModules();

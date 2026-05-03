@@ -1,8 +1,11 @@
+import fs from "node:fs";
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
 import { defineConfig } from "vitest/config";
 
-loadEnv({ path: ".env.local" });
+const localEnv = path.resolve(__dirname, ".env.local");
+const mainRepoEnv = path.resolve(__dirname, "../../../.env.local");
+loadEnv({ path: fs.existsSync(localEnv) ? localEnv : mainRepoEnv });
 
 export default defineConfig({
 	test: {
