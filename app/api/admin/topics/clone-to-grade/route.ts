@@ -6,6 +6,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { cloneTopicsToGrade } from "@/lib/admin/topics/clone-to-grade";
+import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
 				ipAddress: clientIpFromRequest(request),
 				userAgent: userAgentFromRequest(request),
 			});
+			revalidateCurriculumTopicCaches();
 			return NextResponse.json({ ok: true, inserted: count }, { headers: adminHeaders() });
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "clone failed";

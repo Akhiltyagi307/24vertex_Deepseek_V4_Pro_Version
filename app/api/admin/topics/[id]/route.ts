@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { topics } from "@/db/schema/academic";
 
@@ -69,6 +70,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 			userAgent: userAgentFromRequest(request),
 		});
 
+		revalidateCurriculumTopicCaches();
 		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
 	});
 }
@@ -95,6 +97,7 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 			userAgent: userAgentFromRequest(request),
 		});
 
+		revalidateCurriculumTopicCaches();
 		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
 	});
 }
