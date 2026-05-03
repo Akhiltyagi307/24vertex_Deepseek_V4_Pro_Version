@@ -48,7 +48,10 @@ function resolvePracticePdfLogoPath(): string | null {
 	return null;
 }
 
-const CHUNK_SIZE = 8;
+// 5 questions per grading call keeps each chunk's output budget under ~6k
+// tokens (≈1.2k per question payload). Smaller chunks also mean a stuck or
+// timing-out chunk fails one batch instead of a third of the test.
+const CHUNK_SIZE = 5;
 
 function getGradingConcurrency(): number {
 	const raw = process.env.PRACTICE_WORKER_CONCURRENCY;
@@ -98,7 +101,9 @@ async function runGradingChunk(
 	nQuestions: number,
 	userId: string,
 ): Promise<{ questions: GradedQuestionItem[] }> {
-	const maxOutputTokens = Math.min(32_000, Math.max(4_000, nQuestions * 1_200));
+	// Hard-cap output tokens at 12k. CHUNK_SIZE=5 means at most ~6k expected
+	// tokens per chunk (~1.2k per question grading payload), well within budget.
+	const maxOutputTokens = Math.min(12_000, Math.max(4_000, nQuestions * 1_200));
 	const modelId = getOpenAIChatModel();
 	return withPracticeAiAttempts("gradePracticeTest.chunk", async () => {
 		const t0 = Date.now();
