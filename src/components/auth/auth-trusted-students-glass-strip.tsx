@@ -41,13 +41,13 @@ export function AuthTrustedStudentsGlassStrip({
 			className={cn(
 				panelShell,
 				hero
-					? "flex w-full max-w-xl flex-col items-center gap-3 rounded-2xl px-5 py-4 sm:flex-row sm:justify-center sm:gap-5 sm:px-7 sm:py-4"
-					: "flex w-full max-w-sm items-center justify-start gap-2 px-4 py-4 md:px-6 md:py-5",
+					? "flex w-full max-w-xl flex-col items-center gap-3 rounded-2xl px-5 py-4 medium:flex-row medium:justify-center medium:gap-5 medium:px-7 medium:py-4"
+					: "flex w-full max-w-sm items-center justify-start gap-2 px-4 py-4 medium:px-6 medium:py-5",
 				className,
 			)}
 		>
 			<AvatarGroup
-				className={cn("grayscale", hero ? "-space-x-2.5 sm:-space-x-3" : "-space-x-3")}
+				className={cn("grayscale", hero ? "-space-x-2.5 medium:-space-x-3" : "-space-x-3")}
 				aria-label="Example student avatars; illustrative only"
 			>
 				<Avatar size="lg">
@@ -74,7 +74,7 @@ export function AuthTrustedStudentsGlassStrip({
 			<p
 				className={cn(
 					hero
-						? "text-center text-[0.9375rem] font-medium leading-snug tracking-tight text-foreground/88 sm:text-left sm:text-[1.0625rem]"
+						? "text-center text-[0.9375rem] font-medium leading-snug tracking-tight text-foreground/88 medium:text-left medium:text-[1.0625rem]"
 						: "text-xs font-medium tracking-[-0.01em] text-muted-foreground",
 				)}
 			>

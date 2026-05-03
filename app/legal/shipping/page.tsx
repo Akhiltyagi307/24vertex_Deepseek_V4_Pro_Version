@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function LegalShippingPage() {
 	return (
-		<main className="w-full min-w-0 max-w-none px-4 py-12 text-foreground sm:px-8">
+		<main className="w-full min-w-0 max-w-none px-4 py-12 text-foreground medium:px-8">
 			<MotionPageEnter className="flex flex-col">
 				<h1 className="text-2xl font-semibold tracking-tight">Shipping & delivery</h1>
 				<p className="mt-2 text-sm text-muted-foreground">Last updated April 2026</p>

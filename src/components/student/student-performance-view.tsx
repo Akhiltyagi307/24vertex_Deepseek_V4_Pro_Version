@@ -407,7 +407,7 @@ export function StudentPerformanceView({
 
 	if (loadError) {
 		return (
-			<div className="py-6 md:py-8">
+			<div className="py-6 medium:py-8">
 				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">
@@ -429,7 +429,7 @@ export function StudentPerformanceView({
 
 	if (!loadError && enrolledSubjectCards.length === 0) {
 		return (
-			<div className="py-6 md:py-8">
+			<div className="py-6 medium:py-8">
 				<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 				<div className="flex flex-col gap-1.5">
 					<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">
@@ -465,13 +465,13 @@ export function StudentPerformanceView({
 	}
 
 	return (
-		<div className="flex w-full min-w-0 flex-col gap-6 py-6 pb-24 sm:gap-7 md:py-8 sm:pb-28">
+		<div className="flex w-full min-w-0 flex-col gap-6 py-6 pb-24 medium:gap-7 medium:py-8 medium:pb-28">
 			<StudentPerformanceTrackerHydrate needsHydration={trackerNeedsHydration} />
 			<AnimatePresence mode="wait" initial={false}>
 				{!detailSubjectId ? (
 					<motion.div
 						key="perf-subject-list"
-						className="flex flex-col gap-6 sm:gap-7"
+						className="flex flex-col gap-6 medium:gap-7"
 						initial="hidden"
 						animate="show"
 						exit="exit"
@@ -506,7 +506,7 @@ export function StudentPerformanceView({
 							Open a subject
 						</h2>
 						<motion.div
-							className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 lg:grid-cols-3 lg:gap-4"
+							className="grid grid-cols-1 gap-3 medium:grid-cols-2 medium:gap-3.5 xl:grid-cols-3 xl:gap-4"
 							initial="hidden"
 							animate="show"
 							variants={container}
@@ -529,14 +529,14 @@ export function StudentPerformanceView({
 								const iconEl = (
 									<span
 										className={cn(
-											"flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-11",
+											"flex size-10 shrink-0 items-center justify-center rounded-lg border medium:size-11",
 											"border-border/80 ring-1",
 											shellClassName,
 										)}
 										aria-hidden
 									>
 										<Icon
-											className={cn("size-5 sm:size-[1.375rem]", iconClassName)}
+											className={cn("size-5 medium:size-[1.375rem]", iconClassName)}
 											strokeWidth={1.25}
 										/>
 									</span>
@@ -725,7 +725,7 @@ export function StudentPerformanceView({
 							</CollapsibleTrigger>
 							<CollapsibleContent className="overflow-hidden">
 								<motion.div
-									className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+									className="grid gap-4 medium:grid-cols-2 xl:grid-cols-5"
 									initial="hidden"
 									animate="show"
 									variants={container}
@@ -813,8 +813,8 @@ export function StudentPerformanceView({
 							size="sm"
 						>
 							{/* Tight vertical padding: Search/Filter band should sit close to the title row and table rule. */}
-							<div className="px-4 py-3 sm:px-5 sm:py-3.5">
-								<div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-6 lg:gap-8">
+							<div className="px-4 py-3 medium:px-5 medium:py-3.5">
+								<div className="flex flex-col gap-5 medium:flex-row medium:items-start medium:gap-6 xl:gap-8">
 									<div className="flex min-w-0 flex-1 flex-col gap-3">
 										<Label htmlFor="perf-topic-search" className="text-foreground text-sm font-medium">
 											Search
@@ -857,7 +857,7 @@ export function StudentPerformanceView({
 									</div>
 
 									<div
-										className="flex min-w-0 flex-1 flex-col gap-3 border-border border-t pt-5 md:min-w-0 md:border-t-0 md:border-l md:pt-0 md:pl-8"
+										className="flex min-w-0 flex-1 flex-col gap-3 border-border border-t pt-5 medium:min-w-0 medium:border-t-0 medium:border-l medium:pt-0 medium:pl-8"
 										role="toolbar"
 										aria-label="Filter and sort topics"
 									>
@@ -1302,7 +1302,7 @@ export function StudentPerformanceView({
 
 			{detailSubjectId ? (
 				<Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-					<SheetContent side="right" className="sm:max-w-md">
+					<SheetContent side="right" className="medium:max-w-md">
 						{sheetRow ? (
 							<>
 								<SheetHeader>
@@ -1352,10 +1352,10 @@ export function StudentPerformanceView({
 										ship.
 									</p>
 								</div>
-								<SheetFooter className="sm:flex-row">
+								<SheetFooter className="medium:flex-row">
 									{allowPractice ? (
 										<Button
-											className="w-full sm:w-auto"
+											className="w-full medium:w-auto"
 											render={
 												<Link href={practiceHref([sheetRow.topicId], sheetRow.subjectId, practiceOpts)} />
 											}

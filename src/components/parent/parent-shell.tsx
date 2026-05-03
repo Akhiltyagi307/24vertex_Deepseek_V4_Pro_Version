@@ -78,7 +78,7 @@ export function ParentShell({
 					className={cn(
 						doubtChat
 							? "min-h-0 min-w-0 grow basis-0 overflow-hidden bg-background"
-							: "min-h-0 min-w-0 grow basis-0 overflow-auto bg-background px-4 md:px-6 lg:px-8",
+							: "min-h-0 min-w-0 grow basis-0 overflow-auto bg-background px-4 medium:px-6 xl:px-8",
 					)}
 				>
 					{children}

@@ -56,13 +56,13 @@ export function ParentDoubtHistoryView({
 	);
 
 	return (
-		<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden md:flex-row">
+		<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden medium:flex-row">
 			<aside
 				className={cn(
 					"flex max-h-[min(40vh,240px)] w-full shrink-0 flex-col overflow-hidden border-b",
 					"border-zinc-200/90 bg-emerald-50/35 text-sidebar-foreground",
 					"dark:border-sidebar-border dark:bg-sidebar dark:border-b",
-					"md:max-h-none md:min-h-0 md:w-72 md:self-stretch md:border-r md:border-b-0",
+					"medium:max-h-none medium:min-h-0 medium:w-72 medium:self-stretch medium:border-r medium:border-b-0",
 				)}
 			>
 				<div

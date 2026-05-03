@@ -26,16 +26,16 @@ import {
 } from "@/lib/marketing/landing-copy";
 import { cn } from "@/lib/utils";
 
-const sectionShell = "w-full px-4 py-16 sm:px-6 sm:py-20 lg:px-8";
+const sectionShell = "w-full px-4 py-16 medium:px-6 medium:py-20 xl:px-8";
 /** Band for full-width sections (matches CTA inner `max-w-7xl`). */
 const sectionContentMax = "max-w-7xl";
-const sectionTitle = "text-3xl font-semibold tracking-tight text-foreground sm:text-4xl";
-const sectionLead = "mx-auto mt-3 max-w-2xl text-base text-muted-foreground sm:text-lg";
+const sectionTitle = "text-3xl font-semibold tracking-tight text-foreground medium:text-4xl";
+const sectionLead = "mx-auto mt-3 max-w-2xl text-base text-muted-foreground medium:text-lg";
 
 export function LandingMarketingBody() {
 	return (
 		<>
-			<section id="home" className="w-full bg-background pb-10 pt-6 sm:pb-12 sm:pt-8">
+			<section id="home" className="w-full bg-background pb-10 pt-6 medium:pb-12 medium:pt-8">
 				<AcmeHero />
 			</section>
 
@@ -54,11 +54,11 @@ export function LandingMarketingBody() {
 				<div className={pricingSectionGridOverlayClassName} aria-hidden />
 				<div
 					className={cn(
-						"relative z-10 mx-auto w-full space-y-8 md:space-y-10",
+						"relative z-10 mx-auto w-full space-y-8 medium:space-y-10",
 						sectionContentMax,
 					)}
 				>
-					<div className="mx-auto max-w-3xl space-y-4 text-center md:space-y-6">
+					<div className="mx-auto max-w-3xl space-y-4 text-center medium:space-y-6">
 						<div className="flex justify-center">
 							<Badge variant="outline" className={landingMarketingSectionEyebrowBadgeClassName}>
 								FAQ
@@ -68,7 +68,7 @@ export function LandingMarketingBody() {
 						<p
 							className={cn(
 								sectionLead,
-								"mt-4 text-center leading-relaxed sm:text-lg md:mt-6",
+								"mt-4 text-center leading-relaxed medium:text-lg medium:mt-6",
 							)}
 						>
 							Find essential details about EduAI and how each role can get the most from it.
@@ -76,7 +76,7 @@ export function LandingMarketingBody() {
 					</div>
 
 					<div className="w-full space-y-10">
-						<div className="grid gap-3 md:grid-cols-2 md:gap-6">
+						<div className="grid gap-3 medium:grid-cols-2 medium:gap-6">
 						{[
 							{
 								id: "1",
@@ -124,7 +124,7 @@ export function LandingMarketingBody() {
 							<details
 								key={item.id}
 								className={cn(
-									"group relative z-10 overflow-hidden px-4 py-4 transition-shadow duration-200 ease-out md:px-6 md:py-6",
+									"group relative z-10 overflow-hidden px-4 py-4 transition-shadow duration-200 ease-out medium:px-6 medium:py-6",
 									faqCardSurfaceClassName,
 									"open:shadow-[0_22px_55px_-28px_oklch(0.2_0.04_160/.55)]",
 								)}
@@ -137,7 +137,7 @@ export function LandingMarketingBody() {
 										<Badge variant="secondary" className={cn("text-[11px] font-medium", landingMarketingFaqRoleBadgeClassName)}>
 											{item.role}
 										</Badge>
-										<h3 className="text-foreground mt-2 text-lg font-semibold tracking-tight sm:text-xl">
+										<h3 className="text-foreground mt-2 text-lg font-semibold tracking-tight medium:text-xl">
 											{item.question}
 										</h3>
 									</div>
@@ -148,7 +148,7 @@ export function LandingMarketingBody() {
 										<ChevronDown className="size-5" strokeWidth={2} />
 									</span>
 								</summary>
-								<p className="text-muted-foreground mt-3 pl-10 text-sm leading-relaxed md:text-[15px]">
+								<p className="text-muted-foreground mt-3 pl-10 text-sm leading-relaxed medium:text-[15px]">
 									<span className="block max-w-[68ch] text-pretty">{item.answer}</span>
 								</p>
 							</details>
@@ -156,11 +156,11 @@ export function LandingMarketingBody() {
 						</div>
 						<div
 							className={cn(
-								"relative z-10 flex flex-wrap items-center justify-between gap-4 px-4 py-4 md:px-6 md:py-6",
+								"relative z-10 flex flex-wrap items-center justify-between gap-4 px-4 py-4 medium:px-6 medium:py-6",
 								faqCardSurfaceClassName,
 							)}
 						>
-							<p className="text-muted-foreground text-sm sm:text-base">
+							<p className="text-muted-foreground text-sm medium:text-base">
 								Still have a question? Pick your role and we will route you to the right portal flow.
 							</p>
 							<Button
@@ -177,7 +177,7 @@ export function LandingMarketingBody() {
 			<section id="cta" className={`bg-background ${sectionShell}`}>
 				<div
 					className={cn(
-						"relative mx-auto overflow-hidden rounded-2xl px-6 py-16 text-center sm:px-10 sm:py-20",
+						"relative mx-auto overflow-hidden rounded-2xl px-6 py-16 text-center medium:px-10 medium:py-20",
 						sectionContentMax,
 						landingFeatureBentoShell,
 					)}

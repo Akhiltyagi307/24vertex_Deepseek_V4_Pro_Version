@@ -83,11 +83,11 @@ export const Footer7 = ({
   legalLinks = defaultLegalLinks,
 }: Footer7Props) => {
   return (
-    <section className="py-16 sm:py-20">
+    <section className="py-16 medium:py-20">
       <div className="container mx-auto">
-        <div className="flex w-full flex-col justify-between gap-10 lg:flex-row lg:items-start lg:text-left">
-          <div className="flex w-full flex-col justify-between gap-6 lg:items-start">
-            <div className="flex items-center gap-2 lg:justify-start">
+        <div className="flex w-full flex-col justify-between gap-10 xl:flex-row xl:items-start xl:text-left">
+          <div className="flex w-full flex-col justify-between gap-6 xl:items-start">
+            <div className="flex items-center gap-2 xl:justify-start">
               <a href={logo.url}>
                 <img src={logo.src} alt={logo.alt} title={logo.title} className="h-8 w-8 rounded-md object-cover" />
               </a>
@@ -104,7 +104,7 @@ export const Footer7 = ({
               ))}
             </ul>
           </div>
-          <div className="grid w-full gap-6 md:grid-cols-3 lg:gap-20">
+          <div className="grid w-full gap-6 medium:grid-cols-3 xl:gap-20">
             {sections.map((section, sectionIdx) => (
               <div key={sectionIdx}>
                 <h3 className="mb-4 font-bold">{section.title}</h3>
@@ -119,9 +119,9 @@ export const Footer7 = ({
             ))}
           </div>
         </div>
-        <div className="mt-8 flex flex-col justify-between gap-4 py-8 text-xs font-medium text-muted-foreground md:flex-row md:items-center md:text-left">
-          <p className="order-2 lg:order-1">{copyright}</p>
-          <ul className="order-1 flex flex-col gap-2 md:order-2 md:flex-row">
+        <div className="mt-8 flex flex-col justify-between gap-4 py-8 text-xs font-medium text-muted-foreground medium:flex-row medium:items-center medium:text-left">
+          <p className="order-2 xl:order-1">{copyright}</p>
+          <ul className="order-1 flex flex-col gap-2 medium:order-2 medium:flex-row">
             {legalLinks.map((link, idx) => (
               <li key={idx} className="hover:text-primary">
                 <a href={link.href}> {link.name}</a>

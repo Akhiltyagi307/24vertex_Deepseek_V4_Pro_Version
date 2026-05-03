@@ -30,6 +30,11 @@ export function getSupabaseUrl(): string {
 	return url;
 }
 
+/** Private bucket for GDPR/DSR ZIP exports (create in Supabase Dashboard; default name). */
+export function getComplianceExportsBucket(): string {
+	return readTrimmedEnv("COMPLIANCE_EXPORTS_BUCKET") || "compliance-exports";
+}
+
 /** Publishable (recommended) or legacy anon JWT */
 export function getSupabasePublishableKey(): string {
 	const key =

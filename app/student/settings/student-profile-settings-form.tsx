@@ -93,7 +93,7 @@ const tabAccentClass =
 	"bg-emerald-600 hover:bg-emerald-600/90 dark:bg-emerald-500 dark:hover:bg-emerald-500/90";
 
 const comfortableInputClass =
-	"h-10 md:h-10 md:text-base px-3 py-2 file:text-sm [&::file-selector-button]:text-sm";
+	"h-10 medium:h-10 medium:text-base px-3 py-2 file:text-sm [&::file-selector-button]:text-sm";
 
 /** Solid light fill on grey/muted panels (Input defaults to transparent). */
 const panelRaisedInputClass = cn(
@@ -104,7 +104,7 @@ const panelRaisedInputClass = cn(
 const accountReadonlyInputClass = panelRaisedInputClass;
 
 const settingsNestedWellClass =
-	"rounded-xl border border-border/80 bg-sidebar-accent p-4 shadow-sm dark:border-border dark:bg-foreground/10 md:p-5";
+	"rounded-xl border border-border/80 bg-sidebar-accent p-4 shadow-sm dark:border-border dark:bg-foreground/10 medium:p-5";
 
 function AccountFieldEditButton({
 	tooltipContent,
@@ -907,12 +907,12 @@ export function StudentProfileSettingsForm({
 	});
 	const accountDetails = (
 		<div className={cn(settingsNestedWellClass, "text-base")}>
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<div className="min-w-0 sm:col-span-2">
+			<div className="grid grid-cols-1 gap-4 medium:grid-cols-2">
+				<div className="min-w-0 medium:col-span-2">
 					<LoginEmailField email={loginEmail} isVerified={profile.is_verified} />
 				</div>
 				<AccountReadonlyField
-					className="min-w-0 sm:col-span-2"
+					className="min-w-0 medium:col-span-2"
 					label="Enrollment date"
 					value={enrolled}
 					description="Set when your account was created. This cannot be changed."
@@ -954,7 +954,7 @@ export function StudentProfileSettingsForm({
 					placementEditAriaLabel="Edit elective"
 				/>
 				<AccountReadonlyField
-					className="min-w-0 sm:col-span-2"
+					className="min-w-0 medium:col-span-2"
 					label="School"
 					schoolManaged
 					value={profile.school_name?.trim() || "—"}
@@ -1078,7 +1078,7 @@ export function StudentProfileSettingsForm({
 			<form action={formAction} className="flex flex-col gap-6">
 				<SmoothTab
 					defaultTabId="school"
-					panelClassName="min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm md:px-8 md:py-8 dark:border-border dark:bg-muted/20"
+					panelClassName="min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm medium:px-8 medium:py-8 dark:border-border dark:bg-muted/20"
 					persistContentPanels
 					tabListPosition="top"
 					items={[
@@ -1246,7 +1246,7 @@ export function StudentProfileSettingsForm({
 											</FieldGroup>
 											<Button
 												type="button"
-												className="mt-6 h-11 w-full text-base sm:w-auto"
+												className="mt-6 h-11 w-full text-base medium:w-auto"
 												size="lg"
 												disabled={pwPending}
 												onClick={() => void handleChangePassword()}
@@ -1305,7 +1305,7 @@ export function StudentProfileSettingsForm({
 				<div
 					className={cn(
 						"sticky bottom-0 z-10 -mx-1 mt-2 flex flex-col gap-3 border-t border-border bg-background/95 px-1 py-4 backdrop-blur-md",
-						"supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:items-center sm:justify-between",
+						"supports-[backdrop-filter]:bg-background/80 medium:flex-row medium:items-center medium:justify-between",
 					)}
 				>
 					<p className="text-muted-foreground text-sm leading-relaxed">
@@ -1316,7 +1316,7 @@ export function StudentProfileSettingsForm({
 					<Button
 						type="submit"
 						size="lg"
-						className="h-11 w-full shrink-0 px-6 text-base sm:w-auto"
+						className="h-11 w-full shrink-0 px-6 text-base medium:w-auto"
 					>
 						Save changes
 					</Button>

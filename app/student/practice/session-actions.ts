@@ -4,6 +4,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getAppUrl, getOpenAIChatModel } from "@/lib/env";
 import { practiceGenerationOutputSchema, validateAndStripGeneration } from "@/lib/practice";
 import { consumeAdaptiveFollowupsRateLimit } from "@/lib/practice/practice-rate-limit";
@@ -416,7 +417,8 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 	);
 
 	try {
-		const { object } = await generateObject({
+		const t0 = Date.now();
+		const { object, usage } = await generateObject({
 			model: getOpenAIProvider()(getOpenAIChatModel()),
 			schema: practiceGenerationOutputSchema,
 			system: systemPrompt,
@@ -424,6 +426,15 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 			maxOutputTokens: Math.min(12_000, count * 900),
 			maxRetries: 2,
 			providerOptions: { openai: { strictJsonSchema: false } },
+		});
+		void recordAiCall({
+			feature: "practice.adaptive_followups",
+			model: getOpenAIChatModel(),
+			userId: user.id,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
 		});
 
 		const validation = validateAndStripGeneration(object, count, new Set(topicIds));

@@ -19,22 +19,22 @@ const COUNSELOR_AVATAR = "https://images.unsplash.com/photo-1494790108377-be9c29
 
 export default function FeaturesSection() {
   return (
-    <section id="benefits" className="bg-background py-16 sm:py-20">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="benefits" className="bg-background py-16 medium:py-20">
+      <div className="mx-auto w-full max-w-7xl px-4 medium:px-6 xl:px-8">
         <div className="mx-auto max-w-3xl text-center">
           <Badge variant="outline" className={cn("mb-4", landingMarketingSectionEyebrowBadgeClassName)}>
             Benefits
           </Badge>
-          <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-foreground medium:text-4xl">
             Benefits that compound across student, parent, and teacher workflows
           </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground sm:text-lg">
+          <p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground medium:text-lg">
             Every role sees what matters next, so follow-ups stay timely and progress does not stall.
           </p>
         </div>
 
         <div className="mt-16 grid gap-12">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-3 lg:items-stretch lg:gap-8 xl:gap-10">
+          <div className="grid grid-cols-1 gap-12 xl:grid-cols-3 xl:items-stretch xl:gap-8 xl:gap-10">
             <div className="flex h-full min-h-0 flex-col gap-5">
               <div className={featurePreviewShell}>
                 <MeetingIllustration />

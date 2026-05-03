@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { StudentShell } from "@/components/student/student-shell";
 import { SubscriptionBanner } from "@/components/student/subscription/subscription-banner";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
@@ -21,6 +22,9 @@ export default async function StudentLayout({ children }: { children: React.Reac
 	if (!row || row.role !== "student") {
 		redirect("/login");
 	}
+	if (row.is_suspended) {
+		redirect("/login?suspended=1");
+	}
 
 	const ctx = mapAppProfileToStudentLayoutContext(row, user.email);
 
@@ -28,7 +32,9 @@ export default async function StudentLayout({ children }: { children: React.Reac
 	const displayName = formatPersonDisplayName(ctx.fullName ?? "") || "Student";
 
 	return (
-		<StudentShell
+		<>
+			<AdminImpersonationBanner />
+			<StudentShell
 			organizationName={org}
 			userDisplayName={displayName}
 			shareableId={ctx.studentLinkCode}
@@ -40,5 +46,6 @@ export default async function StudentLayout({ children }: { children: React.Reac
 			<SubscriptionBanner entitlement={entitlement} />
 			{children}
 		</StudentShell>
+		</>
 	);
 }

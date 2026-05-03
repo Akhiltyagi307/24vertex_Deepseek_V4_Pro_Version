@@ -160,6 +160,32 @@ if (!fs.existsSync(nextCli)) {
 }
 
 const devArgs = ["dev", "-H", "localhost", "-p", String(port)];
+// Turbopack default in Next 16 can leave `.next/dev` in a bad state (e.g. missing
+// `chunks/ssr/[turbopack]_runtime.js` while `pages/_document.js` still requires it).
+// `pnpm run dev:clean` fixes that; `NEXT_DEV_WEBPACK=1` opts into webpack dev instead.
+const useWebpack =
+	process.env.NEXT_DEV_WEBPACK === "1" || process.env.NEXT_DEV_WEBPACK === "true";
+if (useWebpack) {
+	devArgs.push("--webpack");
+	console.warn("NEXT_DEV_WEBPACK: using webpack dev (slower but avoids Turbopack chunk glitches).");
+} else {
+	// Turbopack can also leave per-route artifacts missing (e.g. ENOENT on
+	// `.next/dev/server/app/.../build-manifest.json`) after interrupted compiles or
+	// stale processes. Clearing dev output before start avoids that class of errors.
+	const preserve =
+		process.env.NEXT_DEV_PRESERVE_DEV_CACHE === "1" ||
+		process.env.NEXT_DEV_PRESERVE_DEV_CACHE === "true";
+	if (!preserve) {
+		const devOut = resolve(process.cwd(), ".next/dev");
+		try {
+			if (fs.existsSync(devOut)) {
+				fs.rmSync(devOut, { recursive: true, force: true });
+			}
+		} catch (e) {
+			console.warn("Could not remove .next/dev (continuing):", e?.message ?? e);
+		}
+	}
+}
 const env = buildDevEnv();
 
 /**

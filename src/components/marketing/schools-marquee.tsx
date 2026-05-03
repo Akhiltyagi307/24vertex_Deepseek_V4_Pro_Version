@@ -37,7 +37,7 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 	return (
 		<div
 			className={cn(
-				"relative w-full pt-12 sm:pt-14",
+				"relative w-full pt-12 medium:pt-14",
 				caption == null && "border-t border-border/40",
 				className,
 			)}
@@ -48,11 +48,11 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 				Scrolling illustrative names only. These schools are not shown as partners or endorsements of EduAI.
 			</span>
 			<div
-				className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent sm:w-20"
+				className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent medium:w-20"
 				aria-hidden
 			/>
 			<div
-				className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent sm:w-20"
+				className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent medium:w-20"
 				aria-hidden
 			/>
 			<div className="overflow-hidden">
@@ -61,7 +61,7 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 					{looped.map((name, index) => (
 						<span
 							key={`${name}-${index}`}
-							className="me-10 shrink-0 whitespace-nowrap text-sm font-medium tracking-tight text-muted-foreground/50 sm:me-14 sm:text-[0.9375rem]"
+							className="me-10 shrink-0 whitespace-nowrap text-sm font-medium tracking-tight text-muted-foreground/50 medium:me-14 medium:text-[0.9375rem]"
 						>
 							{name}
 						</span>
@@ -69,7 +69,7 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 				</div>
 			</div>
 			{caption != null && caption.length > 0 ? (
-				<p className="text-muted-foreground/75 mx-auto mt-8 max-w-2xl px-4 text-center text-xs leading-relaxed sm:text-[0.8125rem]">
+				<p className="text-muted-foreground/75 mx-auto mt-8 max-w-2xl px-4 text-center text-xs leading-relaxed medium:text-[0.8125rem]">
 					{caption}
 				</p>
 			) : null}

@@ -65,8 +65,8 @@ export function FeaturePerformanceRadial({ compact = false }: FeaturePerformance
 				className={cn(
 					"mx-auto w-full max-w-full [&_.recharts-polar-radius-axis-tick]:hidden [&_.recharts-polar-grid]:opacity-100",
 					compact
-						? "aspect-auto min-h-[9rem] w-full max-w-[min(100%,17.5rem)] sm:min-h-[10rem] sm:max-w-[min(100%,18.5rem)]"
-						: "aspect-auto h-full min-h-[12.5rem] flex-1 sm:min-h-[13.5rem]",
+						? "aspect-auto min-h-[9rem] w-full max-w-[min(100%,17.5rem)] medium:min-h-[10rem] medium:max-w-[min(100%,18.5rem)]"
+						: "aspect-auto h-full min-h-[12.5rem] flex-1 medium:min-h-[13.5rem]",
 				)}
 				initialDimension={compact ? { width: 260, height: 168 } : { width: 320, height: 220 }}
 				aria-label="Illustrative chart: topic, session, and readiness mix with an overall index."
@@ -174,8 +174,8 @@ export function FeaturePerformanceRadial({ compact = false }: FeaturePerformance
 				className={cn(
 					"flex shrink-0 flex-nowrap items-center justify-center gap-y-0.5 px-0.5 tracking-tight",
 					compact
-						? "gap-x-2 sm:gap-x-2.5 text-xs text-[rgb(250,250,250)]"
-						: "text-muted-foreground gap-x-3 text-[11px] font-medium sm:text-xs",
+						? "gap-x-2 medium:gap-x-2.5 text-xs text-[rgb(250,250,250)]"
+						: "text-muted-foreground gap-x-3 text-[11px] font-medium medium:text-xs",
 				)}
 				aria-hidden
 			>

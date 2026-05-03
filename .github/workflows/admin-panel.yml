@@ -1,0 +1,61 @@
+name: Admin panel
+
+# Integration tests in tests/admin/immutability.test.ts and tests/admin/login.test.ts run only when
+# ADMIN_INTEGRATION_TESTS=true plus the relevant secrets/URLs are set (see .env.example).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  admin-phase1-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install
+
+      - name: pnpm audit (high and above; advisory only)
+        continue-on-error: true
+        run: pnpm audit --audit-level=high
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: Admin Phase 6 security checklist (console + optional static grep)
+        run: pnpm run admin:security-phase6
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Vitest (admin unit tests)
+        run: pnpm vitest run tests/admin/auth.test.ts tests/admin/middleware.test.ts tests/admin/maintenance-routing.test.ts tests/admin/datatable-export.test.ts tests/admin/admin-data-table-mobile.test.tsx tests/admin/admin-data-table-states.test.tsx tests/admin/csv-import-diff.test.ts tests/admin/sql-read-only.test.ts tests/admin/sql-write-guard.test.ts tests/admin/digest-week-key.test.ts
+
+      - name: Next build + verify service role not in client static
+        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          export DATABASE_URL="${DATABASE_URL:-postgresql://ci:ci@127.0.0.1:5432/postgres?sslmode=disable}"
+          pnpm run build
+          node scripts/ci-verify-no-service-role-in-next-static.mjs
+
+      - name: Vitest (admin immutability — skips without Supabase env)
+        run: pnpm vitest run tests/admin/immutability.test.ts
+
+      - name: Vitest (admin login — skips without DATABASE_URL)
+        run: pnpm vitest run tests/admin/login.test.ts

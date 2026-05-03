@@ -1,4 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import { APICallError, generateObject, NoObjectGeneratedError, streamObject } from "ai";
+
+import { insertHeuristicModerationFlag, moderatePracticeGenerationText } from "@/lib/ai/moderation";
+import { recordAiCall } from "@/lib/ai/record-ai-call";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { getOpenAIChatModel } from "@/lib/env";
@@ -121,6 +126,7 @@ async function runModelOnce(
 	estimatedQuestionCount: number,
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
 	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject">,
+	studentUserId: string,
 ): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
 	const maxOutputTokens = Math.min(32_000, Math.max(6_000, estimatedQuestionCount * 900));
 	const model = getOpenAIProvider()(getOpenAIChatModel());
@@ -138,8 +144,11 @@ async function runModelOnce(
 		},
 	};
 
+	const chatModelId = getOpenAIChatModel();
+
 	if (opts.useStreamObject) {
 		try {
+			const t0 = Date.now();
 			const result = streamObject(baseParams);
 			const streamPartial = (async () => {
 				if (!opts.onPartialObject) {
@@ -150,6 +159,16 @@ async function runModelOnce(
 				}
 			})();
 			const [object] = await Promise.all([result.object, streamPartial]);
+			const usage = await result.usage;
+			void recordAiCall({
+				feature: "practice.generation",
+				model: chatModelId,
+				userId: studentUserId,
+				inputTokens: usage?.inputTokens ?? 0,
+				outputTokens: usage?.outputTokens ?? 0,
+				latencyMs: Date.now() - t0,
+				status: "ok",
+			});
 			return { ok: true, object: object as PracticeGenerationGroupedOutput };
 		} catch (e) {
 			logServerError("runPracticeGeneration.streamObject", e);
@@ -161,7 +180,17 @@ async function runModelOnce(
 	}
 
 	try {
-		const { object } = await generateObject(baseParams);
+		const t0 = Date.now();
+		const { object, usage } = await generateObject(baseParams);
+		void recordAiCall({
+			feature: "practice.generation",
+			model: chatModelId,
+			userId: studentUserId,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
+		});
 		return { ok: true, object: object as PracticeGenerationGroupedOutput };
 	} catch (e) {
 		logServerError("generatePracticeTest.generateObject", e);
@@ -301,7 +330,14 @@ async function runPracticeGenerationAfterResolveCore(
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
 		const m0 = Date.now();
-		const r = await runModelOnce(systemPrompt, userPrompt, expectedCount, generationOutputSchema, opts);
+		const r = await runModelOnce(
+			systemPrompt,
+			userPrompt,
+			expectedCount,
+			generationOutputSchema,
+			opts,
+			resolved.userId,
+		);
 		cumulativeModelMs += Date.now() - m0;
 		if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
 		const v0 = Date.now();
@@ -323,6 +359,24 @@ async function runPracticeGenerationAfterResolveCore(
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
 		}
+
+		const modBlob = JSON.stringify(flattened.questions);
+		const mod = await moderatePracticeGenerationText(modBlob);
+		if (!mod.ok) {
+			try {
+				await insertHeuristicModerationFlag({
+					entityType: "practice_generation",
+					entityId: randomUUID(),
+					source: mod.source,
+					reason: mod.reason,
+					severity: mod.source === "profanity" ? "high" : "medium",
+				});
+			} catch (e) {
+				logServerError("generatePracticeTest.moderation_flag", e, { correlationId });
+			}
+			return { ok: false, message: "Output blocked by moderation filters.", code: "generation_invalid" };
+		}
+
 		return { ok: true, object: flattened, public: out };
 	}
 
@@ -390,7 +444,7 @@ async function runPracticeGenerationAfterResolveCore(
 		const dedupT0 = Date.now();
 		try {
 			const texts = fullOutput.questions.map((q) => q.question_text);
-			const embeddings = await embedQuestionTexts(texts);
+			const embeddings = await embedQuestionTexts(texts, { userId: resolved.userId });
 			const dupes = await findDuplicatesAgainstStudent(
 				supabase,
 				resolved.userId,

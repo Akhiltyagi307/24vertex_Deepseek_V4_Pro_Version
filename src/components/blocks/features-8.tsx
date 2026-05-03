@@ -26,26 +26,26 @@ const featureBentoCardEyebrowClassName =
 
 export function Features() {
 	return (
-		<section id="features" className="bg-background py-16 sm:py-20">
-			<div className="w-full px-4 sm:px-6 lg:px-8">
+		<section id="features" className="bg-background py-16 medium:py-20">
+			<div className="w-full px-4 medium:px-6 xl:px-8">
 				<div className="mx-auto mb-12 max-w-3xl text-center">
 					<Badge variant="outline" className={cn("mb-4", landingMarketingSectionEyebrowBadgeClassName)}>
 						Features
 					</Badge>
-					<h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+					<h2 className="text-3xl font-semibold tracking-tight text-foreground medium:text-4xl">
 						Platform features built for measurable learning outcomes
 					</h2>
-					<p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground sm:text-lg">
+					<p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground medium:text-lg">
 						Designed to improve student clarity, parent visibility, and teacher action with one
 						connected workflow.
 					</p>
 				</div>
-				<div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+				<div className="grid grid-cols-1 gap-3 medium:grid-cols-6">
 					<GlowCard
 						glowColor="green"
 						customSize
 						className={cn(
-							"h-full md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
+							"h-full medium:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -54,18 +54,18 @@ export function Features() {
 								<BarChart3 className="size-3.5 text-[#3ECF8E]" />
 								Progress analytics
 							</div>
-							<div className="border-border bg-muted/45 relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[15px] border p-2 sm:p-3">
-								<div className="absolute left-2 top-1.5 flex gap-1 sm:left-3 sm:top-2">
+							<div className="border-border bg-muted/45 relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[15px] border p-2 medium:p-3">
+								<div className="absolute left-2 top-1.5 flex gap-1 medium:left-3 medium:top-2">
 									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
 									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
 									<span className="bg-muted-foreground/45 block size-1.5 rounded-full" />
 								</div>
-								<div className="flex min-h-0 flex-1 items-center justify-center px-1 py-2 sm:px-2 sm:py-3">
+								<div className="flex min-h-0 flex-1 items-center justify-center px-1 py-2 medium:px-2 medium:py-3">
 									<FeaturePerformanceRadial compact />
 								</div>
 							</div>
 							<div className="shrink-0">
-								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+								<h3 className={cn("text-xl font-semibold medium:text-2xl", featureCardTitleClassName)}>
 									Performance clarity
 								</h3>
 								<p className="text-muted-foreground mt-2 text-sm">
@@ -79,7 +79,7 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"h-full md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
+							"h-full medium:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -99,7 +99,7 @@ export function Features() {
 								</div>
 							</div>
 							<div className="shrink-0">
-								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+								<h3 className={cn("text-xl font-semibold medium:text-2xl", featureCardTitleClassName)}>
 									Secure by default
 								</h3>
 								<p className="text-muted-foreground mt-2 text-sm">
@@ -113,7 +113,7 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"h-full md:col-span-2 min-h-[300px] sm:min-h-[320px] overflow-hidden rounded-[12px] border",
+							"h-full medium:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -126,7 +126,7 @@ export function Features() {
 								<FeatureInterventionRadar />
 							</div>
 							<div className="shrink-0">
-								<h3 className={cn("text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+								<h3 className={cn("text-xl font-semibold medium:text-2xl", featureCardTitleClassName)}>
 									Faster intervention loops
 								</h3>
 								<p className="text-muted-foreground mt-2 text-sm">
@@ -140,7 +140,7 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"relative bg-transparent md:col-span-3 min-h-[240px] sm:min-h-[260px] overflow-hidden rounded-[12px] border",
+							"relative bg-transparent medium:col-span-3 min-h-[240px] medium:min-h-[260px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -163,18 +163,18 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"md:col-span-3 min-h-[240px] sm:min-h-[260px] overflow-hidden rounded-[12px] border",
+							"medium:col-span-3 min-h-[240px] medium:min-h-[260px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
-						<div className="relative z-10 grid h-full gap-5 sm:grid-cols-2">
+						<div className="relative z-10 grid h-full gap-5 medium:grid-cols-2">
 							<div className="flex flex-col justify-between">
 								<div className={featureBentoCardEyebrowClassName}>
 									<Users className="size-3.5 text-[#3ECF8E]" />
 									Student-parent-teacher sync
 								</div>
 								<div>
-									<h3 className={cn("mt-4 text-xl font-semibold sm:text-2xl", featureCardTitleClassName)}>
+									<h3 className={cn("mt-4 text-xl font-semibold medium:text-2xl", featureCardTitleClassName)}>
 										Shared accountability
 									</h3>
 									<p className="text-muted-foreground mt-2 text-sm">

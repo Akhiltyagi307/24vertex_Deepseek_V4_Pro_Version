@@ -50,10 +50,10 @@ export function SubjectTopicRadarChart({
 
 	const legendRowClass =
 		variant === "marketing"
-			? "mt-1 gap-3 text-xs text-[rgb(250,250,250)] sm:gap-4"
+			? "mt-1 gap-3 text-xs text-[rgb(250,250,250)] medium:gap-4"
 			: fillHeight
-				? "mt-0.5 gap-2 text-[0.6875rem] text-muted-foreground sm:gap-3 sm:text-xs"
-				: "mt-1 gap-3 text-xs text-muted-foreground sm:gap-4";
+				? "mt-0.5 gap-2 text-[0.6875rem] text-muted-foreground medium:gap-3 medium:text-xs"
+				: "mt-1 gap-3 text-xs text-muted-foreground medium:gap-4";
 
 	const tickFontSize = data.length > 10 ? 8 : data.length > 7 ? 9 : 10;
 
@@ -69,7 +69,7 @@ export function SubjectTopicRadarChart({
 			className={cn(
 				fillHeight
 					? "mx-auto h-full min-h-0 w-full max-w-none flex-1 items-start justify-center aspect-auto"
-					: "mx-auto w-full max-w-[min(100%,260px)] aspect-[5/4] max-h-[200px] sm:max-h-[220px]",
+					: "mx-auto w-full max-w-[min(100%,260px)] aspect-[5/4] max-h-[200px] medium:max-h-[220px]",
 				"[&_.recharts-polar-angle-axis-tick_text]:fill-muted-foreground",
 				legendTickClass,
 				className,

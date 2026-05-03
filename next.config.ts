@@ -106,7 +106,20 @@ const nextConfig: NextConfig = {
 			});
 		}
 
+		const robotsAdmin: { key: string; value: string } = {
+			key: "X-Robots-Tag",
+			value: "noindex, nofollow",
+		};
+
 		return [
+			{
+				source: "/admin/:path*",
+				headers: [...base, robotsAdmin],
+			},
+			{
+				source: "/api/admin/:path*",
+				headers: [...base, robotsAdmin],
+			},
 			{
 				source: "/:path*",
 				headers: base,

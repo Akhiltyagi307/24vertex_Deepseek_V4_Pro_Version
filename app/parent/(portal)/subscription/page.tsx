@@ -115,11 +115,11 @@ export default async function ParentSubscriptionPage() {
 		: "";
 
 	return (
-		<div className="w-full min-w-0 py-6 sm:py-8">
+		<div className="w-full min-w-0 py-6 medium:py-8">
 			<main className="min-w-0">
 				<PageStaggerRoot
 					enableLift={false}
-					className="flex w-full min-w-0 flex-col gap-6 sm:gap-8"
+					className="flex w-full min-w-0 flex-col gap-6 medium:gap-8"
 					sections={[
 						{
 							key: "header",

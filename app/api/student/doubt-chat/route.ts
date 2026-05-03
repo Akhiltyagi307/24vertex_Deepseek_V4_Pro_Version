@@ -1,8 +1,10 @@
 import { convertToModelMessages, type UIMessage, streamText } from "ai";
 import { z } from "zod";
 
-import { buildDoubtSystemPrompt } from "@/lib/ai/doubt-system-prompt";
+import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/doubt-prompt-templates";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { recordAiCall } from "@/lib/ai/record-ai-call";
+import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
 import { getOpenAIChatModel } from "@/lib/env";
@@ -106,7 +108,12 @@ export async function POST(req: Request) {
 	}
 
 	const modelId = getOpenAIChatModel();
-	const system = buildDoubtSystemPrompt(scope, tutorMode);
+	const doubtFeature = tutorMode === "explain" ? "doubt.explain" : "doubt.solve_with_me";
+	const dbPrompt = await getActiveAiPrompt(doubtFeature);
+	const templateSrc = dbPrompt?.template?.trim()
+		? dbPrompt.template
+		: getDoubtModeTemplate(tutorMode);
+	const system = interpolateDoubtPromptTemplate(templateSrc, scope);
 
 	const { data: existing, error: findErr } = await supabase
 		.from("doubt_conversations")
@@ -173,6 +180,7 @@ export async function POST(req: Request) {
 		});
 	}
 
+	const streamStartedAt = Date.now();
 	const result = streamText({
 		model: getOpenAIProvider().chat(modelId),
 		system,
@@ -180,6 +188,16 @@ export async function POST(req: Request) {
 		onFinish: async ({ text, totalUsage, finishReason }) => {
 			const promptT = totalUsage?.inputTokens ?? null;
 			const compT = totalUsage?.outputTokens ?? null;
+			void recordAiCall({
+				feature: "doubt.chat",
+				model: modelId,
+				userId: user.id,
+				promptId: dbPrompt?.id ?? null,
+				inputTokens: promptT ?? 0,
+				outputTokens: compT ?? 0,
+				latencyMs: Date.now() - streamStartedAt,
+				status: "ok",
+			});
 			// Bill only normal completions (not provider errors, aborts, or tool loops).
 			const billableTurn = finishReason === "stop" || finishReason === "length";
 			const { error: asstErr } = await supabase.from("doubt_messages").insert({

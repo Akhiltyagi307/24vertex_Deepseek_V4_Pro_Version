@@ -251,7 +251,7 @@ export function StudentReportsView({
 	const { container, item } = useReportsStaggerVariants();
 
 	return (
-		<div className="flex w-full min-w-0 flex-col gap-8 py-6 pb-28 md:py-8">
+		<div className="flex w-full min-w-0 flex-col gap-8 py-6 pb-28 medium:py-8">
 			<motion.header
 				className="flex shrink-0 flex-col gap-1.5"
 				initial="hidden"
@@ -284,7 +284,7 @@ export function StudentReportsView({
 
 			<motion.section
 				aria-labelledby="report-stats-heading"
-				className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+				className="grid gap-4 medium:grid-cols-2 xl:grid-cols-5"
 				initial="hidden"
 				animate="show"
 				variants={container}
@@ -406,8 +406,8 @@ export function StudentReportsView({
 				</div>
 				<Card className="overflow-hidden p-0 shadow-none">
 						<div className="p-[22px]">
-							<div className="flex flex-col gap-6 md:flex-row md:items-stretch">
-						<div className="flex min-w-0 flex-1 flex-col gap-3 md:min-h-0">
+							<div className="flex flex-col gap-6 medium:flex-row medium:items-stretch">
+						<div className="flex min-w-0 flex-1 flex-col gap-3 medium:min-h-0">
 							<Label htmlFor="report-search" className="text-foreground text-sm font-medium">
 								Search
 							</Label>
@@ -427,19 +427,19 @@ export function StudentReportsView({
 										else p.delete("q");
 									});
 								}}
-								className="box-border h-8 w-1/2 min-w-0 max-w-[50%] md:mt-auto"
+								className="box-border h-8 w-1/2 min-w-0 max-w-[50%] medium:mt-auto"
 								autoComplete="off"
 							/>
 						</div>
 
-						<div className="flex min-w-0 flex-1 flex-col gap-3 border-border border-t pt-6 md:min-h-0 md:border-t-0 md:border-l md:pl-8 md:pt-0">
+						<div className="flex min-w-0 flex-1 flex-col gap-3 border-border border-t pt-6 medium:min-h-0 medium:border-t-0 medium:border-l medium:pl-8 medium:pt-0">
 							<p className="m-0 text-foreground text-sm font-medium leading-none">Filter and Sort</p>
 							<p className="m-0 text-muted-foreground text-xs leading-relaxed">
 								<span className="font-medium text-foreground">Filters</span> and{" "}
 								<span className="font-medium text-foreground">Sort</span> open as floating panels over the
 								page. Opening one closes the other.
 							</p>
-							<div className="flex w-1/2 min-w-0 max-w-[50%] gap-3 md:mt-auto">
+							<div className="flex w-1/2 min-w-0 max-w-[50%] gap-3 medium:mt-auto">
 								<div className="flex min-w-0 flex-1 basis-0">
 									<Popover
 										open={filtersOpen}
@@ -490,7 +490,7 @@ export function StudentReportsView({
 													icon={Library}
 													value={subjectFilter}
 													options={subjectPillOptions}
-													className="w-full max-w-none sm:w-full"
+													className="w-full max-w-none medium:w-full"
 													onValueChange={(v) => {
 														replaceQuery((p) => {
 															if (v) p.set("subject", v);
@@ -514,7 +514,7 @@ export function StudentReportsView({
 														{ value: "hard", label: "Hard" },
 														{ value: "mixed", label: "Mixed" },
 													]}
-													className="w-full max-w-none sm:w-full"
+													className="w-full max-w-none medium:w-full"
 													onValueChange={(v) => {
 														replaceQuery((p) => {
 															if (v) p.set("difficulty", v);
@@ -536,7 +536,7 @@ export function StudentReportsView({
 														{ value: "submitted", label: "Submitted" },
 														{ value: "graded", label: "Graded" },
 													]}
-													className="w-full max-w-none sm:w-full"
+													className="w-full max-w-none medium:w-full"
 													onValueChange={(v) => {
 														replaceQuery((p) => {
 															if (v) p.set("outcome", v);
@@ -607,7 +607,7 @@ export function StudentReportsView({
 														{ value: "status", label: "Status" },
 														{ value: "type", label: "Test type" },
 													]}
-													className="w-full max-w-none sm:w-full"
+													className="w-full max-w-none medium:w-full"
 													onValueChange={(v) => {
 														replaceQuery((p) => {
 															p.set("sort", v);
@@ -627,7 +627,7 @@ export function StudentReportsView({
 														{ value: "desc", label: "Descending" },
 														{ value: "asc", label: "Ascending" },
 													]}
-													className="w-full max-w-none sm:w-full"
+													className="w-full max-w-none medium:w-full"
 													onValueChange={(v) => {
 														replaceQuery((p) => {
 															p.set("dir", v);

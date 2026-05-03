@@ -7,6 +7,7 @@ export type ProfileRow = {
 	id: string;
 	role: string;
 	is_verified: boolean | null;
+	is_suspended: boolean | null;
 };
 
 /**
@@ -16,7 +17,7 @@ export type ProfileRow = {
 export async function getProfile(): Promise<ProfileRow | null> {
 	const row = await getCachedAppProfileRow();
 	if (!row) return null;
-	return { id: row.id, role: row.role, is_verified: row.is_verified };
+	return { id: row.id, role: row.role, is_verified: row.is_verified, is_suspended: row.is_suspended };
 }
 
 /** Where to send a signed-in user (dashboard or onboarding). */

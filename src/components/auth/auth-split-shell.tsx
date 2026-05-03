@@ -33,7 +33,7 @@ export function AuthSplitShell({ children }: { children: React.ReactNode }) {
 			>
 				<Boxes />
 			</div>
-			<div className="relative z-10 flex min-h-0 flex-1 flex-col p-6 md:p-10 pointer-events-none">
+			<div className="relative z-10 flex min-h-0 flex-1 flex-col p-6 medium:p-10 pointer-events-none">
 				<AuthSplitShellMotion logo={logo}>{children}</AuthSplitShellMotion>
 			</div>
 		</div>

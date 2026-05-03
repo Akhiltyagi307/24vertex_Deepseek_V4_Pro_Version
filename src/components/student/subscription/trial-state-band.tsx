@@ -64,7 +64,7 @@ export function TrialStateBand({ entitlement, className }: Props) {
 		<section
 			aria-labelledby="trial-state-title"
 			className={cn(
-				"relative overflow-hidden rounded-xl border border-primary/25 bg-primary/[0.04] p-5 md:p-6",
+				"relative overflow-hidden rounded-xl border border-primary/25 bg-primary/[0.04] p-5 medium:p-6",
 				className,
 			)}
 		>
@@ -73,7 +73,7 @@ export function TrialStateBand({ entitlement, className }: Props) {
 				className="pointer-events-none absolute -top-16 -right-16 size-40 rounded-full bg-primary/[0.08] blur-2xl"
 			/>
 
-			<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
+			<div className="flex flex-col gap-4 medium:flex-row medium:items-center medium:justify-between medium:gap-8">
 				<div className="flex min-w-0 flex-col gap-1">
 					<p className="font-mono text-[11px] uppercase tracking-wider text-primary/80">
 						Free trial
@@ -91,11 +91,11 @@ export function TrialStateBand({ entitlement, className }: Props) {
 				<TrialRing
 					daysLeft={daysLeft}
 					daysTotal={TRIAL_TOTAL_DAYS}
-					className="text-foreground md:mr-2"
+					className="text-foreground medium:mr-2"
 				/>
 			</div>
 
-			<div className="mt-5 grid gap-4 sm:grid-cols-2">
+			<div className="mt-5 grid gap-4 medium:grid-cols-2">
 				<MiniMeter
 					label="Practice tests"
 					used={entitlement.testsUsed}

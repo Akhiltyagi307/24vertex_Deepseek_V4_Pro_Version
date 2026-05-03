@@ -51,7 +51,7 @@ export function AppHeaderBrandTrail({
 	return (
 		<nav
 			aria-label="App context"
-			className="flex min-w-0 max-w-full items-center gap-x-1.5 text-sm md:gap-x-3"
+			className="flex min-w-0 max-w-full items-center gap-x-1.5 text-sm medium:gap-x-3"
 		>
 			{omitLogo ? null : (
 				<>
@@ -165,20 +165,20 @@ function CopyableShareableIdSegment({
 						aria-label={ariaLabel}
 						className={cn(
 							"flex cursor-pointer items-center rounded-sm border-0 bg-transparent outline-none",
-							"max-md:min-h-11 max-md:min-w-11 max-md:shrink-0 max-md:justify-center max-md:rounded-md max-md:p-0",
+							"max-medium:min-h-11 max-medium:min-w-11 max-medium:shrink-0 max-medium:justify-center max-medium:rounded-md max-medium:p-0",
 							"hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-							"md:min-w-0 md:max-w-full md:justify-start md:gap-2 md:p-0 md:text-left",
+							"medium:min-w-0 medium:max-w-full medium:justify-start medium:gap-2 medium:p-0 medium:text-left",
 						)}
 					>
 						<IdCardIcon
-							className={cn(iconClassName, "max-md:size-4")}
+							className={cn(iconClassName, "max-medium:size-4")}
 							strokeWidth={2}
 							aria-hidden
 						/>
 						<span
 							className={cn(
 								textClassName,
-								"hidden min-w-0 font-mono tabular-nums tracking-tight md:block",
+								"hidden min-w-0 font-mono tabular-nums tracking-tight medium:block",
 							)}
 						>
 							<span className="truncate">{shareableId}</span>
@@ -187,7 +187,7 @@ function CopyableShareableIdSegment({
 							{copied ? (
 								<motion.span
 									key="shareable-id-copied-badge"
-									className="hidden shrink-0 md:inline-flex"
+									className="hidden shrink-0 medium:inline-flex"
 									initial={
 										reduceMotion
 											? { opacity: 0 }

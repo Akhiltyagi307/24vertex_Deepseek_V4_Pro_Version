@@ -80,7 +80,7 @@ export function SubscriptionBanner({ entitlement }: { entitlement: EntitlementSn
 	return (
 		<div
 			className={cn(
-				"flex shrink-0 flex-col items-start gap-2 border-b py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4",
+				"flex shrink-0 flex-col items-start gap-2 border-b py-2.5 text-sm medium:flex-row medium:items-center medium:gap-4",
 				immersiveShell ? "px-4" : "px-0",
 				toneClasses[banner.tone],
 			)}

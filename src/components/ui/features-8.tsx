@@ -17,15 +17,15 @@ export function Features() {
 	const g3 = `${rid}-paint3`;
 
 	return (
-		<section id="features" className="border-b border-border/60 bg-background py-20 md:py-36">
-			<div className="mx-auto w-full min-w-0 max-w-none px-4 sm:px-6 2xl:px-10">
+		<section id="features" className="border-b border-border/60 bg-background py-20 medium:py-36">
+			<div className="mx-auto w-full min-w-0 max-w-none px-4 medium:px-6 xl:px-10">
 				<div className="relative">
-					<div className="relative z-10 grid grid-cols-6 gap-4 md:gap-5 lg:gap-6">
+					<div className="relative z-10 grid grid-cols-6 gap-4 medium:gap-5 xl:gap-6">
 						<Card
-							className={`relative col-span-full flex overflow-hidden text-base lg:col-span-2 ${cardReset}`}
+							className={`relative col-span-full flex overflow-hidden text-base xl:col-span-2 ${cardReset}`}
 						>
-							<CardContent className="relative m-auto size-fit px-2 pt-8 sm:px-4 sm:pt-10">
-								<div className="relative flex h-28 w-64 items-center sm:h-32 sm:w-72 md:h-36 md:w-80">
+							<CardContent className="relative m-auto size-fit px-2 pt-8 medium:px-4 medium:pt-10">
+								<div className="relative flex h-28 w-64 items-center medium:h-32 medium:w-72 medium:h-36 medium:w-80">
 									<svg
 										className="text-muted pointer-events-none absolute inset-0 size-full"
 										viewBox="0 0 254 104"
@@ -38,18 +38,18 @@ export function Features() {
 											fill="currentColor"
 										/>
 									</svg>
-									<span className="relative z-10 mx-auto block w-fit text-6xl font-semibold sm:text-7xl">100%</span>
+									<span className="relative z-10 mx-auto block w-fit text-6xl font-semibold medium:text-7xl">100%</span>
 								</div>
-								<h2 className="mt-8 text-center text-3xl font-semibold sm:text-4xl">Customizable</h2>
+								<h2 className="mt-8 text-center text-3xl font-semibold medium:text-4xl">Customizable</h2>
 							</CardContent>
 						</Card>
 						<Card
-							className={`relative col-span-full overflow-hidden text-base sm:col-span-3 lg:col-span-2 ${cardReset}`}
+							className={`relative col-span-full overflow-hidden text-base medium:col-span-3 xl:col-span-2 ${cardReset}`}
 						>
-							<CardContent className="px-2 pt-8 sm:px-4 sm:pt-10">
-								<div className="relative mx-auto flex aspect-square size-36 rounded-full border before:absolute before:-inset-2 before:rounded-full before:border sm:size-40 md:size-44 dark:border-white/10 dark:before:border-white/5">
+							<CardContent className="px-2 pt-8 medium:px-4 medium:pt-10">
+								<div className="relative mx-auto flex aspect-square size-36 rounded-full border before:absolute before:-inset-2 before:rounded-full before:border medium:size-40 medium:size-44 dark:border-white/10 dark:before:border-white/5">
 									<svg
-										className="m-auto h-fit w-28 sm:w-32"
+										className="m-auto h-fit w-28 medium:w-32"
 										viewBox="0 0 212 143"
 										fill="none"
 										xmlns="http://www.w3.org/2000/svg"
@@ -96,10 +96,10 @@ export function Features() {
 									</svg>
 								</div>
 								<div className="relative z-10 mt-8 space-y-3 text-center">
-									<h2 className="group-hover:text-secondary-950 text-xl font-medium transition sm:text-2xl dark:text-white">
+									<h2 className="group-hover:text-secondary-950 text-xl font-medium transition medium:text-2xl dark:text-white">
 										Secure by default
 									</h2>
-									<p className="text-foreground text-base sm:text-lg">
+									<p className="text-foreground text-base medium:text-lg">
 										Provident fugit and vero voluptate. magnam magni doloribus dolores voluptates a
 										sapiente nisi.
 									</p>
@@ -107,10 +107,10 @@ export function Features() {
 							</CardContent>
 						</Card>
 						<Card
-							className={`relative col-span-full overflow-hidden text-base sm:col-span-3 lg:col-span-2 ${cardReset}`}
+							className={`relative col-span-full overflow-hidden text-base medium:col-span-3 xl:col-span-2 ${cardReset}`}
 						>
-							<CardContent className="px-2 pt-8 sm:px-4 sm:pt-10">
-								<div className="pt-2 lg:px-8 lg:pt-4">
+							<CardContent className="px-2 pt-8 medium:px-4 medium:pt-10">
+								<div className="pt-2 xl:px-8 xl:pt-4">
 									<svg
 										className="w-full dark:text-muted-foreground"
 										viewBox="0 0 386 123"
@@ -187,38 +187,38 @@ export function Features() {
 										</defs>
 									</svg>
 								</div>
-								<div className="relative z-10 mt-16 space-y-3 text-center sm:mt-20">
-									<h2 className="text-xl font-medium transition sm:text-2xl">Faster than light</h2>
-									<p className="text-foreground text-base sm:text-lg">
+								<div className="relative z-10 mt-16 space-y-3 text-center medium:mt-20">
+									<h2 className="text-xl font-medium transition medium:text-2xl">Faster than light</h2>
+									<p className="text-foreground text-base medium:text-lg">
 										Provident fugit vero voluptate. magnam magni doloribus dolores voluptates inventore
 										nisi.
 									</p>
 								</div>
 							</CardContent>
 						</Card>
-						<Card className={`relative col-span-full overflow-hidden text-base lg:col-span-3 ${cardReset}`}>
-							<CardContent className="grid px-2 pt-8 sm:grid-cols-2 sm:px-4 sm:pt-10">
-								<div className="relative z-10 flex flex-col justify-between space-y-10 sm:space-y-12 lg:space-y-8">
-									<div className="relative flex aspect-square size-14 rounded-full border before:absolute before:-inset-2 before:rounded-full before:border sm:size-16 dark:border-white/10 dark:before:border-white/5">
+						<Card className={`relative col-span-full overflow-hidden text-base xl:col-span-3 ${cardReset}`}>
+							<CardContent className="grid px-2 pt-8 medium:grid-cols-2 medium:px-4 medium:pt-10">
+								<div className="relative z-10 flex flex-col justify-between space-y-10 medium:space-y-12 xl:space-y-8">
+									<div className="relative flex aspect-square size-14 rounded-full border before:absolute before:-inset-2 before:rounded-full before:border medium:size-16 dark:border-white/10 dark:before:border-white/5">
 										<Shield className="m-auto size-6" strokeWidth={1} />
 									</div>
 									<div className="space-y-3">
-										<h2 className="group-hover:text-secondary-950 text-xl font-medium text-zinc-800 transition sm:text-2xl dark:text-white">
+										<h2 className="group-hover:text-secondary-950 text-xl font-medium text-zinc-800 transition medium:text-2xl dark:text-white">
 											Faster than light
 										</h2>
-										<p className="text-foreground text-base sm:text-lg">
+										<p className="text-foreground text-base medium:text-lg">
 											Provident fugit vero voluptate. Voluptates a sapiente inventore nisi.
 										</p>
 									</div>
 								</div>
-								<div className="rounded-tl-(--radius) relative -mb-6 -mr-6 mt-6 h-fit border-l border-t p-8 py-8 sm:ml-6 md:p-10">
+								<div className="rounded-tl-(--radius) relative -mb-6 -mr-6 mt-6 h-fit border-l border-t p-8 py-8 medium:ml-6 medium:p-10">
 									<div className="absolute left-3 top-2 flex gap-1">
 										<span className="block size-2 rounded-full border dark:border-white/10 dark:bg-white/10" />
 										<span className="block size-2 rounded-full border dark:border-white/10 dark:bg-white/10" />
 										<span className="block size-2 rounded-full border dark:border-white/10 dark:bg-white/10" />
 									</div>
 									<svg
-										className="w-full sm:w-[150%]"
+										className="w-full medium:w-[150%]"
 										viewBox="0 0 366 231"
 										fill="none"
 										xmlns="http://www.w3.org/2000/svg"
@@ -258,24 +258,24 @@ export function Features() {
 								</div>
 							</CardContent>
 						</Card>
-						<Card className={`relative col-span-full overflow-hidden text-base lg:col-span-3 ${cardReset}`}>
-							<CardContent className="grid h-full px-2 pt-8 sm:grid-cols-2 sm:px-4 sm:pt-10">
-								<div className="relative z-10 flex flex-col justify-between space-y-10 sm:space-y-12 lg:space-y-8">
-									<div className="relative flex aspect-square size-14 rounded-full border before:absolute before:-inset-2 before:rounded-full before:border sm:size-16 dark:border-white/10 dark:before:border-white/5">
+						<Card className={`relative col-span-full overflow-hidden text-base xl:col-span-3 ${cardReset}`}>
+							<CardContent className="grid h-full px-2 pt-8 medium:grid-cols-2 medium:px-4 medium:pt-10">
+								<div className="relative z-10 flex flex-col justify-between space-y-10 medium:space-y-12 xl:space-y-8">
+									<div className="relative flex aspect-square size-14 rounded-full border before:absolute before:-inset-2 before:rounded-full before:border medium:size-16 dark:border-white/10 dark:before:border-white/5">
 										<Users className="m-auto size-7" strokeWidth={1} />
 									</div>
 									<div className="space-y-3">
-										<h2 className="text-xl font-medium transition sm:text-2xl">Keep your loved ones safe</h2>
-										<p className="text-foreground text-base sm:text-lg">
+										<h2 className="text-xl font-medium transition medium:text-2xl">Keep your loved ones safe</h2>
+										<p className="text-foreground text-base medium:text-lg">
 											Voluptate. magnam magni doloribus dolores voluptates a sapiente inventore nisi.
 										</p>
 									</div>
 								</div>
-								<div className="before:bg-(--color-border) relative mt-6 before:absolute before:inset-0 before:mx-auto before:w-px sm:-my-6 sm:-mr-6">
-									<div className="relative flex h-full flex-col justify-center space-y-8 py-8 sm:space-y-10 sm:py-10">
+								<div className="before:bg-(--color-border) relative mt-6 before:absolute before:inset-0 before:mx-auto before:w-px medium:-my-6 medium:-mr-6">
+									<div className="relative flex h-full flex-col justify-center space-y-8 py-8 medium:space-y-10 medium:py-10">
 										<div className="relative flex w-[calc(50%+0.875rem)] items-center justify-end gap-3">
 											<span className="block h-fit rounded border px-2.5 py-1.5 text-sm shadow-sm">Likeur</span>
-											<div className="ring-background size-9 ring-[6px] sm:size-10">
+											<div className="ring-background size-9 ring-[6px] medium:size-10">
 												<img
 													className="size-full rounded-full"
 													src="https://avatars.githubusercontent.com/u/102558960?v=4"
@@ -284,7 +284,7 @@ export function Features() {
 											</div>
 										</div>
 										<div className="relative ml-[calc(50%-1rem)] flex items-center gap-3">
-											<div className="ring-background size-10 ring-[6px] sm:size-11">
+											<div className="ring-background size-10 ring-[6px] medium:size-11">
 												<img
 													className="size-full rounded-full"
 													src="https://avatars.githubusercontent.com/u/47919550?v=4"
@@ -295,7 +295,7 @@ export function Features() {
 										</div>
 										<div className="relative flex w-[calc(50%+0.875rem)] items-center justify-end gap-3">
 											<span className="block h-fit rounded border px-2.5 py-1.5 text-sm shadow-sm">B. Ng</span>
-											<div className="ring-background size-9 ring-[6px] sm:size-10">
+											<div className="ring-background size-9 ring-[6px] medium:size-10">
 												<img
 													className="size-full rounded-full"
 													src="https://avatars.githubusercontent.com/u/31113941?v=4"

@@ -216,8 +216,8 @@ export function PracticeGradingProgressView({
 	const showStuckNudge = phase === "grading" && elapsedSeconds >= STUCK_REQUEUE_AFTER_SECONDS;
 
 	return (
-		<div className="flex min-h-[calc(100dvh-8rem)] w-full min-w-0 flex-col items-center justify-center gap-6 p-6 sm:p-8">
-			<Card className="w-full min-w-0 max-w-full bg-card/80 shadow-md sm:w-[45%] dark:shadow-none">
+		<div className="flex min-h-[calc(100dvh-8rem)] w-full min-w-0 flex-col items-center justify-center gap-6 p-6 medium:p-8">
+			<Card className="w-full min-w-0 max-w-full bg-card/80 shadow-md medium:w-[45%] dark:shadow-none">
 				<CardHeader className="gap-2 border-b border-border/60 pb-6">
 					<div className="flex items-center gap-2">
 						<SparklesIcon className="size-4 text-primary" aria-hidden />
@@ -270,7 +270,7 @@ export function PracticeGradingProgressView({
 										type="button"
 										variant="outline"
 										size="default"
-										className="w-full sm:w-auto"
+										className="w-full medium:w-auto"
 										disabled={actionBusy}
 										onClick={() => void runRequeue()}
 									>
@@ -322,7 +322,7 @@ export function PracticeGradingProgressView({
 							<Button
 								type="button"
 								size="lg"
-								className="w-full sm:w-auto"
+								className="w-full medium:w-auto"
 								disabled={actionBusy}
 								onClick={() => void runRequeue({ resetSessionClock: true })}
 							>

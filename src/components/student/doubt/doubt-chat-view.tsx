@@ -269,7 +269,7 @@ function EmptyState({
 	onPick: (text: string) => void;
 }) {
 	return (
-		<div className="flex w-full flex-col items-center gap-4 pt-4 sm:pt-8">
+		<div className="flex w-full flex-col items-center gap-4 pt-4 medium:pt-8">
 			<div className="flex w-full min-w-0 max-w-[50%] flex-col items-center gap-4 text-center">
 				<div className="min-w-0 w-full space-y-1.5">
 					<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
@@ -434,7 +434,7 @@ function DoubtChatThread({
 
 	return (
 		<div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
-			<header className="border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-10 shrink-0 border-b px-4 py-2.5 backdrop-blur sm:px-6">
+			<header className="border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-10 shrink-0 border-b px-4 py-2.5 backdrop-blur medium:px-6">
 				<div className="flex w-full min-w-0 items-center gap-3">
 					<div
 						aria-hidden
@@ -453,7 +453,7 @@ function DoubtChatThread({
 					</div>
 					<span
 						className={cn(
-							"hidden shrink-0 items-center gap-1.5 rounded-full border bg-emerald-500/5 px-2 py-0.5 text-[10.5px] font-medium tracking-wide uppercase sm:inline-flex",
+							"hidden shrink-0 items-center gap-1.5 rounded-full border bg-emerald-500/5 px-2 py-0.5 text-[10.5px] font-medium tracking-wide uppercase medium:inline-flex",
 							"border-emerald-500/25 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-300",
 						)}
 					>
@@ -469,7 +469,7 @@ function DoubtChatThread({
 					className="min-h-0 h-full overflow-y-auto overscroll-y-contain"
 					aria-label="Conversation messages"
 				>
-					<div className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+					<div className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 medium:px-6 medium:py-8">
 						{empty ? (
 							<EmptyState
 								topicName={topicName}
@@ -486,7 +486,7 @@ function DoubtChatThread({
 								return (
 									<div
 										key={m.id}
-										className="group/msg flex w-full min-w-0 justify-end pl-10 sm:pl-16"
+										className="group/msg flex w-full min-w-0 justify-end pl-10 medium:pl-16"
 									>
 										<div
 											className={cn(
@@ -503,7 +503,7 @@ function DoubtChatThread({
 							return (
 								<div
 									key={m.id}
-									className="group/msg flex w-full min-w-0 items-start gap-3 pr-2 sm:pr-6"
+									className="group/msg flex w-full min-w-0 items-start gap-3 pr-2 medium:pr-6"
 								>
 									<div
 										aria-hidden
@@ -521,7 +521,7 @@ function DoubtChatThread({
 						})}
 
 						{thinking && !lastAssistantIsStreaming ? (
-							<div className="flex w-full min-w-0 items-start gap-3 pr-2 sm:pr-6">
+							<div className="flex w-full min-w-0 items-start gap-3 pr-2 medium:pr-6">
 								<div
 									aria-hidden
 									className="border-emerald-500/30 bg-emerald-500/10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border text-emerald-600 dark:text-emerald-400"
@@ -557,7 +557,7 @@ function DoubtChatThread({
 				) : null}
 			</div>
 
-			<div className="shrink-0 px-4 pt-1 pb-4 sm:px-6">
+			<div className="shrink-0 px-4 pt-1 pb-4 medium:px-6">
 				<div className="mx-auto w-full min-w-0 max-w-full">
 					{error ? (
 						<Alert variant="destructive" className="mb-3 w-full min-w-0 rounded-xl">
@@ -588,7 +588,7 @@ function DoubtChatThread({
 									<SelectTrigger
 										id="doubt-tutor-mode"
 										aria-label="Tutor mode"
-										className="border-input bg-background h-9 min-w-0 max-w-[10.5rem] shrink sm:min-w-[9.5rem] sm:max-w-[14rem]"
+										className="border-input bg-background h-9 min-w-0 max-w-[10.5rem] shrink medium:min-w-[9.5rem] medium:max-w-[14rem]"
 									>
 										<SelectValue placeholder="Explain">
 											{(v) =>
@@ -819,13 +819,13 @@ export function DoubtChatView(props: {
 
 	return (
 		<>
-		<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden md:flex-row">
+		<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden medium:flex-row">
 			<aside
 				className={cn(
 					"flex max-h-[min(40vh,240px)] w-full shrink-0 flex-col overflow-hidden border-b",
 					"border-zinc-200/90 bg-emerald-50/35 text-sidebar-foreground",
 					"dark:border-sidebar-border dark:bg-sidebar dark:border-b",
-					"md:max-h-none md:min-h-0 md:w-72 md:self-stretch md:border-r md:border-b-0",
+					"medium:max-h-none medium:min-h-0 medium:w-72 medium:self-stretch medium:border-r medium:border-b-0",
 				)}
 			>
 				<div
@@ -1021,13 +1021,13 @@ export function DoubtChatView(props: {
 					{showPicker ? (
 						<motion.div
 							key="picker"
-							className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-10 sm:py-14"
+							className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-10 medium:py-14"
 							initial={reduceMotion ? false : { opacity: 0, y: 8 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
 							transition={{ duration: panelDuration, ease: "easeOut" }}
 						>
-						<div className="flex w-full min-w-0 flex-col gap-6 md:w-1/2">
+						<div className="flex w-full min-w-0 flex-col gap-6 medium:w-1/2">
 							{/* Hero */}
 							<div className="flex min-w-0 w-full flex-col items-start gap-3">
 								<div
@@ -1037,7 +1037,7 @@ export function DoubtChatView(props: {
 									<Sparkles className="size-5" strokeWidth={1.75} />
 								</div>
 								<div className="min-w-0 w-full space-y-1.5">
-									<h1 className="text-foreground text-[22px] font-semibold tracking-tight sm:text-[24px]">
+									<h1 className="text-foreground text-[22px] font-semibold tracking-tight medium:text-[24px]">
 										Start a new chat
 									</h1>
 									<PageHeaderSubtext variant="wrap">
@@ -1054,7 +1054,7 @@ export function DoubtChatView(props: {
 									"divide-border/60 divide-y",
 								)}
 							>
-								<div className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
+								<div className="flex items-center justify-between gap-3 px-4 py-2.5 medium:px-5">
 									<p className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
 										Scope
 									</p>
@@ -1067,7 +1067,7 @@ export function DoubtChatView(props: {
 									/>
 								</div>
 
-								<div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+								<div className="space-y-4 px-4 py-4 medium:px-5 medium:py-5">
 									<PickerField
 										icon={BookOpen}
 										label="Subject"
@@ -1207,14 +1207,14 @@ export function DoubtChatView(props: {
 									) : null}
 								</div>
 
-								<div className="flex flex-col-reverse items-stretch gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+								<div className="flex flex-col-reverse items-stretch gap-2.5 px-4 py-3 medium:flex-row medium:items-center medium:justify-between medium:px-5">
 									<p className="text-muted-foreground text-[12px] leading-snug">
 										The tutor only answers within this topic.
 									</p>
 									<Button
 										type="button"
 										size="lg"
-										className="h-10 gap-1.5 px-4 font-medium shadow-sm sm:w-auto"
+										className="h-10 gap-1.5 px-4 font-medium shadow-sm medium:w-auto"
 										onClick={() => void onStartChat()}
 										disabled={!subjectId || !topicId || startPending}
 									>
@@ -1318,7 +1318,7 @@ export function DoubtChatView(props: {
 					<div className="flex flex-col gap-2 pe-8">
 						<Dialog.Title
 							id={deleteDialogTitleId}
-							className="font-heading text-lg font-semibold tracking-tight sm:text-xl"
+							className="font-heading text-lg font-semibold tracking-tight medium:text-xl"
 						>
 							Delete this chat?
 						</Dialog.Title>
@@ -1330,7 +1330,7 @@ export function DoubtChatView(props: {
 							will be removed from your account. This cannot be undone.
 						</Dialog.Description>
 					</div>
-					<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+					<div className="flex flex-col-reverse gap-2 medium:flex-row medium:justify-end">
 						<Button
 							type="button"
 							variant="outline"

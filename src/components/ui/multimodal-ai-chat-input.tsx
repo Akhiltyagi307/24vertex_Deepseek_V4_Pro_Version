@@ -95,7 +95,7 @@ export function TopicChatComposer({
 					"dark:focus-within:border-emerald-400/45 dark:focus-within:shadow-[0_0_0_3px_rgba(52,211,153,0.1)]",
 				)}
 			>
-				<div className="flex min-w-0 items-end gap-2 px-3 py-2 sm:gap-2.5 sm:px-3.5 sm:py-2.5">
+				<div className="flex min-w-0 items-end gap-2 px-3 py-2 medium:gap-2.5 medium:px-3.5 medium:py-2.5">
 					<div className="relative min-w-0 flex-1">
 						<label htmlFor={textareaId} className="sr-only">
 							Message to tutor
@@ -114,7 +114,7 @@ export function TopicChatComposer({
 							data-enable-grammarly="false"
 							spellCheck
 							className={cn(
-								"block max-h-[var(--composer-max-h)] min-h-[52px] w-full resize-none bg-transparent py-2 pl-1 pr-1 text-[15px] leading-relaxed sm:py-2.5 sm:pl-1.5",
+								"block max-h-[var(--composer-max-h)] min-h-[52px] w-full resize-none bg-transparent py-2 pl-1 pr-1 text-[15px] leading-relaxed medium:py-2.5 medium:pl-1.5",
 								"text-foreground placeholder:text-muted-foreground/75",
 								"outline-none focus-visible:outline-none",
 								"disabled:cursor-not-allowed disabled:opacity-60",

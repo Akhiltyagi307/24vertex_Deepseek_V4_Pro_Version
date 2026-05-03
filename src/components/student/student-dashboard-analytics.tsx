@@ -94,7 +94,7 @@ function SubjectScoreCompactList({ rows }: { rows: SubjectRow[] }) {
 						<Tooltip>
 							<TooltipTrigger
 								render={
-									<span className="w-[5.25rem] shrink-0 cursor-default truncate font-medium text-foreground text-xs leading-tight sm:w-[6.25rem]">
+									<span className="w-[5.25rem] shrink-0 cursor-default truncate font-medium text-foreground text-xs leading-tight medium:w-[6.25rem]">
 										{subjectCompactLabel(row.fullLabel)}
 									</span>
 								}
@@ -216,7 +216,7 @@ function AnalyticsActivityCalendar({
 					About {Math.round(totalMinutes)} minutes of test time logged in this window.
 				</p>
 			) : null}
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-6">
+			<div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:gap-6">
 				<Calendar
 					month={month}
 					onMonthChange={setMonth}
@@ -229,7 +229,7 @@ function AnalyticsActivityCalendar({
 						if (mods.disabled) return;
 						setPickedKey(localDateKey(date));
 					}}
-					className="w-full max-w-[min(100%,20rem)] rounded-xl border border-border/60 bg-background p-1 shadow-sm [--cell-size:2.25rem] sm:w-fit"
+					className="w-full max-w-[min(100%,20rem)] rounded-xl border border-border/60 bg-background p-1 shadow-sm [--cell-size:2.25rem] medium:w-fit"
 					aria-label={`Test activity calendar, last ${weeks} weeks`}
 				/>
 				<div className="flex min-h-[4.5rem] min-w-0 flex-1 flex-col gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 dark:bg-muted/10">
@@ -375,7 +375,7 @@ export function StudentDashboardAnalytics({
 		<TooltipProvider>
 			<Card className="overflow-hidden shadow-sm">
 				<CardHeader className="gap-4 border-border/50 border-b bg-gradient-to-br from-emerald-50/90 via-card to-card pb-4 dark:from-emerald-950/40 dark:via-card dark:to-card">
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+					<div className="flex flex-col gap-3 medium:flex-row medium:items-start medium:justify-between">
 						<div className="flex flex-col gap-1.5">
 							<CardTitle className="text-lg tracking-tight">
 								{variant === "parent" ? "Learning insights" : "Performance insights"}
@@ -424,7 +424,7 @@ export function StudentDashboardAnalytics({
 								<TabsTrigger
 									key={tab.value}
 									value={tab.value}
-									className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs data-[active]:shadow-sm sm:px-3 sm:text-sm"
+									className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs data-[active]:shadow-sm medium:px-3 medium:text-sm"
 								>
 									{tab.label}
 								</TabsTrigger>
@@ -460,7 +460,7 @@ export function StudentDashboardAnalytics({
 								{...trendAnimation}
 								className="rounded-xl border border-emerald-600/10 bg-gradient-to-b from-emerald-50/40 to-card p-2 dark:border-emerald-500/15 dark:from-emerald-950/25 dark:to-card"
 							>
-								<ChartContainer config={trendConfig} className="aspect-auto h-72 w-full sm:h-80 md:h-96">
+								<ChartContainer config={trendConfig} className="aspect-auto h-72 w-full medium:h-80 medium:h-96">
 									<AreaChart data={trendSeries} margin={{ left: 4, right: 8, top: 8, bottom: 4 }}>
 										<defs>
 											<linearGradient id={trendFillId} x1="0" y1="0" x2="0" y2="1">
@@ -538,7 +538,7 @@ export function StudentDashboardAnalytics({
 									config={{
 										value: { label: "Topics", color: AP.topicGood },
 									}}
-									className="aspect-auto h-72 w-full sm:h-80 md:h-96"
+									className="aspect-auto h-72 w-full medium:h-80 medium:h-96"
 								>
 									<BarChart data={distData} margin={{ left: 4, right: 8, top: 8, bottom: 28 }}>
 										<CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border/50" />

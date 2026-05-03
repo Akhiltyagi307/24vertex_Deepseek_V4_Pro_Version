@@ -37,7 +37,7 @@ export function ThemeToggle() {
 		: "Theme";
 
 	return (
-		<div className="inline-flex items-center gap-2.5 sm:gap-4">
+		<div className="inline-flex items-center gap-2.5 medium:gap-4">
 			<div className={cn("inline-flex shrink-0 items-center justify-center", headerControlChrome)}>
 				{mounted ? (
 					<AnimatedToggle
@@ -59,7 +59,7 @@ export function ThemeToggle() {
 					/>
 				)}
 			</div>
-			<span className="hidden text-foreground text-xs font-semibold md:inline">
+			<span className="hidden text-foreground text-xs font-semibold medium:inline">
 				{mounted ? (isDark ? "Dark" : "Light") : "\u00a0"}
 			</span>
 			<Tooltip>

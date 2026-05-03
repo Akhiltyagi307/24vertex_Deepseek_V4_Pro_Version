@@ -15,7 +15,7 @@ export default function AccountIncompletePage() {
 					then sign out and try again.
 				</p>
 			</div>
-			<div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+			<div className="flex flex-col gap-3 medium:flex-row medium:justify-center">
 				<SignOutButton />
 				<Link
 					href="/"

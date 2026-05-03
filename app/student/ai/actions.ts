@@ -93,6 +93,7 @@ export async function requestStudyTipsJson(input: unknown): Promise<StudyTipsRes
 		system: STUDY_TIPS_SYSTEM,
 		user: `Topic or goal: ${parsedInput.data.topic}`,
 		schema: studyTipsResponseSchema,
+		telemetry: { feature: "student.study_tips", userId: user.id },
 	});
 
 	if (!ai.ok) {

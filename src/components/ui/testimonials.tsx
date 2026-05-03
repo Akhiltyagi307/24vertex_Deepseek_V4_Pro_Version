@@ -79,22 +79,22 @@ const testimonials = [
 
 export default function Testimonials() {
 	return (
-		<section id="testimonials" className="bg-background py-16 sm:py-20">
-			<div className="mx-auto w-full max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8 md:space-y-14">
+		<section id="testimonials" className="bg-background py-16 medium:py-20">
+			<div className="mx-auto w-full max-w-7xl space-y-8 px-4 medium:px-6 xl:px-8 medium:space-y-14">
 				<div className="mx-auto max-w-2xl space-y-4 text-center">
 					<Badge variant="outline" className={landingMarketingSectionEyebrowBadgeClassName}>
 						Voices
 					</Badge>
-					<h2 className="pt-1 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+					<h2 className="pt-1 text-balance text-3xl font-semibold tracking-tight text-foreground medium:text-4xl">
 						Built for Indian classrooms, trusted by students, parents, and teachers
 					</h2>
-					<p className="mx-auto max-w-2xl text-balance text-base text-muted-foreground sm:text-lg">
+					<p className="mx-auto max-w-2xl text-balance text-base text-muted-foreground medium:text-lg">
 						Representative stories from students, parents, and school teams across boards and
 						grade levels.
 					</p>
 				</div>
 
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 xl:grid-rows-2">
+				<div className="grid grid-cols-1 gap-4 medium:grid-cols-2 xl:grid-cols-4 xl:grid-rows-2">
 					{testimonials.map((item) => (
 						<Card
 							key={item.name}
@@ -122,7 +122,7 @@ export default function Testimonials() {
 							</CardHeader>
 							<CardContent className="grid h-full grid-rows-[1fr_auto] gap-6">
 								<blockquote
-									className={`leading-relaxed text-foreground ${item.featured ? "text-lg font-semibold" : "text-base font-medium"} line-clamp-5 md:line-clamp-none`}
+									className={`leading-relaxed text-foreground ${item.featured ? "text-lg font-semibold" : "text-base font-medium"} line-clamp-5 medium:line-clamp-none`}
 								>
 									{item.quote}
 								</blockquote>

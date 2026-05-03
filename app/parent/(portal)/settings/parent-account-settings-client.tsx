@@ -13,7 +13,7 @@ const tabAccentClass =
 	"bg-emerald-600 hover:bg-emerald-600/90 dark:bg-emerald-500 dark:hover:bg-emerald-500/90";
 
 const settingsNestedWellClass =
-	"rounded-xl border border-border/80 bg-sidebar-accent p-4 shadow-sm dark:border-border dark:bg-foreground/10 md:p-5";
+	"rounded-xl border border-border/80 bg-sidebar-accent p-4 shadow-sm dark:border-border dark:bg-foreground/10 medium:p-5";
 
 const studentSelectButtonClass = cn(
 	"w-full rounded-lg border border-border/90 bg-background px-4 py-3 text-left text-sm font-medium text-foreground shadow-sm transition-colors",
@@ -47,7 +47,7 @@ export function ParentAccountSettingsClient({
 
 			<SmoothTab
 				defaultTabId="switch"
-				panelClassName="min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm md:px-8 md:py-8 dark:border-border dark:bg-muted/20"
+				panelClassName="min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm medium:px-8 medium:py-8 dark:border-border dark:bg-muted/20"
 				persistContentPanels
 				tabListPosition="top"
 				items={[
@@ -86,7 +86,7 @@ export function ParentAccountSettingsClient({
 								</div>
 								<Button
 									variant="outline"
-									className="w-full sm:w-auto"
+									className="w-full medium:w-auto"
 									render={<Link href="/parent/select-student" />}
 								>
 									Switch student account

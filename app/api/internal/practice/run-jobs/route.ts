@@ -219,7 +219,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 }
 
 /**
- * Background worker. Triggered by Vercel Cron (GET; see `vercel.json`) and by a
+ * Background worker. Triggered by Supabase pg_cron + pg_net (GET/POST) and by a
  * fire-and-forget fetch (POST) from the submit action for low-latency startup.
  */
 export async function POST(request: Request) {

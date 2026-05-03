@@ -145,7 +145,7 @@ export default async function ParentSelectStudentPage() {
 						key: "footer",
 						content: (
 							<div className="flex flex-col gap-4 border-t border-border pt-8">
-								<Button variant="outline" className="w-full sm:w-auto" render={<Link href="/parent/link-child" />}>
+								<Button variant="outline" className="w-full medium:w-auto" render={<Link href="/parent/link-child" />}>
 									<UserPlusIcon data-icon="inline-start" />
 									Link another child
 								</Button>

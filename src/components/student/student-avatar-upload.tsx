@@ -160,8 +160,8 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 						"bg-background dark:border-input dark:bg-input/35",
 					)}
 				>
-					<div className="flex flex-col items-center gap-10 p-7 sm:flex-row sm:items-start sm:justify-between sm:gap-12 sm:p-9 md:gap-16 md:px-11 md:py-10 lg:gap-20 lg:px-14">
-						<div className="relative shrink-0 sm:pt-1">
+					<div className="flex flex-col items-center gap-10 p-7 medium:flex-row medium:items-start medium:justify-between medium:gap-12 medium:p-9 medium:gap-16 medium:px-11 medium:py-10 xl:gap-20 xl:px-14">
+						<div className="relative shrink-0 medium:pt-1">
 							<div
 								className={cn(
 									"absolute -inset-2 rounded-full bg-gradient-to-br from-emerald-500/20 via-transparent to-transparent opacity-80 blur-md",
@@ -172,7 +172,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 							<Avatar
 								size="lg"
 								className={cn(
-									"relative z-[1] size-56 rounded-full shadow-md ring-4 ring-background sm:size-64",
+									"relative z-[1] size-56 rounded-full shadow-md ring-4 ring-background medium:size-64",
 									avatarUrl
 										? "ring-emerald-600/25 dark:ring-emerald-400/30"
 										: "ring-border/60 dark:ring-border/80",
@@ -187,15 +187,15 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 										fetchPriority="high"
 									/>
 								) : null}
-								<AvatarFallback className="text-6xl font-semibold tracking-tight text-muted-foreground sm:text-7xl">
+								<AvatarFallback className="text-6xl font-semibold tracking-tight text-muted-foreground medium:text-7xl">
 									{initialsFromName(displayName)}
 								</AvatarFallback>
 							</Avatar>
 						</div>
 
-						<div className="flex min-w-0 flex-1 flex-col items-center gap-7 pb-1 text-center sm:items-start sm:justify-center sm:gap-8 sm:self-stretch sm:pb-0 sm:pl-2 sm:text-left lg:pl-6">
-							<div className="w-full space-y-3 sm:space-y-3.5">
-								<p className="text-foreground text-sm font-semibold leading-snug sm:text-base">
+						<div className="flex min-w-0 flex-1 flex-col items-center gap-7 pb-1 text-center medium:items-start medium:justify-center medium:gap-8 medium:self-stretch medium:pb-0 medium:pl-2 medium:text-left xl:pl-6">
+							<div className="w-full space-y-3 medium:space-y-3.5">
+								<p className="text-foreground text-sm font-semibold leading-snug medium:text-base">
 									{displayName.trim() ? (
 										<>
 											Photo for <span className="text-foreground/90">{displayName.trim()}</span>
@@ -204,18 +204,18 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 										"Your profile photo"
 									)}
 								</p>
-								<p className="max-w-prose text-muted-foreground text-sm leading-relaxed sm:text-[0.9375rem]">
+								<p className="max-w-prose text-muted-foreground text-sm leading-relaxed medium:text-[0.9375rem]">
 									Square crop, shown across EduAI. JPEG, PNG, or WebP, up to 5MB — zoom and
 									reposition before saving.
 								</p>
 							</div>
 
-							<div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3">
+							<div className="flex w-full flex-col gap-3 medium:flex-row medium:flex-wrap medium:items-center medium:gap-x-4 medium:gap-y-3">
 								<Button
 									type="button"
 									variant="default"
 									size="lg"
-									className="h-10 w-full gap-2 px-5 sm:w-auto"
+									className="h-10 w-full gap-2 px-5 medium:w-auto"
 									onClick={openFilePicker}
 								>
 									{avatarUrl ? (
@@ -230,7 +230,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 										type="button"
 										variant="ghost"
 										size="lg"
-										className="h-10 w-full text-muted-foreground sm:w-auto"
+										className="h-10 w-full text-muted-foreground medium:w-auto"
 										onClick={removePhoto}
 									>
 										Remove photo
@@ -247,7 +247,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 					</p>
 				) : null}
 
-				<FieldDescription className="mt-4 text-xs leading-relaxed text-muted-foreground sm:mt-5 sm:text-sm">
+				<FieldDescription className="mt-4 text-xs leading-relaxed text-muted-foreground medium:mt-5 medium:text-sm">
 					Tip: use a clear, well-lit face or logo — it appears small in navigation and lists.
 				</FieldDescription>
 			</FieldContent>

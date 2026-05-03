@@ -87,7 +87,7 @@ export function StudentShell({
 							doubtChat
 								? "min-h-0 min-w-0 grow basis-0 overflow-hidden bg-background"
 								: "min-h-0 min-w-0 grow basis-0 overflow-auto bg-background",
-							!immersiveShell && "px-4 md:px-6 lg:px-8",
+							!immersiveShell && "px-4 medium:px-6 xl:px-8",
 						)}
 					>
 						{children}

@@ -7,7 +7,7 @@ import { cardSurfaceFrameClassName } from "@/components/ui/card";
 /** RSC Suspense fallback while dashboard data loads. */
 export function StudentDashboardSkeleton() {
 	return (
-		<div className="flex flex-col gap-8 py-6 md:py-8" aria-busy aria-label="Loading dashboard">
+		<div className="flex flex-col gap-8 py-6 medium:py-8" aria-busy aria-label="Loading dashboard">
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<Skeleton className="h-9 w-48 max-w-full" />
 				<div className={pageHeaderSubtextScrollClass}>
@@ -16,7 +16,7 @@ export function StudentDashboardSkeleton() {
 			</div>
 			<section className="flex flex-col gap-3">
 				<Skeleton className="h-4 w-28" />
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				<div className="grid gap-4 medium:grid-cols-2 xl:grid-cols-4">
 					{Array.from({ length: 4 }).map((_, i) => (
 						<Skeleton key={i} className={cn("h-28 rounded-xl", cardSurfaceFrameClassName)} />
 					))}

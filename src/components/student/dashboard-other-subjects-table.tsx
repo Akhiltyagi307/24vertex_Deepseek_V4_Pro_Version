@@ -82,7 +82,7 @@ const BAR: Record<RowVisual, string> = {
 };
 
 /** Same horizontal padding as `commonTd` so header labels align with cell content. */
-const th = "px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-foreground/90 sm:px-4";
+const th = "px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-foreground/90 medium:px-4";
 
 /** Header cell chrome: must sit on `th` (not `tr`) so `rounded-t-*` works with `border-separate`. */
 const thHeaderBg = "border-border border-b-2 bg-muted/60";
@@ -130,14 +130,14 @@ export function DashboardOtherSubjectsTable({
 			)}
 		>
 			<table
-				className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm sm:min-w-0"
+				className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm medium:min-w-0"
 				aria-label="Other subjects and quick links to practice"
 			>
 				<thead>
 					<tr>
 						<th
 							scope="col"
-							className={cn(th, thHeaderBg, thSticky, "rounded-tl-lg", "w-[24%] min-w-[7.5rem] sm:w-[22%]")}
+							className={cn(th, thHeaderBg, thSticky, "rounded-tl-lg", "w-[24%] min-w-[7.5rem] medium:w-[22%]")}
 						>
 							Subject
 						</th>
@@ -147,12 +147,12 @@ export function DashboardOtherSubjectsTable({
 						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-[30%] min-w-[9rem]")}>
 							Progress
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-14 text-right tabular-nums sm:w-16")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-14 text-right tabular-nums medium:w-16")}>
 							Coverage
 						</th>
 						<th
 							scope="col"
-							className={cn(th, thHeaderBg, thSticky, "w-[3.5rem] text-right tabular-nums sm:w-16")}
+							className={cn(th, thHeaderBg, thSticky, "w-[3.5rem] text-right tabular-nums medium:w-16")}
 						>
 							Avg score
 						</th>
@@ -187,7 +187,7 @@ export function DashboardOtherSubjectsTable({
 
 function NoTopicsRow({ s, rowVariants }: { s: DashboardSubjectCompactModel; rowVariants?: Variants }) {
 	const lastLabel = s.lastTestDateIso ? formatLastTestShort(s.lastTestDateIso) : null;
-	const commonTd = "border-border/50 border-b px-3 py-3 align-middle sm:px-4";
+	const commonTd = "border-border/50 border-b px-3 py-3 align-middle medium:px-4";
 
 	return (
 		<TableRow className="hover:bg-white/[0.02]" rowVariants={rowVariants}>
@@ -212,7 +212,7 @@ function NoTopicsRow({ s, rowVariants }: { s: DashboardSubjectCompactModel; rowV
 				<Button
 					variant="secondary"
 					size="sm"
-					className={cn(dashboardSubjectCardCtaClassName, "w-full max-w-[8.5rem] sm:w-auto")}
+					className={cn(dashboardSubjectCardCtaClassName, "w-full max-w-[8.5rem] medium:w-auto")}
 					render={<Link href={s.practiceHref} />}
 				>
 					Practice focus
@@ -236,7 +236,7 @@ function DataRow({ s, rowVariants }: { s: DashboardSubjectCompactModel; rowVaria
 	);
 	const goLabel = `Open practice for ${s.subjectName}`;
 
-	const commonTd = "border-border/50 border-b px-3 py-3 align-middle sm:px-4";
+	const commonTd = "border-border/50 border-b px-3 py-3 align-middle medium:px-4";
 
 	return (
 		<TableRow className="hover:bg-white/[0.02]" rowVariants={rowVariants}>

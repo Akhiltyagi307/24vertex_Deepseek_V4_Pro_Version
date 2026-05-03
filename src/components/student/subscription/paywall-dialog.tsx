@@ -88,7 +88,7 @@ export function PaywallProvider({ children }: { children: React.ReactNode }) {
 					/>
 					<Dialog.Popup
 						className={cn(
-							"fixed top-1/2 left-1/2 z-50 flex max-h-[92vh] w-[min(calc(100vw-2rem),30rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-2xl border bg-popover p-6 text-popover-foreground shadow-xl sm:gap-5 sm:p-7",
+							"fixed top-1/2 left-1/2 z-50 flex max-h-[92vh] w-[min(calc(100vw-2rem),30rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-2xl border bg-popover p-6 text-popover-foreground shadow-xl medium:gap-5 medium:p-7",
 							"data-ending-style:opacity-0 data-starting-style:opacity-0",
 						)}
 					>
@@ -108,13 +108,13 @@ export function PaywallProvider({ children }: { children: React.ReactNode }) {
 							</div>
 							<span className="font-mono text-2xs uppercase tracking-wider">Upgrade needed</span>
 						</div>
-						<Dialog.Title className="font-heading text-xl font-semibold leading-snug text-foreground sm:text-2xl">
+						<Dialog.Title className="font-heading text-xl font-semibold leading-snug text-foreground medium:text-2xl">
 							{title}
 						</Dialog.Title>
 						<Dialog.Description className="text-sm text-muted-foreground">
 							{description}
 						</Dialog.Description>
-						<div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+						<div className="flex flex-col gap-2 medium:flex-row medium:justify-end">
 							<Button variant="outline" onClick={() => setPayload(null)}>
 								Maybe later
 							</Button>
