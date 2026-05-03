@@ -1,6 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { db } from "@/db";
+import { subscriptions as subscriptionsTbl, usagePeriods as usagePeriodsTbl } from "@/db/schema/billing";
 import { fetchInvoice, verifyWebhookSignature } from "@/lib/billing/razorpay";
 import { isPlanCode, PLAN_CATALOG, tokenQuotaForGrade, type PlanCode, type PlanCatalogEntry } from "@/lib/billing/plans";
 import {
@@ -164,30 +167,66 @@ export async function POST(req: Request) {
 	return Response.json({ ok: true });
 }
 
-async function upsertUsagePeriod(
-	admin: ReturnType<typeof createServiceRoleClient>,
-	input: {
-		subscriptionId: string;
-		profileId: string;
-		periodStart: string;
-		periodEnd: string;
-		testsQuota: number;
-		tokensQuota: number;
-	},
-): Promise<void> {
-	await admin.from("usage_periods").upsert(
-		{
-			subscription_id: input.subscriptionId,
-			profile_id: input.profileId,
-			period_start: input.periodStart,
-			period_end: input.periodEnd,
-			tests_quota: input.testsQuota,
-			tests_used: 0,
-			tokens_quota: input.tokensQuota,
-			tokens_used: 0,
-		},
-		{ onConflict: "subscription_id,period_start" },
-	);
+/**
+ * Subscription state changes that flip plan_code / period bounds and the
+ * matching usage_periods row must be atomic. Otherwise a mid-flight failure
+ * leaves the subscription on the new period with no quota row (or vice versa)
+ * and the student is either over-quota or under-quota.
+ *
+ * Uses the Drizzle pool (postgres-js direct) instead of supabase-js so we get
+ * a real SQL transaction. Side effects (emails, analytics, payment record)
+ * stay outside this helper — they are not transactional with the state change.
+ *
+ * On usage_periods conflict (same subscription_id + period_start), we update
+ * the period_end and quota fields but DO NOT reset tests_used / tokens_used.
+ * That protects against a delivery replay overwriting in-progress usage; the
+ * billing_events dedup at the route layer makes a replay unreachable in
+ * normal operation but defense-in-depth is cheap.
+ */
+async function applySubscriptionStateChangeAtomic(input: {
+	subscriptionId: string;
+	profileId: string;
+	status: string;
+	planCode: string;
+	currentPeriodStart: Date;
+	currentPeriodEnd: Date;
+	testsQuota: number;
+	tokensQuota: number;
+}): Promise<void> {
+	await db.transaction(async (tx) => {
+		await tx
+			.update(subscriptionsTbl)
+			.set({
+				status: input.status,
+				planCode: input.planCode,
+				pendingPlanCode: null,
+				currentPeriodStart: input.currentPeriodStart,
+				currentPeriodEnd: input.currentPeriodEnd,
+				updatedAt: new Date(),
+			})
+			.where(eq(subscriptionsTbl.id, input.subscriptionId));
+
+		await tx
+			.insert(usagePeriodsTbl)
+			.values({
+				subscriptionId: input.subscriptionId,
+				profileId: input.profileId,
+				periodStart: input.currentPeriodStart,
+				periodEnd: input.currentPeriodEnd,
+				testsQuota: input.testsQuota,
+				testsUsed: 0,
+				tokensQuota: input.tokensQuota,
+				tokensUsed: 0,
+			})
+			.onConflictDoUpdate({
+				target: [usagePeriodsTbl.subscriptionId, usagePeriodsTbl.periodStart],
+				set: {
+					periodEnd: input.currentPeriodEnd,
+					testsQuota: input.testsQuota,
+					tokensQuota: input.tokensQuota,
+				},
+			});
+	});
 }
 
 /**
@@ -205,25 +244,22 @@ async function handleSubscriptionMandateAuthenticated(ctx: WebhookHandlerContext
 
 async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<void> {
 	const { admin, subscriptionId, ours, profile, studentEmail, targetPlan, targetPlanCode, currentStart, currentEnd } = ctx;
-	await admin
-		.from("subscriptions")
-		.update({
-			status: "active",
-			plan_code: targetPlanCode,
-			pending_plan_code: null,
-			current_period_start: currentStart ?? new Date().toISOString(),
-			current_period_end: currentEnd ?? (ours.current_period_end ?? new Date(Date.now() + 31 * 86_400_000).toISOString()),
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", ours.id);
-	await upsertUsagePeriod(admin, {
+	const fallbackEnd = new Date(Date.now() + 31 * 86_400_000).toISOString();
+	const periodStartIso = currentStart ?? new Date().toISOString();
+	const periodEndIso = currentEnd ?? ours.current_period_end ?? fallbackEnd;
+
+	await applySubscriptionStateChangeAtomic({
 		subscriptionId: ours.id,
 		profileId: ours.profile_id,
-		periodStart: currentStart ?? new Date().toISOString(),
-		periodEnd: currentEnd ?? new Date(Date.now() + 31 * 86_400_000).toISOString(),
+		status: "active",
+		planCode: targetPlanCode,
+		currentPeriodStart: new Date(periodStartIso),
+		currentPeriodEnd: new Date(periodEndIso),
 		testsQuota: targetPlan.testsPerPeriod,
 		tokensQuota: tokenQuotaForGrade(targetPlan, profile?.grade ?? null),
 	});
+
+	// Side effects — not transactional with the state change above.
 	await admin.from("practice_analytics_events").insert({
 		student_id: ours.profile_id,
 		event_name: "subscription_started",
@@ -234,7 +270,7 @@ async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<
 			to: studentEmail,
 			studentName: profile?.full_name ?? undefined,
 			planName: targetPlan.name,
-			nextRenewalIso: currentEnd ?? new Date(Date.now() + 31 * 86_400_000).toISOString(),
+			nextRenewalIso: periodEndIso,
 		});
 	}
 }
@@ -244,27 +280,21 @@ async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<vo
 		ctx;
 	const amt = (paymentEntity?.amount as number | undefined) ?? targetPlan.pricePaise;
 	const paymentId = paymentEntity?.id as string | undefined;
-	const periodStart = currentStart ?? ours.current_period_end;
-	const periodEnd = currentEnd ?? ours.current_period_end;
-	await admin
-		.from("subscriptions")
-		.update({
-			status: "active",
-			plan_code: targetPlanCode,
-			pending_plan_code: null,
-			current_period_start: periodStart,
-			current_period_end: periodEnd,
-			updated_at: new Date().toISOString(),
-		})
-		.eq("id", ours.id);
-	await upsertUsagePeriod(admin, {
+	const fallbackIso = new Date().toISOString();
+	const periodStartIso = currentStart ?? ours.current_period_end ?? fallbackIso;
+	const periodEndIso = currentEnd ?? ours.current_period_end ?? fallbackIso;
+
+	await applySubscriptionStateChangeAtomic({
 		subscriptionId: ours.id,
 		profileId: ours.profile_id,
-		periodStart: periodStart ?? new Date().toISOString(),
-		periodEnd: periodEnd ?? new Date().toISOString(),
+		status: "active",
+		planCode: targetPlanCode,
+		currentPeriodStart: new Date(periodStartIso),
+		currentPeriodEnd: new Date(periodEndIso),
 		testsQuota: targetPlan.testsPerPeriod,
 		tokensQuota: tokenQuotaForGrade(targetPlan, profile?.grade ?? null),
 	});
+
 	if (paymentId) {
 		const invoiceShortUrl = await resolveInvoiceShortUrl(paymentEntity, null);
 		await admin.from("payments").upsert(
