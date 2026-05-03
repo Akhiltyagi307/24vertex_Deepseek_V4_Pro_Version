@@ -181,7 +181,11 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 	if (reclaimErr) {
 		logSupabaseError("runPracticeJobs.practice_reclaim_stale_running_jobs", reclaimErr, { workerId });
 	} else if (typeof reclaimed === "number" && reclaimed > 0) {
-		console.log(`[runPracticeJobs] requeued ${reclaimed} stale running practice job(s)`);
+		logPracticeObs({
+			phase: "practice_jobs_reclaim",
+			workerId,
+			reclaimed,
+		});
 	}
 
 	const { data: jobs, error } = await admin.rpc("practice_claim_jobs", {

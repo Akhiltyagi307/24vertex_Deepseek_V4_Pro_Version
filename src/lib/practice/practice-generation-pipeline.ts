@@ -459,9 +459,11 @@ async function runPracticeGenerationAfterResolveCore(
 				embeddings,
 			);
 			if (dupes.length > 0) {
-				if (process.env.NODE_ENV === "development") {
-					console.log(`[generatePracticeTest] dedup: ${dupes.length} duplicate(s), regenerating`);
-				}
+				logPracticeObs({
+					phase: "generation_dedup_regen",
+					correlation_id: correlationId,
+					duplicates: dupes.length,
+				});
 				const regen = await generateAndStrip();
 				if (regen.ok) {
 					stripped = regen.public;
