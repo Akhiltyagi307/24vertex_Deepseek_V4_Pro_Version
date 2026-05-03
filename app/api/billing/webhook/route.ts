@@ -112,22 +112,37 @@ export async function POST(req: Request) {
 		topEventId ??
 		`${body.event}:${(body.payload?.payment?.entity as { id?: string } | undefined)?.id ?? (body.payload?.subscription?.entity as { id?: string } | undefined)?.id ?? (body.payload?.invoice?.entity as { payment_id?: string } | undefined)?.payment_id ?? ""}:${(body.payload?.subscription?.entity as { current_start?: number } | undefined)?.current_start ?? (body.payload?.invoice?.entity as { id?: string } | undefined)?.id ?? Math.floor(Date.now() / 1000)}`;
 
-	const { data: existing } = await admin
+	// Atomic dedup: INSERT ... ON CONFLICT DO NOTHING RETURNING.
+	// If razorpay_event_id is already in the table the conflict short-circuits the
+	// insert and `inserted` comes back null, so handleEvent never runs twice. The
+	// previous SELECT-then-INSERT pattern had a TOCTOU race under concurrent
+	// webhook deliveries that the table's UNIQUE constraint caught only as a
+	// silent insert error — duplicate handler invocations were possible.
+	const { data: inserted, error: insertErr } = await admin
 		.from("billing_events")
+		.upsert(
+			{
+				razorpay_event_id: eventId,
+				event_type: body.event,
+				payload: body,
+			},
+			{ onConflict: "razorpay_event_id", ignoreDuplicates: true },
+		)
 		.select("id")
-		.eq("razorpay_event_id", eventId)
 		.maybeSingle();
 
-	if (existing) {
-		// Already processed — idempotent ack.
-		return Response.json({ ok: true, deduped: true });
+	if (insertErr) {
+		Sentry.captureException(insertErr, {
+			tags: { component: "billing.webhook", phase: "dedup_insert", event: body.event },
+		});
+		logServerError("billing.webhook.dedup_insert", insertErr);
+		return Response.json({ ok: false }, { status: 500 });
 	}
 
-	await admin.from("billing_events").insert({
-		razorpay_event_id: eventId,
-		event_type: body.event,
-		payload: body,
-	});
+	if (!inserted) {
+		// ON CONFLICT skipped the insert — already processed by a prior delivery.
+		return Response.json({ ok: true, deduped: true });
+	}
 
 	try {
 		await handleEvent(admin, body);
