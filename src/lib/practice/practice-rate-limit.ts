@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { rlConsume } from "@/lib/ratelimit";
 
 export const PRACTICE_GENERATE_RATE_LIMIT_N = 10;
 export const PRACTICE_GENERATE_RATE_LIMIT_WINDOW_SECONDS = 3600;
@@ -16,13 +16,7 @@ export const DOUBT_CHAT_RATE_LIMIT_WINDOW_SECONDS = 3600;
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
-type RateLimitRow = {
-	allowed: boolean;
-	remaining: number;
-	reset_at: string | null;
-};
-
-function rateLimitRpcFailClosed(): boolean {
+function rateLimitFailClosed(): boolean {
 	return (
 		process.env.VERCEL_ENV === "preview" ||
 		process.env.VERCEL_ENV === "production" ||
@@ -33,8 +27,16 @@ function rateLimitRpcFailClosed(): boolean {
 const RPC_ERROR_USER_MESSAGE = "Could not verify limits. Try again shortly.";
 
 /**
- * Shared `practice_rate_limit_consume` wrapper. In production, RPC errors fail closed
- * so limits cannot be bypassed when the database is misbehaving.
+ * Shared rate-limit wrapper. Calls the auth-agnostic public.rl_consume() via
+ * the dedicated rate-limit DB pool, using the authenticated student's ID as
+ * part of the bucket key. The route handler is expected to have already
+ * verified auth (typically via supabase.auth.getUser()) before reaching here.
+ *
+ * Fail-policy: when the rate-limit DB has been failing recently the consumer's
+ * circuit breaker trips open and returns `degraded: "circuit_open"`. For these
+ * cost-sensitive paths (AI generations, doubt chat) we fail closed in prod so
+ * limits cannot be bypassed during infra issues; in dev we fail open so local
+ * work is unaffected. This preserves the policy of the previous RPC wrapper.
  */
 export async function consumePracticeRateLimit(
 	supabase: ServerSupabase,
@@ -45,32 +47,31 @@ export async function consumePracticeRateLimit(
 		limitExceededMessage: (resetAt: string | null) => string;
 	},
 ): Promise<{ ok: true } | { ok: false; message: string; resetAt: string | null }> {
-	const { data, error } = await supabase.rpc("practice_rate_limit_consume", {
-		p_bucket: params.bucket,
-		p_limit_n: params.limitN,
-		p_window_seconds: params.windowSeconds,
+	const { data: sessionData } = await supabase.auth.getSession();
+	const userId = sessionData?.session?.user?.id;
+	if (!userId) {
+		return { ok: false, message: "Not authenticated.", resetAt: null };
+	}
+
+	const result = await rlConsume({
+		key: `practice:${params.bucket}:user:${userId}`,
+		limit: params.limitN,
+		windowSec: params.windowSeconds,
 	});
 
-	if (error) {
-		logSupabaseError("consumePracticeRateLimit.practice_rate_limit_consume", error, {
-			bucket: params.bucket,
-		});
-		if (rateLimitRpcFailClosed()) {
-			return { ok: false, message: RPC_ERROR_USER_MESSAGE, resetAt: null };
-		}
+	if (result.degraded === "circuit_open" && rateLimitFailClosed()) {
+		return { ok: false, message: RPC_ERROR_USER_MESSAGE, resetAt: null };
+	}
+
+	if (result.allowed) {
 		return { ok: true };
 	}
 
-	const rows = (data ?? []) as RateLimitRow[];
-	const row = rows[0];
-	if (!row || row.allowed) {
-		return { ok: true };
-	}
-	const reset = row.reset_at;
+	const resetIso = result.resetAt.toISOString();
 	return {
 		ok: false,
-		message: params.limitExceededMessage(reset),
-		resetAt: reset,
+		message: params.limitExceededMessage(resetIso),
+		resetAt: resetIso,
 	};
 }
 
