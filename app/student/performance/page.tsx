@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { StudentPerformanceView } from "@/components/student/student-performance-view";
+import { StudentPerformanceAsync } from "./student-performance-async";
+import { StudentPerformanceSkeleton } from "./student-performance-skeleton";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
-import { buildEnrolledSubjectCards } from "@/lib/student/performance-matrix";
-import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
-import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,33 +18,25 @@ export default async function StudentPerformancePage({ searchParams }: PageProps
 	if (!user) {
 		redirect("/login");
 	}
-	const [row, supabase] = await Promise.all([getCachedAppProfileRow(), createClient()]);
+	const row = await getCachedAppProfileRow();
 	if (!row || row.role !== "student") {
 		redirect("/login");
 	}
 
-	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } =
-		await loadStudentPerformanceBundle(
-		supabase,
-		user.id,
-		{
-			grade: row.grade,
-			stream: row.stream,
-			elective_subject_id: row.elective_subject_id,
-			role: row.role,
-		},
-	);
-
-	const enrolledSubjectCards = buildEnrolledSubjectCards(enrolledSubjects, topicCountBySubjectId, rows);
+	const profileRow = {
+		grade: row.grade,
+		stream: row.stream,
+		elective_subject_id: row.elective_subject_id,
+		role: row.role,
+	};
 
 	return (
-		<StudentPerformanceView
-			initialRows={rows}
-			loadError={loadError}
-			subjectFromUrl={sp.subject ?? null}
-			enrolledSubjectCards={enrolledSubjectCards}
-			profileGrade={row.grade}
-			trackerNeedsHydration={trackerNeedsHydration}
-		/>
+		<Suspense fallback={<StudentPerformanceSkeleton />}>
+			<StudentPerformanceAsync
+				userId={user.id}
+				profileRow={profileRow}
+				subjectFromUrl={sp.subject ?? null}
+			/>
+		</Suspense>
 	);
 }

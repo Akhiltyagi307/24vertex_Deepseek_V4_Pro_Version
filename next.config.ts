@@ -1,4 +1,9 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = bundleAnalyzer({
+	enabled: process.env.ANALYZE === "true",
+});
 
 function supabaseStorageRemotePatterns() {
 	const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,10 +24,44 @@ function supabaseStorageRemotePatterns() {
 }
 
 const nextConfig: NextConfig = {
-	experimental: {
-		optimizePackageImports: ["lucide-react", "recharts"],
+	reactStrictMode: true,
+	compress: true,
+	poweredByHeader: false,
+	// Pin workspace root explicitly — avoids Turbopack inferring an unrelated
+	// parent directory when multiple lockfiles exist on the dev machine.
+	turbopack: {
+		root: process.cwd(),
 	},
+	experimental: {
+		optimizePackageImports: [
+			"lucide-react",
+			"recharts",
+			"motion",
+			"@radix-ui/react-avatar",
+			"@radix-ui/react-dialog",
+			"@radix-ui/react-label",
+			"@radix-ui/react-separator",
+			"@radix-ui/react-slot",
+			"@radix-ui/react-toggle",
+			"@radix-ui/react-toggle-group",
+			"date-fns",
+			"@tiptap/core",
+			"@tiptap/react",
+			"@tiptap/starter-kit",
+		],
+	},
+	serverExternalPackages: [
+		"@sentry/nextjs",
+		"drizzle-orm",
+		"postgres",
+		"@react-pdf/renderer",
+		"razorpay",
+		"resend",
+	],
 	images: {
+		formats: ["image/avif", "image/webp"],
+		minimumCacheTTL: 60 * 60 * 24 * 365,
+		dangerouslyAllowSVG: false,
 		remotePatterns: [
 			...supabaseStorageRemotePatterns(),
 			{
@@ -60,6 +99,10 @@ const nextConfig: NextConfig = {
 
 		return [
 			{
+				source: "/:all*(svg|jpg|jpeg|png|gif|webp|avif|ico|mp4|webm)",
+				headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+			},
+			{
 				source: "/admin/:path*",
 				headers: [...base, robotsAdmin],
 			},
@@ -75,4 +118,4 @@ const nextConfig: NextConfig = {
 	},
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

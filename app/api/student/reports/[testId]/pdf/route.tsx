@@ -1,5 +1,6 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 
+import { getServerUser } from "@/lib/auth/get-server-user";
 import {
 	buildPracticeGradingReportPdfBuffer,
 	uploadPracticeGradingReportPdf,
@@ -27,13 +28,11 @@ export async function GET(request: Request, context: RouteContext) {
 		url.searchParams.get("view") === "1" ||
 		url.searchParams.get("inline") === "1";
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) {
 		return new Response("Unauthorized", { status: 401 });
 	}
+	const supabase = await createClient();
 
 	const { data: testRow, error: testErr } = await supabase
 		.from("tests")

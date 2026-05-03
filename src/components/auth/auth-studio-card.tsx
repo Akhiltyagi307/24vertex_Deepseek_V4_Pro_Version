@@ -6,6 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FieldDescription } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
+// Base64 8×6 JPEG generated from auth-fractal-glass.png via sharp; Next/Image
+// skips auto-blur for AVIF inputs, so we provide a manual blurDataURL.
+const AUTH_FRACTAL_BLUR_DATA =
+	"data:image/jpeg;base64,/9j/2wBDABcQERQRDhcUEhQaGBcbIjklIh8fIkYyNSk5UkhXVVFIUE5bZoNvW2F8Yk5QcptzfIeLkpSSWG2grJ+OqoOPko3/2wBDARgaGiIeIkMlJUONXlBejY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY3/wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAT/xAAbEAADAAIDAAAAAAAAAAAAAAAAAQMCBAUiQf/EABQBAQAAAAAAAAAAAAAAAAAAAAL/xAAaEQACAgMAAAAAAAAAAAAAAAAAAQIRBCFR/9oADAMBAAIRAxEAPwCDR03yEa3rklRdsWl6ABwdthydONcP/9k=";
+
 type AuthStudioCardProps = {
 	children: React.ReactNode;
 	className?: string;
@@ -33,11 +38,13 @@ export function AuthStudioCard({
 					<div className="relative hidden min-h-0 bg-muted medium:block medium:min-h-[min(52vh,28rem)] medium:rounded-r-xl">
 						<div className="absolute inset-0 z-0 overflow-hidden medium:rounded-r-xl">
 							<Image
-								src="/brand/auth-fractal-glass.png"
+								src="/brand/auth-fractal-glass.avif"
 								alt=""
 								fill
 								className="object-cover"
 								sizes="(min-width: 768px) 480px, 0px"
+								placeholder="blur"
+								blurDataURL={AUTH_FRACTAL_BLUR_DATA}
 								priority={false}
 							/>
 							<div

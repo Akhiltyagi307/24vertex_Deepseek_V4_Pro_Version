@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants } from "motion/react";
 
 import { dashboardSubjectCardCtaClassName } from "@/components/student/dashboard-subject-card";
 import { Button } from "@/components/ui/button";

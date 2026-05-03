@@ -18,7 +18,7 @@ import {
 	Search,
 } from "lucide-react";
 import * as React from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { ReportsPillSelect } from "@/components/student/reports-pill-select";

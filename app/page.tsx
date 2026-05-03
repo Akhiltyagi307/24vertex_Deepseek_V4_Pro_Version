@@ -1,15 +1,14 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { HomeMarketingShell } from "@/components/marketing/home-marketing-shell";
 import { LandingMarketingBody } from "@/components/marketing/landing-marketing-body";
 
 export default async function HomePage() {
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	// `getServerUser` is React-cached so `resolvePostAuthPath` (also calls it)
+	// dedupes against this read — one Supabase round-trip total when logged in.
+	const user = await getServerUser();
 	if (user) {
 		const path = await resolvePostAuthPath();
 		redirect(path);

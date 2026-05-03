@@ -18,7 +18,7 @@ import {
 	TrendingUpIcon,
 } from "lucide-react";
 import * as React from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import {
 	PageHeaderSubtext,

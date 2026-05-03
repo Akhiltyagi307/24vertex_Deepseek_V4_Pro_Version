@@ -13,7 +13,7 @@ export function AuthSplitShell({ children }: { children: React.ReactNode }) {
 		>
 			<span className="relative size-10 shrink-0">
 				<Image
-					src="/brand/logo-icon.png"
+					src="/brand/logo-icon.avif"
 					alt=""
 					fill
 					className="object-contain"

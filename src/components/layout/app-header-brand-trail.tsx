@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CopyIcon, IdCardIcon, SchoolIcon, UserRoundIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -56,7 +56,7 @@ export function AppHeaderBrandTrail({
 			{omitLogo ? null : (
 				<>
 					<Image
-						src="/brand/logo-icon.png"
+						src="/brand/logo-icon.avif"
 						alt=""
 						width={28}
 						height={28}

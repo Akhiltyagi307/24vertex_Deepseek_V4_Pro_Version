@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { cancelSubscription } from "@/lib/billing/razorpay";
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
@@ -21,13 +22,11 @@ const cancelBodySchema = z.object({
  * flips `status → cancelled` once the cycle actually ends.
  */
 export async function POST(req: Request) {
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
+	const supabase = await createClient();
 
 	const rawBody = await req.json().catch(() => ({}));
 	const parsedBody = cancelBodySchema.safeParse(rawBody);

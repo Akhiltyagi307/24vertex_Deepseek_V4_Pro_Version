@@ -1,8 +1,8 @@
 'use client'
 
 import type { CSSProperties } from 'react'
-import type { Transition } from 'framer-motion'
-import { motion } from 'framer-motion'
+import type { Transition } from 'motion/react'
+import { motion } from 'motion/react'
 
 import { cn } from '@/lib/utils'
 

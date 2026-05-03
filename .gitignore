@@ -45,6 +45,12 @@ tw-debug.css
 .tmp_*.json
 .mcp-github-push-batches/
 
+# Playwright artifacts (generated locally, not committed)
+test-results/
+playwright-report/
+.playwright-cache/
+playwright/.auth/
+
 # Agent/cursor metadata and references (non-production)
 .agents/
 .cursor/

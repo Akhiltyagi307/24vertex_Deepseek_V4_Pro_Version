@@ -16,6 +16,28 @@ declare global {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+const CHECKOUT_ORIGIN = "https://checkout.razorpay.com";
+
+let preconnectInjected = false;
+
+/**
+ * Injects `<link rel="preconnect">` to checkout.razorpay.com on first user intent
+ * (hover/focus on the upgrade button). Cuts the TLS handshake out of the click path
+ * without making every subscription-page visitor pay it.
+ */
+function preconnectRazorpayOnce(): void {
+	if (preconnectInjected || typeof document === "undefined") return;
+	preconnectInjected = true;
+	const preconnect = document.createElement("link");
+	preconnect.rel = "preconnect";
+	preconnect.href = CHECKOUT_ORIGIN;
+	preconnect.crossOrigin = "anonymous";
+	document.head.appendChild(preconnect);
+	const dnsPrefetch = document.createElement("link");
+	dnsPrefetch.rel = "dns-prefetch";
+	dnsPrefetch.href = CHECKOUT_ORIGIN;
+	document.head.appendChild(dnsPrefetch);
+}
 
 async function ensureRazorpayScript(): Promise<boolean> {
 	if (typeof window === "undefined") return false;
@@ -134,6 +156,8 @@ export function RazorpayCheckoutButton({
 	return (
 		<Button
 			onClick={onClick}
+			onPointerEnter={preconnectRazorpayOnce}
+			onFocus={preconnectRazorpayOnce}
 			variant={variant}
 			disabled={disabled || pending}
 			className={className}

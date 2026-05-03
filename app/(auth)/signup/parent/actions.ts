@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { parentSignupSchema } from "@/lib/validations/auth";
@@ -25,15 +27,13 @@ export async function completeParentRegistration(
 	}
 
 	const v = parsed.data;
-	const supabase = await createClient();
-	const {
-		data: { user },
-		error: userError,
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 
-	if (userError || !user) {
+	if (!user) {
 		return { error: "Session missing. Try again or log in." };
 	}
+
+	const supabase = await createClient();
 
 	if (user.email?.toLowerCase() !== v.email.toLowerCase()) {
 		return { error: "Email does not match the signed-in account." };

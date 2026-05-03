@@ -13,7 +13,7 @@ import {
 	YAxis,
 } from "recharts";
 import { format } from "date-fns";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import { LineChartIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

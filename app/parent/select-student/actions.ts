@@ -5,9 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { PARENT_ACTIVE_STUDENT_COOKIE } from "@/lib/parent/active-student-cookie";
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
-import { createClient } from "@/lib/supabase/server";
 
 const studentIdSchema = z.string().uuid();
 
@@ -18,10 +18,7 @@ export async function selectParentStudentAction(formData: FormData): Promise<voi
 		redirect("/parent/select-student");
 	}
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) {
 		redirect("/login");
 	}

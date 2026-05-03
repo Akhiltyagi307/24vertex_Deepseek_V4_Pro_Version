@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cancelSubscription } from "@/lib/billing/razorpay";
 import { isCouponSingleUseGlobalExhausted } from "@/lib/billing/coupon-policy";
 import { PLAN_CATALOG, tokenQuotaForGrade } from "@/lib/billing/plans";
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
@@ -46,13 +47,11 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		return { ok: false, code: "invalid_code", message: INVALID };
 	}
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) {
 		return { ok: false, code: "unauthorized", message: "Sign in to redeem a coupon." };
 	}
+	const supabase = await createClient();
 	const admin = createServiceRoleClient();
 
 	const { data: callerProfile } = await admin
@@ -234,11 +233,9 @@ export type CancelSubscriptionResult = { ok: true } | { ok: false; message: stri
  * date arrives.
  */
 export async function cancelAtPeriodEnd(): Promise<CancelSubscriptionResult> {
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) return { ok: false, message: "Sign in to manage your subscription." };
+	const supabase = await createClient();
 
 	const admin = createServiceRoleClient();
 	const { data: sub } = await admin

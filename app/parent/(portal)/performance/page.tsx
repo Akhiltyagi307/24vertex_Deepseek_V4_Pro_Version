@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { StudentPerformanceView } from "@/components/student/student-performance-view";
+import { StudentPerformanceAsync } from "../../../student/performance/student-performance-async";
+import { StudentPerformanceSkeleton } from "../../../student/performance/student-performance-skeleton";
 import { getServerUser } from "@/lib/auth/get-server-user";
-import { buildEnrolledSubjectCards } from "@/lib/student/performance-matrix";
-import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
 import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
 import { createClient } from "@/lib/supabase/server";
@@ -40,30 +40,22 @@ export default async function ParentPerformancePage({ searchParams }: PageProps)
 		redirect("/parent/select-student");
 	}
 
-	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } =
-		await loadStudentPerformanceBundle(
-			supabase,
-			activeId,
-			{
-				grade: row.grade,
-				stream: row.stream,
-				elective_subject_id: row.elective_subject_id,
-				role: row.role,
-			},
-		);
-
-	const enrolledSubjectCards = buildEnrolledSubjectCards(enrolledSubjects, topicCountBySubjectId, rows);
+	const profileRow = {
+		grade: row.grade,
+		stream: row.stream,
+		elective_subject_id: row.elective_subject_id,
+		role: row.role,
+	};
 
 	return (
-		<StudentPerformanceView
-			initialRows={rows}
-			loadError={loadError}
-			subjectFromUrl={sp.subject ?? null}
-			enrolledSubjectCards={enrolledSubjectCards}
-			profileGrade={row.grade}
-			trackerNeedsHydration={trackerNeedsHydration}
-			portalBasePath="/parent"
-			parentViewer
-		/>
+		<Suspense fallback={<StudentPerformanceSkeleton />}>
+			<StudentPerformanceAsync
+				userId={activeId}
+				profileRow={profileRow}
+				subjectFromUrl={sp.subject ?? null}
+				portalBasePath="/parent"
+				parentViewer
+			/>
+		</Suspense>
 	);
 }

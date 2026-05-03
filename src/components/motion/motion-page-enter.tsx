@@ -1,6 +1,3 @@
-"use client";
-
-import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -11,22 +8,9 @@ type MotionPageEnterProps = {
 };
 
 /**
- * Full-column enter for routes without a segment `template.tsx` (e.g. marketing, legal).
- * Uses opacity + slight vertical motion; skipped when reduced motion is preferred.
+ * CSS-only enter for routes without a segment `template.tsx` (marketing, legal).
+ * Animation lives in globals.css `.motion-page-enter`; reduced-motion is honored there.
  */
 export function MotionPageEnter({ children, className }: MotionPageEnterProps) {
-	const reduceMotion = useReducedMotion();
-	const y = reduceMotion ? 0 : 8;
-	const duration = reduceMotion ? 0 : 0.24;
-
-	return (
-		<motion.div
-			className={cn("min-w-0 w-full", className)}
-			initial={reduceMotion ? false : { opacity: 0, y }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ duration, ease: [0.25, 0.1, 0.25, 1] }}
-		>
-			{children}
-		</motion.div>
-	);
+	return <div className={cn("motion-page-enter min-w-0 w-full", className)}>{children}</div>;
 }

@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { completeChatJson } from "@/lib/ai/json-completion";
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { getOpenAIChatModel } from "@/lib/env";
 import { consumeStudyTipsRateLimit } from "@/lib/practice/practice-rate-limit";
 import { createClient } from "@/lib/supabase/server";
@@ -60,14 +61,11 @@ export async function requestStudyTipsJson(input: unknown): Promise<StudyTipsRes
 		};
 	}
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-		error: userError,
-	} = await supabase.auth.getUser();
-	if (userError || !user) {
+	const user = await getServerUser();
+	if (!user) {
 		return { ok: false, code: "unauthorized", message: "Sign in to continue." };
 	}
+	const supabase = await createClient();
 
 	const { data: profileRow, error: profileErr } = await supabase
 		.from("profiles")

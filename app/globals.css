@@ -193,6 +193,70 @@
     }
 }
 
+/* CSS-only page-enter for routes without a segment template (marketing, legal). */
+@keyframes motion-page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.motion-page-enter {
+  animation: motion-page-enter 0.24s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-page-enter {
+    animation: none;
+  }
+}
+
+/* CSS-only segment transition for App Router template.tsx (replaces framer-motion). */
+@keyframes segment-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.segment-enter {
+  animation: segment-enter 0.22s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment-enter {
+    animation: none;
+  }
+}
+
+/* CSS-only stagger for hero rows (replaces motion.div initial+animate chain). */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hero-rise-up {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-rise {
+  animation: hero-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-rise-up {
+  animation: hero-rise-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-rise-delay-60 { animation-delay: 0.06s; }
+.hero-rise-delay-120 { animation-delay: 0.12s; }
+.hero-rise-delay-180 { animation-delay: 0.18s; }
+.hero-rise-delay-240 { animation-delay: 0.24s; }
+.hero-rise-delay-320 { animation-delay: 0.32s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise,
+  .hero-rise-up {
+    animation: none;
+  }
+}
+
 /* Practice wizard topic matrix: circular check controls (SVG data URLs; keep out of Tailwind arbitrary values). */
 .practice-matrix-check-circle[type="checkbox"]:checked {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");

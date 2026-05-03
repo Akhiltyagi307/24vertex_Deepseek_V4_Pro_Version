@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { isOwnSupabaseAvatarUrl } from "@/lib/supabase/avatar-storage-url";
@@ -29,14 +30,11 @@ export async function updateStudentProfile(
 	}
 	const v = parsed.data;
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-		error: userError,
-	} = await supabase.auth.getUser();
-	if (userError || !user) {
+	const user = await getServerUser();
+	if (!user) {
 		return { error: "Not signed in." };
 	}
+	const supabase = await createClient();
 
 	const { data: row, error: fetchError } = await supabase
 		.from("profiles")
@@ -90,14 +88,11 @@ export async function updateStudentSchoolPlacement(
 	}
 	const v = parsed.data;
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-		error: userError,
-	} = await supabase.auth.getUser();
-	if (userError || !user) {
+	const user = await getServerUser();
+	if (!user) {
 		return { error: "Not signed in." };
 	}
+	const supabase = await createClient();
 
 	const { data: row, error: fetchError } = await supabase
 		.from("profiles")

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRightIcon, CrownIcon, SparklesIcon, ZapIcon } from "lucide-react";
 
 import { cardSurfaceFrameClassName } from "@/components/ui/card";

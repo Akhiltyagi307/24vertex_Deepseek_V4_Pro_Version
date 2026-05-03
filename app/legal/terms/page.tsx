@@ -9,6 +9,9 @@ export const metadata: Metadata = {
 	description: "Terms of use for the EduAI service.",
 };
 
+export const dynamic = "force-static";
+export const revalidate = 86400;
+
 export default function LegalTermsPage() {
 	return (
 		<main className="w-full min-w-0 max-w-none px-4 py-12 text-foreground medium:px-8">

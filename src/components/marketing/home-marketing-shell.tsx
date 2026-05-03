@@ -1,10 +1,7 @@
-"use client";
-
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
-
-import { useMarketingThemeSync } from "@/components/marketing/use-marketing-theme-sync";
+import { MarketingThemeSyncIsland } from "@/components/marketing/marketing-theme-sync-island";
 
 export function HomeMarketingShell({
 	className,
@@ -13,7 +10,6 @@ export function HomeMarketingShell({
 	className?: string;
 	children: React.ReactNode;
 }) {
-	useMarketingThemeSync();
 	return (
 		<div
 			className={cn(
@@ -21,6 +17,7 @@ export function HomeMarketingShell({
 				className,
 			)}
 		>
+			<MarketingThemeSyncIsland />
 			{children}
 		</div>
 	);

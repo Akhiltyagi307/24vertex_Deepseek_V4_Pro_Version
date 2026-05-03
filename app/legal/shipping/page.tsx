@@ -9,6 +9,9 @@ export const metadata: Metadata = {
 	description: "How EduAI delivers access to digital practice and AI features after purchase.",
 };
 
+export const dynamic = "force-static";
+export const revalidate = 86400;
+
 export default function LegalShippingPage() {
 	return (
 		<main className="w-full min-w-0 max-w-none px-4 py-12 text-foreground medium:px-8">

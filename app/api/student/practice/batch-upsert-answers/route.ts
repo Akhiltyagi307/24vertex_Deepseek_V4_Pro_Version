@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import {
 	assertTestOwnedInProgress,
@@ -50,13 +51,11 @@ export async function POST(request: Request) {
 		return Response.json({ ok: false, message: "Invalid payload." }, { status: 400 });
 	}
 
-	const supabase = await createClient();
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+	const user = await getServerUser();
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
+	const supabase = await createClient();
 
 	const gate = await assertTestOwnedInProgress(supabase, parsed.data.testId, user.id);
 	if (!gate.ok) {
