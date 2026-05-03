@@ -79,6 +79,10 @@ export async function POST(request: Request) {
 						onPartialObject: (partial) => {
 							send({ type: "partial" as const, partial });
 						},
+						// When the client closes the connection, request.signal fires
+						// and the in-flight OpenAI HTTP call is cancelled — no more
+						// tokens billed for a stream nobody is reading.
+						abortSignal: request.signal,
 					},
 				);
 				send({ type: "done" as const, result });

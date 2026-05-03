@@ -48,6 +48,8 @@ export type RunGenerationPipelineOptions = {
 	useStreamObject: boolean;
 	/** Fires for each partial object when `useStreamObject` is true. */
 	onPartialObject?: (partial: unknown) => void;
+	/** Cancel the OpenAI HTTP call (and downstream model retries) when fired. */
+	abortSignal?: AbortSignal;
 };
 
 function formatGenerationError(e: unknown): string {
@@ -125,10 +127,14 @@ async function runModelOnce(
 	userPrompt: string,
 	estimatedQuestionCount: number,
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
-	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject">,
+	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
 	studentUserId: string,
 ): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
-	const maxOutputTokens = Math.min(32_000, Math.max(6_000, estimatedQuestionCount * 900));
+	// Hard-cap output tokens at 12k regardless of question count. The previous
+	// scaling could request up to 32k for high-question tests, which exceeds
+	// per-request limits on some models and produces unpredictable cost. 12k
+	// fits a 40-question schema comfortably.
+	const maxOutputTokens = Math.min(12_000, Math.max(6_000, estimatedQuestionCount * 900));
 	const model = getOpenAIProvider()(getOpenAIChatModel());
 	const baseParams = {
 		model,
@@ -137,6 +143,7 @@ async function runModelOnce(
 		prompt: userPrompt,
 		maxOutputTokens,
 		maxRetries: 2,
+		abortSignal: opts.abortSignal,
 		providerOptions: {
 			openai: {
 				strictJsonSchema: false,
