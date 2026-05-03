@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { shouldRedirectToMaintenance } from "@/lib/admin/maintenance-routing";
 import { adminProxyGate } from "@/lib/admin/proxy-guard";
+import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
 import { updateSession } from "@/lib/supabase/session";
 
 /** Node.js runtime: matches prior `proxy.ts` behavior and ensures dev emits `server/middleware.js` (Turbopack + `loadNodeMiddleware`). */
@@ -28,13 +29,13 @@ export async function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
 	const requestId = resolveRequestId(request);
-	// Forward to downstream route handlers — they read it via
-	// request.headers.get("x-request-id") and tag Sentry / structured logs.
-	request.headers.set(REQUEST_ID_HEADER, requestId);
+	const nonce = generateCspNonce();
+	const csp = buildCsp(nonce);
 
 	const adminEarly = await adminProxyGate(request);
 	if (adminEarly) {
 		adminEarly.headers.set(REQUEST_ID_HEADER, requestId);
+		adminEarly.headers.set("Content-Security-Policy", csp);
 		return adminEarly;
 	}
 
@@ -43,11 +44,22 @@ export async function middleware(request: NextRequest) {
 		url.pathname = "/maintenance";
 		const redirect = NextResponse.redirect(url);
 		redirect.headers.set(REQUEST_ID_HEADER, requestId);
+		redirect.headers.set("Content-Security-Policy", csp);
 		return redirect;
 	}
 
-	const response = await updateSession(request);
+	// Forward both the CSP nonce and the request id to downstream RSC / route
+	// handlers via mutated request headers. Server components read the nonce
+	// via headers().get('x-nonce'); route handlers read request.headers.get(
+	// 'x-request-id') for Sentry / structured-log correlation.
+	const response = await updateSession(request, {
+		extraRequestHeaders: {
+			[CSP_NONCE_REQUEST_HEADER]: nonce,
+			[REQUEST_ID_HEADER]: requestId,
+		},
+	});
 	response.headers.set(REQUEST_ID_HEADER, requestId);
+	response.headers.set("Content-Security-Policy", csp);
 	return response;
 }
 

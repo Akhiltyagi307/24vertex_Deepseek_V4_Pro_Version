@@ -18,61 +18,6 @@ function supabaseStorageRemotePatterns() {
 	}
 }
 
-/**
- * Baseline CSP: Supabase API + Realtime, Razorpay checkout script/API, Sentry ingest.
- * `unsafe-inline` scripts/styles align with Next.js + Tailwind; dev adds `unsafe-eval` for tooling.
- */
-function contentSecurityPolicy(): string {
-	const connectParts = ["'self'"];
-	const supabaseRaw = process.env.NEXT_PUBLIC_SUPABASE_URL;
-	if (supabaseRaw) {
-		try {
-			const u = new URL(supabaseRaw);
-			connectParts.push(u.origin, `wss://${u.hostname}`);
-		} catch {
-			/* ignore */
-		}
-	}
-	connectParts.push(
-		"https://*.ingest.sentry.io",
-		"https://*.ingest.de.sentry.io",
-		"https://api.razorpay.com",
-	);
-
-	let imgSrc = "'self' data: blob: https:";
-	if (supabaseRaw) {
-		try {
-			imgSrc += ` ${new URL(supabaseRaw).origin}`;
-		} catch {
-			/* ignore */
-		}
-	}
-
-	const scriptSrc =
-		process.env.NODE_ENV === "production" ?
-			"'self' 'unsafe-inline' https://checkout.razorpay.com"
-		:	"'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com";
-
-	const directives = [
-		"default-src 'self'",
-		"base-uri 'self'",
-		"form-action 'self'",
-		"frame-ancestors 'self'",
-		`script-src ${scriptSrc}`,
-		"style-src 'self' 'unsafe-inline'",
-		`connect-src ${connectParts.join(" ")}`,
-		`img-src ${imgSrc}`,
-		"font-src 'self' data:",
-		"frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
-	];
-
-	if (process.env.VERCEL_ENV === "production") {
-		directives.push("upgrade-insecure-requests");
-	}
-
-	return directives.join("; ");
-}
-
 const nextConfig: NextConfig = {
 	experimental: {
 		optimizePackageImports: ["lucide-react", "recharts"],
@@ -88,6 +33,9 @@ const nextConfig: NextConfig = {
 		],
 	},
 	async headers() {
+		// `Content-Security-Policy` is set per-request in `middleware.ts` so we can issue a fresh
+		// nonce for `script-src 'strict-dynamic' 'nonce-…'`. Static security headers stay here so
+		// they're applied even on routes the middleware matcher excludes (static assets, images).
 		const base: { key: string; value: string }[] = [
 			{ key: "X-Content-Type-Options", value: "nosniff" },
 			{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -96,7 +44,6 @@ const nextConfig: NextConfig = {
 				key: "Permissions-Policy",
 				value: "camera=(), microphone=(), geolocation=()",
 			},
-			{ key: "Content-Security-Policy", value: contentSecurityPolicy() },
 		];
 
 		if (process.env.VERCEL_ENV === "production") {
