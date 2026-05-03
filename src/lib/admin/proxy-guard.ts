@@ -3,6 +3,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, ADMIN_RUNTIME_KV_JWT_VERSION } from "@/lib/admin/constants";
 import { verifyAdminJwtShape } from "@/lib/admin/jwt-edge";
 
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 function isAdminArea(pathname: string): boolean {
 	return pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
 }
@@ -11,6 +13,45 @@ function isPublicAdminPath(pathname: string): boolean {
 	if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) return true;
 	if (pathname === "/api/admin/auth/login") return true;
 	if (pathname === "/api/admin/panic") return true;
+	return false;
+}
+
+/**
+ * Defense-in-depth CSRF check for /api/admin/* mutations. Browsers always set
+ * Origin on cross-origin POST/PUT/PATCH/DELETE; if it's set and doesn't match
+ * our app's origin, the request is a CSRF attempt and we reject. If Origin is
+ * absent (server-to-server fetch, curl, dev tools), we allow — CSRF only
+ * applies to browser-driven cross-origin smuggling.
+ *
+ * The admin session cookie is already SameSite=Strict, so this is belt + suspenders:
+ * if a future browser bug or downgrade ever weakens SameSite, we still hold.
+ */
+function adminOriginAllowed(request: NextRequest): boolean {
+	const origin = request.headers.get("origin")?.trim();
+	if (!origin) return true;
+
+	const expected = process.env.NEXT_PUBLIC_APP_URL?.trim();
+	const expectedOrigin = (() => {
+		if (!expected) return null;
+		try {
+			return new URL(expected).origin;
+		} catch {
+			return null;
+		}
+	})();
+
+	if (expectedOrigin && origin === expectedOrigin) return true;
+
+	// Same-origin to the request itself is also acceptable (covers preview
+	// deployments, custom domains, and the case where NEXT_PUBLIC_APP_URL is
+	// unset in dev).
+	try {
+		const requestOrigin = new URL(request.url).origin;
+		if (origin === requestOrigin) return true;
+	} catch {
+		/* malformed url — fall through to deny */
+	}
+
 	return false;
 }
 
@@ -54,6 +95,21 @@ async function getJwtVersionFromSupabaseRest(): Promise<number> {
 export async function adminProxyGate(request: NextRequest): Promise<NextResponse | null> {
 	const { pathname } = request.nextUrl;
 	if (!isAdminArea(pathname)) return null;
+
+	// CSRF defense-in-depth for /api/admin/* mutations. Reject before the auth
+	// check so a misconfigured Origin can never accidentally bypass into the
+	// session lookup or downstream handler.
+	if (
+		pathname.startsWith("/api/admin") &&
+		MUTATION_METHODS.has(request.method) &&
+		!isPublicAdminPath(pathname) &&
+		!adminOriginAllowed(request)
+	) {
+		return NextResponse.json(
+			{ error: "Forbidden", code: "admin_origin_mismatch" },
+			{ status: 403 },
+		);
+	}
 
 	if (isPublicAdminPath(pathname)) return null;
 
