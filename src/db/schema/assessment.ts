@@ -172,7 +172,7 @@ export const testReports = pgTable("test_reports", {
 	topicPerformance: jsonb("topic_performance"),
 	recommendations: text("recommendations").array(),
 	pdfStoragePath: text("pdf_storage_path"),
-	gradingFailedAt: timestamp("grading_failed_at"),
+	gradingFailedAt: timestamp("grading_failed_at", { withTimezone: true }),
 	gradingError: text("grading_error"),
 	createdAt: timestamp("created_at").defaultNow(),
 });

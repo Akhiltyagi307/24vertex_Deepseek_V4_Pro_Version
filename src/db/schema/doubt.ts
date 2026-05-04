@@ -20,8 +20,8 @@ export const doubtConversations = pgTable(
 		title: text("title"),
 		model: varchar("model", { length: 120 }),
 		metadata: jsonb("metadata").default({}),
-		createdAt: timestamp("created_at").defaultNow(),
-		updatedAt: timestamp("updated_at").defaultNow(),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 	},
 	(t) => [
 		index("idx_doubt_conversations_student_updated").on(t.studentId, t.updatedAt),
@@ -43,7 +43,7 @@ export const doubtMessages = pgTable(
 		promptTokens: integer("prompt_tokens"),
 		completionTokens: integer("completion_tokens"),
 		model: varchar("model", { length: 120 }),
-		createdAt: timestamp("created_at").defaultNow().notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 	},
 	(t) => [
 		index("idx_doubt_messages_conversation_created").on(t.conversationId, t.createdAt),
