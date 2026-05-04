@@ -25,6 +25,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "perf:check": "node scripts/perf-check.mjs",
+    "preview:emails": "NODE_OPTIONS=\"--require ./scripts/_preview-cjs-loader.cjs\" tsx scripts/preview-emails.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:repair-profile-prefs": "node scripts/repair-drifted-profile-prefs.mjs",

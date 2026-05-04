@@ -10,6 +10,7 @@ import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeNextQuotaTestGrant } from "@/lib/billing/quota-grant-consume";
 import { PLAN_CATALOG, type PlanCode, tokenQuotaForGrade } from "@/lib/billing/plans";
 import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
+import { findCurrentUsagePeriod } from "@/lib/billing/usage-period";
 import { maybeNotifyUsageThreshold } from "@/lib/notifications/usage-threshold";
 
 export type SubscriptionStatus =
@@ -455,36 +456,16 @@ export async function consumeTest(
 	return { ok: true };
 }
 
-async function emitTestsUsageThresholdIfAny(supabase: SupabaseClient, profileId: string): Promise<void> {
+async function emitTestsUsageThresholdIfAny(_supabase: SupabaseClient, profileId: string): Promise<void> {
 	try {
-		const { data: sub } = await supabase
-			.from("subscriptions")
-			.select("id")
-			.eq("profile_id", profileId)
-			.maybeSingle<{ id: string }>();
-		if (!sub?.id) return;
-
-		const { data: usage } = await supabase
-			.from("usage_periods")
-			.select("id, tests_quota, tests_used, period_start, period_end")
-			.eq("subscription_id", sub.id)
-			.order("period_end", { ascending: false })
-			.limit(USAGE_PERIOD_LOOKBACK);
-		if (!usage?.length) return;
-
-		const now = Date.now();
-		const active =
-			usage.find(
-				(r) => new Date(r.period_start).getTime() <= now && new Date(r.period_end).getTime() > now,
-			) ?? usage[0];
-		if (!active) return;
-
+		const period = await findCurrentUsagePeriod(profileId);
+		if (!period) return;
 		await maybeNotifyUsageThreshold({
 			profileId,
-			usagePeriodId: active.id as string,
+			usagePeriodId: period.id,
 			meter: "tests",
-			testsUsed: Number(active.tests_used ?? 0),
-			testsQuota: Number(active.tests_quota ?? 0),
+			testsUsed: period.testsUsed,
+			testsQuota: period.testsQuota,
 		});
 	} catch (err) {
 		// Helper already logs; extra catch here so bad data never surfaces to
@@ -518,38 +499,18 @@ export async function consumeTokens(
 }
 
 async function emitTokensUsageThresholdIfAny(
-	supabase: SupabaseClient,
+	_supabase: SupabaseClient,
 	profileId: string,
 ): Promise<void> {
 	try {
-		const { data: sub } = await supabase
-			.from("subscriptions")
-			.select("id")
-			.eq("profile_id", profileId)
-			.maybeSingle<{ id: string }>();
-		if (!sub?.id) return;
-
-		const { data: usage } = await supabase
-			.from("usage_periods")
-			.select("id, tokens_quota, tokens_used, period_start, period_end")
-			.eq("subscription_id", sub.id)
-			.order("period_end", { ascending: false })
-			.limit(USAGE_PERIOD_LOOKBACK);
-		if (!usage?.length) return;
-
-		const now = Date.now();
-		const active =
-			usage.find(
-				(r) => new Date(r.period_start).getTime() <= now && new Date(r.period_end).getTime() > now,
-			) ?? usage[0];
-		if (!active) return;
-
+		const period = await findCurrentUsagePeriod(profileId);
+		if (!period) return;
 		await maybeNotifyUsageThreshold({
 			profileId,
-			usagePeriodId: active.id as string,
+			usagePeriodId: period.id,
 			meter: "tokens",
-			tokensUsed: Number(active.tokens_used ?? 0),
-			tokensQuota: Number(active.tokens_quota ?? 0),
+			tokensUsed: period.tokensUsed,
+			tokensQuota: period.tokensQuota,
 		});
 	} catch (err) {
 		logSupabaseError("billing.consume_tokens.notify_threshold", { message: String(err) }, { profileId });

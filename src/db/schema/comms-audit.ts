@@ -26,7 +26,10 @@ export const notifications = pgTable(
 		body: text("body").notNull(),
 		type: varchar("type", { length: 30 }).notNull(),
 		priority: varchar("priority", { length: 10 }).default("normal"),
-		category: varchar("category", { length: 30 }),
+		// 64 chars leaves headroom for future categories like
+		// `subscription_payment_failed` (28), `parent_child_link_confirmed` (28),
+		// or longer composite keys without bumping the column again.
+		category: varchar("category", { length: 64 }),
 		referenceType: varchar("reference_type", { length: 30 }),
 		referenceId: uuid("reference_id"),
 		/** Student profile this row is about (parent portal and multi-child context). */
@@ -87,11 +90,19 @@ export const userPreferences = pgTable("user_preferences", {
 	testDurationPreference: integer("test_duration_preference").default(3600),
 	enableEmailNotifications: boolean("enable_email_notifications").default(true),
 	enableInappNotifications: boolean("enable_inapp_notifications").default(true),
+	// Stays in sync with `DEFAULT_NOTIFICATION_TYPES` in
+	// `src/lib/notifications/types.ts`. The runtime merges these defaults
+	// with whatever the user has saved, so the literal value here only
+	// affects brand-new rows that omit the column at INSERT time. Changing
+	// this default in production also requires a Postgres `ALTER COLUMN
+	// SET DEFAULT` migration, applied to both Project A and Project B.
 	notificationTypes: jsonb("notification_types").default({
 		test_result: true,
 		announcement: true,
 		reminder: true,
 		usage_alert: true,
+		system: true,
+		encouragement: true,
 	}),
 	preferredLanguage: varchar("preferred_language", { length: 5 }).default("en"),
 	createdAt: timestamp("created_at").defaultNow(),

@@ -11,8 +11,22 @@ import {
 	sendPaymentReceiptEmail,
 	sendSubscriptionActiveEmail,
 } from "@/lib/email/subscription-notifications";
+import { getNotificationPrefs, isEmailAllowed } from "@/lib/notifications/prefs";
 import { logServerError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+
+/**
+ * Centralized pref check for Razorpay webhook emails. Today the master switch
+ * (`enable_email_notifications`) gates everything — payment-failed, receipts,
+ * activations. A finer-grained `subscription_billing` opt-in (so users can
+ * mute receipts but still receive payment-failed) is on the backlog. We use
+ * the existing `system` bucket so any user who muted system mail (the only
+ * key meaningful here today) still skips these.
+ */
+async function isBillingEmailAllowedFor(profileId: string): Promise<boolean> {
+	const prefs = await getNotificationPrefs(profileId);
+	return isEmailAllowed(prefs, "system");
+}
 export type RazorpayWebhookBody = {
 	event: string;
 	payload: Record<string, { entity: Record<string, unknown> }>;
@@ -204,9 +218,10 @@ async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<
 		event_name: "subscription_started",
 		props: { plan_code: targetPlanCode, razorpay_subscription_id: subscriptionId },
 	});
-	if (studentEmail) {
+	if (studentEmail && (await isBillingEmailAllowedFor(ours.profile_id))) {
 		void sendSubscriptionActiveEmail({
 			to: studentEmail,
+			recipientUserId: ours.profile_id,
 			studentName: profile?.full_name ?? undefined,
 			planName: targetPlan.name,
 			nextRenewalIso: periodEndIso,
@@ -260,9 +275,10 @@ async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<vo
 			{ onConflict: "razorpay_payment_id" },
 		);
 		const payStatus = String(paymentEntity?.status ?? "captured").toLowerCase();
-		if (studentEmail && payStatus !== "failed") {
+		if (studentEmail && payStatus !== "failed" && (await isBillingEmailAllowedFor(ours.profile_id))) {
 			void sendPaymentReceiptEmail({
 				to: studentEmail,
+				recipientUserId: ours.profile_id,
 				studentName: profile?.full_name ?? undefined,
 				amountLabel: formatInrPaise(amt),
 				planName: targetPlan.name,
@@ -369,8 +385,20 @@ async function handlePaymentFailed(ctx: WebhookHandlerContext): Promise<void> {
 		event_name: "subscription_payment_failed",
 		props: { razorpay_subscription_id: subscriptionId },
 	});
+	// Payment-failed gates only on the master `enable_email_notifications` switch:
+	// a user who explicitly killed all email still doesn't get pinged here, but
+	// per-type opt-outs cannot mute this critical signal. (When the
+	// `subscription_billing` pref bucket lands, this stays gated on the master
+	// switch only.)
 	if (studentEmail) {
-		void sendPaymentFailedEmail({ to: studentEmail, studentName: profile?.full_name ?? undefined });
+		const prefs = await getNotificationPrefs(ours.profile_id);
+		if (prefs.enableEmail) {
+			void sendPaymentFailedEmail({
+				to: studentEmail,
+				recipientUserId: ours.profile_id,
+				studentName: profile?.full_name ?? undefined,
+			});
+		}
 	}
 }
 

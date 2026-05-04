@@ -1,39 +1,15 @@
 import "server-only";
 
 import { getAppUrl } from "@/lib/env";
+import { escapeHtml, renderEmailShell } from "@/lib/email/render-email-shell";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 
-function escapeHtml(s: string): string {
-	return s
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
+function pctLabel(overall: number | null | undefined): string | null {
+	return overall != null && Number.isFinite(overall) ? `${Math.round(overall)}%` : null;
 }
 
-function wrapHtml(
-	title: string,
-	bodyLines: string[],
-	cta?: { label: string; href: string },
-	secondaryCta?: { label: string; href: string },
-): string {
-	const lines = bodyLines.map((line) => `<p style="margin:0 0 12px;">${line}</p>`).join("");
-	const buttonStyle =
-		"background:#059669;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;";
-	const outlineStyle =
-		"background:#fff;color:#059669;border:1px solid #059669;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;";
-	const buttons = [
-		cta ? `<p style="margin:16px 0 0;"><a href="${escapeHtml(cta.href)}" style="${buttonStyle}">${escapeHtml(cta.label)}</a></p>` : "",
-		secondaryCta ?
-			`<p style="margin:12px 0 0;"><a href="${escapeHtml(secondaryCta.href)}" style="${outlineStyle}">${escapeHtml(secondaryCta.label)}</a></p>`
-		:	"",
-	].join("");
-	return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.55;color:#111;max-width:560px;margin:0 auto;padding:24px;">
-<h1 style="font-size:20px;margin:0 0 16px;">${escapeHtml(title)}</h1>
-${lines}
-${buttons}
-<p style="margin:16px 0 0;font-size:13px;color:#666;">${escapeHtml(getAppUrl())}</p>
-</body></html>`;
+function buildReportDedupKey(scope: "student" | "parent", testId: string, recipientId: string): string {
+	return `report-ready:${testId}:${scope}:${recipientId}`;
 }
 
 export type ReportReadyEmailParams = {
@@ -48,31 +24,50 @@ export type ReportReadyEmailParams = {
 };
 
 export async function sendReportReadyEmail(params: ReportReadyEmailParams): Promise<{ error: string | null }> {
-	const pct =
-		params.overallPercent != null && Number.isFinite(params.overallPercent)
-			? `${Math.round(params.overallPercent)}%`
-			: null;
+	const pct = pctLabel(params.overallPercent);
 	const subject = `Your ${params.subjectName} report is ready`;
 	const portalHref = `${getAppUrl()}/student/reports?test=${encodeURIComponent(params.testId)}`;
 	const pdfUrl = params.pdfSignedUrl?.trim() || null;
-	const bodyLines = [
-		`Hi ${escapeHtml(params.studentName ?? "there")},`,
-		`We just graded your ${escapeHtml(params.subjectName)} practice test${pct ? ` — you scored ${pct}.` : "."}`,
-		pdfUrl ?
-			"Open the PDF for your full printable report. You do not need to sign in to EduAI to use this link. It expires after 90 days."
-		:	"Open the report to see topic-level strengths, weaknesses, and your next recommended practice.",
-		...(pdfUrl ? ["For topic breakdowns and next practice inside the app, use View in EduAI below."] : []),
-	];
-	const html =
-		pdfUrl ?
-			wrapHtml(subject, bodyLines, { label: "Open PDF report", href: pdfUrl }, { label: "View in EduAI", href: portalHref })
-		:	wrapHtml(subject, bodyLines, { label: "View report", href: portalHref });
+
+	const subjectName = escapeHtml(params.subjectName);
+	const studentName = escapeHtml(params.studentName ?? "there");
+
+	const paragraphs: string[] = [];
+	paragraphs.push(
+		`We just finished grading your <strong>${subjectName}</strong> practice test${pct ? ` — you scored <strong>${pct}</strong>.` : "."}`,
+	);
+	if (pdfUrl) {
+		paragraphs.push(
+			"Open the PDF for the full printable report. You don't need to sign in to EduAI to use this link, and it stays valid for 90 days.",
+		);
+		paragraphs.push("For topic breakdowns and your next recommended practice inside the app, use <em>View in EduAI</em>.");
+	} else {
+		paragraphs.push(
+			"Open the report to see topic-level strengths, weaknesses, and your next recommended practice.",
+		);
+	}
+
+	const html = renderEmailShell({
+		preheader: pct ? `${pct} on your ${params.subjectName} report — open it now.` : `Your ${params.subjectName} report is ready.`,
+		greeting: `Hi ${studentName},`,
+		title: subject,
+		paragraphs,
+		primaryCta: pdfUrl
+			? { label: "Open PDF report", href: pdfUrl }
+			: { label: "View report", href: portalHref },
+		secondaryCta: pdfUrl ? { label: "View in EduAI", href: portalHref } : undefined,
+	});
+
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
+		unsubscribeRecipientUserId: params.recipientUserId ?? null,
 		subject,
 		html,
 		templateSlug: "report-ready",
+		dedupKey: params.recipientUserId
+			? buildReportDedupKey("student", params.testId, params.recipientUserId)
+			: undefined,
 		templateVariables: {
 			student_name: params.studentName ?? "there",
 			subject_name: params.subjectName,
@@ -100,31 +95,50 @@ export type ParentPortalReportReadyEmailParams = {
 export async function sendParentPortalReportReadyEmail(
 	params: ParentPortalReportReadyEmailParams,
 ): Promise<{ error: string | null }> {
-	const pct =
-		params.overallPercent != null && Number.isFinite(params.overallPercent)
-			? `${Math.round(params.overallPercent)}%`
-			: null;
+	const pct = pctLabel(params.overallPercent);
 	const subject = `${params.childDisplayName} — ${params.subjectName} report ready`;
 	const portalHref = `${getAppUrl()}/parent/open-report?student=${encodeURIComponent(params.studentId)}&test=${encodeURIComponent(params.testId)}`;
 	const pdfUrl = params.pdfSignedUrl?.trim() || null;
-	const bodyLines = [
-		`Hi ${escapeHtml(params.parentDisplayName ?? "there")},`,
-		`We just finished grading ${escapeHtml(params.childDisplayName)}'s ${escapeHtml(params.subjectName)} practice test${pct ? ` — they scored ${pct}.` : "."}`,
-		pdfUrl ?
-			"Open the PDF for the full printable report. You do not need to sign in to EduAI to use this link. It expires after 90 days."
-		:	"Open the parent portal report for topic strengths, gaps, and suggested next practice.",
-		...(pdfUrl ? ["For the interactive report in the parent portal, use Open parent portal below."] : []),
-	];
-	const html =
-		pdfUrl ?
-			wrapHtml(subject, bodyLines, { label: "Open PDF report", href: pdfUrl }, { label: "Open parent portal", href: portalHref })
-		:	wrapHtml(subject, bodyLines, { label: "View report", href: portalHref });
+
+	const childName = escapeHtml(params.childDisplayName);
+	const subjectName = escapeHtml(params.subjectName);
+	const parentName = escapeHtml(params.parentDisplayName ?? "there");
+
+	const paragraphs: string[] = [];
+	paragraphs.push(
+		`We just finished grading <strong>${childName}</strong>'s ${subjectName} practice test${pct ? ` — they scored <strong>${pct}</strong>.` : "."}`,
+	);
+	if (pdfUrl) {
+		paragraphs.push(
+			"Open the PDF for the full printable report. You don't need to sign in to EduAI to use this link, and it stays valid for 90 days.",
+		);
+		paragraphs.push("For the interactive parent portal version, use <em>Open parent portal</em>.");
+	} else {
+		paragraphs.push("Open the parent portal report for topic strengths, gaps, and suggested next practice.");
+	}
+
+	const html = renderEmailShell({
+		preheader: pct ? `${params.childDisplayName} scored ${pct} on ${params.subjectName}.` : `${params.childDisplayName}'s ${params.subjectName} report is ready.`,
+		greeting: `Hi ${parentName},`,
+		title: subject,
+		paragraphs,
+		primaryCta: pdfUrl
+			? { label: "Open PDF report", href: pdfUrl }
+			: { label: "View report", href: portalHref },
+		secondaryCta: pdfUrl ? { label: "Open parent portal", href: portalHref } : undefined,
+		preferencesHref: `${getAppUrl()}/parent/settings#notifications`,
+	});
+
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
+		unsubscribeRecipientUserId: params.recipientUserId ?? null,
 		subject,
 		html,
 		templateSlug: "parent-portal-report-ready",
+		dedupKey: params.recipientUserId
+			? buildReportDedupKey("parent", params.testId, params.recipientUserId)
+			: undefined,
 		templateVariables: {
 			parent_name: params.parentDisplayName ?? "there",
 			child_name: params.childDisplayName,
@@ -152,12 +166,21 @@ export async function sendParentChildLinkConfirmedEmail(
 ): Promise<{ error: string | null }> {
 	const subject = `Connected to ${params.childDisplayName} on EduAI`;
 	const href = `${getAppUrl()}/parent/dashboard`;
-	const bodyLines = [
-		`Hi ${escapeHtml(params.parentDisplayName ?? "there")},`,
-		`Your parent login is now linked to ${escapeHtml(params.childDisplayName)} in EduAI.`,
-		"You can open the parent portal to follow their progress, view test reports, and more.",
-	];
-	const html = wrapHtml(subject, bodyLines, { label: "Open parent portal", href });
+	const childName = escapeHtml(params.childDisplayName);
+	const parentName = escapeHtml(params.parentDisplayName ?? "there");
+
+	const html = renderEmailShell({
+		preheader: `You're now linked to ${params.childDisplayName} in EduAI.`,
+		greeting: `Hi ${parentName},`,
+		title: subject,
+		paragraphs: [
+			`Your parent account is now linked to <strong>${childName}</strong> in EduAI.`,
+			"Open the parent portal to follow their progress, view test reports, and switch between children if you have more than one.",
+		],
+		primaryCta: { label: "Open parent portal", href },
+		preferencesHref: `${getAppUrl()}/parent/settings#notifications`,
+	});
+
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
@@ -194,26 +217,43 @@ export async function sendParentPortalUsageThresholdEmail(
 	const label = isTests ? "practice tests" : "doubt-chat tokens";
 	const hundred = params.threshold === 100;
 	const subject = hundred
-		? `${params.childDisplayName}'s plan — 100% of ${label} this period`
-		: `${params.childDisplayName}'s plan — 80% of ${label} this period`;
+		? `${params.childDisplayName}'s plan — 100% of ${label} used`
+		: `${params.childDisplayName}'s plan — 80% of ${label} used`;
 	const href = `${getAppUrl()}/parent/subscription`;
-	const statLine = isTests
-		? `${params.testsUsed ?? 0} of ${params.testsQuota ?? 0} tests used this period.`
-		: `${(params.tokensUsed ?? 0).toLocaleString()} of ${(params.tokensQuota ?? 0).toLocaleString()} tokens used this period.`;
-	const bodyLines = [
-		`Hi ${escapeHtml(params.parentDisplayName ?? "there")},`,
+
+	const childName = escapeHtml(params.childDisplayName);
+	const parentName = escapeHtml(params.parentDisplayName ?? "there");
+
+	const usedNum = isTests ? params.testsUsed ?? 0 : params.tokensUsed ?? 0;
+	const quotaNum = isTests ? params.testsQuota ?? 0 : params.tokensQuota ?? 0;
+	const usedFmt = isTests ? String(usedNum) : usedNum.toLocaleString();
+	const quotaFmt = isTests ? String(quotaNum) : quotaNum.toLocaleString();
+
+	const paragraphs = [
 		hundred
-			? `${escapeHtml(params.childDisplayName)} has reached the limit for ${label} on their current plan period.`
-			: `${escapeHtml(params.childDisplayName)} is approaching the limit for ${label} on their current plan period.`,
-		escapeHtml(statLine),
+			? `<strong>${childName}</strong> has reached the limit for ${label} on their current plan period.`
+			: `<strong>${childName}</strong> is approaching the limit for ${label} on their current plan period.`,
 		hundred
-			? "Open Plan & billing in the parent portal to upgrade or top up so their practice can continue without pausing."
+			? "Upgrade or top up in the parent portal so their practice doesn't pause."
 			: "You may want to review their plan soon so practice doesn't pause at 100%.",
 	];
-	const html = wrapHtml(subject, bodyLines, {
-		label: hundred ? "Upgrade plan" : "View plan",
-		href,
+
+	const html = renderEmailShell({
+		preheader: `${params.childDisplayName}: ${params.threshold}% of ${label} used this period.`,
+		greeting: `Hi ${parentName},`,
+		title: subject,
+		paragraphs,
+		stats: [
+			{ label: isTests ? "Tests used" : "Tokens used", value: `${usedFmt} of ${quotaFmt}` },
+			{ label: "Threshold", value: `${params.threshold}%` },
+		],
+		callout: hundred
+			? { tone: "warning", text: "Practice is paused until quota resets or the plan is upgraded." }
+			: undefined,
+		primaryCta: { label: hundred ? "Upgrade plan" : "View plan", href },
+		preferencesHref: `${getAppUrl()}/parent/settings#notifications`,
 	});
+
 	const slug = isTests
 		? params.threshold === 80
 			? "parent-usage-tests-80"
@@ -224,6 +264,7 @@ export async function sendParentPortalUsageThresholdEmail(
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
+		unsubscribeRecipientUserId: params.recipientUserId ?? null,
 		subject,
 		html,
 		templateSlug: slug,
@@ -263,23 +304,37 @@ export async function sendUsageThresholdEmail(
 		? `You've used 100% of your ${label} this period`
 		: `You've used 80% of your ${label} this period`;
 	const href = `${getAppUrl()}/student/subscription`;
-	const statLine = isTests
-		? `${params.testsUsed ?? 0} of ${params.testsQuota ?? 0} tests used.`
-		: `${(params.tokensUsed ?? 0).toLocaleString()} of ${(params.tokensQuota ?? 0).toLocaleString()} tokens used.`;
-	const bodyLines = [
-		`Hi ${escapeHtml(params.studentName ?? "there")},`,
+	const studentName = escapeHtml(params.studentName ?? "there");
+
+	const usedNum = isTests ? params.testsUsed ?? 0 : params.tokensUsed ?? 0;
+	const quotaNum = isTests ? params.testsQuota ?? 0 : params.tokensQuota ?? 0;
+	const usedFmt = isTests ? String(usedNum) : usedNum.toLocaleString();
+	const quotaFmt = isTests ? String(quotaNum) : quotaNum.toLocaleString();
+
+	const paragraphs = [
 		hundred
-			? `You've reached the limit of your plan's ${label} for the current period.`
-			: `You're approaching the limit of your plan's ${label} for the current period.`,
-		escapeHtml(statLine),
+			? `You've reached the limit of your plan's ${label} for this billing period.`
+			: `You're approaching the limit of your plan's ${label} for this billing period.`,
 		hundred
-			? "Upgrade or top up to continue without pausing your practice."
+			? "Upgrade or top up to keep practicing without a pause."
 			: "Consider upgrading soon so your practice doesn't pause when you hit 100%.",
 	];
-	const html = wrapHtml(subject, bodyLines, {
-		label: hundred ? "Upgrade plan" : "View plan",
-		href,
+
+	const html = renderEmailShell({
+		preheader: `${params.threshold}% of ${label} used this period.`,
+		greeting: `Hi ${studentName},`,
+		title: subject,
+		paragraphs,
+		stats: [
+			{ label: isTests ? "Tests used" : "Tokens used", value: `${usedFmt} of ${quotaFmt}` },
+			{ label: "Threshold", value: `${params.threshold}%` },
+		],
+		callout: hundred
+			? { tone: "warning", text: "Practice is paused until your quota resets or you upgrade." }
+			: undefined,
+		primaryCta: { label: hundred ? "Upgrade plan" : "View plan", href },
 	});
+
 	const slug = isTests
 		? params.threshold === 80
 			? "usage-tests-80"
@@ -290,6 +345,7 @@ export async function sendUsageThresholdEmail(
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
+		unsubscribeRecipientUserId: params.recipientUserId ?? null,
 		subject,
 		html,
 		templateSlug: slug,
@@ -317,12 +373,20 @@ export async function sendAccountPasswordChangedEmail(
 ): Promise<{ error: string | null }> {
 	const subject = "Your EduAI password was changed";
 	const href = `${getAppUrl()}/student/settings`;
-	const bodyLines = [
-		`Hi ${escapeHtml(params.displayName ?? "there")},`,
-		"This confirms the password for your EduAI account was just changed.",
-		"If you did not make this change, reset your password from Account settings or contact support right away.",
-	];
-	const html = wrapHtml(subject, bodyLines, { label: "Account settings", href });
+	const displayName = escapeHtml(params.displayName?.trim() || "there");
+
+	const html = renderEmailShell({
+		preheader: "Confirming a password change on your EduAI account.",
+		greeting: `Hi ${displayName},`,
+		title: subject,
+		paragraphs: [
+			"This confirms the password for your EduAI account was just changed.",
+			"If you did not make this change, reset your password from Account settings or contact support right away.",
+		],
+		callout: { tone: "info", text: "We'll always email you when something important changes on your account." },
+		primaryCta: { label: "Account settings", href },
+	});
+
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
@@ -330,7 +394,7 @@ export async function sendAccountPasswordChangedEmail(
 		html,
 		templateSlug: "account-password-changed",
 		templateVariables: {
-			display_name: params.displayName ?? "there",
+			display_name: params.displayName?.trim() || "there",
 			settings_href: href,
 		},
 	});
@@ -345,15 +409,23 @@ export async function sendAccountEmailChangedEmail(
 ): Promise<{ error: string | null }> {
 	const subject = "Your EduAI sign-in email was updated";
 	const href = `${getAppUrl()}/student/settings`;
-	const lines = [
-		`Hi ${escapeHtml(params.displayName ?? "there")},`,
-		"The email address you use to sign in to EduAI was updated.",
-	];
-	if (params.newEmail?.trim()) {
-		lines.push(`New address: ${escapeHtml(params.newEmail.trim())}.`);
+	const displayName = escapeHtml(params.displayName?.trim() || "there");
+	const newEmail = params.newEmail?.trim() ?? "";
+
+	const paragraphs = ["The email address you use to sign in to EduAI was updated."];
+	if (newEmail) {
+		paragraphs.push(`New address: <strong>${escapeHtml(newEmail)}</strong>.`);
 	}
-	lines.push("If you did not request this, contact support immediately.");
-	const html = wrapHtml(subject, lines, { label: "Account settings", href });
+	paragraphs.push("If you did not request this, contact support immediately.");
+
+	const html = renderEmailShell({
+		preheader: "Confirming a sign-in email change on your EduAI account.",
+		greeting: `Hi ${displayName},`,
+		title: subject,
+		paragraphs,
+		primaryCta: { label: "Account settings", href },
+	});
+
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
@@ -361,8 +433,8 @@ export async function sendAccountEmailChangedEmail(
 		html,
 		templateSlug: "account-email-changed",
 		templateVariables: {
-			display_name: params.displayName ?? "there",
-			new_email: params.newEmail?.trim() ?? "",
+			display_name: params.displayName?.trim() || "there",
+			new_email: newEmail,
 			settings_href: href,
 		},
 	});
@@ -380,15 +452,22 @@ export async function sendParentLinkedStudentEmail(
 ): Promise<{ error: string | null }> {
 	const subject = "A parent account was linked to your EduAI profile";
 	const href = `${getAppUrl()}/student/settings`;
-	const who = params.parentName?.trim()
-		? `Parent/guardian: ${escapeHtml(params.parentName.trim())}.`
+	const displayName = escapeHtml(params.studentName?.trim() || "there");
+	const parentLine = params.parentName?.trim()
+		? `Parent or guardian: <strong>${escapeHtml(params.parentName.trim())}</strong>.`
 		: "A parent or guardian account is now linked.";
-	const bodyLines = [
-		`Hi ${escapeHtml(params.studentName ?? "there")},`,
-		who,
-		"They can use the parent portal for updates you share with them. Open Account settings if you need help.",
-	];
-	const html = wrapHtml(subject, bodyLines, { label: "Account settings", href });
+
+	const html = renderEmailShell({
+		preheader: "Heads up — a parent account is now linked to your EduAI profile.",
+		greeting: `Hi ${displayName},`,
+		title: subject,
+		paragraphs: [
+			parentLine,
+			"They can use the parent portal for updates you share with them. If something looks off, open Account settings.",
+		],
+		primaryCta: { label: "Account settings", href },
+	});
+
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
@@ -396,7 +475,7 @@ export async function sendParentLinkedStudentEmail(
 		html,
 		templateSlug: "parent-linked-student",
 		templateVariables: {
-			student_name: params.studentName ?? "there",
+			student_name: params.studentName?.trim() || "there",
 			parent_name: params.parentName?.trim() ?? "",
 			settings_href: href,
 		},

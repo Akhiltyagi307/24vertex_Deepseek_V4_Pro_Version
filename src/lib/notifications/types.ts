@@ -140,13 +140,19 @@ export function preferenceKeyForRow(row: { type: NotificationType; category: Not
 	return row.type;
 }
 
-/** Default preference map applied when a user has no `user_preferences` row yet. */
+/**
+ * Default preference map applied when a user has no `user_preferences` row yet.
+ *
+ * Keys must match the values returned by {@link preferenceKeyForRow}. The bare
+ * `alert` key is intentionally omitted: every `type: "alert"` row in the
+ * codebase is a usage-threshold row (category `usage_*`), which collapses
+ * under `usage_alert` instead.
+ */
 export const DEFAULT_NOTIFICATION_TYPES: Record<string, boolean> = {
 	test_result: true,
 	announcement: true,
 	reminder: true,
 	usage_alert: true,
-	alert: true,
 	system: true,
 	encouragement: true,
 };

@@ -1,29 +1,33 @@
 import "server-only";
 
 import { getAppUrl } from "@/lib/env";
+import { escapeHtml, renderEmailShell } from "@/lib/email/render-email-shell";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 
-export async function sendTeacherApprovedEmail(to: string, teacherName: string): Promise<{ ok: boolean; error?: string }> {
-	const appUrl = getAppUrl();
-	const html = `
-<p>Hi ${escapeHtml(teacherName)},</p>
-<p>Your EduAI teacher account has been approved. You can sign in at <a href="${appUrl}/login">${escapeHtml(appUrl)}/login</a>.</p>
-<p>— EduAI</p>`;
+export async function sendTeacherApprovedEmail(
+	to: string,
+	teacherName: string,
+): Promise<{ ok: boolean; error?: string }> {
+	const subject = "Your teacher account is approved";
+	const loginHref = `${getAppUrl()}/login`;
+	const safeName = escapeHtml(teacherName);
+
+	const html = renderEmailShell({
+		preheader: "Your EduAI teacher account is ready to sign in.",
+		greeting: `Hi ${safeName},`,
+		title: subject,
+		paragraphs: ["Your EduAI teacher account has been approved. You can sign in below."],
+		primaryCta: { label: "Sign in to EduAI", href: loginHref },
+	});
+
 	const { error } = await sendHtmlEmailLogged({
 		to,
-		subject: "Your teacher account is approved",
+		subject,
 		html,
 		templateSlug: "teacher-approved",
 		templateVariables: { teacher_name: teacherName },
 	});
+
 	if (error) return { ok: false, error };
 	return { ok: true };
-}
-
-function escapeHtml(s: string): string {
-	return s
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
 }

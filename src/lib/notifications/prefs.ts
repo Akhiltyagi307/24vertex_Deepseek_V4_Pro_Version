@@ -46,13 +46,21 @@ export async function getNotificationPrefs(userId: string): Promise<Notification
 		const types: Record<string, boolean> = { ...DEFAULT_NOTIFICATION_TYPES };
 		if (rawTypes && typeof rawTypes === "object") {
 			for (const [k, v] of Object.entries(rawTypes)) {
-				types[k] = v !== false;
+				// Strict-boolean: only honour explicit `true` / `false`. Strings,
+				// numbers and `null` fall through to the code default for that
+				// key (or `true` if it's a key we don't ship a default for) so
+				// a typo in admin tooling can't silently flip a preference.
+				if (typeof v === "boolean") {
+					types[k] = v;
+				} else if (!(k in DEFAULT_NOTIFICATION_TYPES)) {
+					types[k] = true;
+				}
 			}
 		}
 
 		return {
-			enableInApp: row.enableInapp !== false,
-			enableEmail: row.enableEmail !== false,
+			enableInApp: row.enableInapp === true || row.enableInapp == null,
+			enableEmail: row.enableEmail === true || row.enableEmail == null,
 			types,
 		};
 	} catch (err) {

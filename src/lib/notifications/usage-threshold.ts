@@ -1,17 +1,18 @@
 import "server-only";
 
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { subscriptions, usageNotificationLog, usagePeriods } from "@/db/schema/billing";
+import { usageNotificationLog } from "@/db/schema/billing";
 import { parentStudentLinks } from "@/db/schema/profiles";
+import { findCurrentUsagePeriodId } from "@/lib/billing/usage-period";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import {
 	sendParentPortalUsageThresholdEmail,
 	sendUsageThresholdEmail,
 } from "@/lib/email/notifications-emails";
-import { loadStudentContact } from "@/lib/notifications/report-ready";
-import { insertInAppNotification } from "@/lib/notifications/insert";
+import { loadProfileContact } from "@/lib/notifications/report-ready";
+import { insertInAppNotification, markNotificationEmailSent } from "@/lib/notifications/insert";
 import {
 	getNotificationPrefs,
 	isEmailAllowed,
@@ -73,7 +74,7 @@ export async function maybeNotifyUsageThreshold(input: MaybeNotifyUsageInput): P
 
 	let periodId = input.usagePeriodId ?? null;
 	if (!periodId) {
-		periodId = await resolveCurrentUsagePeriodId(input.profileId);
+		periodId = await findCurrentUsagePeriodId(input.profileId);
 		if (!periodId) return;
 	}
 
@@ -113,7 +114,7 @@ export async function maybeNotifyUsageThreshold(input: MaybeNotifyUsageInput): P
 
 			const { title, body } = buildUsageCopy({ ...input, threshold });
 
-			await insertInAppNotification({
+			const studentNotificationId = await insertInAppNotification({
 				recipientId: input.profileId,
 				title,
 				body,
@@ -125,28 +126,30 @@ export async function maybeNotifyUsageThreshold(input: MaybeNotifyUsageInput): P
 				prefs,
 			});
 
-			if (!isEmailAllowed(prefs, "usage_alert")) continue;
-
-			const contact = await loadStudentContact(input.profileId);
-			if (!contact?.email) continue;
-
-			const { error } = await sendUsageThresholdEmail({
-				to: contact.email,
-				recipientUserId: input.profileId,
-				studentName: contact.fullName ?? undefined,
-				meter: input.meter,
-				threshold,
-				testsUsed: input.meter === "tests" ? input.testsUsed : undefined,
-				testsQuota: input.meter === "tests" ? input.testsQuota : undefined,
-				tokensUsed: input.meter === "tokens" ? input.tokensUsed : undefined,
-				tokensQuota: input.meter === "tokens" ? input.tokensQuota : undefined,
-			});
-			if (error) {
-				logServerError("notifications.usage_threshold.email", new Error(error), {
-					profileId: input.profileId,
-					meter: input.meter,
-					threshold,
-				});
+			if (isEmailAllowed(prefs, "usage_alert")) {
+				const contact = await loadProfileContact(input.profileId);
+				if (contact?.email) {
+					const { error } = await sendUsageThresholdEmail({
+						to: contact.email,
+						recipientUserId: input.profileId,
+						studentName: contact.fullName ?? undefined,
+						meter: input.meter,
+						threshold,
+						testsUsed: input.meter === "tests" ? input.testsUsed : undefined,
+						testsQuota: input.meter === "tests" ? input.testsQuota : undefined,
+						tokensUsed: input.meter === "tokens" ? input.tokensUsed : undefined,
+						tokensQuota: input.meter === "tokens" ? input.tokensQuota : undefined,
+					});
+					if (error) {
+						logServerError("notifications.usage_threshold.email", new Error(error), {
+							profileId: input.profileId,
+							meter: input.meter,
+							threshold,
+						});
+					} else if (studentNotificationId) {
+						await markNotificationEmailSent(studentNotificationId);
+					}
+				}
 			}
 
 			await notifyLinkedParentsUsageThreshold({
@@ -174,7 +177,7 @@ async function notifyLinkedParentsUsageThreshold(params: {
 	threshold: Threshold;
 	category: NotificationCategory;
 }): Promise<void> {
-	const childContact = await loadStudentContact(params.studentProfileId);
+	const childContact = await loadProfileContact(params.studentProfileId);
 	const childLabel = formatPersonDisplayName(childContact?.fullName ?? "") || "your child";
 
 	const linkRows = await db
@@ -187,64 +190,68 @@ async function notifyLinkedParentsUsageThreshold(params: {
 			),
 		);
 
-	for (const { parentId } of linkRows) {
-		try {
-			const parentPrefs = await getNotificationPrefs(parentId);
-			const { title, body } = buildParentUsageCopy({
-				childLabel,
-				input: params.input,
-				threshold: params.threshold,
-			});
+	await Promise.allSettled(
+		linkRows.map(async ({ parentId }) => {
+			try {
+				const parentPrefs = await getNotificationPrefs(parentId);
+				const { title, body } = buildParentUsageCopy({
+					childLabel,
+					input: params.input,
+					threshold: params.threshold,
+				});
 
-			await insertInAppNotification({
-				recipientId: parentId,
-				title,
-				body,
-				type: "alert",
-				category: params.category,
-				referenceType: "usage_period",
-				referenceId: params.usagePeriodId,
-				contextStudentId: params.studentProfileId,
-				priority: params.threshold === 100 ? "urgent" : "normal",
-				prefs: parentPrefs,
-			});
+				const parentNotificationId = await insertInAppNotification({
+					recipientId: parentId,
+					title,
+					body,
+					type: "alert",
+					category: params.category,
+					referenceType: "usage_period",
+					referenceId: params.usagePeriodId,
+					contextStudentId: params.studentProfileId,
+					priority: params.threshold === 100 ? "urgent" : "normal",
+					prefs: parentPrefs,
+				});
 
-			if (!isEmailAllowed(parentPrefs, "usage_alert")) continue;
+				if (!isEmailAllowed(parentPrefs, "usage_alert")) return;
 
-			const parentContact = await loadStudentContact(parentId);
-			if (!parentContact?.email) continue;
+				const parentContact = await loadProfileContact(parentId);
+				if (!parentContact?.email) return;
 
-			const parentDisplayName = formatPersonDisplayName(parentContact.fullName ?? "") || null;
+				const parentDisplayName = formatPersonDisplayName(parentContact.fullName ?? "") || null;
 
-			const { error } = await sendParentPortalUsageThresholdEmail({
-				to: parentContact.email,
-				recipientUserId: parentId,
-				parentDisplayName,
-				childDisplayName: childLabel,
-				meter: params.input.meter,
-				threshold: params.threshold,
-				testsUsed: params.input.meter === "tests" ? params.input.testsUsed : undefined,
-				testsQuota: params.input.meter === "tests" ? params.input.testsQuota : undefined,
-				tokensUsed: params.input.meter === "tokens" ? params.input.tokensUsed : undefined,
-				tokensQuota: params.input.meter === "tokens" ? params.input.tokensQuota : undefined,
-			});
-			if (error) {
-				logServerError("notifications.usage_threshold.parent_email", new Error(error), {
+				const { error } = await sendParentPortalUsageThresholdEmail({
+					to: parentContact.email,
+					recipientUserId: parentId,
+					parentDisplayName,
+					childDisplayName: childLabel,
+					meter: params.input.meter,
+					threshold: params.threshold,
+					testsUsed: params.input.meter === "tests" ? params.input.testsUsed : undefined,
+					testsQuota: params.input.meter === "tests" ? params.input.testsQuota : undefined,
+					tokensUsed: params.input.meter === "tokens" ? params.input.tokensUsed : undefined,
+					tokensQuota: params.input.meter === "tokens" ? params.input.tokensQuota : undefined,
+				});
+				if (error) {
+					logServerError("notifications.usage_threshold.parent_email", new Error(error), {
+						parentId,
+						studentProfileId: params.studentProfileId,
+						meter: params.input.meter,
+						threshold: params.threshold,
+					});
+				} else if (parentNotificationId) {
+					await markNotificationEmailSent(parentNotificationId);
+				}
+			} catch (err) {
+				logServerError("notifications.usage_threshold.parent", err, {
 					parentId,
 					studentProfileId: params.studentProfileId,
 					meter: params.input.meter,
 					threshold: params.threshold,
 				});
 			}
-		} catch (err) {
-			logServerError("notifications.usage_threshold.parent", err, {
-				parentId,
-				studentProfileId: params.studentProfileId,
-				meter: params.input.meter,
-				threshold: params.threshold,
-			});
-		}
-	}
+		}),
+	);
 }
 
 function buildParentUsageCopy(args: {
@@ -288,23 +295,3 @@ function buildUsageCopy(input: MaybeNotifyUsageInput & { threshold: Threshold })
 	return { title, body: `${usageStat} ${nudge}` };
 }
 
-async function resolveCurrentUsagePeriodId(profileId: string): Promise<string | null> {
-	try {
-		const rows = await db
-			.select({ id: usagePeriods.id })
-			.from(usagePeriods)
-			.innerJoin(subscriptions, eq(subscriptions.id, usagePeriods.subscriptionId))
-			.where(
-				and(
-					eq(subscriptions.profileId, profileId),
-					lte(usagePeriods.periodStart, new Date()),
-				),
-			)
-			.orderBy(desc(usagePeriods.periodEnd))
-			.limit(1);
-		return rows[0]?.id ?? null;
-	} catch (err) {
-		logServerError("notifications.usage_threshold.resolve_period", err, { profileId });
-		return null;
-	}
-}

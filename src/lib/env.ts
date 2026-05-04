@@ -90,6 +90,41 @@ export function getResendFrom(): string {
 	return from;
 }
 
+/**
+ * Server-only secret used to sign one-click unsubscribe tokens that go in the
+ * `List-Unsubscribe` email header. Returns `null` when the env var is unset —
+ * the email pipeline gracefully skips the header instead of throwing, so a
+ * missing secret degrades to "no one-click" rather than blocking sends.
+ */
+export function getEmailUnsubscribeSecret(): string | null {
+	const raw = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim();
+	return raw && raw.length >= 32 ? raw : null;
+}
+
+/**
+ * Recipients for admin-side notification mail (panic, weekly digest). Reads
+ * `ADMIN_NOTIFICATION_EMAILS` first as a comma-separated distribution list,
+ * then falls back to `ADMIN_EMAIL` for single-admin deployments. Whitespace
+ * around each entry is trimmed and empties are dropped. Returns `[]` when
+ * nothing is configured — callers should treat that as "no admin to email".
+ *
+ * Note: admin-login auth still gates on the single `ADMIN_EMAIL` variable
+ * (see `src/lib/admin/auth.ts`); this helper is only for outbound
+ * notifications and intentionally does not change auth behaviour.
+ */
+export function getAdminNotificationRecipients(): string[] {
+	const list = process.env.ADMIN_NOTIFICATION_EMAILS?.trim();
+	if (list) {
+		return list
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s) => s.length > 0 && s.includes("@"));
+	}
+	const single = process.env.ADMIN_EMAIL?.trim();
+	if (single && single.includes("@")) return [single];
+	return [];
+}
+
 /** OpenAI API key — server-only; used by `@ai-sdk/openai` with the Vercel AI SDK. */
 export function getOpenAIApiKey(): string {
 	const key = process.env.OPENAI_API_KEY?.trim();

@@ -63,6 +63,7 @@ async function runTrialEmails(): Promise<Response> {
 		try {
 			const { error: sendErr } = await sendTrialEndingEmail({
 				to: email,
+				recipientUserId: sub.profile_id,
 				studentName: profile?.full_name ?? null,
 				daysLeft,
 			});

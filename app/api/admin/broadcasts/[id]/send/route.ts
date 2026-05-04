@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { broadcasts } from "@/db/schema/broadcasts";
 import { notifications } from "@/db/schema/comms-audit";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
+import { MAX_NOTIFICATION_BODY_LEN } from "@/lib/notifications/insert";
 
 export const runtime = "nodejs";
 
@@ -62,7 +63,7 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 					recipientId: r.id,
 					senderId: null as string | null,
 					title: subject,
-					body: bodyMd.slice(0, 8000),
+					body: bodyMd.slice(0, MAX_NOTIFICATION_BODY_LEN),
 					type: "announcement" as const,
 					priority: (urgent ? "urgent" : "normal") as "normal" | "urgent",
 					category: "broadcast" as const,
@@ -85,6 +86,7 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 								html: emailHtml,
 								templateSlug: "broadcast",
 								recipientUserId: r.id,
+								unsubscribeRecipientUserId: r.id,
 								broadcastId: id,
 							});
 							if (error) errors.push(`${r.email}: ${error}`);
