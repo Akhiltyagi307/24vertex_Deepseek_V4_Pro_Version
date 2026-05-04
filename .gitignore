@@ -1,22 +1,27 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # Dependencies
-node_modules
+node_modules/
 /.pnp
 .pnp.js
 
 # Next.js
-.next
+.next/
 
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report//
+# Build / export output
 out/
 build/
+dist/
 
 # Testing
 coverage/
+/test-results/
+/playwright-report/
+/blob-report/
+.playwright-cache/
+
+# Playwright auth storage (local secrets — never commit)
+playwright/.auth/
 
 # Env (local secrets — never commit)
 .env
@@ -26,39 +31,48 @@ env.local
 # pnpm store when created inside the repo (never commit)
 .pnpm-store/
 
+# Supabase CLI local cache (e.g. version pins); not part of migrations
+supabase/.temp/
+
+# TypeScript / tooling caches
+*.tsbuildinfo
+.eslintcache
+
 # Debug / OS
 .DS_Store
+Thumbs.db
 *.pem
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Vercel
-.vercel
-
-# TypeScript
-*.tsbuildinfo
+# Vercel (linked project metadata — local only)
+.vercel/
 
 # Local dev logs (do not commit)
 .cursor-dev-server.log
 dev-nohup.log
+*.log
 
 # Temp / scratch
 tw-debug.css
 .tmp_*.json
 .mcp-github-push-batches/
 
-# Playwright artifacts (generated locally, not committed)
-test-results/
-playwright-report/
-.playwright-cache/
-playwright/.auth/
+# IDE (optional; remove if your team commits shared IDE config)
+.idea/
 
-# Agent/cursor metadata and references (non-production)
+# Agent / assistant metadata (non-app source)
 .agents/
 .cursor/
 .claude/
-docs/
+
+# TestSprite generated suites (local tooling output)
 testsprite_tests/
+
+# Product / design markdown (kept local; not versioned in this repo)
+docs/
+
+# One-off local notes at repo root (keep out of git)
 EduAI_PRD_v3_2_TestSprite_Backend.md
