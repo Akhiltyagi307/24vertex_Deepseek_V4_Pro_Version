@@ -37,7 +37,7 @@ const PREF_LABELS: Record<PrefKey, { title: string; description: string }> = {
 	},
 	reminder: {
 		title: "Reminders",
-		description: "Nudges for uncompleted practice or upcoming sessions.",
+		description: "Trial-ending emails and other practice nudges.",
 	},
 };
 

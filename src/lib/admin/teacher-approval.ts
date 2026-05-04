@@ -3,8 +3,8 @@ import "server-only";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { notifications } from "@/db/schema/comms-audit";
 import { profiles } from "@/db/schema/profiles";
+import { insertInAppNotification } from "@/lib/notifications/insert";
 
 export async function setTeacherVerified(teacherId: string, verified: boolean): Promise<boolean> {
 	const rows = await db
@@ -17,13 +17,18 @@ export async function setTeacherVerified(teacherId: string, verified: boolean): 
 }
 
 export async function insertTeacherWelcomeNotification(teacherId: string, title: string, body: string): Promise<void> {
-	await db.insert(notifications).values({
+	// Welcome card is a one-time trust signal, similar to parent-link
+	// confirmations. Force the in-app row even when prefs say "off" so a
+	// brand-new teacher sees onboarding content. If teachers ever get a
+	// notifications UI, the row written here is still subject to bell-side
+	// filtering by category ("onboarding") rather than being suppressed at
+	// write time.
+	await insertInAppNotification({
 		recipientId: teacherId,
-		senderId: null,
 		title,
 		body,
 		type: "system",
-		priority: "normal",
 		category: "onboarding",
+		forceInApp: true,
 	});
 }

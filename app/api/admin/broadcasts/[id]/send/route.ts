@@ -5,16 +5,13 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { broadcastBodyToEmailHtml } from "@/lib/admin/broadcast-markdown";
 import { listBroadcastRecipients, type BroadcastAudienceJson } from "@/lib/admin/broadcast-audience";
+import { filterAllowedBroadcastRecipients } from "@/lib/admin/broadcast-recipient-filter";
 import { db } from "@/db";
 import { broadcasts } from "@/db/schema/broadcasts";
 import { notifications } from "@/db/schema/comms-audit";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 import { MAX_NOTIFICATION_BODY_LEN } from "@/lib/notifications/insert";
-import {
-	getNotificationPrefsForUsers,
-	isEmailAllowed,
-	isInAppAllowed,
-} from "@/lib/notifications/prefs";
+import { getNotificationPrefsForUsers } from "@/lib/notifications/prefs";
 
 export const runtime = "nodejs";
 
@@ -63,38 +60,37 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 			if (batch.length === 0) break;
 			totalRecipients += batch.length;
 
-			const prefsByUser = await getNotificationPrefsForUsers(batch.map((r) => r.id));
+			// One prefs query per chunk, then a pure filter — keeps the hot path
+			// O(chunks). totalRecipients still reflects audience size; inAppSent
+			// and emailSent now reflect the gated-down delivery counts.
+			const prefsByUserId = await getNotificationPrefsForUsers(batch.map((r) => r.id));
+			const { inAppAllowed, emailAllowed } = filterAllowedBroadcastRecipients(
+				batch,
+				prefsByUserId,
+				{ inApp, email },
+			);
 
-			if (inApp) {
-				const notifRows = batch
-					.filter((r) => isInAppAllowed(prefsByUser.get(r.id)!, "announcement"))
-					.map((r) => ({
-						recipientId: r.id,
-						senderId: null as string | null,
-						title: subject,
-						body: bodyMd.slice(0, MAX_NOTIFICATION_BODY_LEN),
-						type: "announcement" as const,
-						priority: (urgent ? "urgent" : "normal") as "normal" | "urgent",
-						category: "broadcast" as const,
-						referenceType: "broadcast" as const,
-						referenceId: id,
-					}));
-				if (notifRows.length > 0) {
-					await db.insert(notifications).values(notifRows);
-					inAppSent += notifRows.length;
-				}
+			if (inApp && inAppAllowed.length > 0) {
+				const notifRows = inAppAllowed.map((r) => ({
+					recipientId: r.id,
+					senderId: null as string | null,
+					title: subject,
+					body: bodyMd.slice(0, MAX_NOTIFICATION_BODY_LEN),
+					type: "announcement" as const,
+					priority: (urgent ? "urgent" : "normal") as "normal" | "urgent",
+					category: "broadcast" as const,
+					referenceType: "broadcast" as const,
+					referenceId: id,
+				}));
+				await db.insert(notifications).values(notifRows);
+				inAppSent += notifRows.length;
 			}
 
-			if (email) {
-				const emailJobs = batch.filter((r) => r.email && r.email.includes("@"));
-				for (let i = 0; i < emailJobs.length; i += EMAIL_CONCURRENCY) {
-					const slice = emailJobs.slice(i, i + EMAIL_CONCURRENCY);
+			if (email && emailAllowed.length > 0) {
+				for (let i = 0; i < emailAllowed.length; i += EMAIL_CONCURRENCY) {
+					const slice = emailAllowed.slice(i, i + EMAIL_CONCURRENCY);
 					await Promise.all(
 						slice.map(async (r) => {
-							const prefs = prefsByUser.get(r.id)!;
-							if (!isEmailAllowed(prefs, "announcement")) {
-								return;
-							}
 							const { error } = await sendHtmlEmailLogged({
 								to: r.email!,
 								subject,

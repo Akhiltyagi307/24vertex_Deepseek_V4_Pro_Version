@@ -1,6 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// `vi.mock` factories are hoisted above module-level `const`s, so the mock
+// fn has to be created via `vi.hoisted` to be visible inside the factory.
+const { dbRowsMock } = vi.hoisted(() => ({ dbRowsMock: vi.fn() }));
+vi.mock("@/db", () => {
+	const chain: {
+		select: ReturnType<typeof vi.fn>;
+		from: ReturnType<typeof vi.fn>;
+		where: ReturnType<typeof vi.fn>;
+	} = {
+		select: vi.fn(() => chain),
+		from: vi.fn(() => chain),
+		where: vi.fn(() => dbRowsMock()),
+	};
+	return { db: chain };
+});
 
 import {
+	getNotificationPrefsForUsers,
 	isEmailAllowed,
 	isInAppAllowed,
 	prefsFromUserPreferenceRow,
@@ -94,5 +111,65 @@ describe("prefsFromUserPreferenceRow", () => {
 			types: { announcement: "no" as unknown as boolean },
 		});
 		expect(isEmailAllowed(p, "announcement")).toBe(true);
+	});
+});
+
+describe("getNotificationPrefsForUsers", () => {
+	beforeEach(() => {
+		dbRowsMock.mockReset();
+	});
+
+	it("returns defaults for users with no row", async () => {
+		dbRowsMock.mockResolvedValueOnce([]);
+		const map = await getNotificationPrefsForUsers(["u1", "u2"]);
+		expect(map.get("u1")).toEqual({
+			enableInApp: true,
+			enableEmail: true,
+			types: {
+				test_result: true,
+				announcement: true,
+				reminder: true,
+				usage_alert: true,
+				system: true,
+				encouragement: true,
+			},
+		});
+		expect(map.get("u2")).toEqual(map.get("u1"));
+	});
+
+	it("honors strict booleans in notification_types and falls through for non-booleans", async () => {
+		dbRowsMock.mockResolvedValueOnce([
+			{
+				userId: "u1",
+				enableInapp: true,
+				enableEmail: false,
+				types: { announcement: false, reminder: "yes", new_key: 1 },
+			},
+		]);
+		const map = await getNotificationPrefsForUsers(["u1"]);
+		const p = map.get("u1")!;
+		expect(p.enableInApp).toBe(true);
+		expect(p.enableEmail).toBe(false);
+		// strict boolean wins
+		expect(p.types.announcement).toBe(false);
+		// non-boolean on a known key → keep code default (true)
+		expect(p.types.reminder).toBe(true);
+		// non-boolean on an unknown key → default to true
+		expect(p.types.new_key).toBe(true);
+	});
+
+	it("returns an empty map when given no ids and does not query", async () => {
+		const map = await getNotificationPrefsForUsers([]);
+		expect(map.size).toBe(0);
+		expect(dbRowsMock).not.toHaveBeenCalled();
+	});
+
+	it("treats null masters as on (matches single-user loader)", async () => {
+		dbRowsMock.mockResolvedValueOnce([
+			{ userId: "u1", enableInapp: null, enableEmail: null, types: null },
+		]);
+		const p = (await getNotificationPrefsForUsers(["u1"])).get("u1")!;
+		expect(p.enableInApp).toBe(true);
+		expect(p.enableEmail).toBe(true);
 	});
 });

@@ -1,6 +1,7 @@
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
 import { sendTrialEndingEmail } from "@/lib/email/subscription-notifications";
-import { isEmailAllowed, getNotificationPrefs } from "@/lib/notifications/prefs";
+import { getNotificationPrefs } from "@/lib/notifications/prefs";
+import { shouldSendTrialReminder } from "@/lib/notifications/should-send-trial-reminder";
 import { logSupabaseError, logServerError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -52,6 +53,14 @@ async function runTrialEmails(): Promise<Response> {
 		const already = Array.isArray(meta.trial_emails_sent) ? meta.trial_emails_sent : [];
 		if (already.includes(bucket)) continue;
 
+		// Skip this bucket today when the user has opted out of reminders. We do
+		// NOT append to trial_emails_sent — re-enabling Reminders before the
+		// trial ends restores the next scheduled bucket rather than swallowing it.
+		// Uses the "reminder" preference key (not "announcement") because trial
+		// reminders are nudges, not product announcements.
+		const prefs = await getNotificationPrefs(sub.profile_id);
+		if (!shouldSendTrialReminder(prefs)) continue;
+
 		const { data: profile } = await admin
 			.from("profiles")
 			.select("full_name")
@@ -60,11 +69,6 @@ async function runTrialEmails(): Promise<Response> {
 		const { data: authUser } = await admin.auth.admin.getUserById(sub.profile_id);
 		const email = authUser.user?.email;
 		if (!email) continue;
-
-		const prefs = await getNotificationPrefs(sub.profile_id);
-		if (!isEmailAllowed(prefs, "announcement")) {
-			continue;
-		}
 
 		try {
 			const { error: sendErr } = await sendTrialEndingEmail({
