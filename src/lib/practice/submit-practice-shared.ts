@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
-import { gradePracticeTestWithAi, recordGradingFailure } from "@/lib/practice/ai-grade-practice-test";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { notifyTestReportPdfReadyEmails } from "@/lib/notifications/report-ready";
+import { gradePracticeTestWithAi, recordGradingFailure, renderAndUploadPracticeReportPdf } from "@/lib/practice/ai-grade-practice-test";
+import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
 	writeStudentAnswerRow,
 	writeStudentAnswerRows,
@@ -302,6 +303,35 @@ export async function executePracticeTestSubmit(
 		// Do not send the student to reports: this test is not `graded` yet. Same
 		// handoff as the async worker path — grading UI with retry.
 		return { ok: true, redirectTo: `/student/practice/${testId}/grading` };
+	}
+
+	const { error: pdfEnqErr } = await supabase.rpc("practice_enqueue_job", {
+		p_job_type: "pdf",
+		p_test_id: testId,
+		p_payload: {},
+		p_run_after: new Date().toISOString(),
+	});
+	if (pdfEnqErr) {
+		logSupabaseError("executePracticeTestSubmit.practice_enqueue_job", pdfEnqErr, {
+			testId,
+			jobType: "pdf",
+		});
+		const pdfResult = await renderAndUploadPracticeReportPdf(testId);
+		if (!pdfResult.ok) {
+			logServerError(
+				"executePracticeTestSubmit.renderAndUploadPracticeReportPdf",
+				new Error(pdfResult.message),
+				{ testId },
+			);
+		} else {
+			void notifyTestReportPdfReadyEmails({
+				testId,
+				studentId: pdfResult.studentId,
+				subjectName: pdfResult.subjectName,
+				overallPercent: pdfResult.overallPercent,
+				storagePath: pdfResult.storagePath,
+			});
+		}
 	}
 
 	const subjectId = gate.row.subject_id;

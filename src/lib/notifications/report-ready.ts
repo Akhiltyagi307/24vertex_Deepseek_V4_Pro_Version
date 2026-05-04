@@ -5,11 +5,12 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/auth-users";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
-import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { sendParentPortalReportReadyEmail, sendReportReadyEmail } from "@/lib/email/notifications-emails";
+import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { insertInAppNotification } from "@/lib/notifications/insert";
 import { getNotificationPrefs, isEmailAllowed } from "@/lib/notifications/prefs";
 import { logServerError } from "@/lib/server/log-supabase-error";
+import { createStudentTestReportPdfSignedUrl } from "@/lib/practice/student-test-report-pdf-signed-url";
 
 export type NotifyTestReportReadyInput = {
 	studentId: string;
@@ -19,9 +20,9 @@ export type NotifyTestReportReadyInput = {
 };
 
 /**
- * Emits the "your report is ready" notification after grading finishes.
- * Fire-and-forget: all failures are logged and swallowed so grading callers
- * never see an error from this path.
+ * Emits the "your report is ready" in-app notification after grading finishes.
+ * Report-ready emails (student + linked parents) are sent from the PDF pipeline
+ * with a Supabase signed URL so recipients can open the PDF without EduAI login.
  */
 export async function notifyTestReportReady(input: NotifyTestReportReadyInput): Promise<void> {
 	try {
@@ -38,27 +39,7 @@ export async function notifyTestReportReady(input: NotifyTestReportReadyInput): 
 			prefs,
 		});
 
-		if (isEmailAllowed(prefs, "test_result")) {
-			const contact = await loadStudentContact(input.studentId);
-			if (contact?.email) {
-				const { error } = await sendReportReadyEmail({
-					to: contact.email,
-					recipientUserId: input.studentId,
-					studentName: contact.fullName ?? undefined,
-					subjectName: input.subjectName,
-					overallPercent: input.overallPercent,
-					testId: input.testId,
-				});
-				if (error) {
-					logServerError("notifications.report_ready.email", new Error(error), {
-						studentId: input.studentId,
-						testId: input.testId,
-					});
-				}
-			}
-		}
-
-		await notifyLinkedParentsTestReportReady(input);
+		await notifyLinkedParentsTestReportReadyInApp(input);
 	} catch (err) {
 		logServerError("notifications.report_ready", err, {
 			studentId: input.studentId,
@@ -67,7 +48,7 @@ export async function notifyTestReportReady(input: NotifyTestReportReadyInput): 
 	}
 }
 
-async function notifyLinkedParentsTestReportReady(input: NotifyTestReportReadyInput): Promise<void> {
+async function notifyLinkedParentsTestReportReadyInApp(input: NotifyTestReportReadyInput): Promise<void> {
 	const linkRows = await db
 		.select({ parentId: parentStudentLinks.parentId })
 		.from(parentStudentLinks)
@@ -90,37 +71,110 @@ async function notifyLinkedParentsTestReportReady(input: NotifyTestReportReadyIn
 				contextStudentId: input.studentId,
 				prefs,
 			});
-
-			if (!isEmailAllowed(prefs, "test_result")) continue;
-
-			const parentContact = await loadStudentContact(parentId);
-			if (!parentContact?.email) continue;
-
-			const parentDisplayName = formatPersonDisplayName(parentContact.fullName ?? "") || null;
-			const { error } = await sendParentPortalReportReadyEmail({
-				to: parentContact.email,
-				recipientUserId: parentId,
-				parentDisplayName,
-				childDisplayName: childLabel,
-				studentId: input.studentId,
-				subjectName: input.subjectName,
-				overallPercent: input.overallPercent,
-				testId: input.testId,
-			});
-			if (error) {
-				logServerError("notifications.report_ready.parent_email", new Error(error), {
-					parentId,
-					studentId: input.studentId,
-					testId: input.testId,
-				});
-			}
 		} catch (err) {
-			logServerError("notifications.report_ready.parent", err, {
+			logServerError("notifications.report_ready.parent_in_app", err, {
 				parentId,
 				studentId: input.studentId,
 				testId: input.testId,
 			});
 		}
+	}
+}
+
+export type NotifyTestReportPdfReadyEmailsInput = {
+	testId: string;
+	studentId: string;
+	subjectName: string;
+	overallPercent: number | null;
+	storagePath: string;
+};
+
+/**
+ * Sends student + parent "report ready" emails after the PDF is in Storage.
+ * Uses a time-limited signed URL so the PDF opens without EduAI authentication.
+ */
+export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfReadyEmailsInput): Promise<void> {
+	try {
+		const signed = await createStudentTestReportPdfSignedUrl(input.storagePath);
+		if (!signed.ok) {
+			logServerError("notifications.report_pdf_ready.signed_url", new Error(signed.message), {
+				testId: input.testId,
+				studentId: input.studentId,
+			});
+			return;
+		}
+		const pdfSignedUrl = signed.url;
+
+		const prefs = await getNotificationPrefs(input.studentId);
+		if (isEmailAllowed(prefs, "test_result")) {
+			const contact = await loadStudentContact(input.studentId);
+			if (contact?.email) {
+				const { error } = await sendReportReadyEmail({
+					to: contact.email,
+					recipientUserId: input.studentId,
+					studentName: contact.fullName ?? undefined,
+					subjectName: input.subjectName,
+					overallPercent: input.overallPercent,
+					testId: input.testId,
+					pdfSignedUrl,
+				});
+				if (error) {
+					logServerError("notifications.report_pdf_ready.student_email", new Error(error), {
+						studentId: input.studentId,
+						testId: input.testId,
+					});
+				}
+			}
+		}
+
+		const linkRows = await db
+			.select({ parentId: parentStudentLinks.parentId })
+			.from(parentStudentLinks)
+			.where(and(eq(parentStudentLinks.studentId, input.studentId), eq(parentStudentLinks.status, "active")));
+
+		const studentContact = await loadStudentContact(input.studentId);
+		const childLabel = formatPersonDisplayName(studentContact?.fullName ?? "") || "your child";
+
+		for (const { parentId } of linkRows) {
+			try {
+				const parentPrefs = await getNotificationPrefs(parentId);
+				if (!isEmailAllowed(parentPrefs, "test_result")) continue;
+
+				const parentContact = await loadStudentContact(parentId);
+				if (!parentContact?.email) continue;
+
+				const parentDisplayName = formatPersonDisplayName(parentContact.fullName ?? "") || null;
+				const { error } = await sendParentPortalReportReadyEmail({
+					to: parentContact.email,
+					recipientUserId: parentId,
+					parentDisplayName,
+					childDisplayName: childLabel,
+					studentId: input.studentId,
+					subjectName: input.subjectName,
+					overallPercent: input.overallPercent,
+					testId: input.testId,
+					pdfSignedUrl,
+				});
+				if (error) {
+					logServerError("notifications.report_pdf_ready.parent_email", new Error(error), {
+						parentId,
+						studentId: input.studentId,
+						testId: input.testId,
+					});
+				}
+			} catch (err) {
+				logServerError("notifications.report_pdf_ready.parent", err, {
+					parentId,
+					studentId: input.studentId,
+					testId: input.testId,
+				});
+			}
+		}
+	} catch (err) {
+		logServerError("notifications.report_pdf_ready", err, {
+			studentId: input.studentId,
+			testId: input.testId,
+		});
 	}
 }
 

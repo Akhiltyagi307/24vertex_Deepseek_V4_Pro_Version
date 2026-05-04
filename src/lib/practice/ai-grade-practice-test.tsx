@@ -521,8 +521,7 @@ async function gradePracticeTestWithAiInner(
 
 	trace.timingsMs.testReports = mark();
 
-	// Fire-and-forget: "your report is ready" in-app + email. Failures are
-	// logged inside the helper and must never block grading completion.
+	// Fire-and-forget: in-app "report ready" (emails go after PDF upload + signed URL).
 	void notifyTestReportReady({
 		studentId: userId,
 		testId,
@@ -613,7 +612,7 @@ async function gradePracticeTestWithAiInner(
 }
 
 export type BuildPracticeGradingReportPdfResult =
-	| { ok: true; buffer: Buffer; userId: string }
+	| { ok: true; buffer: Buffer; userId: string; subjectName: string; overallPercent: number | null }
 	| { ok: false; message: string };
 
 /**
@@ -831,7 +830,8 @@ export async function buildPracticeGradingReportPdfBuffer(
 			/>,
 		);
 		const buffer = raw instanceof Buffer ? raw : Buffer.from(raw);
-		return { ok: true, buffer, userId };
+		const overallPercentOut = Number.isFinite(overallPercent) ? overallPercent : null;
+		return { ok: true, buffer, userId, subjectName, overallPercent: overallPercentOut };
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "PDF render failed.";
 		logServerError("buildPracticeGradingReportPdfBuffer.renderToBuffer", e, { testId });
@@ -873,14 +873,34 @@ export async function uploadPracticeGradingReportPdf(
  * Called from the `pdf` background job after grading completes so a slow
  * render doesn't block the student's redirect to their report.
  */
+export type RenderAndUploadPracticeReportPdfResult =
+	| {
+			ok: true;
+			storagePath: string;
+			studentId: string;
+			subjectName: string;
+			overallPercent: number | null;
+	  }
+	| { ok: false; message: string };
+
 export async function renderAndUploadPracticeReportPdf(
 	testId: string,
-): Promise<{ ok: true; storagePath: string } | { ok: false; message: string }> {
+): Promise<RenderAndUploadPracticeReportPdfResult> {
 	const built = await buildPracticeGradingReportPdfBuffer(testId);
 	if (!built.ok) {
 		return built;
 	}
-	return uploadPracticeGradingReportPdf(built.userId, testId, built.buffer);
+	const up = await uploadPracticeGradingReportPdf(built.userId, testId, built.buffer);
+	if (!up.ok) {
+		return up;
+	}
+	return {
+		ok: true,
+		storagePath: up.storagePath,
+		studentId: built.userId,
+		subjectName: built.subjectName,
+		overallPercent: built.overallPercent,
+	};
 }
 
 /**

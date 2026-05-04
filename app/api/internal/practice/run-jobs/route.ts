@@ -1,3 +1,4 @@
+import { notifyTestReportPdfReadyEmails } from "@/lib/notifications/report-ready";
 import {
 	gradePracticeTestWithAi,
 	recordGradingFailure,
@@ -153,6 +154,14 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 			});
 			// Test is already `graded` at this point; do not mark the grade job failed so a stuck row
 			// will not block the queue or confuse diagnostics.
+		} else {
+			void notifyTestReportPdfReadyEmails({
+				testId: job.test_id,
+				studentId: pdfResult.studentId,
+				subjectName: pdfResult.subjectName,
+				overallPercent: pdfResult.overallPercent,
+				storagePath: pdfResult.storagePath,
+			});
 		}
 	}
 
@@ -164,6 +173,13 @@ async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false
 	if (!result.ok) {
 		return { ok: false, message: result.message };
 	}
+	void notifyTestReportPdfReadyEmails({
+		testId: job.test_id,
+		studentId: result.studentId,
+		subjectName: result.subjectName,
+		overallPercent: result.overallPercent,
+		storagePath: result.storagePath,
+	});
 	return { ok: true };
 }
 

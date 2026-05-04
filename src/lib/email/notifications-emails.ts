@@ -11,15 +11,27 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, "&quot;");
 }
 
-function wrapHtml(title: string, bodyLines: string[], cta?: { label: string; href: string }): string {
+function wrapHtml(
+	title: string,
+	bodyLines: string[],
+	cta?: { label: string; href: string },
+	secondaryCta?: { label: string; href: string },
+): string {
 	const lines = bodyLines.map((line) => `<p style="margin:0 0 12px;">${line}</p>`).join("");
-	const button = cta
-		? `<p style="margin:24px 0;"><a href="${escapeHtml(cta.href)}" style="background:#059669;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">${escapeHtml(cta.label)}</a></p>`
-		: "";
+	const buttonStyle =
+		"background:#059669;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;";
+	const outlineStyle =
+		"background:#fff;color:#059669;border:1px solid #059669;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;";
+	const buttons = [
+		cta ? `<p style="margin:16px 0 0;"><a href="${escapeHtml(cta.href)}" style="${buttonStyle}">${escapeHtml(cta.label)}</a></p>` : "",
+		secondaryCta ?
+			`<p style="margin:12px 0 0;"><a href="${escapeHtml(secondaryCta.href)}" style="${outlineStyle}">${escapeHtml(secondaryCta.label)}</a></p>`
+		:	"",
+	].join("");
 	return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;line-height:1.55;color:#111;max-width:560px;margin:0 auto;padding:24px;">
 <h1 style="font-size:20px;margin:0 0 16px;">${escapeHtml(title)}</h1>
 ${lines}
-${button}
+${buttons}
 <p style="margin:16px 0 0;font-size:13px;color:#666;">${escapeHtml(getAppUrl())}</p>
 </body></html>`;
 }
@@ -31,6 +43,8 @@ export type ReportReadyEmailParams = {
 	subjectName: string;
 	overallPercent: number | null;
 	testId: string;
+	/** Supabase storage signed URL; opens PDF without EduAI login. */
+	pdfSignedUrl?: string | null;
 };
 
 export async function sendReportReadyEmail(params: ReportReadyEmailParams): Promise<{ error: string | null }> {
@@ -39,13 +53,20 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 			? `${Math.round(params.overallPercent)}%`
 			: null;
 	const subject = `Your ${params.subjectName} report is ready`;
-	const href = `${getAppUrl()}/student/reports?test=${encodeURIComponent(params.testId)}`;
+	const portalHref = `${getAppUrl()}/student/reports?test=${encodeURIComponent(params.testId)}`;
+	const pdfUrl = params.pdfSignedUrl?.trim() || null;
 	const bodyLines = [
 		`Hi ${escapeHtml(params.studentName ?? "there")},`,
 		`We just graded your ${escapeHtml(params.subjectName)} practice test${pct ? ` — you scored ${pct}.` : "."}`,
-		"Open the report to see topic-level strengths, weaknesses, and your next recommended practice.",
+		pdfUrl ?
+			"Open the PDF for your full printable report. You do not need to sign in to EduAI to use this link. It expires after 90 days."
+		:	"Open the report to see topic-level strengths, weaknesses, and your next recommended practice.",
+		...(pdfUrl ? ["For topic breakdowns and next practice inside the app, use View in EduAI below."] : []),
 	];
-	const html = wrapHtml(subject, bodyLines, { label: "View report", href });
+	const html =
+		pdfUrl ?
+			wrapHtml(subject, bodyLines, { label: "Open PDF report", href: pdfUrl }, { label: "View in EduAI", href: portalHref })
+		:	wrapHtml(subject, bodyLines, { label: "View report", href: portalHref });
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
@@ -57,7 +78,8 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 			subject_name: params.subjectName,
 			overall_percent: pct ?? "",
 			test_id: params.testId,
-			report_href: href,
+			report_href: portalHref,
+			pdf_href: pdfUrl ?? "",
 		},
 	});
 }
@@ -71,6 +93,7 @@ export type ParentPortalReportReadyEmailParams = {
 	subjectName: string;
 	overallPercent: number | null;
 	testId: string;
+	pdfSignedUrl?: string | null;
 };
 
 /** Email to a linked parent when their child's practice test report is ready. */
@@ -82,13 +105,20 @@ export async function sendParentPortalReportReadyEmail(
 			? `${Math.round(params.overallPercent)}%`
 			: null;
 	const subject = `${params.childDisplayName} — ${params.subjectName} report ready`;
-	const href = `${getAppUrl()}/parent/open-report?student=${encodeURIComponent(params.studentId)}&test=${encodeURIComponent(params.testId)}`;
+	const portalHref = `${getAppUrl()}/parent/open-report?student=${encodeURIComponent(params.studentId)}&test=${encodeURIComponent(params.testId)}`;
+	const pdfUrl = params.pdfSignedUrl?.trim() || null;
 	const bodyLines = [
 		`Hi ${escapeHtml(params.parentDisplayName ?? "there")},`,
 		`We just finished grading ${escapeHtml(params.childDisplayName)}'s ${escapeHtml(params.subjectName)} practice test${pct ? ` — they scored ${pct}.` : "."}`,
-		"Open the parent portal report for topic strengths, gaps, and suggested next practice.",
+		pdfUrl ?
+			"Open the PDF for the full printable report. You do not need to sign in to EduAI to use this link. It expires after 90 days."
+		:	"Open the parent portal report for topic strengths, gaps, and suggested next practice.",
+		...(pdfUrl ? ["For the interactive report in the parent portal, use Open parent portal below."] : []),
 	];
-	const html = wrapHtml(subject, bodyLines, { label: "View report", href });
+	const html =
+		pdfUrl ?
+			wrapHtml(subject, bodyLines, { label: "Open PDF report", href: pdfUrl }, { label: "Open parent portal", href: portalHref })
+		:	wrapHtml(subject, bodyLines, { label: "View report", href: portalHref });
 	return sendHtmlEmailLogged({
 		to: params.to,
 		recipientUserId: params.recipientUserId ?? null,
@@ -102,7 +132,8 @@ export async function sendParentPortalReportReadyEmail(
 			overall_percent: pct ?? "",
 			student_id: params.studentId,
 			test_id: params.testId,
-			report_href: href,
+			report_href: portalHref,
+			pdf_href: pdfUrl ?? "",
 		},
 	});
 }
