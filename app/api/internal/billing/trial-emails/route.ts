@@ -1,5 +1,6 @@
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
 import { sendTrialEndingEmail } from "@/lib/email/subscription-notifications";
+import { isEmailAllowed, getNotificationPrefs } from "@/lib/notifications/prefs";
 import { logSupabaseError, logServerError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -59,6 +60,11 @@ async function runTrialEmails(): Promise<Response> {
 		const { data: authUser } = await admin.auth.admin.getUserById(sub.profile_id);
 		const email = authUser.user?.email;
 		if (!email) continue;
+
+		const prefs = await getNotificationPrefs(sub.profile_id);
+		if (!isEmailAllowed(prefs, "announcement")) {
+			continue;
+		}
 
 		try {
 			const { error: sendErr } = await sendTrialEndingEmail({

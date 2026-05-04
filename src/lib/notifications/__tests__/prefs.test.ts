@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { isEmailAllowed, isInAppAllowed, type NotificationPrefs } from "@/lib/notifications/prefs";
+import {
+	isEmailAllowed,
+	isInAppAllowed,
+	prefsFromUserPreferenceRow,
+	type NotificationPrefs,
+} from "@/lib/notifications/prefs";
 
 describe("prefs gating", () => {
 	const base: NotificationPrefs = {
@@ -48,5 +53,46 @@ describe("prefs gating", () => {
 				"test_result",
 			),
 		).toBe(false);
+	});
+});
+
+describe("prefsFromUserPreferenceRow", () => {
+	it("treats null master flags as enabled", () => {
+		const p = prefsFromUserPreferenceRow({
+			enableInapp: null,
+			enableEmail: null,
+			types: null,
+		});
+		expect(p.enableInApp).toBe(true);
+		expect(p.enableEmail).toBe(true);
+		expect(isEmailAllowed(p, "announcement")).toBe(true);
+	});
+
+	it("honours explicit false for master email (e.g. one-click unsubscribe)", () => {
+		const p = prefsFromUserPreferenceRow({
+			enableInapp: true,
+			enableEmail: false,
+			types: {},
+		});
+		expect(isEmailAllowed(p, "announcement")).toBe(false);
+	});
+
+	it("honours announcement false for broadcast-style gating", () => {
+		const p = prefsFromUserPreferenceRow({
+			enableInapp: true,
+			enableEmail: true,
+			types: { announcement: false },
+		});
+		expect(isEmailAllowed(p, "announcement")).toBe(false);
+		expect(isInAppAllowed(p, "announcement")).toBe(false);
+	});
+
+	it("ignores non-boolean JSON values for known keys", () => {
+		const p = prefsFromUserPreferenceRow({
+			enableInapp: true,
+			enableEmail: true,
+			types: { announcement: "no" as unknown as boolean },
+		});
+		expect(isEmailAllowed(p, "announcement")).toBe(true);
 	});
 });

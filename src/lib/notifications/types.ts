@@ -141,6 +141,20 @@ export function preferenceKeyForRow(row: { type: NotificationType; category: Not
 }
 
 /**
+ * Keys shown in the student notification preferences UI and accepted from the
+ * client payload. Keep in sync with the Zod schema in
+ * `app/student/settings/notification-preferences-actions.ts`.
+ */
+export const NOTIFICATION_PREFERENCE_KEYS = [
+	"test_result",
+	"usage_alert",
+	"announcement",
+	"reminder",
+] as const;
+
+export type NotificationPreferenceKey = (typeof NOTIFICATION_PREFERENCE_KEYS)[number];
+
+/**
  * Default preference map applied when a user has no `user_preferences` row yet.
  *
  * Keys must match the values returned by {@link preferenceKeyForRow}. The bare

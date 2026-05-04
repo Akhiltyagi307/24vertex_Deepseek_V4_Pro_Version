@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { NotificationPreferencesForm } from "./notification-preferences-form";
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
+import { updateNotificationPreferences } from "./notification-preferences-actions";
 import {
 	StudentProfileSettingsForm,
 	type ResolvedSubjectForSettings,
@@ -98,12 +98,10 @@ export default async function StudentSettingsPage() {
 								electiveSubjectName={electiveSubjectName}
 								resolvedSubjects={resolvedSubjects}
 								subjectsLoadError={subjectResult.loadError}
+								initialNotificationPrefs={initialNotificationPrefs}
+								saveNotificationPreferences={updateNotificationPreferences}
 							/>
 						),
-					},
-					{
-						key: "notification-preferences",
-						content: <NotificationPreferencesForm initial={initialNotificationPrefs} />,
 					},
 				]}
 			/>

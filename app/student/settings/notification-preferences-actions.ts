@@ -7,18 +7,13 @@ import { z } from "zod";
 import { db } from "@/db";
 import { userPreferences } from "@/db/schema/comms-audit";
 import { getServerUser } from "@/lib/auth/get-server-user";
-import { DEFAULT_NOTIFICATION_TYPES } from "@/lib/notifications/types";
+import {
+	DEFAULT_NOTIFICATION_TYPES,
+	NOTIFICATION_PREFERENCE_KEYS,
+} from "@/lib/notifications/types";
 import { logServerError } from "@/lib/server/log-supabase-error";
 
-export type NotificationPreferencesState = { ok: boolean; error?: string };
-
-/** Keys shown in the preferences UI and accepted from the client. */
-export const NOTIFICATION_PREFERENCE_KEYS = [
-	"test_result",
-	"usage_alert",
-	"announcement",
-	"reminder",
-] as const;
+import type { NotificationPreferencesState } from "./notification-preferences-types";
 
 const payloadSchema = z.object({
 	enableInApp: z.boolean(),

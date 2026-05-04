@@ -10,6 +10,11 @@ import { broadcasts } from "@/db/schema/broadcasts";
 import { notifications } from "@/db/schema/comms-audit";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 import { MAX_NOTIFICATION_BODY_LEN } from "@/lib/notifications/insert";
+import {
+	getNotificationPrefsForUsers,
+	isEmailAllowed,
+	isInAppAllowed,
+} from "@/lib/notifications/prefs";
 
 export const runtime = "nodejs";
 
@@ -58,20 +63,26 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 			if (batch.length === 0) break;
 			totalRecipients += batch.length;
 
+			const prefsByUser = await getNotificationPrefsForUsers(batch.map((r) => r.id));
+
 			if (inApp) {
-				const notifRows = batch.map((r) => ({
-					recipientId: r.id,
-					senderId: null as string | null,
-					title: subject,
-					body: bodyMd.slice(0, MAX_NOTIFICATION_BODY_LEN),
-					type: "announcement" as const,
-					priority: (urgent ? "urgent" : "normal") as "normal" | "urgent",
-					category: "broadcast" as const,
-					referenceType: "broadcast" as const,
-					referenceId: id,
-				}));
-				await db.insert(notifications).values(notifRows);
-				inAppSent += notifRows.length;
+				const notifRows = batch
+					.filter((r) => isInAppAllowed(prefsByUser.get(r.id)!, "announcement"))
+					.map((r) => ({
+						recipientId: r.id,
+						senderId: null as string | null,
+						title: subject,
+						body: bodyMd.slice(0, MAX_NOTIFICATION_BODY_LEN),
+						type: "announcement" as const,
+						priority: (urgent ? "urgent" : "normal") as "normal" | "urgent",
+						category: "broadcast" as const,
+						referenceType: "broadcast" as const,
+						referenceId: id,
+					}));
+				if (notifRows.length > 0) {
+					await db.insert(notifications).values(notifRows);
+					inAppSent += notifRows.length;
+				}
 			}
 
 			if (email) {
@@ -80,6 +91,10 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 					const slice = emailJobs.slice(i, i + EMAIL_CONCURRENCY);
 					await Promise.all(
 						slice.map(async (r) => {
+							const prefs = prefsByUser.get(r.id)!;
+							if (!isEmailAllowed(prefs, "announcement")) {
+								return;
+							}
 							const { error } = await sendHtmlEmailLogged({
 								to: r.email!,
 								subject,

@@ -2,6 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import {
+	Bell,
 	CheckIcon,
 	CopyIcon,
 	GraduationCap,
@@ -21,6 +22,12 @@ import {
 	type UpdateStudentProfileState,
 } from "./actions";
 import { recordPasswordChangedAction } from "./account-security-actions";
+import { NotificationPreferencesForm } from "./notification-preferences-form";
+import type {
+	NotificationPreferencesInitial,
+	NotificationPreferencesInput,
+	NotificationPreferencesState,
+} from "./notification-preferences-types";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -816,6 +823,8 @@ export function StudentProfileSettingsForm({
 	electiveSubjectName,
 	resolvedSubjects = [],
 	subjectsLoadError = null,
+	initialNotificationPrefs,
+	saveNotificationPreferences,
 }: {
 	userId: string;
 	loginEmail: string;
@@ -823,6 +832,10 @@ export function StudentProfileSettingsForm({
 	electiveSubjectName: string | null;
 	resolvedSubjects?: ResolvedSubjectForSettings[];
 	subjectsLoadError?: string | null;
+	initialNotificationPrefs: NotificationPreferencesInitial;
+	saveNotificationPreferences: (
+		input: NotificationPreferencesInput,
+	) => Promise<NotificationPreferencesState>;
 }) {
 	const [state, formAction] = useActionState<UpdateStudentProfileState | undefined, FormData>(
 		updateStudentProfile,
@@ -1055,8 +1068,10 @@ export function StudentProfileSettingsForm({
 					<span className="text-foreground/90">Save changes</span> when you&apos;re done.
 					<br />
 					<span className="text-foreground/90">Password</span>,{" "}
-					<span className="text-foreground/90">School &amp; account</span>, and{" "}
-					<span className="text-foreground/90">Guardian</span> cover sign-in, grade, and parent info.
+					<span className="text-foreground/90">School &amp; account</span>,{" "}
+					<span className="text-foreground/90">Guardian</span>, and{" "}
+					<span className="text-foreground/90">Notifications</span> cover sign-in, grade, parent info, and
+					alerts.
 				</PageHeaderSubtext>
 			</div>
 
@@ -1301,6 +1316,19 @@ export function StudentProfileSettingsForm({
 								</div>
 							),
 						},
+						{
+							id: "notifications",
+							title: "Notifications",
+							icon: Bell,
+							color: tabAccentClass,
+							content: (
+								<NotificationPreferencesForm
+									initial={initialNotificationPrefs}
+									saveNotificationPreferences={saveNotificationPreferences}
+									variant="settingsTab"
+								/>
+							),
+						},
 					]}
 				/>
 
@@ -1313,7 +1341,9 @@ export function StudentProfileSettingsForm({
 					<p className="text-muted-foreground text-sm leading-relaxed">
 						<strong className="font-medium text-foreground">Save changes</strong> only saves the Profile tab
 						(name, photo, phone). On School &amp; account, each field saves in its own pop-up. Use{" "}
-						<strong className="font-medium text-foreground">Update password</strong> on the Password tab.
+						<strong className="font-medium text-foreground">Update password</strong> on the Password tab and{" "}
+						<strong className="font-medium text-foreground">Save preferences</strong> on the Notifications
+						tab.
 					</p>
 					<Button
 						type="submit"

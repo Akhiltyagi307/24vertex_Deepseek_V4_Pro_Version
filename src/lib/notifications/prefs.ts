@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { userPreferences } from "@/db/schema/comms-audit";
@@ -22,6 +22,37 @@ const DEFAULT_PREFS: NotificationPrefs = {
 	types: { ...DEFAULT_NOTIFICATION_TYPES },
 };
 
+/** DB row shape for merge (single-user or batch select). Exported for unit tests. */
+export type UserPreferenceNotificationRow = {
+	enableInapp: boolean | null;
+	enableEmail: boolean | null;
+	types: unknown;
+};
+
+/**
+ * Merges `user_preferences` columns into effective {@link NotificationPrefs}.
+ * Same rules as the historical inline `getNotificationPrefs` implementation.
+ */
+export function prefsFromUserPreferenceRow(row: UserPreferenceNotificationRow): NotificationPrefs {
+	const rawTypes = row.types as Record<string, unknown> | null;
+	const types: Record<string, boolean> = { ...DEFAULT_NOTIFICATION_TYPES };
+	if (rawTypes && typeof rawTypes === "object") {
+		for (const [k, v] of Object.entries(rawTypes)) {
+			if (typeof v === "boolean") {
+				types[k] = v;
+			} else if (!(k in DEFAULT_NOTIFICATION_TYPES)) {
+				types[k] = true;
+			}
+		}
+	}
+
+	return {
+		enableInApp: row.enableInapp === true || row.enableInapp == null,
+		enableEmail: row.enableEmail === true || row.enableEmail == null,
+		types,
+	};
+}
+
 /**
  * Reads `user_preferences` for a profile and returns effective notification
  * settings. Missing rows return defaults so first-signup users see
@@ -42,31 +73,63 @@ export async function getNotificationPrefs(userId: string): Promise<Notification
 		const row = rows[0];
 		if (!row) return DEFAULT_PREFS;
 
-		const rawTypes = row.types as Record<string, unknown> | null;
-		const types: Record<string, boolean> = { ...DEFAULT_NOTIFICATION_TYPES };
-		if (rawTypes && typeof rawTypes === "object") {
-			for (const [k, v] of Object.entries(rawTypes)) {
-				// Strict-boolean: only honour explicit `true` / `false`. Strings,
-				// numbers and `null` fall through to the code default for that
-				// key (or `true` if it's a key we don't ship a default for) so
-				// a typo in admin tooling can't silently flip a preference.
-				if (typeof v === "boolean") {
-					types[k] = v;
-				} else if (!(k in DEFAULT_NOTIFICATION_TYPES)) {
-					types[k] = true;
-				}
-			}
-		}
-
-		return {
-			enableInApp: row.enableInapp === true || row.enableInapp == null,
-			enableEmail: row.enableEmail === true || row.enableEmail == null,
-			types,
-		};
+		return prefsFromUserPreferenceRow(row);
 	} catch (err) {
 		logServerError("notifications.prefs.read", err, { userId });
 		return DEFAULT_PREFS;
 	}
+}
+
+/**
+ * Batch-read prefs for many users in one query. Every requested id appears in
+ * the map: missing DB rows get {@link DEFAULT_PREFS}. On failure, returns the
+ * same all-defaults map (fail-open, same spirit as {@link getNotificationPrefs}).
+ */
+export async function getNotificationPrefsForUsers(
+	userIds: string[],
+): Promise<Map<string, NotificationPrefs>> {
+	const map = new Map<string, NotificationPrefs>();
+	const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+	if (unique.length === 0) {
+		return map;
+	}
+
+	const cloneDefaults = (): NotificationPrefs => ({
+		enableInApp: DEFAULT_PREFS.enableInApp,
+		enableEmail: DEFAULT_PREFS.enableEmail,
+		types: { ...DEFAULT_PREFS.types },
+	});
+
+	for (const id of unique) {
+		map.set(id, cloneDefaults());
+	}
+
+	try {
+		const rows = await db
+			.select({
+				userId: userPreferences.userId,
+				enableInapp: userPreferences.enableInappNotifications,
+				enableEmail: userPreferences.enableEmailNotifications,
+				types: userPreferences.notificationTypes,
+			})
+			.from(userPreferences)
+			.where(inArray(userPreferences.userId, unique));
+
+		for (const row of rows) {
+			map.set(
+				row.userId,
+				prefsFromUserPreferenceRow({
+					enableInapp: row.enableInapp,
+					enableEmail: row.enableEmail,
+					types: row.types,
+				}),
+			);
+		}
+	} catch (err) {
+		logServerError("notifications.prefs.read_batch", err, { count: unique.length });
+	}
+
+	return map;
 }
 
 /** Helper used by writers to gate a row before insert. */
