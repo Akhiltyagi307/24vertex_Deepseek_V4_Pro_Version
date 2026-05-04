@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
+import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import {
+	notifyParentChildLinkConfirmed,
+	notifyParentLinkedToStudent,
+} from "@/lib/notifications/account-security";
 import { parentSignupSchema } from "@/lib/validations/auth";
 
 export type ParentSignupState = { error?: string; needsVerification?: boolean };
@@ -58,6 +63,12 @@ export async function completeParentRegistration(
 			error:
 				"We created your account but couldn't link that student. Check their six-character link code from Profile. If their profile already has a guardian email on file, your parent login email must match it. You can link again from the parent portal.",
 		};
+	}
+
+	const studentId = await resolveStudentProfileIdForLinkRef(supabase, v.studentLinkCode);
+	if (studentId) {
+		await notifyParentLinkedToStudent({ studentId, parentId: user.id });
+		await notifyParentChildLinkConfirmed({ studentId, parentId: user.id });
 	}
 
 	redirect("/parent/select-student");

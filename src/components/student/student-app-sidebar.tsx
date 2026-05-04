@@ -29,6 +29,7 @@ export function StudentAppSidebar({
 	user,
 	gradeLabel,
 	entitlement,
+	userId,
 }: {
 	user: {
 		name: string;
@@ -37,6 +38,8 @@ export function StudentAppSidebar({
 	};
 	gradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
+	/** Auth user id — sidebar notification tab unread pill + Realtime. */
+	userId?: string | null;
 }) {
 	const { state, isMobile } = useSidebar();
 	const collapsedDesktop = state === "collapsed" && !isMobile;
@@ -98,7 +101,7 @@ export function StudentAppSidebar({
 			</SidebarHeader>
 			<SidebarSeparator />
 			<SidebarContent>
-				<StudentNavMain />
+				<StudentNavMain userId={userId ?? null} />
 			</SidebarContent>
 			<SidebarFooter className="gap-2">
 				{entitlement ? <SidebarPlanCard entitlement={entitlement} /> : null}

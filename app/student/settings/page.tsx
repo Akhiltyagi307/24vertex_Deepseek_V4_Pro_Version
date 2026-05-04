@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { NotificationPreferencesForm } from "./notification-preferences-form";
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import {
 	StudentProfileSettingsForm,
@@ -9,6 +10,7 @@ import {
 import type { AppProfileRow } from "@/lib/auth/cached-profile";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { getNotificationPrefs } from "@/lib/notifications/prefs";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
 import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { createClient } from "@/lib/supabase/server";
@@ -63,6 +65,18 @@ export default async function StudentSettingsPage() {
 		.map((row: { id: string; name: string }) => ({ id: row.id, name: row.name }))
 		.filter((s: ResolvedSubjectForSettings) => Boolean(s.id && s.name));
 
+	const prefs = await getNotificationPrefs(user.id);
+	const initialNotificationPrefs = {
+		enableInApp: prefs.enableInApp,
+		enableEmail: prefs.enableEmail,
+		types: {
+			test_result: prefs.types.test_result !== false,
+			usage_alert: prefs.types.usage_alert !== false,
+			announcement: prefs.types.announcement !== false,
+			reminder: prefs.types.reminder !== false,
+		},
+	};
+
 	return (
 		<div
 			className={cn(
@@ -86,6 +100,10 @@ export default async function StudentSettingsPage() {
 								subjectsLoadError={subjectResult.loadError}
 							/>
 						),
+					},
+					{
+						key: "notification-preferences",
+						content: <NotificationPreferencesForm initial={initialNotificationPrefs} />,
 					},
 				]}
 			/>

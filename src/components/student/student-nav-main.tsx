@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+	BellIcon,
 	CreditCardIcon,
 	FileBarChartIcon,
 	LayoutDashboardIcon,
@@ -13,6 +14,7 @@ import {
 	MessageCircleIcon,
 } from "lucide-react";
 
+import { NotificationUnreadPill } from "@/components/student/notifications/notification-unread-pill";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -21,6 +23,7 @@ import {
 	SidebarMenuItem,
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { useNotificationUnreadCount } from "@/lib/notifications/use-notification-unread-count";
 
 type NavItem = {
 	title: string;
@@ -40,6 +43,7 @@ const progressItems: NavItem[] = [
 ];
 
 const accountItems: NavItem[] = [
+	{ title: "Notifications", href: "/student/notifications", icon: BellIcon },
 	{ title: "Profile", href: "/student/settings", icon: UserRoundIcon },
 	{ title: "Plan & billing", href: "/student/subscription", icon: CreditCardIcon },
 ];
@@ -47,7 +51,57 @@ const accountItems: NavItem[] = [
 const groupLabelClass =
 	"font-mono text-2xs uppercase tracking-wider text-muted-foreground";
 
-function NavMenuItems({ items }: { items: NavItem[] }) {
+const STUDENT_NOTIFICATIONS_HREF = "/student/notifications";
+
+function SidebarNotificationsRow({
+	userId,
+	item,
+	pathname,
+}: {
+	userId: string;
+	item: NavItem;
+	pathname: string;
+}) {
+	const Icon = item.icon;
+	const { count } = useNotificationUnreadCount({
+		userId,
+		apiBasePath: "/api/student/notifications",
+		realtimeScope: "nav",
+	});
+	const isActive =
+		pathname === item.href || pathname.startsWith(`${item.href}/`);
+	const ariaLabel =
+		count === 0
+			? item.title
+			: count === 1
+				? `${item.title}, 1 unread`
+				: `${item.title}, ${count} unread`;
+
+	return (
+		<SidebarMenuItem key={item.href}>
+			<SidebarMenuButton
+				isActive={isActive}
+				tooltip={item.title}
+				render={<Link href={item.href} aria-label={ariaLabel} />}
+			>
+				<span className="relative inline-flex shrink-0">
+					<Icon />
+					<NotificationUnreadPill count={count} />
+				</span>
+				<span>{item.title}</span>
+			</SidebarMenuButton>
+		</SidebarMenuItem>
+	);
+}
+
+function NavMenuItems({
+	items,
+	userId,
+}: {
+	items: NavItem[];
+	/** When set, the Notifications row shows the same unread pill as the top bar. */
+	userId?: string | null;
+}) {
 	const pathname = usePathname();
 
 	return (
@@ -56,6 +110,16 @@ function NavMenuItems({ items }: { items: NavItem[] }) {
 				const Icon = item.icon;
 				const isActive =
 					pathname === item.href || pathname.startsWith(`${item.href}/`);
+				if (userId && item.href === STUDENT_NOTIFICATIONS_HREF) {
+					return (
+						<SidebarNotificationsRow
+							key={item.href}
+							userId={userId}
+							item={item}
+							pathname={pathname}
+						/>
+					);
+				}
 				return (
 					<SidebarMenuItem key={item.href}>
 						<SidebarMenuButton
@@ -73,22 +137,22 @@ function NavMenuItems({ items }: { items: NavItem[] }) {
 	);
 }
 
-export function StudentNavMain() {
+export function StudentNavMain({ userId }: { userId?: string | null }) {
 	return (
 		<>
 			<SidebarGroup>
 				<SidebarGroupLabel className={groupLabelClass}>Student</SidebarGroupLabel>
-				<NavMenuItems items={primaryItems} />
+				<NavMenuItems items={primaryItems} userId={userId} />
 			</SidebarGroup>
 			<SidebarSeparator />
 			<SidebarGroup className="pt-0">
 				<SidebarGroupLabel className={groupLabelClass}>Progress</SidebarGroupLabel>
-				<NavMenuItems items={progressItems} />
+				<NavMenuItems items={progressItems} userId={userId} />
 			</SidebarGroup>
 			<SidebarSeparator />
 			<SidebarGroup className="pt-0">
 				<SidebarGroupLabel className={groupLabelClass}>Account</SidebarGroupLabel>
-				<NavMenuItems items={accountItems} />
+				<NavMenuItems items={accountItems} userId={userId} />
 			</SidebarGroup>
 		</>
 	);

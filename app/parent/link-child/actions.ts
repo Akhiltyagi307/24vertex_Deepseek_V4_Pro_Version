@@ -6,9 +6,14 @@ import {
 	formatLinkParentRpcDevDetails,
 	userMessageForLinkParentRpcFailure,
 } from "@/lib/auth/link-parent-rpc-errors";
+import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 import { linkParentSchema } from "@/lib/validations/auth";
+import {
+	notifyParentChildLinkConfirmed,
+	notifyParentLinkedToStudent,
+} from "@/lib/notifications/account-security";
 
 export type LinkChildState = { error?: string; success?: boolean };
 
@@ -39,6 +44,17 @@ export async function linkParentToStudent(
 			}
 		}
 		return { error: message };
+	}
+
+	const {
+		data: { user: parentUser },
+	} = await supabase.auth.getUser();
+	if (parentUser?.id) {
+		const studentId = await resolveStudentProfileIdForLinkRef(supabase, parsed.data.studentId);
+		if (studentId) {
+			await notifyParentLinkedToStudent({ studentId, parentId: parentUser.id });
+			await notifyParentChildLinkConfirmed({ studentId, parentId: parentUser.id });
+		}
 	}
 
 	redirect("/parent/dashboard");

@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+	BellIcon,
 	CreditCardIcon,
 	FileBarChartIcon,
 	LayoutDashboardIcon,
@@ -42,6 +43,7 @@ const progressItems: NavItem[] = [
 ];
 
 const accountItems: NavItem[] = [
+	{ title: "Notifications", href: "/parent/notifications", icon: BellIcon },
 	{ title: "Account", href: "/parent/settings", icon: UserRoundIcon },
 	{ title: "Plan & billing", href: "/parent/subscription", icon: CreditCardIcon },
 ];

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { recordPasswordChangedAction } from "../../student/settings/account-security-actions";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export default function UpdatePasswordPage() {
 			setPending(false);
 			return;
 		}
+		await recordPasswordChangedAction();
 		setDone(true);
 		router.push("/login");
 		router.refresh();

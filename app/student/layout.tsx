@@ -42,6 +42,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 			avatarUrl={ctx.avatarUrl}
 			gradeLabel={gradeLabel(ctx.grade, ctx.section)}
 			entitlement={entitlement}
+			userId={user.id}
 		>
 			<SubscriptionBanner entitlement={entitlement} />
 			{children}

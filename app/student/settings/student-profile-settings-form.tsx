@@ -20,6 +20,7 @@ import {
 	updateStudentSchoolPlacement,
 	type UpdateStudentProfileState,
 } from "./actions";
+import { recordPasswordChangedAction } from "./account-security-actions";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -896,6 +897,7 @@ export function StudentProfileSettingsForm({
 			setPwError(updErr.message);
 			return;
 		}
+		await recordPasswordChangedAction();
 		setPwSuccess(true);
 		setPwCurrent("");
 		setPwNew("");

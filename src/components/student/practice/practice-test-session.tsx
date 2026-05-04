@@ -494,8 +494,6 @@ export function PracticeTestSession({
 	const pendingExitHrefRef = React.useRef<string | null>(null);
 	const [navOpen, setNavOpen] = React.useState(false);
 	const [saveUi, setSaveUi] = React.useState<"idle" | "saving" | "saved" | "failed">("idle");
-	const [lastSavedAt, setLastSavedAt] = React.useState<number | null>(null);
-	const [lastSavedAgo, setLastSavedAgo] = React.useState(0);
 	const [skipped, setSkipped] = React.useState<Record<string, boolean>>({});
 	const [isOnline, setIsOnline] = React.useState(true);
 	const [unsyncedCount, setUnsyncedCount] = React.useState(0);
@@ -644,16 +642,6 @@ export function PracticeTestSession({
 		return () => document.removeEventListener("visibilitychange", onVis);
 	}, [testId]);
 
-	// Phase 5: "Last saved Xs ago" ticker.
-	React.useEffect(() => {
-		if (lastSavedAt == null) return;
-		const tick = () =>
-			setLastSavedAgo(Math.max(0, Math.floor((Date.now() - lastSavedAt) / 1000)));
-		tick();
-		const id = window.setInterval(tick, 1000);
-		return () => window.clearInterval(id);
-	}, [lastSavedAt]);
-
 	// Phase 5: pause countdown (when a pause is active).
 	React.useEffect(() => {
 		if (!paused) return;
@@ -762,7 +750,6 @@ export function PracticeTestSession({
 			}
 			setSaveError(null);
 			setSaveUi("saved");
-			setLastSavedAt(Date.now());
 		},
 		[testId],
 	);
@@ -791,7 +778,6 @@ export function PracticeTestSession({
 			flagged: { ...flaggedRef.current },
 		};
 		setSaveUi("saved");
-		setLastSavedAt(Date.now());
 		setUnsyncedCount(0);
 		return true;
 	}, [testId]);
@@ -1277,7 +1263,7 @@ export function PracticeTestSession({
 												Offline — {unsyncedCount} unsynced
 											</span>
 										) : saveUi === "saving" ? (
-											<span className="text-foreground/65">Saving…</span>
+											<span className="text-foreground/65">Saving</span>
 										) : saveUi === "failed" ? (
 											<button
 												type="button"
@@ -1287,11 +1273,7 @@ export function PracticeTestSession({
 												Save failed — retry
 											</button>
 										) : saveUi === "saved" ? (
-											<span className="text-emerald-700 dark:text-emerald-400/90 tabular-nums">
-												{lastSavedAgo === 0
-													? "Saved just now"
-													: `Saved ${lastSavedAgo}s ago`}
-											</span>
+											<span className="text-emerald-700 dark:text-emerald-400/90">Saved</span>
 										) : null}
 									</div>
 								</div>

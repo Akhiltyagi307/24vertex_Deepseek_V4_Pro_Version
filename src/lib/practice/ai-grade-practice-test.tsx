@@ -7,6 +7,7 @@ import { generateObject } from "ai";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { consumeTest } from "@/lib/billing/entitlements";
+import { notifyTestReportReady } from "@/lib/notifications/report-ready";
 import { getOpenAIChatModel } from "@/lib/env";
 import {
 	buildPracticeGradingSystemPrompt,
@@ -519,6 +520,15 @@ async function gradePracticeTestWithAiInner(
 	}
 
 	trace.timingsMs.testReports = mark();
+
+	// Fire-and-forget: "your report is ready" in-app + email. Failures are
+	// logged inside the helper and must never block grading completion.
+	void notifyTestReportReady({
+		studentId: userId,
+		testId,
+		subjectName,
+		overallPercent,
+	});
 
 	if (topicRollups.length > 0) {
 		const { error: bulkTrackerErr } = await supabase.rpc("practice_update_trackers_bulk", {

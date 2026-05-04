@@ -18,6 +18,9 @@ module.exports = {
 			env: {
 				NODE_ENV: "development",
 				PORT: "3001",
+				// Turbopack dev cache can corrupt across restarts (missing manifests / `[turbopack]_runtime.js`).
+				// Webpack is slower but stable for a long-lived PM2 process; see `scripts/next-dev.mjs`.
+				NEXT_DEV_WEBPACK: "1",
 			},
 		},
 	],

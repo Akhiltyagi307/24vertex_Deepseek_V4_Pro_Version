@@ -23,6 +23,8 @@ export type StudentShellProps = {
 	avatarUrl: string | null;
 	gradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
+	/** Auth user id — used to subscribe the top-bar bell to Realtime inserts. */
+	userId?: string | null;
 	children: React.ReactNode;
 };
 
@@ -34,6 +36,7 @@ export function StudentShell({
 	avatarUrl,
 	gradeLabel,
 	entitlement,
+	userId,
 	children,
 }: StudentShellProps) {
 	const pathname = usePathname();
@@ -66,6 +69,7 @@ export function StudentShell({
 					organizationName={organizationName}
 					userDisplayName={userDisplayName}
 					shareableId={shareableId}
+					userId={userId ?? null}
 				/>
 				<div
 					className={cn(
@@ -81,6 +85,7 @@ export function StudentShell({
 						}}
 						gradeLabel={gradeLabel}
 						entitlement={entitlement}
+						userId={userId ?? null}
 					/>
 					<SidebarInset
 						className={cn(

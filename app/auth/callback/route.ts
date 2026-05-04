@@ -6,6 +6,7 @@ import { consumePendingRegistration } from "@/lib/auth/pending-registration";
 import { resolveSafeNextPath } from "@/lib/auth/safe-redirect";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/env";
+import { notifyEmailChanged } from "@/lib/notifications/account-security";
 
 const EMAIL_OTP_TYPES = new Set<EmailOtpType>([
 	"signup",
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
 		},
 	});
 
+	let sessionEstablished = false;
 	if (code) {
 		const { error } = await supabase.auth.exchangeCodeForSession(code);
 		if (error) {
@@ -57,6 +59,7 @@ export async function GET(request: Request) {
 			u.searchParams.set("error", error.message);
 			return NextResponse.redirect(u);
 		}
+		sessionEstablished = true;
 	} else if (token_hash && otpType) {
 		const { error: otpError } = await supabase.auth.verifyOtp({
 			type: otpType,
@@ -66,6 +69,16 @@ export async function GET(request: Request) {
 			const u = new URL("/login", origin);
 			u.searchParams.set("error", otpError.message);
 			return NextResponse.redirect(u);
+		}
+		sessionEstablished = true;
+	}
+
+	if (sessionEstablished && otpType === "email_change") {
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (user?.id) {
+			void notifyEmailChanged(user.id, user.email);
 		}
 	}
 

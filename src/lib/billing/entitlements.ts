@@ -10,6 +10,7 @@ import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeNextQuotaTestGrant } from "@/lib/billing/quota-grant-consume";
 import { PLAN_CATALOG, type PlanCode, tokenQuotaForGrade } from "@/lib/billing/plans";
 import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
+import { maybeNotifyUsageThreshold } from "@/lib/notifications/usage-threshold";
 
 export type SubscriptionStatus =
 	| "trialing"
@@ -444,7 +445,52 @@ export async function consumeTest(
 	if (data === false) {
 		return { ok: false, code: "quota_tests", message: QUOTA_TEST_MESSAGE };
 	}
+
+	// Fire-and-forget: 80% / 100% usage notifications. We re-read the
+	// subscription's active usage_periods row because `billing_consume_test`
+	// only returns a boolean; mirrors the window rule used in
+	// `get_entitlement_snapshot`.
+	void emitTestsUsageThresholdIfAny(supabase, profileId);
+
 	return { ok: true };
+}
+
+async function emitTestsUsageThresholdIfAny(supabase: SupabaseClient, profileId: string): Promise<void> {
+	try {
+		const { data: sub } = await supabase
+			.from("subscriptions")
+			.select("id")
+			.eq("profile_id", profileId)
+			.maybeSingle<{ id: string }>();
+		if (!sub?.id) return;
+
+		const { data: usage } = await supabase
+			.from("usage_periods")
+			.select("id, tests_quota, tests_used, period_start, period_end")
+			.eq("subscription_id", sub.id)
+			.order("period_end", { ascending: false })
+			.limit(USAGE_PERIOD_LOOKBACK);
+		if (!usage?.length) return;
+
+		const now = Date.now();
+		const active =
+			usage.find(
+				(r) => new Date(r.period_start).getTime() <= now && new Date(r.period_end).getTime() > now,
+			) ?? usage[0];
+		if (!active) return;
+
+		await maybeNotifyUsageThreshold({
+			profileId,
+			usagePeriodId: active.id as string,
+			meter: "tests",
+			testsUsed: Number(active.tests_used ?? 0),
+			testsQuota: Number(active.tests_quota ?? 0),
+		});
+	} catch (err) {
+		// Helper already logs; extra catch here so bad data never surfaces to
+		// the grading caller.
+		logSupabaseError("billing.consume_test.notify_threshold", { message: String(err) }, { profileId });
+	}
 }
 
 /**
@@ -465,6 +511,48 @@ export async function consumeTokens(
 	});
 	if (error) {
 		logSupabaseError("billing.consume_tokens.rpc", error, { profileId, tokens });
+		return;
+	}
+	// Fire-and-forget: 80% / 100% usage notifications for doubt-chat tokens.
+	void emitTokensUsageThresholdIfAny(supabase, profileId);
+}
+
+async function emitTokensUsageThresholdIfAny(
+	supabase: SupabaseClient,
+	profileId: string,
+): Promise<void> {
+	try {
+		const { data: sub } = await supabase
+			.from("subscriptions")
+			.select("id")
+			.eq("profile_id", profileId)
+			.maybeSingle<{ id: string }>();
+		if (!sub?.id) return;
+
+		const { data: usage } = await supabase
+			.from("usage_periods")
+			.select("id, tokens_quota, tokens_used, period_start, period_end")
+			.eq("subscription_id", sub.id)
+			.order("period_end", { ascending: false })
+			.limit(USAGE_PERIOD_LOOKBACK);
+		if (!usage?.length) return;
+
+		const now = Date.now();
+		const active =
+			usage.find(
+				(r) => new Date(r.period_start).getTime() <= now && new Date(r.period_end).getTime() > now,
+			) ?? usage[0];
+		if (!active) return;
+
+		await maybeNotifyUsageThreshold({
+			profileId,
+			usagePeriodId: active.id as string,
+			meter: "tokens",
+			tokensUsed: Number(active.tokens_used ?? 0),
+			tokensQuota: Number(active.tokens_quota ?? 0),
+		});
+	} catch (err) {
+		logSupabaseError("billing.consume_tokens.notify_threshold", { message: String(err) }, { profileId });
 	}
 }
 

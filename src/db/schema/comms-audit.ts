@@ -29,6 +29,8 @@ export const notifications = pgTable(
 		category: varchar("category", { length: 30 }),
 		referenceType: varchar("reference_type", { length: 30 }),
 		referenceId: uuid("reference_id"),
+		/** Student profile this row is about (parent portal and multi-child context). */
+		contextStudentId: uuid("context_student_id"),
 		isRead: boolean("is_read").default(false),
 		readAt: timestamp("read_at"),
 		emailSent: boolean("email_sent").default(false),
@@ -89,6 +91,7 @@ export const userPreferences = pgTable("user_preferences", {
 		test_result: true,
 		announcement: true,
 		reminder: true,
+		usage_alert: true,
 	}),
 	preferredLanguage: varchar("preferred_language", { length: 5 }).default("en"),
 	createdAt: timestamp("created_at").defaultNow(),

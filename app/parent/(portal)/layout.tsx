@@ -58,6 +58,7 @@ export default async function ParentPortalLayout({ children }: { children: React
 			organizationName={org}
 			childDisplayName={childName}
 			childLinkCode={childRow.student_link_code}
+			parentUserId={user.id}
 			parentDisplayName={parentName}
 			parentEmail={user.email ?? ""}
 			parentAvatarUrl={parentRow.avatar_url}

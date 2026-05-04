@@ -10,6 +10,28 @@ vi.mock("@/lib/auth/routing", () => ({
 	getProfile: vi.fn(async () => null),
 }));
 
+vi.mock("@/lib/notifications/account-security", () => ({
+	notifyParentLinkedToStudent: vi.fn(async () => {}),
+	notifyParentChildLinkConfirmed: vi.fn(async () => {}),
+}));
+
+function mockProfilesChain(studentId: string) {
+	const chain: {
+		select: ReturnType<typeof vi.fn>;
+		eq: ReturnType<typeof vi.fn>;
+		maybeSingle: ReturnType<typeof vi.fn>;
+	} = {
+		select: vi.fn(),
+		eq: vi.fn(),
+		maybeSingle: vi.fn(async () => ({ data: { id: studentId, role: "student" }, error: null })),
+	};
+	chain.select.mockReturnValue(chain);
+	chain.eq.mockReturnValue(chain);
+	return {
+		from: vi.fn(() => chain),
+	};
+}
+
 describe("consumePendingRegistration", () => {
 	it("returns unsupported-teacher status for legacy teacher pending metadata", async () => {
 		const supabase = {
@@ -76,6 +98,7 @@ describe("consumePendingRegistration", () => {
 				})),
 			},
 			rpc: rpc,
+			...mockProfilesChain("11111111-1111-1111-1111-111111111111"),
 		};
 
 		const result = await consumePendingRegistration(supabase as never);
@@ -121,6 +144,7 @@ describe("consumePendingRegistration", () => {
 				})),
 			},
 			rpc,
+			...mockProfilesChain("22222222-2222-2222-2222-222222222222"),
 		};
 
 		const result = await consumePendingRegistration(supabase as never);

@@ -15,6 +15,8 @@ export type ParentShellProps = {
 	/** Child — shown in header trail. */
 	childDisplayName: string;
 	childLinkCode?: string | null;
+	/** Parent auth user id (Supabase) for notifications and account chrome. */
+	parentUserId: string;
 	parentDisplayName: string;
 	parentEmail: string;
 	parentAvatarUrl: string | null;
@@ -27,6 +29,7 @@ export function ParentShell({
 	organizationName,
 	childDisplayName,
 	childLinkCode,
+	parentUserId,
 	parentDisplayName,
 	parentEmail,
 	parentAvatarUrl,
@@ -58,6 +61,7 @@ export function ParentShell({
 				userDisplayName={childDisplayName}
 				shareableId={childLinkCode}
 				headerPortal="parent"
+				parentNotificationsUserId={parentUserId}
 			/>
 			<div
 				className={cn(

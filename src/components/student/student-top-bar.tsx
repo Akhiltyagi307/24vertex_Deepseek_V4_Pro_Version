@@ -5,6 +5,7 @@ import {
 	HeaderBreadcrumbSlash,
 	type HeaderPortal,
 } from "@/components/layout/app-header-brand-trail";
+import { StudentNotificationsBell } from "@/components/student/notifications/notifications-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,10 @@ export type StudentTopBarProps = {
 	shareableId?: string | null;
 	/** Parent portal uses child link wording for the ID copy control. */
 	headerPortal?: HeaderPortal;
+	/** Present for the student portal (bell + unread). */
+	userId?: string | null;
+	/** Parent auth user id — when set with `headerPortal="parent"`, shows parent notifications bell. */
+	parentNotificationsUserId?: string | null;
 };
 
 export function StudentTopBar({
@@ -26,6 +31,8 @@ export function StudentTopBar({
 	userDisplayName,
 	shareableId,
 	headerPortal = "student",
+	userId,
+	parentNotificationsUserId,
 }: StudentTopBarProps) {
 	return (
 		<header className="sticky top-0 z-50 flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-sidebar px-4">
@@ -45,7 +52,19 @@ export function StudentTopBar({
 					omitLogo={false}
 				/>
 			</div>
-			<ThemeToggle />
+			<div className="flex items-center gap-2">
+				{userId && headerPortal === "student" ? (
+					<StudentNotificationsBell userId={userId} />
+				) : parentNotificationsUserId && headerPortal === "parent" ? (
+					<StudentNotificationsBell
+						userId={parentNotificationsUserId}
+						apiBasePath="/api/parent/notifications"
+						notificationsPageHref="/parent/notifications"
+						portal="parent"
+					/>
+				) : null}
+				<ThemeToggle />
+			</div>
 		</header>
 	);
 }

@@ -215,3 +215,27 @@ export const billingEvents = pgTable(
 	},
 	(t) => [index("idx_billing_events_type_created").on(t.eventType, t.createdAt)],
 );
+
+/**
+ * Idempotency ledger for 80% / 100% usage-threshold notifications.
+ * One row per (profile, usage_period, meter, threshold) guarantees the
+ * corresponding in-app notification + email fires at most once per period.
+ * Server-only (RLS denies authenticated/anon).
+ */
+export const usageNotificationLog = pgTable(
+	"usage_notification_log",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		profileId: uuid("profile_id").notNull(),
+		usagePeriodId: uuid("usage_period_id")
+			.notNull()
+			.references(() => usagePeriods.id, { onDelete: "cascade" }),
+		meter: varchar("meter", { length: 16 }).notNull(),
+		threshold: smallint("threshold").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		unique("usage_notification_log_key").on(t.profileId, t.usagePeriodId, t.meter, t.threshold),
+		index("idx_usage_notif_log_profile_created").on(t.profileId, t.createdAt),
+	],
+);

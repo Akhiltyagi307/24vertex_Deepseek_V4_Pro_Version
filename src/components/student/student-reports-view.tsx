@@ -18,6 +18,7 @@ import {
 	Search,
 } from "lucide-react";
 import * as React from "react";
+import { format } from "date-fns";
 import { motion, useReducedMotion } from "motion/react";
 
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
@@ -53,6 +54,19 @@ function rowTimestamp(r: StudentReportTestRowSerialized): number {
 	if (!raw) return 0;
 	const t = new Date(raw).getTime();
 	return Number.isFinite(t) ? t : 0;
+}
+
+/** Avoid `toLocaleString` / `Intl` — Node and browsers can emit different punctuation for the same locale. */
+function formatReportTableDateTime(raw: string): string {
+	const d = new Date(raw);
+	if (!Number.isFinite(d.getTime())) return "—";
+	return format(d, "MMM d, yyyy 'at' h:mm a");
+}
+
+function formatReportSummaryDate(raw: number): string {
+	const d = new Date(raw);
+	if (!Number.isFinite(d.getTime())) return "—";
+	return format(d, "MMM d, yyyy");
 }
 
 function scoreForAverage(r: StudentReportTestRowSerialized): number | null {
@@ -370,11 +384,7 @@ export function StudentReportsView({
 						</CardHeader>
 						<CardContent>
 							<p className="font-semibold text-2xl leading-snug">
-								{overviewStats.lastTestMs
-									? new Date(overviewStats.lastTestMs).toLocaleDateString("en-US", {
-											dateStyle: "medium",
-										})
-									: "—"}
+								{overviewStats.lastTestMs ? formatReportSummaryDate(overviewStats.lastTestMs) : "—"}
 							</p>
 							<p className="text-muted-foreground text-xs">
 								{parentViewer ? "Their last submitted test" : "When you last submitted"}
@@ -701,15 +711,9 @@ export function StudentReportsView({
 							) : (
 								filteredSorted.map((r) => {
 									const dateStr = r.testDate
-										? new Date(r.testDate).toLocaleString("en-US", {
-												dateStyle: "medium",
-												timeStyle: "short",
-											})
+										? formatReportTableDateTime(r.testDate)
 										: r.createdAt
-											? new Date(r.createdAt).toLocaleString("en-US", {
-													dateStyle: "medium",
-													timeStyle: "short",
-												})
+											? formatReportTableDateTime(r.createdAt)
 											: "—";
 									const correct = r.correctAnswers ?? 0;
 									const totalQ = r.totalQuestions ?? 0;

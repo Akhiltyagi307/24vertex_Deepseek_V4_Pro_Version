@@ -7,6 +7,11 @@ import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
 import { getProfile } from "@/lib/auth/routing";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { classifyLinkParentRpc } from "@/lib/auth/link-parent-rpc-errors";
+import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
+import {
+	notifyParentChildLinkConfirmed,
+	notifyParentLinkedToStudent,
+} from "@/lib/notifications/account-security";
 import {
 	parentRegistrationPayloadSchema,
 	studentProfileBodySchema,
@@ -54,6 +59,11 @@ async function linkPendingParentToStudent(
 		p_student_ref: studentLinkCode,
 	});
 	if (!linkErr) {
+		const studentId = await resolveStudentProfileIdForLinkRef(supabase, studentLinkCode);
+		if (studentId) {
+			await notifyParentLinkedToStudent({ studentId, parentId: parentUserId });
+			await notifyParentChildLinkConfirmed({ studentId, parentId: parentUserId });
+		}
 		return "completed_profile";
 	}
 	logSupabaseError("consumePendingRegistration.link_parent_to_student", linkErr);
