@@ -3,11 +3,26 @@
 -- Vector columns use USING casts so typmod is enforced; fails if stored dimension mismatches.
 --
 -- Policies that reference parent_student_links.status must be dropped before altering that column.
--- Assignments SELECT policies reference target_sections — dropped before altering assignments.
+-- Assignment-related drops/ALTERs are skipped when teaching tables were removed (20260428203000).
 
-DROP POLICY IF EXISTS "Parents view child submissions" ON public.assignment_submissions;
-DROP POLICY IF EXISTS "Parents view child assignments" ON public.assignments;
-DROP POLICY IF EXISTS "Students view assignments for their grade/section" ON public.assignments;
+DO $$
+BEGIN
+	IF to_regclass('public.assignment_submissions') IS NOT NULL THEN
+		EXECUTE 'DROP POLICY IF EXISTS "Parents view child submissions" ON public.assignment_submissions';
+	END IF;
+	IF to_regclass('public.assignments') IS NOT NULL THEN
+		EXECUTE 'DROP POLICY IF EXISTS "Parents view child assignments" ON public.assignments';
+		EXECUTE 'DROP POLICY IF EXISTS "Students view assignments for their grade/section" ON public.assignments';
+		EXECUTE 'DROP POLICY IF EXISTS "Teachers select own assignments" ON public.assignments';
+		EXECUTE 'DROP POLICY IF EXISTS "Verified teachers delete own assignments" ON public.assignments';
+		EXECUTE 'DROP POLICY IF EXISTS "Verified teachers insert assignments" ON public.assignments';
+		EXECUTE 'DROP POLICY IF EXISTS "Verified teachers update own assignments" ON public.assignments';
+	END IF;
+	IF to_regclass('public.teacher_assignments') IS NOT NULL THEN
+		EXECUTE 'DROP POLICY IF EXISTS "Teachers manage own assignments rows" ON public.teacher_assignments';
+	END IF;
+END $$;
+
 DROP POLICY IF EXISTS "Parents read linked student doubt conversations" ON public.doubt_conversations;
 DROP POLICY IF EXISTS "Parents read linked student doubt messages" ON public.doubt_messages;
 DROP POLICY IF EXISTS "payments_select_linked_student" ON public.payments;
@@ -17,9 +32,6 @@ DROP POLICY IF EXISTS "subscriptions_select_linked_student" ON public.subscripti
 DROP POLICY IF EXISTS "Parents view linked child test reports" ON public.test_reports;
 DROP POLICY IF EXISTS "Parents view linked child tests" ON public.tests;
 DROP POLICY IF EXISTS "usage_periods_select_linked_student" ON public.usage_periods;
-DROP POLICY IF EXISTS "Verified teachers delete own assignments" ON public.assignments;
-DROP POLICY IF EXISTS "Verified teachers insert assignments" ON public.assignments;
-DROP POLICY IF EXISTS "Verified teachers update own assignments" ON public.assignments;
 DROP POLICY IF EXISTS "Verified teachers can insert notifications" ON public.notifications;
 DROP POLICY IF EXISTS "Teachers view students in their grade/section performance" ON public.performance_tracker;
 DROP POLICY IF EXISTS "Teachers read questions for student tests in scope" ON public.questions;
@@ -27,21 +39,25 @@ DROP POLICY IF EXISTS "Teachers read answers for in-scope tests" ON public.stude
 DROP POLICY IF EXISTS "Teachers view test reports for in-scope students" ON public.test_reports;
 DROP POLICY IF EXISTS "Teachers view their students tests" ON public.tests;
 
--- assignment_submissions
-ALTER TABLE public.assignment_submissions
-  ALTER COLUMN penalty_applied SET DATA TYPE numeric(5,2),
-  ALTER COLUMN score SET DATA TYPE numeric(5,2),
-  ALTER COLUMN status SET DATA TYPE character varying(20);
-
--- assignments (RLS policies dropped at top — recreate after parent_student_links.status)
-ALTER TABLE public.assignments
-  ALTER COLUMN assignment_type SET DATA TYPE character varying(20),
-  ALTER COLUMN difficulty SET DATA TYPE character varying(10),
-  ALTER COLUMN late_submission_policy SET DATA TYPE character varying(20),
-  ALTER COLUMN status SET DATA TYPE character varying(20),
-  ALTER COLUMN target_sections SET DATA TYPE character varying(5)[],
-  ALTER COLUMN title SET DATA TYPE character varying(300),
-  ALTER COLUMN unit_name SET DATA TYPE character varying(250);
+DO $$
+BEGIN
+	IF to_regclass('public.assignment_submissions') IS NOT NULL THEN
+		ALTER TABLE public.assignment_submissions
+			ALTER COLUMN penalty_applied SET DATA TYPE numeric(5,2),
+			ALTER COLUMN score SET DATA TYPE numeric(5,2),
+			ALTER COLUMN status SET DATA TYPE character varying(20);
+	END IF;
+	IF to_regclass('public.assignments') IS NOT NULL THEN
+		ALTER TABLE public.assignments
+			ALTER COLUMN assignment_type SET DATA TYPE character varying(20),
+			ALTER COLUMN difficulty SET DATA TYPE character varying(10),
+			ALTER COLUMN late_submission_policy SET DATA TYPE character varying(20),
+			ALTER COLUMN status SET DATA TYPE character varying(20),
+			ALTER COLUMN target_sections SET DATA TYPE character varying(5)[],
+			ALTER COLUMN title SET DATA TYPE character varying(300),
+			ALTER COLUMN unit_name SET DATA TYPE character varying(250);
+	END IF;
+END $$;
 
 -- audit_logs
 ALTER TABLE public.audit_logs
@@ -128,9 +144,14 @@ ALTER TABLE public.subjects
   ALTER COLUMN subject_group SET DEFAULT NULL::character varying,
   ALTER COLUMN stream SET DEFAULT NULL::character varying;
 
--- teacher_assignments
-ALTER TABLE public.teacher_assignments
-  ALTER COLUMN section SET DATA TYPE character varying(5);
+-- teacher_assignments (skipped when table removed)
+DO $$
+BEGIN
+	IF to_regclass('public.teacher_assignments') IS NOT NULL THEN
+		ALTER TABLE public.teacher_assignments
+			ALTER COLUMN section SET DATA TYPE character varying(5);
+	END IF;
+END $$;
 
 -- tests
 ALTER TABLE public.tests
@@ -196,28 +217,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS admin_dashboard_metrics_computed_at_key ON pub
 
 GRANT SELECT ON public.admin_dashboard_metrics TO service_role;
 
--- Recreate policies that reference parent_student_links.status / assignments.target_sections (after all typmods).
-CREATE POLICY "Parents view child assignments" ON public.assignments
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM (parent_student_links psl
-         JOIN profiles p ON ((p.id = psl.student_id)))
-      WHERE ((psl.parent_id = auth.uid()) AND ((psl.status)::text = 'active'::text) AND ((p.grade = ANY (assignments.target_grades)) AND ((p.section)::text = ANY ((assignments.target_sections)::text[]))))))
-  );
-
-CREATE POLICY "Students view assignments for their grade/section" ON public.assignments
-  FOR SELECT USING (
-    ((EXISTS ( SELECT 1
-       FROM profiles p
-      WHERE ((p.id = auth.uid()) AND ((p.role)::text = 'student'::text) AND (p.grade = ANY (assignments.target_grades)) AND ((p.section)::text = ANY ((assignments.target_sections)::text[]))))) OR (auth.uid() = ANY (target_student_ids)))
-  );
-
-CREATE POLICY "Parents view child submissions" ON public.assignment_submissions
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM parent_student_links psl
-      WHERE ((psl.parent_id = auth.uid()) AND (psl.student_id = assignment_submissions.student_id) AND ((psl.status)::text = 'active'::text))))
-  );
+-- Recreate policies that reference parent_student_links.status (after all typmods).
+-- Assignment / teacher-assignment policies are omitted — product no longer includes teaching tables (20260428203000).
 
 CREATE POLICY "Parents read linked student doubt conversations" ON public.doubt_conversations
   FOR SELECT USING (
@@ -281,74 +282,4 @@ CREATE POLICY "usage_periods_select_linked_student" ON public.usage_periods
     (EXISTS ( SELECT 1
        FROM parent_student_links psl
       WHERE ((psl.parent_id = auth.uid()) AND (psl.student_id = usage_periods.profile_id) AND ((psl.status)::text = 'active'::text))))
-  );
-
-CREATE POLICY "Verified teachers delete own assignments" ON public.assignments
-  FOR DELETE USING (
-    ((auth.uid() = teacher_id) AND (EXISTS ( SELECT 1
-       FROM profiles
-      WHERE ((profiles.id = auth.uid()) AND ((profiles.role)::text = 'teacher'::text) AND (profiles.is_verified = true)))))
-  );
-
-CREATE POLICY "Verified teachers insert assignments" ON public.assignments
-  FOR INSERT WITH CHECK (
-    ((auth.uid() = teacher_id) AND (EXISTS ( SELECT 1
-       FROM profiles
-      WHERE ((profiles.id = auth.uid()) AND ((profiles.role)::text = 'teacher'::text) AND (profiles.is_verified = true)))))
-  );
-
-CREATE POLICY "Verified teachers update own assignments" ON public.assignments
-  FOR UPDATE USING (
-    ((auth.uid() = teacher_id) AND (EXISTS ( SELECT 1
-       FROM profiles
-      WHERE ((profiles.id = auth.uid()) AND ((profiles.role)::text = 'teacher'::text) AND (profiles.is_verified = true)))))
-  );
-
-CREATE POLICY "Verified teachers can insert notifications" ON public.notifications
-  FOR INSERT WITH CHECK (
-    (EXISTS ( SELECT 1
-       FROM profiles
-      WHERE ((profiles.id = auth.uid()) AND ((profiles.role)::text = 'teacher'::text) AND (profiles.is_verified = true))))
-  );
-
-CREATE POLICY "Teachers view students in their grade/section performance" ON public.performance_tracker
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM (profiles p
-         JOIN teacher_assignments ta ON (((ta.teacher_id = auth.uid()) AND (ta.grade = p.grade) AND ((ta.section)::text = (p.section)::text))))
-      WHERE (p.id = performance_tracker.student_id)))
-  );
-
-CREATE POLICY "Teachers read questions for student tests in scope" ON public.questions
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM ((tests te
-         JOIN profiles p ON (((p.id = te.student_id) AND ((p.role)::text = 'student'::text))))
-         JOIN teacher_assignments ta ON (((ta.teacher_id = auth.uid()) AND (ta.grade = p.grade) AND ((ta.section)::text = (p.section)::text))))
-      WHERE (te.id = questions.test_id)))
-  );
-
-CREATE POLICY "Teachers read answers for in-scope tests" ON public.student_answers
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM ((tests te
-         JOIN profiles p ON (((p.id = te.student_id) AND ((p.role)::text = 'student'::text))))
-         JOIN teacher_assignments ta ON (((ta.teacher_id = auth.uid()) AND (ta.grade = p.grade) AND ((ta.section)::text = (p.section)::text))))
-      WHERE (te.id = student_answers.test_id)))
-  );
-
-CREATE POLICY "Teachers view test reports for in-scope students" ON public.test_reports
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM (profiles p
-         JOIN teacher_assignments ta ON (((ta.teacher_id = auth.uid()) AND (ta.grade = p.grade) AND ((ta.section)::text = (p.section)::text))))
-      WHERE (p.id = test_reports.student_id)))
-  );
-
-CREATE POLICY "Teachers view their students tests" ON public.tests
-  FOR SELECT USING (
-    (EXISTS ( SELECT 1
-       FROM (profiles p
-         JOIN teacher_assignments ta ON (((ta.teacher_id = auth.uid()) AND (ta.grade = p.grade) AND ((ta.section)::text = (p.section)::text))))
-      WHERE (p.id = tests.student_id)))
   );
