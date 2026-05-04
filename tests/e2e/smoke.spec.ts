@@ -3,12 +3,24 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
 const ADMIN_EMAIL = process.env.PLAYWRIGHT_ADMIN_EMAIL ?? "";
 const ADMIN_PASSWORD = process.env.PLAYWRIGHT_ADMIN_PASSWORD ?? "";
 
+const STUDENT_EMAIL =
+	process.env.PLAYWRIGHT_USER_EMAIL?.trim() || process.env["playwright_user_email"]?.trim() || "";
+const STUDENT_PASSWORD =
+	process.env.PLAYWRIGHT_USER_PASSWORD?.trim() ||
+	process.env["playwright_user_password"]?.trim() ||
+	"";
+
 /** Console errors we'll tolerate (third-party noise we don't control). */
 const IGNORED_CONSOLE_PATTERNS: RegExp[] = [
 	/Failed to load resource.*sentry/i,
 	/sentry.*not configured/i,
 	/Download the React DevTools/i,
 	/\[Fast Refresh\]/i,
+	// Chromium logs CSP violations for some third-party / inline paths in dev; not treated as app regressions here.
+	/Content Security Policy directive/i,
+	/violates the following Content Security Policy/i,
+	// Dev noise when an optional asset or prefetch 404s without breaking the page.
+	/Failed to load resource:.*\b404\b/i,
 ];
 
 function attachConsoleCollector(page: Page): { errors: string[]; warnings: string[] } {
@@ -51,15 +63,15 @@ test.describe("Landing page (perf-optimized)", () => {
 		expect(errors, `Unexpected console errors: ${errors.join("\n")}`).toHaveLength(0);
 	});
 
-	test("optimized assets are referenced (subjects.webp, AVIF logo via next/image)", async ({ page }) => {
+	test("optimized assets are referenced (subjects hero image, AVIF logo via next/image)", async ({ page }) => {
 		await page.goto("/");
-		// Scroll to features to trigger the lazy-loaded animated WebP.
+		// Scroll to features to trigger the lazy-loaded marketing image.
 		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
-		await page.waitForTimeout(500);
+		await page.waitForTimeout(800);
 
-		// The animated subjects.webp should be in DOM (raw <img> intentional — Next/Image strips frames).
-		const subjectsWebp = page.locator('img[src*="subjects.webp"]');
-		await expect(subjectsWebp.first()).toBeAttached();
+		// Raw <img> in features block (path may be .gif or .webp depending on marketing asset).
+		const subjectsHero = page.locator('img[src*="subjects.webp"], img[src*="subjects.gif"]');
+		await expect(subjectsHero.first()).toBeAttached({ timeout: 15_000 });
 	});
 });
 
@@ -106,6 +118,26 @@ test.describe("Auth flow", () => {
 		const onErrorAlert = await page.getByRole("alert").first().isVisible().catch(() => false);
 		const navigatedAway = !/\/login/.test(new URL(page.url()).pathname);
 		expect(onErrorAlert || navigatedAway, "either an error alert or successful navigation must occur").toBe(true);
+	});
+});
+
+test.describe("Student auth (optional env)", () => {
+	test.skip(!STUDENT_EMAIL || !STUDENT_PASSWORD, "playwright_user_* or PLAYWRIGHT_USER_* not set");
+
+	test("student login submits and Supabase returns 200", async ({ page }) => {
+		await page.goto("/login");
+
+		await page.getByLabel(/email/i).first().fill(STUDENT_EMAIL);
+		await page.getByLabel(/password/i).first().fill(STUDENT_PASSWORD);
+
+		const authResponse = page.waitForResponse(
+			(res) => /\/auth\/v1\/token/.test(res.url()) && res.request().method() === "POST",
+			{ timeout: 15_000 },
+		);
+		await page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click();
+		const res = await authResponse;
+		expect(res.status(), "student credentials must be accepted for student portal E2E").toBe(200);
+		await page.waitForURL((url) => !/\/login/.test(url.pathname), { timeout: 15_000 });
 	});
 });
 

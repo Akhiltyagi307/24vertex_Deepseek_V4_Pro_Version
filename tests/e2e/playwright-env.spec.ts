@@ -19,6 +19,13 @@ test.describe("Playwright env from .env.local", () => {
 	});
 
 	test("required admin E2E secrets are present and shaped correctly", () => {
+		test.skip(
+			!process.env.PLAYWRIGHT_ADMIN_EMAIL?.trim() ||
+				!process.env.PLAYWRIGHT_ADMIN_PASSWORD?.trim() ||
+				!process.env.PLAYWRIGHT_E2E_TARGET_USER_ID?.trim(),
+			"Admin E2E not configured — set PLAYWRIGHT_ADMIN_EMAIL, PLAYWRIGHT_ADMIN_PASSWORD, PLAYWRIGHT_E2E_TARGET_USER_ID to validate",
+		);
+
 		const email = mustBeSet("PLAYWRIGHT_ADMIN_EMAIL", process.env.PLAYWRIGHT_ADMIN_EMAIL);
 		expect(email, "PLAYWRIGHT_ADMIN_EMAIL should look like an email").toMatch(/@/);
 
@@ -29,6 +36,20 @@ test.describe("Playwright env from .env.local", () => {
 			process.env.PLAYWRIGHT_E2E_TARGET_USER_ID,
 		);
 		expect(userId, "PLAYWRIGHT_E2E_TARGET_USER_ID should be a UUID").toMatch(UUID_RE);
+	});
+
+	test("student E2E credentials are shaped correctly when set", () => {
+		const email =
+			process.env.PLAYWRIGHT_USER_EMAIL?.trim() ||
+			process.env["playwright_user_email"]?.trim();
+		if (!email) return;
+
+		expect(email, "student Playwright email should look like an email").toMatch(/@/);
+		const password =
+			process.env.PLAYWRIGHT_USER_PASSWORD?.trim() ||
+			process.env["playwright_user_password"]?.trim();
+		expect(password, "password must be set when student email is set").toBeTruthy();
+		expect(password!.trim().length, "password must not be only whitespace").toBeGreaterThan(0);
 	});
 
 	test("optional PLAYWRIGHT_ADMIN_TOTP is 6 digits when set", () => {

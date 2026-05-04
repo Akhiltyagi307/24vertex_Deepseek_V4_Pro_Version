@@ -18,7 +18,7 @@ export async function createClient() {
 						cookieStore.set(name, value, options);
 					}
 				} catch {
-					/* Server Components cannot set cookies; middleware refreshes session */
+					/* Server Components cannot set cookies; root proxy refreshes session */
 				}
 			},
 		},

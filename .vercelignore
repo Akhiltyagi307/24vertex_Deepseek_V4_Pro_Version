@@ -1,18 +1,41 @@
+# Shrink Vercel source uploads — same pattern rules as .gitignore.
+# Docs and product markdown stay in git but are not required for `next build`.
+
 .git/
 .github/
 .agents/
+.claude/
+artifacts/
 .cursor/
 docs/
 testsprite_tests/
+tests/
 node_modules/
 .next/
 .pnpm-store/
 .mcp-github-push-batches/
+supabase/.temp/
+
+# Test & coverage output (not used by default Next build)
 coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright-cache/
+
+# Logs, caches, local env
 *.log
 *.tsbuildinfo
+.eslintcache
 .env
 .env*.local
 env.local
 .DS_Store
+Thumbs.db
+
+# Playwright stored session (secrets)
+playwright/.auth/
+
+# Local scratch
+tw-debug.css
 EduAI_PRD_v3_2_TestSprite_Backend.md

@@ -97,11 +97,20 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 
 	const { data: coupon, error: cErr } = await admin
 		.from("coupons")
-		.select("id, code, is_active, max_redemptions, redemptions_count, duration_days, grants_plan_code, expires_at")
+		.select(
+			"id, code, kind, is_active, max_redemptions, redemptions_count, duration_days, grants_plan_code, expires_at, single_use_globally",
+		)
 		.eq("code", code)
 		.maybeSingle();
 	if (cErr || !coupon) {
 		return { ok: false, code: "invalid_code", message: INVALID };
+	}
+	if (coupon.kind === "checkout_discount") {
+		return {
+			ok: false,
+			code: "invalid_code",
+			message: "This code is for checkout only. Enter it when you subscribe with Razorpay on the subscription page.",
+		};
 	}
 	if (!coupon.is_active) {
 		return { ok: false, code: "inactive", message: "This coupon is no longer active." };
@@ -120,6 +129,7 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		.maybeSingle();
 	if (
 		isCouponSingleUseGlobalExhausted({
+			singleUseGlobally: Boolean(coupon.single_use_globally),
 			redemptionsCount: coupon.redemptions_count,
 			anyRedemptionExists: Boolean(alreadyAny),
 		})
@@ -143,7 +153,10 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		};
 	}
 
-	const grant = coupon.grants_plan_code as keyof typeof PLAN_CATALOG;
+	const grant = coupon.grants_plan_code as keyof typeof PLAN_CATALOG | null;
+	if (!grant) {
+		return { ok: false, code: "invalid_code", message: INVALID };
+	}
 	const plan = PLAN_CATALOG[grant] ?? PLAN_CATALOG.pro_monthly;
 
 	const { data: profile } = await admin
@@ -192,6 +205,14 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 					targetProfileId === user.id
 						? "You already have an active paid subscription. Cancel it first to redeem this coupon."
 						: "This student already has an active paid subscription. Cancel it first to redeem this coupon.",
+			};
+		}
+		if (errorCode === "wrong_kind") {
+			return {
+				ok: false,
+				code: "invalid_code",
+				message:
+					"This code is for checkout only. Enter it when you subscribe with Razorpay on the subscription page.",
 			};
 		}
 		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };

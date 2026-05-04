@@ -1,4 +1,5 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { profiles } from "./profiles";
 
@@ -82,9 +83,40 @@ export const freeTrialClaims = pgTable(
 		identityKey: text("identity_key").primaryKey(),
 		firstProfileId: uuid("first_profile_id").notNull(),
 		claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+		releasedAt: timestamp("released_at", { withTimezone: true }),
+		releasedBy: text("released_by"),
+		releasedReason: text("released_reason"),
 	},
 	(t) => [index("idx_free_trial_claims_profile").on(t.firstProfileId)],
 );
+
+/** Manual test/token grants consumed before subscription period quota (Phase 4). */
+export const quotaGrants = pgTable(
+	"quota_grants",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		studentId: uuid("student_id")
+			.notNull()
+			.references(() => profiles.id, { onDelete: "cascade" }),
+		grantType: varchar("grant_type", { length: 32 }).notNull(),
+		quantity: integer("quantity").notNull(),
+		consumed: integer("consumed").notNull().default(0),
+		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		note: text("note"),
+		createdBy: text("created_by"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		index("idx_quota_grants_student_type").on(t.studentId, t.grantType),
+		index("idx_quota_grants_expires").on(t.expiresAt),
+	],
+);
+
+export const identityBlocklist = pgTable("identity_blocklist", {
+	identityKey: text("identity_key").primaryKey(),
+	reason: text("reason"),
+	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const payments = pgTable(
 	"payments",
@@ -105,12 +137,24 @@ export const payments = pgTable(
 		capturedAt: timestamp("captured_at", { withTimezone: true }),
 		metadata: jsonb("metadata").notNull().default({}),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		razorpayRefundId: varchar("razorpay_refund_id", { length: 80 }),
+		refundAmountPaise: integer("refund_amount_paise"),
+		refundedAt: timestamp("refunded_at", { withTimezone: true }),
 	},
 	(t) => [
 		index("idx_payments_profile").on(t.profileId, t.createdAt),
 		index("idx_payments_subscription").on(t.subscriptionId, t.createdAt),
 	],
 );
+
+export const adminRefundIdempotency = pgTable("admin_refund_idempotency", {
+	idempotencyKey: text("idempotency_key").primaryKey(),
+	paymentId: uuid("payment_id")
+		.notNull()
+		.references(() => payments.id, { onDelete: "cascade" }),
+	razorpayRefundId: varchar("razorpay_refund_id", { length: 80 }),
+	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const coupons = pgTable(
 	"coupons",
@@ -121,13 +165,20 @@ export const coupons = pgTable(
 		maxRedemptions: integer("max_redemptions").notNull(),
 		redemptionsCount: integer("redemptions_count").notNull().default(0),
 		durationDays: integer("duration_days").notNull().default(30),
-		grantsPlanCode: varchar("grants_plan_code", { length: 32 })
-			.notNull()
-			.references(() => plans.code),
+		/** Entitlement coupons require a plan; checkout_discount may omit (use eligible_plan_codes + Razorpay offers). */
+		grantsPlanCode: varchar("grants_plan_code", { length: 32 }).references(() => plans.code),
 		expiresAt: timestamp("expires_at", { withTimezone: true }),
 		isActive: boolean("is_active").notNull().default(true),
 		createdBy: uuid("created_by"),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		kind: varchar("kind", { length: 32 }).notNull().default("entitlement"),
+		singleUseGlobally: boolean("single_use_globally").notNull().default(false),
+		discountPercent: smallint("discount_percent"),
+		eligiblePlanCodes: text("eligible_plan_codes").array(),
+		razorpayOffersByPlan: jsonb("razorpay_offers_by_plan")
+			.$type<Record<string, string>>()
+			.notNull()
+			.default(sql`'{}'::jsonb`),
 	},
 );
 
@@ -157,6 +208,10 @@ export const billingEvents = pgTable(
 		processedAt: timestamp("processed_at", { withTimezone: true }),
 		error: text("error"),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		replayCount: integer("replay_count").notNull().default(0),
+		lastReplayAt: timestamp("last_replay_at", { withTimezone: true }),
+		resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+		resolvedBy: text("resolved_by"),
 	},
 	(t) => [index("idx_billing_events_type_created").on(t.eventType, t.createdAt)],
 );

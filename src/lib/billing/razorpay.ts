@@ -67,6 +67,8 @@ export type CreateSubscriptionInput = {
 	expireBy?: number;
 	customerId?: string;
 	customerNotify?: 0 | 1;
+	/** Linked subscription offer (e.g. checkout % coupon). */
+	offerId?: string;
 	notes?: Record<string, string>;
 };
 
@@ -95,6 +97,7 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
 	if (input.startAt) body.start_at = input.startAt;
 	if (input.expireBy) body.expire_by = input.expireBy;
 	if (input.customerId) body.customer_id = input.customerId;
+	if (input.offerId) body.offer_id = input.offerId;
 	if (input.notes) body.notes = input.notes;
 	const sub = (await rzp.subscriptions.create(body as never)) as unknown as RazorpaySubscription;
 	return sub;
@@ -139,6 +142,19 @@ export type RazorpayPlanInput = {
 	notes?: Record<string, string>;
 };
 
+export type RazorpayPlanFetched = {
+	id: string;
+	period?: string;
+	interval?: number;
+	item?: { name?: string; amount?: number; currency?: string };
+};
+
+/** Loads a plan from Razorpay (amount in paise on `item.amount`). */
+export async function fetchRazorpayPlan(planId: string): Promise<RazorpayPlanFetched> {
+	const rzp = getRazorpayClient();
+	return (await rzp.plans.fetch(planId)) as unknown as RazorpayPlanFetched;
+}
+
 export async function createPlan(input: RazorpayPlanInput): Promise<{ id: string }> {
 	const rzp = getRazorpayClient();
 	const plan = (await rzp.plans.create({
@@ -172,6 +188,20 @@ export type RazorpayInvoice = {
 export async function fetchInvoice(invoiceId: string): Promise<RazorpayInvoice> {
 	const rzp = getRazorpayClient();
 	return (await rzp.invoices.fetch(invoiceId)) as unknown as RazorpayInvoice;
+}
+
+export type RazorpayRefund = { id: string; amount?: number; status?: string };
+
+/** Partial refund when `amountPaise` is set; else full refund. */
+export async function refundPayment(
+	razorpayPaymentId: string,
+	opts: { amountPaise?: number; notes?: Record<string, string> } = {},
+): Promise<RazorpayRefund> {
+	const rzp = getRazorpayClient();
+	const body: Record<string, unknown> = {};
+	if (opts.amountPaise != null) body.amount = opts.amountPaise;
+	if (opts.notes) body.notes = opts.notes;
+	return (await rzp.payments.refund(razorpayPaymentId, body as never)) as unknown as RazorpayRefund;
 }
 
 // ------------------------------------------------------------

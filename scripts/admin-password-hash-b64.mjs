@@ -9,7 +9,9 @@
  */
 import bcrypt from "bcryptjs";
 
-const pwd = process.argv[2];
+/** `pnpm run … -- <password>` leaves a literal `--` in argv; strip it. */
+const args = process.argv.slice(2);
+const pwd = args[0] === "--" ? args[1] : args[0];
 if (!pwd || pwd === "-h" || pwd === "--help") {
 	console.error("Usage: pnpm run admin:password-hash-b64 -- '<password>'");
 	console.error("   or: node scripts/admin-password-hash-b64.mjs '<password>'");

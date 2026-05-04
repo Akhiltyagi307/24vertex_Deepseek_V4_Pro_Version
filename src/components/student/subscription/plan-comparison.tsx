@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { CheckIcon } from "lucide-react";
 
@@ -8,6 +10,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { RazorpayCheckoutButton } from "@/components/student/subscription/razorpay-checkout";
 import { PriceDisplay } from "@/components/student/subscription/price-display";
 import { PLAN_CATALOG, type PlanCode } from "@/lib/billing/plans";
@@ -65,6 +68,7 @@ export function PlanComparison({
 	const annual = planCatalog.pro_annual;
 	const isSenior = grade != null && grade >= 11;
 	const billingStart = formatBillingStart(trialEndsAt);
+	const [checkoutCoupon, setCheckoutCoupon] = React.useState("");
 
 	const monthlyLabel =
 		currentPlanCode === "pro_monthly"
@@ -103,6 +107,7 @@ export function PlanComparison({
 					className="w-full"
 					disabled={currentPlanCode === "pro_monthly"}
 					billingProfileId={billingProfileId}
+					checkoutCouponCode={checkoutCoupon}
 				/>
 			),
 		},
@@ -129,13 +134,31 @@ export function PlanComparison({
 					className="w-full"
 					disabled={currentPlanCode === "pro_annual"}
 					billingProfileId={billingProfileId}
+					checkoutCouponCode={checkoutCoupon}
 				/>
 			),
 		},
 	];
 
 	return (
-		<div className="grid gap-4 medium:grid-cols-2 medium:gap-5">
+		<div className="space-y-4">
+			<div className="rounded-lg border border-border bg-muted/20 p-3">
+				<label className="text-xs font-medium text-muted-foreground" htmlFor="checkout-coupon">
+					Checkout coupon (optional)
+				</label>
+				<Input
+					id="checkout-coupon"
+					className="mt-1 h-9 max-w-xs font-mono uppercase"
+					placeholder="e.g. SAVE50"
+					autoComplete="off"
+					value={checkoutCoupon}
+					onChange={(e) => setCheckoutCoupon(e.target.value)}
+				/>
+				<p className="mt-1 text-xs text-muted-foreground">
+					For % off paid checkout only. Entitlement coupons are redeemed in the “Have a code?” box above.
+				</p>
+			</div>
+			<div className="grid gap-4 medium:grid-cols-2 medium:gap-5">
 			{cards.map((c) => {
 				const isCurrent = currentPlanCode === c.code;
 				return (
@@ -204,6 +227,7 @@ export function PlanComparison({
 					</Card>
 				);
 			})}
+			</div>
 		</div>
 	);
 }

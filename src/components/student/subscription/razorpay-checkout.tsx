@@ -68,6 +68,8 @@ export type CheckoutButtonProps = {
 	disabled?: boolean;
 	/** Parent portal: bill this student profile (server verifies link). */
 	billingProfileId?: string;
+	/** Checkout % coupon (checkout_discount kind); passed to create-subscription. */
+	checkoutCouponCode?: string;
 };
 
 export function RazorpayCheckoutButton({
@@ -79,6 +81,7 @@ export function RazorpayCheckoutButton({
 	className,
 	disabled,
 	billingProfileId,
+	checkoutCouponCode,
 }: CheckoutButtonProps) {
 	const router = useRouter();
 	const [pending, setPending] = React.useState(false);
@@ -93,6 +96,7 @@ export function RazorpayCheckoutButton({
 					planCode,
 					startMode,
 					...(billingProfileId ? { billingProfileId } : {}),
+					...(checkoutCouponCode?.trim() ? { couponCode: checkoutCouponCode.trim().toUpperCase() } : {}),
 				}),
 			});
 			const data = (await res.json()) as {

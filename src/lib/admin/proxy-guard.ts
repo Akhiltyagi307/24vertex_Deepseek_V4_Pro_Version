@@ -61,8 +61,8 @@ function adminOriginAllowed(request: NextRequest): boolean {
  *
  * Panic-revoke (`v < current` check) is enforced by Node-runtime guards `requireAdmin` and
  * `requireAdminApi`, which call `verifyAdminJwt` and read the current version from postgres.
- * The middleware deliberately does NOT fetch the version: doing so would require
- * `SUPABASE_SERVICE_ROLE_KEY` in every middleware invocation, expanding the blast radius if
+ * The root proxy deliberately does NOT fetch the version: doing so would require
+ * `SUPABASE_SERVICE_ROLE_KEY` on every request through `proxy.ts`, expanding the blast radius if
  * the request handler is ever compromised. Locally-verifiable signature is enough at this layer.
  */
 export async function adminProxyGate(request: NextRequest): Promise<NextResponse | null> {

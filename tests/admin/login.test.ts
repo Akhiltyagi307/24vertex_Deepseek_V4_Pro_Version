@@ -7,13 +7,18 @@ describe.skipIf(!hasDb)("admin login core (integration)", () => {
 	const prevEmail = process.env.ADMIN_EMAIL;
 	const prevPlain = process.env.ADMIN_PASSWORD;
 	const prevHash = process.env.ADMIN_PASSWORD_HASH;
+	const prevHashB64 = process.env.ADMIN_PASSWORD_HASH_B64;
 	const prevSecret = process.env.ADMIN_JWT_SECRET;
+	const prevAllowlist = process.env.ADMIN_IP_ALLOWLIST;
 
 	beforeAll(() => {
 		process.env.ADMIN_EMAIL = "admin@test.local";
 		process.env.ADMIN_PASSWORD = "good-password";
 		delete process.env.ADMIN_PASSWORD_HASH;
+		delete process.env.ADMIN_PASSWORD_HASH_B64;
 		process.env.ADMIN_JWT_SECRET = "unit-test-admin-jwt-secret-32bytes!";
+		// Allowlist is checked before password; real .env may restrict IPs and yield 403 before 401.
+		delete process.env.ADMIN_IP_ALLOWLIST;
 	});
 
 	afterAll(() => {
@@ -22,7 +27,11 @@ describe.skipIf(!hasDb)("admin login core (integration)", () => {
 		else process.env.ADMIN_PASSWORD = prevPlain;
 		if (prevHash === undefined) delete process.env.ADMIN_PASSWORD_HASH;
 		else process.env.ADMIN_PASSWORD_HASH = prevHash;
+		if (prevHashB64 === undefined) delete process.env.ADMIN_PASSWORD_HASH_B64;
+		else process.env.ADMIN_PASSWORD_HASH_B64 = prevHashB64;
 		process.env.ADMIN_JWT_SECRET = prevSecret;
+		if (prevAllowlist === undefined) delete process.env.ADMIN_IP_ALLOWLIST;
+		else process.env.ADMIN_IP_ALLOWLIST = prevAllowlist;
 	});
 
 	it("rejects wrong password", async () => {

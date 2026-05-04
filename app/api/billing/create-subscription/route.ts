@@ -5,6 +5,7 @@ import {
 	createSubscription,
 } from "@/lib/billing/razorpay";
 import { getApiRequestUser } from "@/lib/auth/api-request-user";
+import { quoteCheckoutCouponForPlan } from "@/lib/billing/checkout-coupon";
 import { isPlanCode } from "@/lib/billing/plans";
 import { getPublicRazorpayKeyId } from "@/lib/env";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
@@ -24,6 +25,8 @@ const bodySchema = z.object({
 	startMode: z.enum(["immediate", "after_trial"]).default("immediate"),
 	/** When set, a verified parent may purchase for this student profile instead of self. */
 	billingProfileId: z.string().uuid().optional(),
+	/** Optional checkout_discount coupon code (must be synced to Razorpay offers). */
+	couponCode: z.string().trim().min(2).max(40).optional(),
 });
 
 function isMissingProfileColumnError(error: {
@@ -203,6 +206,20 @@ export async function POST(req: Request) {
 		}
 	}
 
+	let offerId: string | undefined;
+	let eduaiCouponId: string | undefined;
+	if (parsed.data.couponCode?.trim()) {
+		const q = await quoteCheckoutCouponForPlan({
+			couponCode: parsed.data.couponCode,
+			planCode: parsed.data.planCode,
+		});
+		if (!q.ok) {
+			return Response.json({ ok: false, message: q.message }, { status: 400 });
+		}
+		offerId = q.offerId;
+		eduaiCouponId = q.couponId;
+	}
+
 	let razorpaySubscription;
 	try {
 		razorpaySubscription = await createSubscription({
@@ -210,7 +227,12 @@ export async function POST(req: Request) {
 			totalCount,
 			startAt,
 			customerId: customer.id,
-			notes: { profile_id: targetProfileId, plan_code: plan.code },
+			offerId,
+			notes: {
+				profile_id: String(targetProfileId),
+				plan_code: plan.code,
+				...(eduaiCouponId ? { eduai_coupon_id: String(eduaiCouponId) } : {}),
+			},
 		});
 	} catch (e) {
 		logServerError("billing.create-subscription.rzp", e);

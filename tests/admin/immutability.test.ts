@@ -23,8 +23,9 @@ describe.skipIf(!enabled)("admin_action_log immutability (integration)", () => {
 		const { error: updateErr } = await admin.from("admin_action_log").update({ action: "tampered" }).eq("id", row!.id);
 
 		expect(updateErr).toBeTruthy();
-		const msg = `${updateErr?.message ?? ""} ${(updateErr as { details?: string })?.details ?? ""}`;
-		expect(msg.toLowerCase()).toMatch(/append-only|check_violation/);
+		const msg = `${updateErr?.message ?? ""} ${(updateErr as { details?: string })?.details ?? ""}`.toLowerCase();
+		// Trigger uses ERRCODE check_violation + "append-only"; REVOKE UPDATE on service_role surfaces first as permission denied — both satisfy immutability.
+		expect(msg).toMatch(/append-only|check_violation|permission denied for table admin_action_log/);
 
 		const { error: deleteErr } = await admin.from("admin_action_log").delete().eq("id", row!.id);
 

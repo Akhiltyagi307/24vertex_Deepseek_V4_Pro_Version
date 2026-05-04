@@ -70,7 +70,7 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 			return;
 		}
 
-		// Full navigation so middleware refreshes cookies before RSC runs (avoids a stale
+		// Full navigation so the root proxy refreshes cookies before RSC runs (avoids a stale
 		// server action reading no session right after signInWithPassword).
 		window.location.assign("/");
 	}
