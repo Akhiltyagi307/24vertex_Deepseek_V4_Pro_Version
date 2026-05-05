@@ -918,7 +918,8 @@ These remain valuable but warrant their own focused PRs:
 2. **JSX decomposition of the 3 remaining giant view components.** practice-test-session.tsx (1,927), practice-test-wizard.tsx (1,943), doubt-chat-view.tsx (1,372). With JSX split, the deferred component-render tests (Phase 2.2) become tractable. Detailed prompt in [FOLLOWUP_PROMPTS.md](FOLLOWUP_PROMPTS.md).
 3. **Wire the e2e specs into GH Actions.** axe-core a11y, security-headers, and visual-snapshots all pass locally but only run on a developer's machine; lift them into CI so PRs are gated.
 4. **Authed-route a11y coverage.** The current axe spec only covers public routes. Add session-scoped projects (student dashboard, admin) — likely surfaces a new round of findings, hence its own PR.
-5. **i18n.** Out of scope per [PATH_TO_95.md § 5](#5-out-of-scope-deliberately-deferred). When this lands, the wizard's step components are the natural seam for `next-intl` wrapping.
+5. **Bundle-budget script: Next 16 rewrite.** Next 16 dropped `.next/app-build-manifest.json`; the script currently skips gracefully (logs an informational message + exits 0). A Next-16-aware rewrite needs to walk per-route `.next/server/app/<route>/build-manifest.json` plus per-page `.nft.json` traces to reconstruct first-load JS per route. Workflow + budgets are still in the repo and ready to wire back up.
+6. **i18n.** Out of scope per [PATH_TO_95.md § 5](#5-out-of-scope-deliberately-deferred). When this lands, the wizard's step components are the natural seam for `next-intl` wrapping.
 
 ### Engineering hygiene the project gained
 
