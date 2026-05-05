@@ -6,16 +6,20 @@ export type SubjectTopicRadarDatum = {
 	perfected: number;
 };
 
-/** Marketing and dashboard topic radar accent (matches Features bento). */
-export const SUBJECT_TOPIC_RADAR_ACCENT_HEX = "#3ECF8E" as const;
+/**
+ * Marketing and dashboard topic radar accent. Resolves to the EduAI brand green
+ * via the `--subject-grid-icon` token so the chart inherits theme switches
+ * (One Voice Rule, DESIGN.md §2).
+ */
+export const SUBJECT_TOPIC_RADAR_ACCENT = "var(--subject-grid-icon)" as const;
 
 export const subjectTopicRadarChartConfig = {
 	coverage: {
 		label: "Topic coverage",
-		color: `color-mix(in oklab, ${SUBJECT_TOPIC_RADAR_ACCENT_HEX} 32%, var(--muted-foreground))`,
+		color: `color-mix(in oklab, ${SUBJECT_TOPIC_RADAR_ACCENT} 32%, var(--muted-foreground))`,
 	},
 	perfected: {
 		label: "Topics perfected",
-		color: SUBJECT_TOPIC_RADAR_ACCENT_HEX,
+		color: SUBJECT_TOPIC_RADAR_ACCENT,
 	},
 } satisfies ChartConfig;

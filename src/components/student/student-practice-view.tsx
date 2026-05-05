@@ -10,7 +10,6 @@ export type StudentPracticeViewProps = {
 	enrolledSubjects: PracticeEnrolledSubject[];
 	performanceRows: PerformanceRowSerialized[];
 	loadError: string | null;
-	profileGrade: number | null;
 	showPromptPreview: boolean;
 	subjectProgressBySubjectId: Record<string, PracticeSubjectProgress>;
 	isAdmin?: boolean;
@@ -20,7 +19,6 @@ export function StudentPracticeView({
 	enrolledSubjects,
 	performanceRows,
 	loadError,
-	profileGrade,
 	showPromptPreview,
 	subjectProgressBySubjectId,
 	isAdmin,
@@ -29,7 +27,6 @@ export function StudentPracticeView({
 		enrolledSubjects,
 		performanceRows,
 		loadError,
-		profileGrade,
 		showPromptPreview,
 		subjectProgressBySubjectId,
 		isAdmin: Boolean(isAdmin),

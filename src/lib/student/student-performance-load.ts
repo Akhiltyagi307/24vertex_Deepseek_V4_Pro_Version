@@ -7,7 +7,6 @@ import {
 } from "@/lib/student/performance-matrix";
 import { getCachedTopicCountsBySubjectForGrade } from "@/lib/cache/curriculum-topic-counts";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import type { createClient } from "@/lib/supabase/server";
 
 type RpcSubjectRow = {

@@ -35,11 +35,14 @@ describe("AdminDataTable mobile cards", () => {
 					data={[{ name: "Ada" }]}
 					getRowId={(r) => r.name}
 					rowCount={1}
-					pageIndex={0}
-					pageSize={25}
-					onPaginationChange={() => {}}
-					sorting={[]}
-					onSortingChange={() => {}}
+					state={{
+						pagination: { pageIndex: 0, pageSize: 25 },
+						sorting: [],
+					}}
+					handlers={{
+						onPaginationChange: () => {},
+						onSortingChange: () => {},
+					}}
 				/>,
 			);
 		});

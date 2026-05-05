@@ -18,8 +18,25 @@ import {
 } from "lucide-react";
 
 import { submitPracticeTest } from "../../../../app/student/practice/session-actions";
-import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
+import { useAdminTestMessageChannel } from "@/hooks/use-admin-test-message-channel";
+import { useLowBatteryWarning } from "@/hooks/use-low-battery-warning";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { usePracticeDraftPersist } from "@/hooks/use-practice-draft-persist";
+import { usePracticeSessionTimer } from "@/hooks/use-practice-session-timer";
+import { usePracticeTabBlurReporter } from "@/hooks/use-practice-tab-blur-reporter";
+import {
+	clearPracticeDraft,
+	clearPracticeSessionStart,
+	mergeServerAndLocalDraft,
+	readPracticeDraft,
+	readPracticeSessionStart,
+	writePracticeSessionStart,
+} from "@/lib/practice/practice-session-storage";
 import { useTestRowRealtimePoll } from "@/lib/practice/use-test-row-realtime-poll";
+import type {
+	PracticeBatchItem,
+	PracticeSessionQuestion,
+} from "@/components/student/practice/practice-session-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,7 +66,6 @@ import {
 	isAnswered,
 	normalizeDifficultyLevel,
 	optionEntries,
-	type PracticeQuestionKind,
 	type SessionStudentAnswer,
 	questionTypeLabel,
 	questionTypeNavLabel,
@@ -74,18 +90,7 @@ const PracticeRichAnswerEditor = dynamic(
 	},
 );
 
-export type PracticeSessionQuestion = {
-	id: string;
-	question_number: number;
-	question_text: string;
-	question_type: PracticeQuestionKind;
-	difficulty_level: string | null;
-	options: Record<string, string> | null;
-	topic_id: string;
-	topic_name: string;
-	/** From `topics.chapter_name` when joined; used with `topic_name` for the header line. */
-	chapter_name: string | null;
-};
+export type { PracticeSessionQuestion } from "@/components/student/practice/practice-session-types";
 
 export type PracticeTestSessionProps = {
 	testId: string;
@@ -260,57 +265,6 @@ function scheduleFlush(
 	}, delayMs);
 }
 
-const PRACTICE_SESSION_START_KEY = (testId: string) => `eduai:practice-test-session:${testId}`;
-
-type PracticeSessionStartPayload = {
-	startedAt: number;
-	timeLimitSeconds: number;
-};
-
-function readPracticeSessionStart(testId: string, timeLimitSeconds: number): PracticeSessionStartPayload | null {
-	try {
-		const raw = localStorage.getItem(PRACTICE_SESSION_START_KEY(testId));
-		if (!raw) return null;
-		const parsed = JSON.parse(raw) as Partial<PracticeSessionStartPayload>;
-		if (
-			typeof parsed.startedAt !== "number" ||
-			!Number.isFinite(parsed.startedAt) ||
-			parsed.timeLimitSeconds !== timeLimitSeconds
-		) {
-			return null;
-		}
-		return { startedAt: parsed.startedAt, timeLimitSeconds: parsed.timeLimitSeconds };
-	} catch {
-		return null;
-	}
-}
-
-function writePracticeSessionStart(testId: string, startedAt: number, timeLimitSeconds: number) {
-	try {
-		const payload: PracticeSessionStartPayload = { startedAt, timeLimitSeconds };
-		localStorage.setItem(PRACTICE_SESSION_START_KEY(testId), JSON.stringify(payload));
-	} catch {
-		/* quota / private mode */
-	}
-}
-
-function clearPracticeSessionStart(testId: string) {
-	try {
-		localStorage.removeItem(PRACTICE_SESSION_START_KEY(testId));
-	} catch {
-		/* ignore */
-	}
-}
-
-const PRACTICE_DRAFT_KEY = (testId: string) => `eduai:practice-answers-draft:${testId}`;
-
-type PracticeAnswersDraftV1 = {
-	v: 1;
-	testId: string;
-	answers: Record<string, SessionStudentAnswer>;
-	flagged: Record<string, boolean>;
-};
-
 function buildInitialMapsFromInitialAnswers(initialAnswers: PracticeTestSessionProps["initialAnswers"]): {
 	answers: Record<string, SessionStudentAnswer>;
 	flagged: Record<string, boolean>;
@@ -325,68 +279,6 @@ function buildInitialMapsFromInitialAnswers(initialAnswers: PracticeTestSessionP
 	}
 	return { answers, flagged };
 }
-
-function readPracticeDraft(testId: string): PracticeAnswersDraftV1 | null {
-	try {
-		const raw = localStorage.getItem(PRACTICE_DRAFT_KEY(testId));
-		if (!raw) return null;
-		const parsed = JSON.parse(raw) as Partial<PracticeAnswersDraftV1>;
-		if (parsed.v !== 1 || parsed.testId !== testId) return null;
-		if (!parsed.answers || typeof parsed.answers !== "object") return null;
-		if (!parsed.flagged || typeof parsed.flagged !== "object") return null;
-		return {
-			v: 1,
-			testId,
-			answers: parsed.answers as Record<string, SessionStudentAnswer>,
-			flagged: parsed.flagged as Record<string, boolean>,
-		};
-	} catch {
-		return null;
-	}
-}
-
-function writePracticeDraft(testId: string, draft: PracticeAnswersDraftV1) {
-	try {
-		localStorage.setItem(PRACTICE_DRAFT_KEY(testId), JSON.stringify(draft));
-	} catch {
-		/* quota / private mode */
-	}
-}
-
-function clearPracticeDraft(testId: string) {
-	try {
-		localStorage.removeItem(PRACTICE_DRAFT_KEY(testId));
-	} catch {
-		/* ignore */
-	}
-}
-
-function mergeServerAndLocalDraft(
-	testId: string,
-	questions: PracticeSessionQuestion[],
-	server: { answers: Record<string, SessionStudentAnswer>; flagged: Record<string, boolean> },
-	draft: PracticeAnswersDraftV1 | null,
-): { answers: Record<string, SessionStudentAnswer>; flagged: Record<string, boolean> } {
-	if (!draft) return server;
-	const ids = new Set(questions.map((q) => q.id));
-	const mergedAnswers = { ...server.answers };
-	for (const [qid, a] of Object.entries(draft.answers)) {
-		if (ids.has(qid)) mergedAnswers[qid] = a;
-	}
-	const mergedFlagged = { ...server.flagged };
-	for (const [qid, f] of Object.entries(draft.flagged)) {
-		if (ids.has(qid)) mergedFlagged[qid] = f;
-	}
-	return { answers: mergedAnswers, flagged: mergedFlagged };
-}
-
-type PracticeBatchItem = {
-	questionId: string;
-	studentAnswer: SessionStudentAnswer;
-	flaggedForReview: boolean;
-	timeSpentMs?: number;
-	visits?: number;
-};
 
 function buildBatchItems(
 	sortedQs: PracticeSessionQuestion[],
@@ -481,7 +373,7 @@ export function PracticeTestSession({
 		const draft = readPracticeDraft(testId);
 		if (!draft) return;
 		const server = buildInitialMapsFromInitialAnswers(initialAnswers);
-		const merged = mergeServerAndLocalDraft(testId, questions, server, draft);
+		const merged = mergeServerAndLocalDraft(questions, server, draft);
 		setAnswers(merged.answers);
 		setFlagged(merged.flagged);
 	}, [testId, questions, initialAnswers]);
@@ -495,7 +387,7 @@ export function PracticeTestSession({
 	const [navOpen, setNavOpen] = React.useState(false);
 	const [saveUi, setSaveUi] = React.useState<"idle" | "saving" | "saved" | "failed">("idle");
 	const [skipped, setSkipped] = React.useState<Record<string, boolean>>({});
-	const [isOnline, setIsOnline] = React.useState(true);
+	const isOnline = useNetworkStatus();
 	const [unsyncedCount, setUnsyncedCount] = React.useState(0);
 	const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
 	const [reportOpen, setReportOpen] = React.useState(false);
@@ -506,7 +398,6 @@ export function PracticeTestSession({
 	const [paused, setPaused] = React.useState(false);
 	const serverRow = useTestRowRealtimePoll(testId, timeLimitSeconds);
 	const [adminMessage, setAdminMessage] = React.useState<string | null>(null);
-	const lastTabBlurSentRef = React.useRef(0);
 
 	React.useEffect(() => {
 		let fp = "";
@@ -532,8 +423,6 @@ export function PracticeTestSession({
 	const questionEnterRef = React.useRef<number | null>(null);
 	const perQuestionMsRef = React.useRef<Record<string, number>>({});
 	const perQuestionVisitsRef = React.useRef<Record<string, number>>({});
-	// Battery/fullscreen nudge one-shot
-	const batteryNudgedRef = React.useRef(false);
 	const submitDialogTitleId = React.useId();
 	const submitDialogDescId = React.useId();
 	const exitDialogTitleId = React.useId();
@@ -563,8 +452,6 @@ export function PracticeTestSession({
 		sessionStartedAtRef.current = sessionStartedAt;
 	}, [sessionStartedAt]);
 
-	const [remainingSec, setRemainingSec] = React.useState(timeLimitSeconds);
-
 	React.useLayoutEffect(() => {
 		// Phase 5: the server stamp (set in Phase 1 on first GET) is authoritative.
 		if (serverStartedAtIso) {
@@ -587,60 +474,22 @@ export function PracticeTestSession({
 		setSessionStartedAt(startedAt);
 	}, [testId, timeLimitSeconds, serverStartedAtIso]);
 
-	React.useEffect(() => {
-		if (sessionStartedAt == null) return;
-		if (paused || serverRow.isPaused) return;
-		const tick = () => {
-			const wallElapsed = Math.floor((Date.now() - sessionStartedAt) / 1000);
-			const effectiveElapsed = Math.max(0, wallElapsed - serverRow.accumulatedPauseSeconds);
-			setRemainingSec(Math.max(0, serverRow.timeLimitSeconds - effectiveElapsed));
-		};
-		tick();
-		const id = window.setInterval(tick, 1000);
-		return () => window.clearInterval(id);
-	}, [serverRow.timeLimitSeconds, serverRow.accumulatedPauseSeconds, serverRow.isPaused, sessionStartedAt, paused]);
+	const remainingSec = usePracticeSessionTimer({
+		sessionStartedAt,
+		clientPaused: paused,
+		serverPaused: serverRow.isPaused,
+		timeLimitSeconds: serverRow.timeLimitSeconds,
+		accumulatedPauseSeconds: serverRow.accumulatedPauseSeconds,
+	});
 
 	React.useEffect(() => {
 		if (sessionStartedAt == null) return;
 		writePracticeSessionStart(testId, sessionStartedAt, serverRow.timeLimitSeconds);
 	}, [testId, sessionStartedAt, serverRow.timeLimitSeconds]);
 
-	React.useEffect(() => {
-		const supabase = createBrowserSupabase();
-		let cancelled = false;
-		const channel = supabase
-			.channel(`admin-test-messages-${testId}`)
-			.on(
-				"postgres_changes",
-				{ event: "INSERT", schema: "public", table: "admin_test_messages", filter: `test_id=eq.${testId}` },
-				(payload) => {
-					if (cancelled) return;
-					const body = (payload.new as { body?: string } | null)?.body;
-					if (typeof body === "string") setAdminMessage(body);
-				},
-			)
-			.subscribe();
-		return () => {
-			cancelled = true;
-			void supabase.removeChannel(channel);
-		};
-	}, [testId]);
+	useAdminTestMessageChannel({ testId, onMessage: setAdminMessage });
 
-	React.useEffect(() => {
-		const onVis = () => {
-			if (document.visibilityState !== "hidden") return;
-			const now = Date.now();
-			if (now - lastTabBlurSentRef.current < 25_000) return;
-			lastTabBlurSentRef.current = now;
-			void fetch("/api/student/practice/tab-blur", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ testId }),
-			}).catch(() => {});
-		};
-		document.addEventListener("visibilitychange", onVis);
-		return () => document.removeEventListener("visibilitychange", onVis);
-	}, [testId]);
+	usePracticeTabBlurReporter({ testId });
 
 	// Phase 5: pause countdown (when a pause is active).
 	React.useEffect(() => {
@@ -662,37 +511,13 @@ export function PracticeTestSession({
 		return () => window.clearInterval(id);
 	}, [paused, pauseRemainingSec]);
 
-	// Phase 5: online/offline indicator.
-	React.useEffect(() => {
-		const setOnline = () => setIsOnline(true);
-		const setOffline = () => setIsOnline(false);
-		window.addEventListener("online", setOnline);
-		window.addEventListener("offline", setOffline);
-		setIsOnline(navigator.onLine);
-		return () => {
-			window.removeEventListener("online", setOnline);
-			window.removeEventListener("offline", setOffline);
-		};
+	// Phase 5: one-shot low-battery warning for long sessions.
+	const onLowBattery = React.useCallback((level: number) => {
+		setSaveError(
+			`Battery low (${Math.round(level * 100)}%). Plug in to avoid losing progress. Answers auto-save while you're online.`,
+		);
 	}, []);
-
-	// Phase 5: one-shot battery + fullscreen nudge.
-	React.useEffect(() => {
-		if (batteryNudgedRef.current) return;
-		if (timeLimitSeconds < 60 * 60) return; // Only for >= 1h sessions.
-		const nav = navigator as Navigator & {
-			getBattery?: () => Promise<{ level: number; charging: boolean }>;
-		};
-		if (typeof nav.getBattery !== "function") return;
-		batteryNudgedRef.current = true;
-		void nav.getBattery().then((b) => {
-			if (b.charging) return;
-			if (b.level <= 0.25) {
-				setSaveError(
-					`Battery low (${Math.round(b.level * 100)}%). Plug in to avoid losing progress. Answers auto-save while you're online.`,
-				);
-			}
-		});
-	}, [timeLimitSeconds]);
+	useLowBatteryWarning({ minSessionSeconds: timeLimitSeconds, onLowBattery });
 
 	const answeredCount = React.useMemo(() => {
 		return sorted.filter((q) => isAnswered(q, answers[q.id])).length;
@@ -782,9 +607,7 @@ export function PracticeTestSession({
 		return true;
 	}, [testId]);
 
-	React.useEffect(() => {
-		writePracticeDraft(testId, { v: 1, testId, answers, flagged });
-	}, [testId, answers, flagged]);
+	usePracticeDraftPersist({ testId, answers, flagged });
 
 	React.useEffect(() => {
 		const server = serverSnapshotRef.current;

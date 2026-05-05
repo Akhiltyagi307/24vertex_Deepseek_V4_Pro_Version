@@ -13,19 +13,22 @@ import { cn } from "@/lib/utils";
 /** Illustrative pillar mix for marketing (scores 0–100; arc share ∝ value). */
 const chartData = [{ topics: 78, sessions: 82, readiness: 76 }] as const;
 
-/** Wide ramp so stacked bands read as three layers, not one muddy slab. */
+/**
+ * Wide ramp so stacked bands read as three layers, not one muddy slab.
+ * Brand-green stops resolve via `--subject-grid-icon` (One Voice Rule, DESIGN.md §2).
+ */
 const chartConfig = {
 	topics: {
 		label: "Topics",
-		color: "color-mix(in oklab, var(--muted-foreground) 78%, #3ECF8E 22%)",
+		color: "color-mix(in oklab, var(--muted-foreground) 78%, var(--subject-grid-icon) 22%)",
 	},
 	sessions: {
 		label: "Session quality",
-		color: "color-mix(in oklab, var(--muted-foreground) 34%, #3ECF8E 66%)",
+		color: "color-mix(in oklab, var(--muted-foreground) 34%, var(--subject-grid-icon) 66%)",
 	},
 	readiness: {
 		label: "Readiness",
-		color: "#3ECF8E",
+		color: "var(--subject-grid-icon)",
 	},
 } satisfies ChartConfig;
 
@@ -69,6 +72,7 @@ export function FeaturePerformanceRadial({ compact = false }: FeaturePerformance
 						: "aspect-auto h-full min-h-[12.5rem] flex-1 medium:min-h-[13.5rem]",
 				)}
 				initialDimension={compact ? { width: 260, height: 168 } : { width: 320, height: 220 }}
+				role="img"
 				aria-label="Illustrative chart: topic, session, and readiness mix with an overall index."
 			>
 				<RadialBarChart
@@ -172,10 +176,10 @@ export function FeaturePerformanceRadial({ compact = false }: FeaturePerformance
 			</ChartContainer>
 			<div
 				className={cn(
-					"flex shrink-0 flex-nowrap items-center justify-center gap-y-0.5 px-0.5 tracking-tight",
+					"flex shrink-0 flex-nowrap items-center justify-center gap-y-0.5 px-0.5 tracking-tight text-muted-foreground",
 					compact
-						? "gap-x-2 medium:gap-x-2.5 text-xs text-[rgb(250,250,250)]"
-						: "text-muted-foreground gap-x-3 text-[11px] font-medium medium:text-xs",
+						? "gap-x-2 medium:gap-x-2.5 text-xs"
+						: "gap-x-3 text-[11px] font-medium medium:text-xs",
 				)}
 				aria-hidden
 			>

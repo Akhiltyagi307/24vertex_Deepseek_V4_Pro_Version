@@ -24,7 +24,7 @@ export default function LegalTermsPage() {
 						for early use and payment integration—they are <strong className="text-foreground">not legal advice</strong>.
 						Before accepting payments at scale, publish terms reviewed by qualified counsel for your jurisdiction and
 						entity. By using EduAI or subscribing, you agree to these terms and to our{" "}
-						<Link href="/legal/privacy" className="font-medium text-primary underline-offset-4 hover:underline">
+						<Link href="/legal/privacy" className="font-medium text-link underline-offset-4 hover:underline">
 							privacy policy
 						</Link>
 						.
@@ -67,15 +67,15 @@ export default function LegalTermsPage() {
 					<p>
 						<strong className="text-foreground">Payments.</strong> Paid plans are processed via Razorpay. Pricing, taxes,
 						and invoicing follow Razorpay and your selected payment method. See our{" "}
-						<Link href="/legal/refund" className="font-medium text-primary underline-offset-4 hover:underline">
+						<Link href="/legal/refund" className="font-medium text-link underline-offset-4 hover:underline">
 							refund & cancellation
 						</Link>
 						,{" "}
-						<Link href="/legal/shipping" className="font-medium text-primary underline-offset-4 hover:underline">
+						<Link href="/legal/shipping" className="font-medium text-link underline-offset-4 hover:underline">
 							shipping & delivery
 						</Link>
 						, and{" "}
-						<Link href="/legal/privacy" className="font-medium text-primary underline-offset-4 hover:underline">
+						<Link href="/legal/privacy" className="font-medium text-link underline-offset-4 hover:underline">
 							privacy policy
 						</Link>
 						.
@@ -111,19 +111,19 @@ export default function LegalTermsPage() {
 				</div>
 				<LegalContactBlock />
 				<p className="mt-10 flex flex-wrap gap-x-2 gap-y-1 text-sm">
-					<Link href="/legal/shipping" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/shipping" className="text-link underline-offset-4 hover:underline">
 						Shipping & delivery
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/legal/privacy" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/privacy" className="text-link underline-offset-4 hover:underline">
 						Privacy policy
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/legal/refund" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/refund" className="text-link underline-offset-4 hover:underline">
 						Refund & cancellation
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/" className="text-link underline-offset-4 hover:underline">
 						Home
 					</Link>
 				</p>

@@ -30,6 +30,30 @@ const EMAIL_URL_ENCODED_RE = /[A-Z0-9._%+-]+%40[A-Z0-9.-]+\.[A-Z]{2,}/gi;
  */
 const EMAIL_QUERY_PARAM_RE = /(\b(?:email|user_email|recipient)=)[^&\s]+/gi;
 
+/**
+ * JWT-shaped tokens (three base64url segments separated by `.`). The lower
+ * bound on each segment guards against false positives like normal
+ * `foo.bar.baz` package names. Real JWTs are >> 60 characters total because
+ * the header alone is ~16 chars.
+ */
+const JWT_RE = /\b[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b/g;
+
+/**
+ * Razorpay signature / hash-shaped tokens (40+ hex chars). Catches Razorpay
+ * payment ids, webhook signatures, opaque session tokens. Deliberately
+ * conservative on the lower bound to avoid stripping legitimate UUIDs and
+ * commit hashes, which we want to keep for debuggability.
+ */
+const HEX_TOKEN_RE = /\b[0-9a-f]{40,}\b/gi;
+
+/**
+ * `key=value` redaction for common token-bearing query params. Same shape as
+ * EMAIL_QUERY_PARAM_RE — value is whatever sits between the `=` and the next
+ * `&` or whitespace.
+ */
+const TOKEN_QUERY_PARAM_RE =
+	/(\b(?:token|access_token|refresh_token|api_key|apikey|key|signature|sig|password|passwd|pwd|secret)=)[^&\s]+/gi;
+
 const USER_ID_HASH_PREFIX = "usr_";
 
 /**
@@ -79,12 +103,16 @@ const SENSITIVE_HEADER_KEYS = new Set([
 	"apikey",
 ]);
 
-function redactEmails(s: string): string {
+function redactPii(s: string): string {
 	return s
 		.replace(EMAIL_RE, "[email]")
 		.replace(EMAIL_URL_ENCODED_RE, "[email]")
-		.replace(EMAIL_QUERY_PARAM_RE, "$1[redacted]");
+		.replace(EMAIL_QUERY_PARAM_RE, "$1[redacted]")
+		.replace(TOKEN_QUERY_PARAM_RE, "$1[redacted]")
+		.replace(JWT_RE, "[jwt]")
+		.replace(HEX_TOKEN_RE, "[token]");
 }
+
 
 function scrubHeaders(headers: Record<string, unknown>): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
@@ -93,7 +121,7 @@ function scrubHeaders(headers: Record<string, unknown>): Record<string, unknown>
 			out[k] = "[redacted]";
 			continue;
 		}
-		out[k] = typeof v === "string" ? redactEmails(v) : v;
+		out[k] = typeof v === "string" ? redactPii(v) : v;
 	}
 	return out;
 }
@@ -131,7 +159,7 @@ export function scrubSentryEvent<T>(event: T): T {
 
 	if (Array.isArray(e.breadcrumbs)) {
 		for (const b of e.breadcrumbs) {
-			if (typeof b.message === "string") b.message = redactEmails(b.message);
+			if (typeof b.message === "string") b.message = redactPii(b.message);
 		}
 	}
 
@@ -153,7 +181,7 @@ export function scrubSentryEvent<T>(event: T): T {
 	}
 
 	if (typeof e.message === "string") {
-		e.message = redactEmails(e.message);
+		e.message = redactPii(e.message);
 	}
 
 	return event;

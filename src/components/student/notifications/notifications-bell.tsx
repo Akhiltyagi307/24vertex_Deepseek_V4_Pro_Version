@@ -47,7 +47,7 @@ export function StudentNotificationsBell({
 	portal = "student",
 }: StudentNotificationsBellProps) {
 	const [open, setOpen] = React.useState(false);
-	const { count, setCount, refresh } = useNotificationUnreadCount({
+	const { count, setCount } = useNotificationUnreadCount({
 		userId,
 		apiBasePath,
 		initialCount: initialUnreadCount,

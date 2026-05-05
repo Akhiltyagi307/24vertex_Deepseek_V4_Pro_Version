@@ -1,0 +1,188 @@
+/**
+ * Server-action tests for `linkParentToStudent`.
+ *
+ * What's covered:
+ *   - Invalid payload (missing / malformed studentId) → error
+ *   - RPC error: maps via classifyLinkParentRpc + writes failure audit
+ *   - Happy path: writes success audit, attempts notifications, then redirects
+ *
+ * Notes:
+ *   - `redirect("/parent/dashboard")` throws NEXT_REDIRECT — we mock it to a
+ *     plain throw so we can detect the redirect path in tests.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { makeMockSupabase } from "../../factories/supabase";
+
+const {
+	mockSupabase,
+	mockUser,
+	resolveStudentMock,
+	classifyMock,
+	auditMock,
+	notifyLinkedMock,
+	notifyConfirmedMock,
+	redirectMock,
+	headersMock,
+} = vi.hoisted(() => ({
+	mockSupabase: { current: null as unknown },
+	mockUser: { current: null as null | { id: string } },
+	resolveStudentMock: {
+		current: vi.fn(async (_sb: unknown, ref: string): Promise<string | null> => ref),
+	},
+	classifyMock: { current: vi.fn(() => "generic" as string) },
+	auditMock: { current: vi.fn(async () => undefined) },
+	notifyLinkedMock: { current: vi.fn(async () => undefined) },
+	notifyConfirmedMock: { current: vi.fn(async () => undefined) },
+	redirectMock: {
+		current: vi.fn((url: string) => {
+			const err = new Error(`NEXT_REDIRECT:${url}`);
+			(err as { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};308;`;
+			throw err;
+		}),
+	},
+	headersMock: {
+		current: () => ({
+			get: (k: string) => (k.toLowerCase() === "user-agent" ? "vitest" : null),
+		}),
+	},
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+	createClient: async () => mockSupabase.current,
+}));
+vi.mock("next/headers", () => ({
+	headers: async () => headersMock.current(),
+}));
+vi.mock("next/navigation", () => ({
+	redirect: (url: string) => redirectMock.current(url),
+}));
+vi.mock("@/lib/auth/link-parent-rpc-errors", () => ({
+	classifyLinkParentRpc: () => classifyMock.current(),
+	formatLinkParentRpcDevDetails: () => null,
+	userMessageForLinkParentRpcFailure: (k: string) => `error_for_${k}`,
+}));
+vi.mock("@/lib/auth/resolve-student-link-ref", () => ({
+	resolveStudentProfileIdForLinkRef: (sb: unknown, ref: string) =>
+		resolveStudentMock.current(sb, ref),
+}));
+vi.mock("@/lib/parent/audit", () => ({
+	writeParentAudit: (...args: unknown[]) =>
+		(auditMock.current as (...a: unknown[]) => unknown)(...args),
+}));
+vi.mock("@/lib/notifications/account-security", () => ({
+	notifyParentLinkedToStudent: (...args: unknown[]) =>
+		(notifyLinkedMock.current as (...a: unknown[]) => unknown)(...args),
+	notifyParentChildLinkConfirmed: (...args: unknown[]) =>
+		(notifyConfirmedMock.current as (...a: unknown[]) => unknown)(...args),
+}));
+vi.mock("@/lib/admin/api-request-meta", () => ({
+	clientIpFromHeaders: () => "127.0.0.1",
+}));
+vi.mock("@/lib/server/log-supabase-error", () => ({
+	logSupabaseError: () => undefined,
+	logServerError: () => undefined,
+	isPostgresUndefinedColumnError: () => false,
+}));
+vi.mock("@sentry/nextjs", () => ({
+	captureException: () => undefined,
+	captureMessage: () => undefined,
+}));
+
+import { linkParentToStudent } from "@/app/parent/link-child/actions";
+
+const PARENT_ID = "11111111-1111-1111-1111-111111111111";
+const STUDENT_REF_CODE = "AB1234";
+const STUDENT_PROFILE_ID = "22222222-2222-2222-2222-222222222222";
+
+beforeEach(() => {
+	mockUser.current = { id: PARENT_ID };
+	mockSupabase.current = makeMockSupabase({
+		user: { id: PARENT_ID },
+		rpcs: { link_parent_to_student: { error: null } },
+	});
+	resolveStudentMock.current = vi.fn(async () => STUDENT_PROFILE_ID);
+	classifyMock.current = vi.fn(() => "generic" as const);
+	auditMock.current = vi.fn(async () => undefined);
+	notifyLinkedMock.current = vi.fn(async () => undefined);
+	notifyConfirmedMock.current = vi.fn(async () => undefined);
+	redirectMock.current = vi.fn((url: string) => {
+		const err = new Error(`NEXT_REDIRECT:${url}`);
+		(err as { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};308;`;
+		throw err;
+	});
+});
+
+afterEach(() => {
+	vi.clearAllMocks();
+});
+
+function fd(entries: Record<string, string>): FormData {
+	const f = new FormData();
+	for (const [k, v] of Object.entries(entries)) f.append(k, v);
+	return f;
+}
+
+describe("linkParentToStudent", () => {
+	it("returns an error when studentId is missing or malformed", async () => {
+		const out = await linkParentToStudent({}, fd({ studentId: "BAD" }));
+		expect(out.error).toBeTruthy();
+	});
+
+	it("maps an RPC failure via classifyLinkParentRpc and records a failure audit", async () => {
+		mockSupabase.current = makeMockSupabase({
+			user: { id: PARENT_ID },
+			rpcs: { link_parent_to_student: { error: { message: "wrong_code" } } },
+		});
+		classifyMock.current = vi.fn(() => "wrong_code" as string);
+		const out = await linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }));
+		expect(out).toEqual({ error: "error_for_wrong_code" });
+		expect(auditMock.current).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: expect.stringMatching(/link_child_failed/i),
+				parentId: PARENT_ID,
+			}),
+		);
+	});
+
+	it("redirects to /parent/dashboard on success and writes a success audit", async () => {
+		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
+			/NEXT_REDIRECT:\/parent\/dashboard/,
+		);
+		expect(redirectMock.current).toHaveBeenCalledWith("/parent/dashboard");
+		expect(auditMock.current).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: expect.stringMatching(/link_child_success/i),
+				parentId: PARENT_ID,
+				targetId: STUDENT_PROFILE_ID,
+			}),
+		);
+	});
+
+	it("still redirects when notifyLinked throws (notifications are best-effort)", async () => {
+		notifyLinkedMock.current = vi.fn(async () => {
+			throw new Error("Resend down");
+		});
+		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
+			/NEXT_REDIRECT:\/parent\/dashboard/,
+		);
+	});
+
+	it("still redirects when notifyConfirmed throws", async () => {
+		notifyConfirmedMock.current = vi.fn(async () => {
+			throw new Error("Sentry'd");
+		});
+		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
+			/NEXT_REDIRECT:\/parent\/dashboard/,
+		);
+	});
+
+	it("still redirects when resolveStudentProfileIdForLinkRef returns null (no student id => no notifications)", async () => {
+		resolveStudentMock.current = vi.fn(async (): Promise<string | null> => null);
+		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
+			/NEXT_REDIRECT:\/parent\/dashboard/,
+		);
+		expect(notifyLinkedMock.current).not.toHaveBeenCalled();
+		expect(notifyConfirmedMock.current).not.toHaveBeenCalled();
+	});
+});

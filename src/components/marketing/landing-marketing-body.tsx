@@ -134,7 +134,7 @@ export function LandingMarketingBody() {
 								)}
 							>
 								<summary className="flex cursor-pointer list-none items-start gap-3 rounded-md outline-none [&::-webkit-details-marker]:hidden focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-									<span className="border-primary/35 bg-primary/10 text-primary mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums">
+									<span className="border-primary/35 bg-primary/10 text-link mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums">
 										{item.id}
 									</span>
 									<div className="min-w-0 flex-1">
@@ -168,7 +168,10 @@ export function LandingMarketingBody() {
 								Still have a question? Pick your role and we will route you to the right portal flow.
 							</p>
 							<Button
-								className="h-10 shrink-0 rounded-full bg-[#63BB95] px-5 text-sm font-semibold text-white shadow-none [a]:hover:bg-[#63BB95]/90 dark:bg-[#63BB95] dark:[a]:hover:bg-[#63BB95]/90"
+								// Brand-faithful pill, but `#63BB95` (mid-mint) only hit 2.31:1 with white
+								// text — fails WCAG AA. Use the darker `--link` brand-green token so the
+								// pill still reads as brand identity and the text clears AA (~7:1).
+								className="h-10 shrink-0 rounded-full bg-[var(--link)] px-5 text-sm font-semibold text-white shadow-none [a]:hover:bg-[var(--link)]/90 dark:bg-[var(--link)] dark:[a]:hover:bg-[var(--link)]/90"
 								render={<Link href="/signup/role-picker" />}
 							>
 								Start with role signup

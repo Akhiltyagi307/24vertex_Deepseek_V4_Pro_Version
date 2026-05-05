@@ -40,7 +40,9 @@ export function AdminShellClient({
 				<div className="border-b border-border px-4 py-3">
 					<AdminBreadcrumbs items={breadcrumbs} />
 				</div>
-				<main className="flex-1 p-4 medium:p-6">{children}</main>
+				<main id="main-content" tabIndex={-1} className="flex-1 p-4 outline-none medium:p-6">
+					{children}
+				</main>
 			</div>
 			<AdminCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
 			<AdminKeyboardShortcuts />

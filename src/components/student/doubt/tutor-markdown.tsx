@@ -7,6 +7,27 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 
 /**
+ * URL schemes the tutor renderer is willing to surface. The model output is
+ * trusted today, but a future feature that pipes user-authored notes through
+ * this renderer would inherit any gap here — so we lock the allowlist tight
+ * (http, https, mailto) regardless of the current source.
+ */
+const ALLOWED_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+
+/** ReactMarkdown `urlTransform`. Returns "" for blocked URLs so `<a href="">` is safe. */
+function safeMarkdownUrl(url: string): string {
+	try {
+		const parsed = new URL(url, "https://x.invalid");
+		return ALLOWED_LINK_SCHEMES.has(parsed.protocol) ? url : "";
+	} catch {
+		return "";
+	}
+}
+
+// Exported for unit testing; not part of the public component surface.
+export const __test_safeMarkdownUrl = safeMarkdownUrl;
+
+/**
  * Renders tutor output as rich markdown. The content is model-generated (not
  * user-authored) but we still skip raw HTML via `skipHtml` to keep the surface
  * area narrow, and style every node to match the product tone.
@@ -136,7 +157,12 @@ function TutorMarkdownImpl({
 				className,
 			)}
 		>
-			<ReactMarkdown remarkPlugins={[remarkGfm]} components={components} skipHtml>
+			<ReactMarkdown
+				remarkPlugins={[remarkGfm]}
+				components={components}
+				skipHtml
+				urlTransform={safeMarkdownUrl}
+			>
 				{children}
 			</ReactMarkdown>
 		</div>

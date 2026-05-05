@@ -33,6 +33,7 @@
     --color-primary-foreground: var(--primary-foreground);
     --color-primary: var(--primary);
     --color-subject-grid-icon: var(--subject-grid-icon);
+    --color-link: var(--link);
     --color-popover-foreground: var(--popover-foreground);
     --color-popover: var(--popover);
     --color-card-foreground: var(--card-foreground);
@@ -83,10 +84,20 @@
     --primary-foreground: #000000;
     /* Subject tile Lucide icons only — full brand green (not the soft --primary mix). */
     --subject-grid-icon: #2ea070;
+    /* Inline body-text links and brand-text-on-mint badges: brand-faithful but
+       darker so contrast meets WCAG AA (4.5:1) on white AND on `bg-primary/10`
+       (which renders ~#e6f4ee). `--primary` is the soft mint surface color
+       and explicitly NOT for text (DESIGN.md §Color §164); `--subject-grid-icon`
+       (#2ea070) only hits ~3.2:1 on white. This token closes the gap. */
+    --link: oklch(0.39 0.13 156);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    /* Darkened from oklch(0.556) → oklch(0.45) so this color meets WCAG AA (4.5:1)
+       on near-white surfaces (`bg-muted/35`, `bg-muted/45`, `bg-card`). The original
+       0.556 hit ~3.54:1 on white; 0.49 still failed against muted-tinted surfaces;
+       0.45 clears 4.5:1 across the surface set used in marketing/legal/feature cards. */
+    --muted-foreground: oklch(0.45 0 0);
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: #e55353;
@@ -121,6 +132,8 @@
     --primary: #2ea070;
     --primary-foreground: #000000;
     --subject-grid-icon: #2ea070;
+    /* Dark-theme inline links — full brand green is already AA-compliant on the dark background. */
+    --link: #2ea070;
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -158,6 +171,7 @@
     --primary: #2ea070;
     --primary-foreground: #000000;
     --subject-grid-icon: #2ea070;
+    --link: #2ea070;
     --secondary: oklch(0.26 0.005 155);
     --secondary-foreground: oklch(0.94 0.004 155);
     --muted: oklch(0.26 0.005 155);

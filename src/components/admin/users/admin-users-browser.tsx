@@ -249,18 +249,23 @@ export function AdminUsersBrowser({ listId, role, title }: Props) {
 				data={rows}
 				getRowId={(r) => r.id}
 				rowCount={total}
-				pageIndex={page - 1}
-				pageSize={pageSize}
-				onPaginationChange={setPage}
-				sorting={sorting}
-				onSortingChange={onSortingChange}
-				rowSelection={rowSelection}
-				onRowSelectionChange={setRowSelection}
-				enableRowSelection
-				enableKeyboardNav
-				isLoading={loading}
-				emptyLabel="No users match filters."
-				onRowClick={(r) => router.push(`/admin/users/${r.id}`)}
+				state={{
+					pagination: { pageIndex: page - 1, pageSize },
+					sorting,
+					selection: rowSelection,
+				}}
+				handlers={{
+					onPaginationChange: setPage,
+					onSortingChange,
+					onSelectionChange: setRowSelection,
+				}}
+				options={{
+					isLoading: loading,
+					emptyLabel: "No users match filters.",
+					enableRowSelection: true,
+					enableKeyboardNav: true,
+					onRowClick: (r) => router.push(`/admin/users/${r.id}`),
+				}}
 			/>
 		</div>
 	);

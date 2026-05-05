@@ -10,7 +10,6 @@ import {
 	loadLastDoubtTutorModeForConversation,
 } from "@/lib/doubt/loaders";
 import { getServerUser } from "@/lib/auth/get-server-user";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
 	title: "Ask about a topic",
@@ -23,7 +22,6 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 	if (!user) {
 		redirect("/login");
 	}
-	const supabase = await createClient();
 
 	const sp = await searchParams;
 	const cParam = typeof sp.c === "string" ? sp.c : null;

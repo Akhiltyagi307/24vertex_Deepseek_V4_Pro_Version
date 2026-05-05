@@ -7,16 +7,41 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { PlanCode } from "@/lib/billing/plans";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare global {
-	interface Window {
-		Razorpay?: any;
-	}
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
+// `Window.Razorpay` is typed in src/types/razorpay.d.ts, which the tsconfig
+// `**/*.ts` include picks up globally — no runtime import needed.
 
 const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 const CHECKOUT_ORIGIN = "https://checkout.razorpay.com";
+
+/**
+ * Origins our backend's `shortUrl` from `subscriptions.create` is allowed to point at.
+ * The hosted-checkout fallback `window.location.href = data.shortUrl` is redirect-from-API
+ * — even though the API is trusted, we still origin-check before navigating to defend
+ * against a future regression / supply-chain issue / mis-typed env. Razorpay returns links
+ * on `rzp.io` (short) or the API host directly.
+ */
+const ALLOWED_RAZORPAY_REDIRECT_ORIGINS = new Set<string>([
+	"https://api.razorpay.com",
+	"https://rzp.io",
+	CHECKOUT_ORIGIN,
+]);
+
+/** Throws if `rawUrl` is not a same-origin Razorpay URL. */
+function safeRazorpayRedirect(rawUrl: string): string {
+	let url: URL;
+	try {
+		url = new URL(rawUrl);
+	} catch {
+		throw new Error("Razorpay returned a malformed redirect URL.");
+	}
+	if (!ALLOWED_RAZORPAY_REDIRECT_ORIGINS.has(url.origin)) {
+		throw new Error(`Untrusted Razorpay redirect origin: ${url.origin}`);
+	}
+	return url.toString();
+}
+
+// Exported for unit testing; not part of the public component surface.
+export const __test_safeRazorpayRedirect = safeRazorpayRedirect;
 
 let preconnectInjected = false;
 
@@ -52,6 +77,17 @@ async function ensureRazorpayScript(): Promise<boolean> {
 		const s = document.createElement("script");
 		s.src = CHECKOUT_SRC;
 		s.async = true;
+		// crossOrigin="anonymous" enables (a) detailed error reporting from the
+		// Razorpay script (otherwise the browser fires opaque "Script error."
+		// events) and (b) better cache reuse with the preconnect link above,
+		// which is also crossOrigin="anonymous". We deliberately do NOT set
+		// `integrity` (SRI): Razorpay rolls checkout.js versions without
+		// publishing stable hashes, so a fixed SRI would break checkout the
+		// moment they push an update. The mitigation that actually works for
+		// vendor-rolled scripts is the CSP `script-src 'strict-dynamic'`
+		// allowlist + per-request nonce (see proxy.ts / src/lib/security/csp.ts)
+		// plus the `frame-src https://api.razorpay.com` carve-out.
+		s.crossOrigin = "anonymous";
 		s.onload = () => resolve(Boolean(window.Razorpay));
 		s.onerror = () => resolve(false);
 		document.body.appendChild(s);
@@ -113,17 +149,30 @@ export function RazorpayCheckoutButton({
 
 			const loaded = await ensureRazorpayScript();
 			if (!loaded || !window.Razorpay) {
-				// Fall back to hosted checkout if the script cannot load.
+				// Fall back to hosted checkout if the script cannot load. Origin-check
+				// the URL before navigating — `data.shortUrl` is server-controlled, but
+				// `safeRazorpayRedirect` throws if a future regression returns anything
+				// outside the Razorpay allowlist.
 				if (data.shortUrl) {
-					window.location.href = data.shortUrl;
-					return;
+					try {
+						window.location.href = safeRazorpayRedirect(data.shortUrl);
+						return;
+					} catch (err) {
+						toast.error(err instanceof Error ? err.message : "Untrusted redirect.");
+						return;
+					}
 				}
 				toast.error("Razorpay checkout did not load. Please try again.");
 				return;
 			}
 
+			const razorpayKey = data.razorpayKeyId ?? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+			if (!razorpayKey) {
+				toast.error("Razorpay is not configured. Contact support if this persists.");
+				return;
+			}
 			const rzp = new window.Razorpay({
-				key: data.razorpayKeyId ?? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+				key: razorpayKey,
 				subscription_id: data.subscriptionId,
 				name: "EduAI",
 				description: `Subscribe to ${label}`,

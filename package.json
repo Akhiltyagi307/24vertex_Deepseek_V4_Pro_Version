@@ -17,7 +17,7 @@
     "build": "next build",
     "analyze": "ANALYZE=true next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:student": "playwright test tests/e2e/auth.setup.ts tests/e2e/smoke.spec.ts tests/e2e/post-login.spec.ts tests/e2e/playwright-env.spec.ts",
@@ -25,6 +25,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "perf:check": "node scripts/perf-check.mjs",
+    "bundle:budget": "node scripts/bundle-budget.mjs",
+    "deadcode": "knip --reporter compact --include files,dependencies",
+    "deadcode:strict": "knip --reporter compact --no-progress --include files,exports,types,duplicates,dependencies",
     "preview:emails": "NODE_OPTIONS=\"--require ./scripts/_preview-cjs-loader.cjs\" tsx scripts/preview-emails.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -86,7 +89,6 @@
     "dompurify": "^3.4.1",
     "dotenv": "^17.4.1",
     "drizzle-orm": "^0.45.2",
-    "framer-motion": "^12.38.0",
     "jose": "^6.2.3",
     "katex": "^0.16.45",
     "lucide-react": "^1.7.0",
@@ -120,7 +122,9 @@
   "pnpm": {
     "overrides": {
       "esbuild": "^0.25.0",
-      "hono": "^4.12.14"
+      "hono": "^4.12.14",
+      "postcss": "^8.5.10",
+      "uuid": "^14.0.0"
     },
     "onlyBuiltDependencies": [
       "@sentry/cli",
@@ -141,10 +145,12 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.184.0",
     "@vitest/coverage-v8": "^4.1.5",
+    "axe-core": "^4.11.4",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "jsdom": "^26.1.0",
+    "knip": "^5.78.0",
     "pm2": "^6.0.14",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",

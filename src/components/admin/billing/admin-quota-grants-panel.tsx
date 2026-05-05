@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,16 +26,16 @@ export function AdminQuotaGrantsPanel({ subscriptionId }: Props) {
 	const [expiresAt, setExpiresAt] = useState("");
 	const [note, setNote] = useState("");
 
-	const load = async () => {
+	const load = useCallback(async () => {
 		const res = await fetch(`/api/admin/subscriptions/${subscriptionId}/grants`, { credentials: "include" });
 		const j = (await res.json()) as { data?: GrantRow[] };
 		if (!res.ok) throw new Error("Failed to load grants");
 		setRows(j.data ?? []);
-	};
+	}, [subscriptionId]);
 
 	useEffect(() => {
 		void load().catch(() => setRows([]));
-	}, [subscriptionId]);
+	}, [load]);
 
 	if (rows === null) {
 		return <p className="text-sm text-muted-foreground">Loading quota grants…</p>;

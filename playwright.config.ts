@@ -77,7 +77,8 @@ export default defineConfig({
 		// break if a student/parent storageState were preloaded).
 		{
 			name: "unauth",
-			testMatch: /(smoke|playwright-env|admin-panel)\.spec\.ts$/,
+			testMatch:
+				/(smoke|playwright-env|admin-panel|security-headers|a11y-axe|visual-snapshots)\.spec\.ts$/,
 		},
 		{
 			name: "student",

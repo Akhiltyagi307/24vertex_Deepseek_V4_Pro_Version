@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- PM2 ecosystem file is CommonJS */
 const path = require("node:path");
 
 /** Next.js dev server managed by PM2 (survives closing the terminal; optional `pm2 startup` for reboot). */

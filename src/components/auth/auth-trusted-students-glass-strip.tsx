@@ -48,6 +48,7 @@ export function AuthTrustedStudentsGlassStrip({
 		>
 			<AvatarGroup
 				className={cn("grayscale", hero ? "-space-x-2.5 medium:-space-x-3" : "-space-x-3")}
+				role="group"
 				aria-label="Example student avatars; illustrative only"
 			>
 				<Avatar size="lg">

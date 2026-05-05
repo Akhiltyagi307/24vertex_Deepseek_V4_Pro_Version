@@ -69,7 +69,7 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 				</div>
 			</div>
 			{caption != null && caption.length > 0 ? (
-				<p className="text-muted-foreground/75 mx-auto mt-8 max-w-2xl px-4 text-center text-xs leading-relaxed medium:text-[0.8125rem]">
+				<p className="text-muted-foreground mx-auto mt-8 max-w-2xl px-4 text-center text-xs leading-relaxed medium:text-[0.8125rem]">
 					{caption}
 				</p>
 			) : null}

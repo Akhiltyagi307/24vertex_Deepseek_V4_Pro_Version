@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import * as React from "react"
 
 import { landingMarketingBadgeClassName } from "@/lib/marketing/landing-marketing-badge"
@@ -116,7 +117,7 @@ export default function CustomersTableCard({
                 <td>
                   <div className="flex items-center gap-2">
                     <div className="size-7 overflow-hidden rounded-full ring-1 ring-border/60">
-                      <img
+                      <Image
                         src={customer.avatar}
                         alt={customer.role}
                         width={28}

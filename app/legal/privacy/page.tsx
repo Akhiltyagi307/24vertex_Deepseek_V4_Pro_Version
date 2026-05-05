@@ -49,7 +49,7 @@ export default function LegalPrivacyPage() {
 						to third-party model providers (for example{" "}
 						<a
 							href="https://platform.openai.com/docs/guides/your-data"
-							className="font-medium text-primary underline-offset-4 hover:underline"
+							className="font-medium text-link underline-offset-4 hover:underline"
 							rel="noopener noreferrer"
 							target="_blank"
 						>
@@ -66,7 +66,7 @@ export default function LegalPrivacyPage() {
 						See also Razorpay&apos;s{" "}
 						<a
 							href="https://razorpay.com/privacy/"
-							className="font-medium text-primary underline-offset-4 hover:underline"
+							className="font-medium text-link underline-offset-4 hover:underline"
 							rel="noopener noreferrer"
 							target="_blank"
 						>
@@ -117,19 +117,19 @@ export default function LegalPrivacyPage() {
 				</div>
 				<LegalContactBlock />
 				<p className="mt-10 flex flex-wrap gap-x-2 gap-y-1 text-sm">
-					<Link href="/legal/shipping" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/shipping" className="text-link underline-offset-4 hover:underline">
 						Shipping & delivery
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/legal/refund" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/refund" className="text-link underline-offset-4 hover:underline">
 						Refund & cancellation
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/legal/terms" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/terms" className="text-link underline-offset-4 hover:underline">
 						Terms of use
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/" className="text-link underline-offset-4 hover:underline">
 						Home
 					</Link>
 				</p>

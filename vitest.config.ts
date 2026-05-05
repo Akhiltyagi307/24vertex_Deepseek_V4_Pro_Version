@@ -10,7 +10,7 @@ loadEnv({ path: fs.existsSync(localEnv) ? localEnv : mainRepoEnv });
 export default defineConfig({
 	test: {
 		environment: "node",
-		include: ["src/**/*.test.ts", "tests/**/*.test.ts", "tests/**/*.test.tsx"],
+		include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts", "tests/**/*.test.tsx"],
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "html", "lcov"],
@@ -37,14 +37,30 @@ export default defineConfig({
 				"src/components/**",
 				"src/test/**",
 			],
-			// Permissive starting thresholds — well below today's baseline so the
-			// gate exists without breaking CI on day one. Ratchet up over time as
-			// test coverage improves.
+			// Coverage thresholds. Phase 2 ratcheted global to 50 (lines/funcs/stmts)
+			// after the server-action test sweep. Phase 5.6 adds per-directory
+			// overrides at 70 for `src/lib/` and `src/hooks/` — the parts of the
+			// codebase with the densest tests, where regressions matter most.
+			// Branches stay at 25 globally because Zod `.safeParse` and
+			// discriminated unions inflate the branch denominator; per-dir branch
+			// thresholds can go higher.
 			thresholds: {
-				lines: 30,
+				lines: 50,
 				branches: 25,
-				functions: 30,
-				statements: 30,
+				functions: 50,
+				statements: 50,
+				"src/lib/**": {
+					lines: 70,
+					branches: 50,
+					functions: 70,
+					statements: 70,
+				},
+				"src/hooks/**": {
+					lines: 70,
+					branches: 50,
+					functions: 70,
+					statements: 70,
+				},
 			},
 		},
 	},

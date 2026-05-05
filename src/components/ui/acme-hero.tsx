@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, GraduationCap, Menu, MoonStarIcon, SunIcon } from "lucide-react";
 import { motion } from "motion/react";
@@ -44,9 +45,12 @@ export function AcmeHero() {
               href="/#home"
               className="text-card-foreground inline-flex items-center gap-2.5 text-lg font-semibold tracking-tight medium:gap-3 medium:text-xl"
             >
-              <img
+              <Image
                 src="/brand/logo-icon.png"
                 alt="24vertex logo"
+                width={40}
+                height={40}
+                priority
                 className="size-8 shrink-0 object-contain medium:size-10"
               />
               <span>24vertex</span>
@@ -120,7 +124,7 @@ export function AcmeHero() {
               <SheetContent side="right" className="w-[240px] medium:w-[300px]">
                 <nav className="flex flex-col gap-4">
                   <Link href="/#home" className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-foreground">
-                    <img src="/brand/logo-icon.png" alt="24vertex logo" className="size-8 shrink-0 object-contain medium:size-9" />
+                    <Image src="/brand/logo-icon.png" alt="24vertex logo" width={36} height={36} className="size-8 shrink-0 object-contain medium:size-9" />
                     <span>24vertex</span>
                   </Link>
                   <Separator />
@@ -174,7 +178,7 @@ export function AcmeHero() {
                   variant="outline"
                   className={cn(
                     landingMarketingSectionEyebrowBadgeClassName,
-                    "h-auto min-h-7 max-w-full gap-1.5 rounded-full px-3 py-1.5 text-center font-medium whitespace-normal leading-snug [a]:hover:bg-[#3ECF8E]/14 [a]:hover:text-[#3ECF8E] dark:[a]:hover:bg-[#3ECF8E]/20",
+                    "h-auto min-h-7 max-w-full gap-1.5 rounded-full px-3 py-1.5 text-center font-medium whitespace-normal leading-snug [a]:hover:bg-[var(--subject-grid-icon)]/14 [a]:hover:text-[var(--subject-grid-icon)] dark:[a]:hover:bg-[var(--subject-grid-icon)]/20",
                   )}
                   render={
                     <Link
@@ -198,7 +202,7 @@ export function AcmeHero() {
                 transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
                 <span className="block whitespace-nowrap">Practice smarter</span>
-                <span className="mt-2 block whitespace-nowrap text-[#3ECF8E] medium:mt-2.5">
+                <span className="mt-2 block whitespace-nowrap text-[var(--subject-grid-icon)] medium:mt-2.5">
                   <span className="medium:hidden">Stay aligned, every role</span>
                   <span className="hidden medium:inline">Stay aligned across every role</span>
                 </span>

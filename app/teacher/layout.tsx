@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
+import { SkipToContent } from "@/components/layout/skip-to-content";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth/routing";
 
@@ -21,8 +22,11 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 	}
 	return (
 		<div className="min-h-screen p-6">
+			<SkipToContent />
 			<AdminImpersonationBanner />
-			{children}
+			<main id="main-content" tabIndex={-1} className="outline-none">
+				{children}
+			</main>
 		</div>
 	);
 }

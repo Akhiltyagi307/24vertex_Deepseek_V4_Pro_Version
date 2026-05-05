@@ -15,28 +15,40 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type AdminDataTableProps<T> = {
-	columns: ColumnDef<T, unknown>[];
-	data: T[];
-	getRowId: (row: T, index: number) => string;
-	/** Total rows server-side (for pagination). */
-	rowCount: number;
-	pageIndex: number;
-	pageSize: number;
-	onPaginationChange: (p: PaginationState) => void;
+export type AdminDataTableState = {
+	pagination: PaginationState;
 	sorting: SortingState;
+	/** Optional — only when `options.enableRowSelection` is set. */
+	selection?: RowSelectionState;
+};
+
+export type AdminDataTableHandlers = {
+	onPaginationChange: (p: PaginationState) => void;
 	onSortingChange: (s: SortingState) => void;
-	/** Optional row selection (controlled). */
-	rowSelection?: RowSelectionState;
-	onRowSelectionChange?: (r: RowSelectionState) => void;
-	enableRowSelection?: boolean;
+	/** Required when selection state is provided. */
+	onSelectionChange?: (s: RowSelectionState) => void;
+};
+
+export type AdminDataTableOptions<T> = {
 	isLoading?: boolean;
 	emptyLabel?: string;
 	className?: string;
-	/** Called when a data row is clicked (not header). */
+	/** Click handler for the entire row (skipped on header / select cell). */
 	onRowClick?: (row: T) => void;
 	/** j/k row focus, x toggles selection, Enter opens row — only when not typing in an input. */
 	enableKeyboardNav?: boolean;
+	enableRowSelection?: boolean;
+};
+
+export type AdminDataTableProps<T> = {
+	columns: ColumnDef<T, unknown>[];
+	data: T[];
+	/** Total rows server-side (for pagination). */
+	rowCount: number;
+	getRowId: (row: T, index: number) => string;
+	state: AdminDataTableState;
+	handlers: AdminDataTableHandlers;
+	options?: AdminDataTableOptions<T>;
 };
 
 export function AdminDataTable<T>({
@@ -44,20 +56,22 @@ export function AdminDataTable<T>({
 	data,
 	getRowId,
 	rowCount,
-	pageIndex,
-	pageSize,
-	onPaginationChange,
-	sorting,
-	onSortingChange,
-	rowSelection,
-	onRowSelectionChange,
-	enableRowSelection,
-	isLoading,
-	emptyLabel = "No rows",
-	className,
-	onRowClick,
-	enableKeyboardNav = false,
+	state,
+	handlers,
+	options,
 }: AdminDataTableProps<T>) {
+	const { pagination, sorting, selection } = state;
+	const { pageIndex, pageSize } = pagination;
+	const { onPaginationChange, onSortingChange, onSelectionChange } = handlers;
+	const {
+		isLoading,
+		emptyLabel = "No rows",
+		className,
+		onRowClick,
+		enableKeyboardNav = false,
+		enableRowSelection = false,
+	} = options ?? {};
+
 	const tableWrapRef = useRef<HTMLDivElement>(null);
 	const [focusIndex, setFocusIndex] = useState(0);
 
@@ -95,33 +109,35 @@ export function AdminDataTable<T>({
 
 	const allColumns = useMemo(() => [...selectionColumns, ...columns], [columns, selectionColumns]);
 
+	// React Compiler skips compilation here: @tanstack/react-table is not yet compiler-aware.
+	// eslint-disable-next-line react-hooks/incompatible-library
 	const table = useReactTable({
 		data,
 		columns: allColumns,
 		state: {
-			pagination: { pageIndex, pageSize },
+			pagination,
 			sorting,
-			rowSelection: rowSelection ?? {},
+			rowSelection: selection ?? {},
 		},
 		manualPagination: true,
 		manualSorting: true,
 		rowCount,
 		getRowId,
 		onPaginationChange: (updater) => {
-			const next = typeof updater === "function" ? updater({ pageIndex, pageSize }) : updater;
+			const next = typeof updater === "function" ? updater(pagination) : updater;
 			onPaginationChange(next);
 		},
 		onSortingChange: (updater) => {
 			const next = typeof updater === "function" ? updater(sorting) : updater;
 			onSortingChange(next);
 		},
-		onRowSelectionChange: onRowSelectionChange
+		onRowSelectionChange: onSelectionChange
 			? (updater) => {
-					const next = typeof updater === "function" ? updater(rowSelection ?? {}) : updater;
-					onRowSelectionChange(next);
+					const next = typeof updater === "function" ? updater(selection ?? {}) : updater;
+					onSelectionChange(next);
 				}
 			: undefined,
-		enableRowSelection: !!enableRowSelection,
+		enableRowSelection,
 		getCoreRowModel: getCoreRowModel(),
 	});
 
@@ -150,12 +166,12 @@ export function AdminDataTable<T>({
 			} else if (e.key === "k" || e.key === "K") {
 				e.preventDefault();
 				setFocusIndex((i) => Math.max(0, i - 1));
-			} else if ((e.key === "x" || e.key === "X") && enableRowSelection && onRowSelectionChange) {
+			} else if ((e.key === "x" || e.key === "X") && enableRowSelection && onSelectionChange) {
 				e.preventDefault();
 				const row = rows[focusIndex];
 				if (!row) return;
-				const next = { ...(rowSelection ?? {}), [row.id]: !row.getIsSelected() };
-				onRowSelectionChange(next);
+				const next = { ...(selection ?? {}), [row.id]: !row.getIsSelected() };
+				onSelectionChange(next);
 			} else if (e.key === "Enter") {
 				e.preventDefault();
 				const row = rows[focusIndex];
@@ -169,8 +185,8 @@ export function AdminDataTable<T>({
 			table,
 			typingInField,
 			enableRowSelection,
-			onRowSelectionChange,
-			rowSelection,
+			onSelectionChange,
+			selection,
 			focusIndex,
 			onRowClick,
 		],
@@ -189,6 +205,9 @@ export function AdminDataTable<T>({
 			ref={tableWrapRef}
 			tabIndex={enableKeyboardNav ? 0 : undefined}
 			onKeyDown={enableKeyboardNav ? onTableKeyDown : undefined}
+			role={enableKeyboardNav ? "region" : undefined}
+			aria-label={enableKeyboardNav ? "Data table with keyboard navigation" : undefined}
+			aria-keyshortcuts={enableKeyboardNav ? "j k Enter x" : undefined}
 			className={cn(
 				"overflow-hidden rounded-lg border border-border",
 				enableKeyboardNav && "outline-none focus-visible:ring-2 focus-visible:ring-ring",

@@ -13,3 +13,6 @@ export function createServiceRoleClient() {
 		auth: { persistSession: false, autoRefreshToken: false },
 	});
 }
+
+/** Public type alias so non-allowlisted modules can describe a service-role client without importing the constructor. */
+export type ServiceRoleClient = ReturnType<typeof createServiceRoleClient>;

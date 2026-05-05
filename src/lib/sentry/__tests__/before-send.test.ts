@@ -146,3 +146,63 @@ describe("scrubSentryEvent — request + breadcrumbs", () => {
 		expect(event.message).toContain("other=baz");
 	});
 });
+
+describe("scrubSentryEvent — JWT and token redaction (Phase 4.6)", () => {
+	const FAKE_JWT =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4iLCJpYXQiOjE1MTYyMzkwMjJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+
+	it("redacts JWT-shaped tokens in event.message", () => {
+		const event = { message: `Auth failed: token=${FAKE_JWT} expired` };
+		scrubSentryEvent(event);
+		expect(event.message).not.toContain(FAKE_JWT);
+		// Either the JWT regex caught it OR the `token=` query-param regex did;
+		// both produce a redaction.
+		expect(event.message).toMatch(/\[(jwt|redacted)\]/);
+	});
+
+	it("redacts JWT-shaped tokens in breadcrumb messages", () => {
+		const event = {
+			breadcrumbs: [{ message: `Bearer ${FAKE_JWT}` }],
+		};
+		scrubSentryEvent(event);
+		expect(event.breadcrumbs[0]!.message).not.toContain(FAKE_JWT);
+		expect(event.breadcrumbs[0]!.message).toContain("[jwt]");
+	});
+
+	it("does not redact ordinary `foo.bar.baz` package names (segments too short)", () => {
+		const event = { message: "loaded module @acme/foo.bar.baz from registry" };
+		scrubSentryEvent(event);
+		expect(event.message).toContain("foo.bar.baz");
+	});
+
+	it("redacts long hex tokens (Razorpay payment ids, signatures)", () => {
+		const fakeSig = "0123456789abcdef0123456789abcdef0123456789abcdef";
+		const event = { message: `webhook signature ${fakeSig} mismatch` };
+		scrubSentryEvent(event);
+		expect(event.message).not.toContain(fakeSig);
+		expect(event.message).toContain("[token]");
+	});
+
+	it("preserves UUIDs and short commit hashes (debuggability)", () => {
+		const event = {
+			message: "test 00000000-0000-0000-0000-000000000001 at sha 7f3a9e0",
+		};
+		scrubSentryEvent(event);
+		// 36-char UUID stays (not 40+ hex)
+		expect(event.message).toContain("00000000-0000-0000-0000-000000000001");
+		// 7-char commit hash stays
+		expect(event.message).toContain("7f3a9e0");
+	});
+
+	it("redacts token / secret / password query params", () => {
+		const event = {
+			message:
+				"GET /x?access_token=eyJabcdefghijklmnop&password=hunter2&signature=deadbeef0123456789ab&keep=ok",
+		};
+		scrubSentryEvent(event);
+		expect(event.message).toContain("access_token=[redacted]");
+		expect(event.message).toContain("password=[redacted]");
+		expect(event.message).toContain("signature=[redacted]");
+		expect(event.message).toContain("keep=ok");
+	});
+});

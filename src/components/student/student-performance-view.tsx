@@ -64,12 +64,18 @@ import {
 	emptySubjectCardTrackerStats,
 	type EnrolledSubjectCard,
 	type PerformanceRowSerialized,
-	type SortMode,
 	sortPerformanceRows,
 	type SubjectCardTrackerStats,
 	type TrackerStatus,
 } from "@/lib/student/performance-matrix";
 import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
+import {
+	activePerformanceFilterCount as computeActiveFilterCount,
+	hasActiveLocalFilters as computeHasActiveLocalFilters,
+	initialPerformanceState,
+	performanceReducer,
+	performanceSortIsNonDefault as computeSortIsNonDefault,
+} from "@/components/student/performance/performance-state";
 import { getSubjectCardIconConfig } from "@/lib/student/subject-lucide-icon";
 
 export type StudentPerformanceViewProps = {
@@ -329,13 +335,18 @@ export function StudentPerformanceView({
 		return enrolledSubjectCards.find((c) => c.subjectId === detailSubjectId)?.subjectName ?? null;
 	}, [detailSubjectId, enrolledSubjectCards]);
 
-	const [statusFilter, setStatusFilter] = React.useState<TrackerStatus | "all">("all");
-	const [sortMode, setSortMode] = React.useState<SortMode>("curriculum");
-	const [topicSearch, setTopicSearch] = React.useState("");
-	const [selectedTopicIds, setSelectedTopicIds] = React.useState<Set<string>>(() => new Set());
-	const [sheetRow, setSheetRow] = React.useState<PerformanceRowSerialized | null>(null);
-	const [sheetOpen, setSheetOpen] = React.useState(false);
-	const [summaryOpen, setSummaryOpen] = React.useState(true);
+	const [perfState, perfDispatch] = React.useReducer(performanceReducer, initialPerformanceState);
+	const {
+		statusFilter,
+		sortMode,
+		topicSearch,
+		selectedTopicIds,
+		sheetRow,
+		sheetOpen,
+		summaryOpen,
+		filtersPopoverOpen: perfMatrixFiltersOpen,
+		sortPopoverOpen: perfMatrixSortOpen,
+	} = perfState;
 
 	const navigateSubject = React.useCallback(
 		(id: string) => {
@@ -368,19 +379,12 @@ export function StudentPerformanceView({
 
 	const summary = React.useMemo(() => computeSummary(filteredRows), [filteredRows]);
 
-	const hasActiveLocalFilters =
-		statusFilter !== "all" || sortMode !== "curriculum" || topicSearch.trim().length > 0;
-
-	const activePerformanceFilterCount = statusFilter !== "all" ? 1 : 0;
-	const performanceSortIsNonDefault = sortMode !== "curriculum";
-
-	const [perfMatrixFiltersOpen, setPerfMatrixFiltersOpen] = React.useState(false);
-	const [perfMatrixSortOpen, setPerfMatrixSortOpen] = React.useState(false);
+	const hasActiveLocalFilters = computeHasActiveLocalFilters(perfState);
+	const activePerformanceFilterCount = computeActiveFilterCount(perfState);
+	const performanceSortIsNonDefault = computeSortIsNonDefault(perfState);
 
 	const resetLocalFilters = React.useCallback(() => {
-		setStatusFilter("all");
-		setSortMode("curriculum");
-		setTopicSearch("");
+		perfDispatch({ type: "reset_local_filters" });
 	}, []);
 
 	const matrixPresenceKey = React.useMemo(
@@ -390,17 +394,11 @@ export function StudentPerformanceView({
 	);
 
 	const toggleTopic = (topicId: string, checked: boolean) => {
-		setSelectedTopicIds((prev) => {
-			const next = new Set(prev);
-			if (checked) next.add(topicId);
-			else next.delete(topicId);
-			return next;
-		});
+		perfDispatch({ type: "toggle_topic", id: topicId, checked });
 	};
 
 	const openSheet = (row: PerformanceRowSerialized) => {
-		setSheetRow(row);
-		setSheetOpen(true);
+		perfDispatch({ type: "open_sheet", row });
 	};
 
 	const selectedList = React.useMemo(() => [...selectedTopicIds], [selectedTopicIds]);
@@ -695,7 +693,7 @@ export function StudentPerformanceView({
 					>
 						<Collapsible
 							open={summaryOpen}
-							onOpenChange={setSummaryOpen}
+							onOpenChange={(open) => perfDispatch({ type: "set_summary_open", open })}
 							className="flex flex-col gap-3"
 						>
 							<h2 id="perf-summary-heading" className="sr-only">
@@ -830,11 +828,13 @@ export function StudentPerformanceView({
 												type="search"
 												placeholder="e.g. Algebra, English, Unit 3…"
 												value={topicSearch}
-												onChange={(e) => setTopicSearch(e.target.value)}
+												onChange={(e) =>
+													perfDispatch({ type: "set_topic_search", value: e.target.value })
+												}
 												onKeyDown={(e) => {
 													if (e.key === "Escape") {
 														e.preventDefault();
-														setTopicSearch("");
+														perfDispatch({ type: "set_topic_search", value: "" });
 													}
 												}}
 												className="box-border h-8 w-full min-w-0 max-w-md border-border bg-background dark:bg-input/30"
@@ -873,10 +873,9 @@ export function StudentPerformanceView({
 											<div className="flex min-w-0 flex-1 basis-0">
 												<Popover
 													open={perfMatrixFiltersOpen}
-													onOpenChange={(open) => {
-														setPerfMatrixFiltersOpen(open);
-														if (open) setPerfMatrixSortOpen(false);
-													}}
+													onOpenChange={(open) =>
+														perfDispatch({ type: "set_filters_popover", open })
+													}
 												>
 													<PopoverTrigger
 														type="button"
@@ -987,7 +986,7 @@ export function StudentPerformanceView({
 																						!active && "border-border bg-background shadow-none",
 																					)}
 																					aria-pressed={active}
-																					onClick={() => setStatusFilter(s)}
+																					onClick={() => perfDispatch({ type: "set_status_filter", value: s })}
 																				>
 																					{label}
 																				</Button>
@@ -1003,10 +1002,9 @@ export function StudentPerformanceView({
 											<div className="flex min-w-0 flex-1 basis-0">
 												<Popover
 													open={perfMatrixSortOpen}
-													onOpenChange={(open) => {
-														setPerfMatrixSortOpen(open);
-														if (open) setPerfMatrixFiltersOpen(false);
-													}}
+													onOpenChange={(open) =>
+														perfDispatch({ type: "set_sort_popover", open })
+													}
 												>
 													<PopoverTrigger
 														type="button"
@@ -1053,7 +1051,7 @@ export function StudentPerformanceView({
 																		variant={sortMode === "curriculum" ? "secondary" : "ghost"}
 																		size="sm"
 																		className="h-9 w-full justify-start gap-2 font-normal"
-																		onClick={() => setSortMode("curriculum")}
+																		onClick={() => perfDispatch({ type: "set_sort_mode", value: "curriculum" })}
 																	>
 																		<ListOrdered className="size-3.5 shrink-0 text-muted-foreground" />
 																		Curriculum order
@@ -1063,7 +1061,7 @@ export function StudentPerformanceView({
 																		variant={sortMode === "last_test" ? "secondary" : "ghost"}
 																		size="sm"
 																		className="h-9 w-full justify-start gap-2 font-normal"
-																		onClick={() => setSortMode("last_test")}
+																		onClick={() => perfDispatch({ type: "set_sort_mode", value: "last_test" })}
 																	>
 																		<ArrowDownUp className="size-3.5 shrink-0 text-muted-foreground" />
 																		Last test (recent first)
@@ -1073,7 +1071,7 @@ export function StudentPerformanceView({
 																		variant={sortMode === "status" ? "secondary" : "ghost"}
 																		size="sm"
 																		className="h-9 w-full justify-start gap-2 font-normal"
-																		onClick={() => setSortMode("status")}
+																		onClick={() => perfDispatch({ type: "set_sort_mode", value: "status" })}
 																	>
 																		<LineChartIcon className="size-3.5 shrink-0 text-muted-foreground" />
 																		Status (priority)
@@ -1289,7 +1287,7 @@ export function StudentPerformanceView({
 							type="button"
 							size="sm"
 							variant="outline"
-							onClick={() => setSelectedTopicIds(new Set())}
+							onClick={() => perfDispatch({ type: "clear_topic_selection" })}
 						>
 							Clear
 						</Button>
@@ -1301,7 +1299,10 @@ export function StudentPerformanceView({
 			) : null}
 
 			{detailSubjectId ? (
-				<Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+				<Sheet
+					open={sheetOpen}
+					onOpenChange={(o) => (o ? null : perfDispatch({ type: "close_sheet" }))}
+				>
 					<SheetContent side="right" className="medium:max-w-md">
 						{sheetRow ? (
 							<>

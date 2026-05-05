@@ -1,0 +1,53 @@
+# Bundle-size budget gate. Builds the production bundle and asserts that each
+# tracked route's first-load JS (gzipped) is within the budget defined in
+# `scripts/bundle-budget.mjs`. Slack defaults to ±5%; bump via env var if a
+# legitimate dependency landed.
+name: Bundle budget
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "next.config.ts"
+      - "scripts/bundle-budget.mjs"
+      - ".github/workflows/bundle-budget.yml"
+  workflow_dispatch:
+
+jobs:
+  bundle-budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # `pnpm/action-setup@v4` reads the version from package.json's
+      # `packageManager` field — passing `version:` here would conflict with it
+      # (ERR_PNPM_BAD_PM_VERSION). Same reason node-version reads from `engines`.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Production build
+        env:
+          # The build needs envs that don't ship secrets in CI — anything that the
+          # `next.config.ts` reads should have a safe placeholder. Real secrets
+          # are validated only in the Vercel build, not here.
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
+          SUPABASE_SERVICE_ROLE_KEY: "placeholder"
+          DATABASE_URL: "postgres://placeholder@localhost:5432/placeholder"
+          OPENAI_API_KEY: "placeholder"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+        run: pnpm build
+
+      - name: Check bundle budget
+        run: node scripts/bundle-budget.mjs

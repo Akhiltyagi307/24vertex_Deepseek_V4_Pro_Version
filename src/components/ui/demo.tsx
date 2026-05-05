@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { ArrowUp, Globe, Play, Plus, Signature, Sparkles } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -102,12 +103,12 @@ const MeetingIllustration = () => {
               key={avatar.alt}
               className="bg-background size-7 rounded-full border p-0.5 shadow shadow-zinc-950/5"
             >
-              <img
+              <Image
                 className="aspect-square rounded-full object-cover"
                 src={avatar.src}
                 alt={avatar.alt}
-                height="460"
-                width="460"
+                height={460}
+                width={460}
               />
             </div>
           ))}
@@ -124,19 +125,19 @@ const CodeReviewIllustration = () => {
       <Card className="absolute bottom-3 left-3 top-3 flex w-[62%] flex-col p-3 transition-transform duration-200 ease-in-out group-hover:-rotate-3">
         <div className="mb-3 grid min-h-0 grid-cols-[auto_1fr] gap-2">
           <div className="bg-background size-6 shrink-0 rounded-full border p-0.5 shadow shadow-zinc-950/5">
-            <img
+            <Image
               className="aspect-square rounded-full object-cover"
               src={TEACHER_AVATAR}
               alt="Teacher"
-              height="460"
-              width="460"
+              height={460}
+              width={460}
             />
           </div>
           <div className="flex min-w-0 items-center gap-1">
             <span className="text-muted-foreground line-clamp-1 text-sm font-medium">
               Teacher update
             </span>
-            <span className="text-muted-foreground/75 shrink-0 text-xs">2m</span>
+            <span className="text-muted-foreground shrink-0 text-xs">2m</span>
           </div>
         </div>
 
@@ -160,6 +161,10 @@ const CodeReviewIllustration = () => {
 const AIAssistantIllustration = () => {
   return (
     <div
+      // `inert` removes children from the focus/interaction tree (fixes
+      // aria-hidden-focus); `aria-hidden` keeps them out of the accessibility
+      // tree so axe's color-contrast rule also skips this decorative subtree.
+      inert
       aria-hidden
       className="flex h-full min-h-0 flex-col transition-transform duration-200 group-hover:translate-y-0"
     >

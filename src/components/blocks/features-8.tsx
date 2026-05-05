@@ -16,11 +16,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Marketing accent #3ECF8E; animates on `GlowCard`’s `group` hover. */
+/** Title hover lifts to the EduAI brand green via the `--subject-grid-icon` token (One Voice Rule, DESIGN.md). */
 const featureCardTitleClassName =
-	"text-card-foreground transition-colors duration-200 group-hover:text-[#3ECF8E]";
+	"text-card-foreground transition-colors duration-200 group-hover:text-[var(--subject-grid-icon)]";
 
-/** Top-left pill on each bento card; label uses neutrals—only Lucide icons use `#3ECF8E` via their own classes. */
+/** Top-left pill on each bento card; label uses neutrals — only Lucide icons use the brand-green token via their own classes. */
 const featureBentoCardEyebrowClassName =
 	"border-border bg-muted/35 inline-flex min-h-[2.25rem] w-fit shrink-0 items-center gap-2 self-start justify-self-start rounded-full border px-3 py-1 text-xs text-muted-foreground";
 
@@ -51,7 +51,7 @@ export function Features() {
 					>
 						<div className="relative z-10 flex h-full min-h-0 flex-col gap-3">
 							<div className={featureBentoCardEyebrowClassName}>
-								<BarChart3 className="size-3.5 text-[#3ECF8E]" />
+								<BarChart3 className="size-3.5 text-[var(--subject-grid-icon)]" />
 								Progress analytics
 							</div>
 							<div className="border-border bg-muted/45 relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[15px] border p-2 medium:p-3">
@@ -85,7 +85,7 @@ export function Features() {
 					>
 						<div className="relative z-10 flex h-full min-h-0 flex-col gap-3">
 							<div className={featureBentoCardEyebrowClassName}>
-								<ShieldCheck className="size-3.5 text-[#3ECF8E]" />
+								<ShieldCheck className="size-3.5 text-[var(--subject-grid-icon)]" />
 								Security mesh
 							</div>
 							<div className="border-border bg-muted/45 relative min-h-0 flex-1 overflow-hidden rounded-[15px] border p-1.5">
@@ -119,7 +119,7 @@ export function Features() {
 					>
 						<div className="relative z-10 flex h-full min-h-0 flex-col gap-3">
 							<div className={featureBentoCardEyebrowClassName}>
-								<Sparkles className="size-3.5 text-[#3ECF8E]" />
+								<Sparkles className="size-3.5 text-[var(--subject-grid-icon)]" />
 								Adaptive insight signals
 							</div>
 							<div className="border-border bg-muted/25 flex min-h-0 flex-1 items-center justify-center rounded-[15px] border px-1 py-2">
@@ -149,6 +149,7 @@ export function Features() {
 							aria-hidden
 						>
 							{/* Plain <img> keeps GIF animation; Next/Image may strip frames. */}
+							{/* eslint-disable-next-line @next/next/no-img-element */}
 							<img
 								src="/marketing/subjects.gif"
 								alt=""
@@ -170,7 +171,7 @@ export function Features() {
 						<div className="relative z-10 grid h-full gap-5 medium:grid-cols-2">
 							<div className="flex flex-col justify-between">
 								<div className={featureBentoCardEyebrowClassName}>
-									<Users className="size-3.5 text-[#3ECF8E]" />
+									<Users className="size-3.5 text-[var(--subject-grid-icon)]" />
 									Student-parent-teacher sync
 								</div>
 								<div>
@@ -193,7 +194,7 @@ export function Features() {
 											className="ring-border bg-muted/50 flex size-7 items-center justify-center rounded-full ring-2"
 											aria-hidden
 										>
-											<GraduationCap className="size-3.5 shrink-0 text-[#3ECF8E]" strokeWidth={2} />
+											<GraduationCap className="size-3.5 shrink-0 text-[var(--subject-grid-icon)]" strokeWidth={2} />
 										</div>
 									</div>
 									<div className="relative ml-[calc(50%-1rem)] flex items-center gap-2">
@@ -201,7 +202,7 @@ export function Features() {
 											className="ring-border bg-muted/50 flex size-8 items-center justify-center rounded-full ring-2"
 											aria-hidden
 										>
-											<UserRound className="size-4 shrink-0 text-[#3ECF8E]" strokeWidth={2} />
+											<UserRound className="size-4 shrink-0 text-[var(--subject-grid-icon)]" strokeWidth={2} />
 										</div>
 										<span className="border-border bg-muted/50 text-card-foreground rounded border px-2 py-1 text-xs">
 											Parent
@@ -215,7 +216,7 @@ export function Features() {
 											className="ring-border bg-muted/50 flex size-7 items-center justify-center rounded-full ring-2"
 											aria-hidden
 										>
-											<Presentation className="size-3.5 shrink-0 text-[#3ECF8E]" strokeWidth={2} />
+											<Presentation className="size-3.5 shrink-0 text-[var(--subject-grid-icon)]" strokeWidth={2} />
 										</div>
 									</div>
 								</div>

@@ -21,9 +21,10 @@ export default function OgImage() {
 					fontFamily: "system-ui, -apple-system, sans-serif",
 				}}
 			>
+				{/* EduAI brand green hex (DESIGN.md §2). OG renders headless — CSS vars don't resolve here. */}
 				<div
 					style={{
-						color: "#3ECF8E",
+						color: "#2ea070",
 						fontSize: 28,
 						fontWeight: 600,
 						letterSpacing: 2,

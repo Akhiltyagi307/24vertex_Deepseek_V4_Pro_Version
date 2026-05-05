@@ -13,7 +13,7 @@ import {
 } from "@/lib/email/subscription-notifications";
 import { getNotificationPrefs, isEmailAllowed } from "@/lib/notifications/prefs";
 import { logServerError } from "@/lib/server/log-supabase-error";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+import type { ServiceRoleClient } from "@/lib/supabase/admin";
 
 /**
  * Centralized pref check for Razorpay webhook emails. Today the master switch
@@ -44,7 +44,7 @@ type SubscriptionOurs = {
 type ProfileRow = { id: string; grade: number | null; full_name: string | null };
 
 type WebhookHandlerContext = {
-	admin: ReturnType<typeof createServiceRoleClient>;
+	admin: ServiceRoleClient;
 	eventName: string;
 	subscriptionId: string;
 	ours: SubscriptionOurs;
@@ -70,7 +70,7 @@ function formatInrPaise(paise: number): string {
 
 /** Records checkout_discount redemption once (idempotent) when notes carry `eduai_coupon_id`. */
 async function maybeApplyCheckoutCouponRedemption(
-	admin: ReturnType<typeof createServiceRoleClient>,
+	admin: ServiceRoleClient,
 	input: { profileId: string; ourSubscriptionId: string; notesUnknown: unknown },
 ): Promise<void> {
 	const notes = input.notesUnknown as Record<string, unknown> | undefined;
@@ -415,7 +415,7 @@ const BILLING_WEBHOOK_HANDLERS: Record<string, (c: WebhookHandlerContext) => Pro
 };
 
 export async function processRazorpayWebhookPayload(
-	admin: ReturnType<typeof createServiceRoleClient>,
+	admin: ServiceRoleClient,
 	body: RazorpayWebhookBody,
 ): Promise<void> {
 	const subEntity = (body.payload?.subscription?.entity as Record<string, unknown> | undefined) ?? null;

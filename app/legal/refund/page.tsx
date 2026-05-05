@@ -53,19 +53,19 @@ export default function LegalRefundPage() {
 				</div>
 				<LegalContactBlock />
 				<p className="mt-10 flex flex-wrap gap-x-2 gap-y-1 text-sm">
-					<Link href="/legal/shipping" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/shipping" className="text-link underline-offset-4 hover:underline">
 						Shipping & delivery
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/legal/privacy" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/privacy" className="text-link underline-offset-4 hover:underline">
 						Privacy policy
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/legal/terms" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/legal/terms" className="text-link underline-offset-4 hover:underline">
 						Terms of use
 					</Link>
 					<span className="text-muted-foreground">·</span>
-					<Link href="/" className="text-primary underline-offset-4 hover:underline">
+					<Link href="/" className="text-link underline-offset-4 hover:underline">
 						Home
 					</Link>
 				</p>

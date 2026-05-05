@@ -65,9 +65,11 @@ test.describe("Landing page (perf-optimized)", () => {
 
 	test("optimized assets are referenced (subjects hero image, AVIF logo via next/image)", async ({ page }) => {
 		await page.goto("/");
-		// Scroll to features to trigger the lazy-loaded marketing image.
+		// Scroll to features to trigger the lazy-loaded marketing image, then wait
+		// for the network to settle rather than a fixed sleep — the previous 800 ms
+		// sleep was both flaky on slow CI and slow on fast local runs.
 		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
-		await page.waitForTimeout(800);
+		await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
 		// Raw <img> in features block (path may be .gif or .webp depending on marketing asset).
 		const subjectsHero = page.locator('img[src*="subjects.webp"], img[src*="subjects.gif"]');

@@ -1,14 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
 
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ParentAppSidebar } from "@/components/parent/parent-app-sidebar";
 import { StudentTopBar } from "@/components/student/student-top-bar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { isParentDoubtChatPath } from "@/lib/navigation/shell-immersive-paths";
-import { cn } from "@/lib/utils";
 
 export type ParentShellProps = {
 	organizationName: string;
@@ -37,38 +35,20 @@ export function ParentShell({
 	entitlement,
 	children,
 }: ParentShellProps) {
-	const pathname = usePathname();
-	const doubtChat = isParentDoubtChatPath(pathname);
-	const [sidebarOpen, setSidebarOpen] = React.useState(!doubtChat);
-
-	React.useEffect(() => {
-		if (isParentDoubtChatPath(pathname)) {
-			setSidebarOpen(false);
-		}
-	}, [pathname]);
-
 	return (
-		<SidebarProvider
-			open={sidebarOpen}
-			onOpenChange={setSidebarOpen}
-			className={cn(
-				"flex w-full flex-col",
-				doubtChat ? "h-dvh max-h-dvh min-h-0 overflow-hidden" : "min-h-svh",
-			)}
-		>
-			<StudentTopBar
-				organizationName={organizationName}
-				userDisplayName={childDisplayName}
-				shareableId={childLinkCode}
-				headerPortal="parent"
-				parentNotificationsUserId={parentUserId}
-			/>
-			<div
-				className={cn(
-					"flex min-h-0 w-full min-w-0 flex-1 items-stretch",
-					doubtChat && "overflow-hidden",
-				)}
-			>
+		<DashboardShell
+			isDoubtChatPath={isParentDoubtChatPath}
+			isSidebarHiddenPath={isParentDoubtChatPath}
+			topBar={
+				<StudentTopBar
+					organizationName={organizationName}
+					userDisplayName={childDisplayName}
+					shareableId={childLinkCode}
+					headerPortal="parent"
+					parentNotificationsUserId={parentUserId}
+				/>
+			}
+			sidebar={
 				<ParentAppSidebar
 					user={{
 						name: parentDisplayName,
@@ -78,16 +58,9 @@ export function ParentShell({
 					childGradeLabel={childGradeLabel}
 					entitlement={entitlement}
 				/>
-				<SidebarInset
-					className={cn(
-						doubtChat
-							? "min-h-0 min-w-0 grow basis-0 overflow-hidden bg-background"
-							: "min-h-0 min-w-0 grow basis-0 overflow-auto bg-background px-4 medium:px-6 xl:px-8",
-					)}
-				>
-					{children}
-				</SidebarInset>
-			</div>
-		</SidebarProvider>
+			}
+		>
+			{children}
+		</DashboardShell>
 	);
 }

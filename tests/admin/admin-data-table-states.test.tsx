@@ -39,16 +39,19 @@ describe("AdminDataTable states", () => {
 		columns: cols,
 		getRowId: (r: { n: string }) => r.n,
 		rowCount: 0,
-		pageIndex: 0,
-		pageSize: 10,
-		onPaginationChange: () => {},
-		sorting: [] as { id: string; desc: boolean }[],
-		onSortingChange: () => {},
+		state: {
+			pagination: { pageIndex: 0, pageSize: 10 },
+			sorting: [] as { id: string; desc: boolean }[],
+		},
+		handlers: {
+			onPaginationChange: () => {},
+			onSortingChange: () => {},
+		},
 	};
 
 	it("shows loading skeleton in mobile and desktop regions", () => {
 		const m = mount(
-			<AdminDataTable {...baseProps} data={[]} rowCount={0} isLoading emptyLabel="None" />,
+			<AdminDataTable {...baseProps} data={[]} rowCount={0} options={{ isLoading: true, emptyLabel: "None" }} />,
 		);
 		root = m.root;
 		container = m.container;
@@ -57,7 +60,9 @@ describe("AdminDataTable states", () => {
 	});
 
 	it("shows empty label when not loading", () => {
-		const m = mount(<AdminDataTable {...baseProps} data={[]} rowCount={0} isLoading={false} emptyLabel="No rows" />);
+		const m = mount(
+			<AdminDataTable {...baseProps} data={[]} rowCount={0} options={{ isLoading: false, emptyLabel: "No rows" }} />,
+		);
 		root = m.root;
 		container = m.container;
 		expect(container.textContent).toContain("No rows");
@@ -69,8 +74,7 @@ describe("AdminDataTable states", () => {
 				{...baseProps}
 				data={[{ n: "x" }]}
 				rowCount={1}
-				isLoading={false}
-				emptyLabel="No rows"
+				options={{ isLoading: false, emptyLabel: "No rows" }}
 			/>,
 		);
 		root = m.root;

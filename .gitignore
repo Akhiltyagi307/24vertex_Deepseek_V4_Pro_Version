@@ -1,7 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # Dependencies
-node_modules/
+# (no trailing slash so symlinks named `node_modules` are also ignored —
+# git was tracking such a symlink in this worktree, breaking CI installs)
+node_modules
 /.pnp
 .pnp.js
 

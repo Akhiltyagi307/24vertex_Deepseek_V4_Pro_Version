@@ -7,6 +7,7 @@ import { AdminExportButton } from "@/components/admin/data-table/export-button";
 import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { Button } from "@/components/ui/button";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
+import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type LiveRow = {
@@ -35,10 +36,34 @@ export function AdminLiveTestsPanel() {
 		}
 	}, []);
 
+	// Replace the previous 2.5s busy-poll with a Supabase realtime subscription
+	// on the `tests` table plus a 30s heartbeat. Any INSERT/UPDATE re-fetches
+	// the projection (the "last 5 minutes" filter lives server-side, so we can't
+	// merge the row payload locally — re-fetch is the only correct option).
 	React.useEffect(() => {
 		void load();
-		const id = window.setInterval(() => void load(), 2500);
-		return () => window.clearInterval(id);
+		const supabase = createBrowserSupabase();
+		let cancelled = false;
+		const channel = supabase
+			.channel("admin-live-tests")
+			.on(
+				"postgres_changes",
+				{ event: "*", schema: "public", table: "tests" },
+				() => {
+					if (!cancelled) void load();
+				},
+			)
+			.subscribe();
+		// Heartbeat: catches missed events (network blip, channel churn, slow
+		// status fall-off the 5-min window without an UPDATE/INSERT).
+		const heartbeat = window.setInterval(() => {
+			if (!cancelled) void load();
+		}, 30_000);
+		return () => {
+			cancelled = true;
+			window.clearInterval(heartbeat);
+			void supabase.removeChannel(channel);
+		};
 	}, [load]);
 
 	const exportRows: Record<string, unknown>[] = rows.map((r) => ({
@@ -58,7 +83,7 @@ export function AdminLiveTestsPanel() {
 					<Button type="button" size="sm" variant="outline" onClick={() => void load()}>
 						Refresh now
 					</Button>
-					<span className="text-xs text-muted-foreground">Auto-refresh every 2.5s</span>
+					<span className="text-xs text-muted-foreground">Live (realtime + 30s heartbeat)</span>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
 					<AdminSavedViews listId={ADMIN_LIST_ID.assessmentsLive} />

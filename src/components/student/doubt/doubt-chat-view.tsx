@@ -468,6 +468,9 @@ function DoubtChatThread({
 					ref={scrollRef}
 					className="min-h-0 h-full overflow-y-auto overscroll-y-contain"
 					aria-label="Conversation messages"
+					aria-live="polite"
+					aria-atomic="false"
+					aria-relevant="additions text"
 				>
 					<div className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 medium:px-6 medium:py-8">
 						{empty ? (

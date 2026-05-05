@@ -192,7 +192,6 @@ export type StudentPracticePagePayload = {
 	enrolledSubjects: PracticeEnrolledSubject[];
 	loadError: string | null;
 	performanceRows: PerformanceRowSerialized[];
-	profileGrade: number | null;
 	showPromptPreview: boolean;
 	subjectProgressBySubjectId: Record<string, PracticeSubjectProgress>;
 	isAdmin: boolean;
@@ -298,7 +297,6 @@ export async function loadStudentPracticePagePayload(
 		enrolledSubjects,
 		loadError,
 		performanceRows: rows,
-		profileGrade: profileRow.grade,
 		showPromptPreview,
 		subjectProgressBySubjectId: practiceProgress.progressBySubjectId,
 		isAdmin,

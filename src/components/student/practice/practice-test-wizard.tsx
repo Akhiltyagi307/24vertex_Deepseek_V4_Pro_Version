@@ -20,6 +20,10 @@ import {
 	generatePracticeTest,
 } from "../../../../app/student/practice/actions";
 import type { GeneratePracticeResult } from "../../../../app/student/practice/actions/types";
+import {
+	initialWizardDraft,
+	wizardDraftReducer,
+} from "@/components/student/practice/wizard/wizard-draft-state";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
@@ -68,7 +72,6 @@ async function readPracticeGenerateNdjsonResponse(res: Response): Promise<Genera
 	const dec = new TextDecoder();
 	let buffer = "";
 	let final: GeneratePracticeResult | null = null;
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	while (true) {
 		const { done, value } = await reader.read();
 		if (value) {
@@ -126,7 +129,6 @@ export type PracticeTestWizardProps = {
 	enrolledSubjects: PracticeEnrolledSubject[];
 	performanceRows: PerformanceRowSerialized[];
 	loadError: string | null;
-	profileGrade: number | null;
 	showPromptPreview: boolean;
 	subjectProgressBySubjectId: Record<string, PracticeSubjectProgress>;
 	/** Phase 4: gates the dev-only "Build prompt preview" affordance. */
@@ -484,7 +486,6 @@ export function PracticeTestWizard({
 	enrolledSubjects,
 	performanceRows,
 	loadError,
-	profileGrade,
 	showPromptPreview,
 	subjectProgressBySubjectId,
 }: PracticeTestWizardProps) {
@@ -500,10 +501,9 @@ export function PracticeTestWizard({
 
 	const subjectClusters = React.useMemo(() => clusterSubjectsByGroup(enrolledSubjects), [enrolledSubjects]);
 
-	const [step, setStep] = React.useState(0);
-	const [subjectId, setSubjectId] = React.useState<string | null>(null);
+	const [draft, draftDispatch] = React.useReducer(wizardDraftReducer, initialWizardDraft);
+	const { step, subjectId, focusArea, difficulty, durationSeconds } = draft;
 	const [selectedTrackerIds, setSelectedTrackerIds] = React.useState<Set<string>>(() => new Set());
-	const [focusArea, setFocusArea] = React.useState<FocusArea>("all");
 	// Only show the inline red "Select at least one topic" nag after the
 	// student actively tries to continue — so a fresh form never reads as wrong.
 	const [attemptedContinueStep1, setAttemptedContinueStep1] = React.useState(false);
@@ -512,8 +512,6 @@ export function PracticeTestWizard({
 		"initial",
 	);
 	const [chapterVersion, setChapterVersion] = React.useState(0);
-	const [difficulty, setDifficulty] = React.useState<PracticeDifficulty>("medium");
-	const [durationSeconds, setDurationSeconds] = React.useState<number>(3600);
 	const practicePlan = React.useMemo(() => getPracticeQuestionPlan(durationSeconds), [durationSeconds]);
 	const [stepError, setStepError] = React.useState<string | null>(null);
 	const [actionError, setActionError] = React.useState<string | null>(null);
@@ -671,14 +669,14 @@ export function PracticeTestWizard({
 		}
 
 		const trackerIds = new Set(coherentRows.map((r) => r.trackerId));
-		setSubjectId(anchorSubjectId);
+		draftDispatch({ type: "set_subject", subjectId: anchorSubjectId });
 		setSelectedTrackerIds(trackerIds);
 		setStepError(null);
 		setActionError(null);
 
 		const n = trackerIds.size;
 		const skipToDifficulty = n >= PRACTICE_MIN_TOPICS;
-		setStep(skipToDifficulty ? 2 : 1);
+		draftDispatch({ type: "go_to_step", step: skipToDifficulty ? 2 : 1 });
 
 		// Phase 4: surface dropped topics in a non-blocking toast.
 		const droppedCount = topicIdsOrdered.length - coherentRows.length;
@@ -781,7 +779,7 @@ export function PracticeTestWizard({
 				void abandonPracticeTest({ testId });
 			}
 		}
-		setStep((s) => Math.max(0, s - 1));
+		draftDispatch({ type: "prev_step" });
 	};
 
 	const runGenerate = async (): Promise<void> => {
@@ -926,7 +924,7 @@ export function PracticeTestWizard({
 			} else {
 				setNonPreviewSuccess(true);
 			}
-			setStep(3);
+			draftDispatch({ type: "go_to_step", step: 3 });
 			return true;
 		}
 		setPending(true);
@@ -949,11 +947,11 @@ export function PracticeTestWizard({
 				};
 				setPreviewPayload(payload);
 				finalizeCacheRef.current = { key: cacheKey, payload };
-				setStep(3);
+				draftDispatch({ type: "go_to_step", step: 3 });
 			} else {
 				setNonPreviewSuccess(true);
 				finalizeCacheRef.current = { key: cacheKey, payload: null };
-				setStep(3);
+				draftDispatch({ type: "go_to_step", step: 3 });
 			}
 			return true;
 		} finally {
@@ -971,7 +969,7 @@ export function PracticeTestWizard({
 				setStepError(formatStepErrors(parsed.error));
 				return;
 			}
-			setStep(1);
+			draftDispatch({ type: "go_to_step", step: 1 });
 			return;
 		}
 
@@ -989,7 +987,7 @@ export function PracticeTestWizard({
 				return;
 			}
 			setAttemptedContinueStep1(false);
-			setStep(2);
+			draftDispatch({ type: "go_to_step", step: 2 });
 			return;
 		}
 
@@ -1118,7 +1116,7 @@ export function PracticeTestWizard({
 														key={s.id}
 														type="button"
 														aria-pressed={selected}
-														onClick={() => setSubjectId(s.id)}
+														onClick={() => draftDispatch({ type: "set_subject", subjectId: s.id })}
 														className={cn(
 															"flex min-h-[4.25rem] w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow] medium:gap-4 medium:px-4",
 															"focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
@@ -1271,7 +1269,7 @@ export function PracticeTestWizard({
 												role="radio"
 												aria-checked={focusArea === opt.value}
 												onClick={() => {
-													setFocusArea(opt.value);
+													draftDispatch({ type: "set_focus_area", value: opt.value });
 													addFocusAreaTopics(opt.value);
 												}}
 												className={cn(
@@ -1602,7 +1600,7 @@ export function PracticeTestWizard({
 											name="difficulty"
 											id={`diff-${value}`}
 											checked={difficulty === value}
-											onChange={() => setDifficulty(value)}
+											onChange={() => draftDispatch({ type: "set_difficulty", value })}
 											className="size-5 border-input"
 										/>
 										<FieldLabel htmlFor={`diff-${value}`}>
@@ -1629,7 +1627,7 @@ export function PracticeTestWizard({
 											name="duration"
 											id={`dur-${opt.seconds}`}
 											checked={durationSeconds === opt.seconds}
-											onChange={() => setDurationSeconds(opt.seconds)}
+											onChange={() => draftDispatch({ type: "set_duration", seconds: opt.seconds })}
 											className="size-5 border-input"
 										/>
 										<FieldLabel htmlFor={`dur-${opt.seconds}`}>

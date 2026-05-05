@@ -158,11 +158,12 @@ const CpuArchitecture = ({
         <mask id="cpu-mask-8">
           <path d="M 30 30 h 25 q 5 0 5 5 v 6.5 q 0 5 5 5 h 20" strokeWidth="0.5" stroke="white" />
         </mask>
-        {/* Marketing accent (landing features bento). */}
+        {/* Brand-green accent via `--subject-grid-icon` (One Voice Rule, DESIGN.md §2).
+            SVG stop-color attributes do not accept CSS variables, so we set the property via inline style. */}
         <radialGradient id="cpu-brand-flow-grad" fx="1">
-          <stop offset="0%" stopColor="#3ECF8E" />
-          <stop offset="55%" stopColor="#3ECF8E" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#3ECF8E" stopOpacity="0" />
+          <stop offset="0%" style={{ stopColor: "var(--subject-grid-icon)" }} />
+          <stop offset="55%" style={{ stopColor: "var(--subject-grid-icon)" }} stopOpacity="0.45" />
+          <stop offset="100%" style={{ stopColor: "var(--subject-grid-icon)" }} stopOpacity="0" />
         </radialGradient>
         <filter id="cpu-light-shadow" x="-50%" y="-50%" width="200%" height="200%">
           <feDropShadow dx="1.5" dy="1.5" stdDeviation="1" floodColor="black" floodOpacity="0.1" />
@@ -180,8 +181,8 @@ const CpuArchitecture = ({
           </circle>
         </marker>
         <linearGradient id="cpu-connection-gradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3ECF8E" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="#3ECF8E" stopOpacity="0.2" />
+          <stop offset="0%" style={{ stopColor: "var(--subject-grid-icon)" }} stopOpacity="0.55" />
+          <stop offset="100%" style={{ stopColor: "var(--subject-grid-icon)" }} stopOpacity="0.2" />
         </linearGradient>
         <linearGradient id="cpu-text-gradient" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#666666">

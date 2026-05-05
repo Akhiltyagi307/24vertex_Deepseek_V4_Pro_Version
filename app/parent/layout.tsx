@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
+import { SkipToContent } from "@/components/layout/skip-to-content";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getProfile } from "@/lib/auth/routing";
 
@@ -18,6 +19,7 @@ export default async function ParentLayout({ children }: { children: React.React
 	}
 	return (
 		<>
+			<SkipToContent />
 			<AdminImpersonationBanner />
 			{children}
 		</>

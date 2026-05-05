@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
+import { SkipToContent } from "@/components/layout/skip-to-content";
 import { StudentShell } from "@/components/student/student-shell";
 import { SubscriptionBanner } from "@/components/student/subscription/subscription-banner";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
@@ -33,6 +34,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
 	return (
 		<>
+			<SkipToContent />
 			<AdminImpersonationBanner />
 			<StudentShell
 			organizationName={org}
