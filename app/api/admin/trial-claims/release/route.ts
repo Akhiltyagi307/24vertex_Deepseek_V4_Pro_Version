@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { freeTrialClaims } from "@/db/schema/billing";
@@ -55,7 +55,11 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		await writeAdminAction({
+		// Strict audit: releasing a trial claim hands a free trial back to
+		// an identity. The abuse pattern (admin colluding with users for
+		// unlimited trials) is only catchable via this audit trail. Volume
+		// is low; reliability cost of fail-closed is negligible.
+		await writeAdminActionStrict({
 			action: ADMIN_ACTIONS.TRIAL_CLAIM_RELEASE,
 			targetType: "trial_claim",
 			targetId: parsed.data.identity_key,

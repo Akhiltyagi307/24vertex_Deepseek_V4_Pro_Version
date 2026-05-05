@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { identityBlocklist } from "@/db/schema/billing";
@@ -45,7 +45,11 @@ export async function POST(request: NextRequest) {
 				set: { reason },
 			});
 
-		await writeAdminAction({
+		// Strict audit: kept symmetrical with TRIAL_CLAIM_RELEASE. When you
+		// read the audit log later, you want both halves of the
+		// give-trial / take-trial-away pair to be guaranteed-recorded —
+		// a one-sided audit makes patterns of admin abuse hard to read.
+		await writeAdminActionStrict({
 			action: ADMIN_ACTIONS.IDENTITY_BLOCKLIST_UPSERT,
 			targetType: "identity_blocklist",
 			targetId: parsed.data.identity_key,

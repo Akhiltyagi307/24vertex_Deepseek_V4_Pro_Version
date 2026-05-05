@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { plans } from "@/db/schema/billing";
@@ -98,7 +98,12 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ code:
 			})
 			.where(eq(plans.code, parsedCode.data));
 
-		await writeAdminAction({
+		// Strict audit: a plan PATCH sets pricing for every future purchase.
+		// A missing audit row means a billing dispute or compliance question
+		// ("who changed the price of plan X on date Y?") cannot be answered.
+		// Volume is low (admins rarely fiddle with plan prices), so the
+		// reliability cost of fail-closed is near-zero.
+		await writeAdminActionStrict({
 			action: ADMIN_ACTIONS.PLAN_PATCH,
 			targetType: "plan",
 			targetId: parsedCode.data,

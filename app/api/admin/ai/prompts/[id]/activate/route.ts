@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { invalidateAiPromptMemoryCache } from "@/lib/ai/prompt-store";
 import { db } from "@/db";
@@ -21,7 +21,13 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 		return adminErrorResponse("Not found", { status: 404 });
 	}
 
-	await writeAdminAction({
+	// Strict audit: activating a prompt switches the live prompt every
+	// student in the system gets routed through. A bad activation could
+	// send every doubt-chat through a broken or malicious template. The
+	// audit row is the only durable record of when the cutover happened.
+	// Audit-first ordering: if this throws, the transaction below never
+	// runs and the active prompt stays unchanged.
+	await writeAdminActionStrict({
 		action: ADMIN_ACTIONS.AI_PROMPT_ACTIVATE,
 		targetType: "ai_prompt",
 		targetId: id,
