@@ -2,15 +2,12 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { readBulkReinitJob, type BulkReinitJobState } from "@/lib/admin/bulk-reinit-job";
 import { db } from "@/db";
 import { operatorJobs } from "@/db/schema/operator-jobs";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(_request: Request, ctx: { params: Promise<{ jobId: string }> }) {
 	const gate = await requireAdminApi();
@@ -43,8 +40,11 @@ export async function GET(_request: Request, ctx: { params: Promise<{ jobId: str
 		};
 	}
 
-	if (!state) {
-		return NextResponse.json({ error: "Job not found" }, { status: 404, headers: adminHeaders() });
-	}
-	return NextResponse.json({ data: state, operator_job: mirror ?? null }, { headers: adminHeaders() });
+	if (!state) return adminErrorResponse("Job not found", { status: 404 });
+
+	// Two-field success body (`data` + `operator_job`) — keep client contract.
+	return NextResponse.json(
+		{ data: state, operator_job: mirror ?? null },
+		{ headers: { ...ADMIN_RESPONSE_HEADERS } },
+	);
 }

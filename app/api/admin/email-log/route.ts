@@ -2,14 +2,11 @@ import { and, count, desc, eq, gte, ilike, isNotNull, lte, or } from "drizzle-or
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminListResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { emailLog } from "@/db/schema/comms-audit";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	const gate = await requireAdminApi();
@@ -59,5 +56,5 @@ export async function GET(request: NextRequest) {
 	const [cntRow] = await db.select({ c: count() }).from(emailLog).where(whereSql);
 	const total = Number(cntRow?.c ?? 0);
 
-	return NextResponse.json({ data, total, page, page_size: pageSize }, { headers: adminHeaders() });
+	return adminListResponse({ data, total, page, pageSize });
 }

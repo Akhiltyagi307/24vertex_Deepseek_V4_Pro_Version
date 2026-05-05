@@ -3,15 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { broadcasts } from "@/db/schema/broadcasts";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
@@ -22,19 +20,24 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = z.object({ scheduled_at: z.string().datetime() }).safeParse(json);
 	if (!parsed.success) {
-		return NextResponse.json({ error: "scheduled_at ISO datetime required" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("scheduled_at ISO datetime required");
 	}
 
 	const when = new Date(parsed.data.scheduled_at);
 	if (when.getTime() <= Date.now()) {
-		return NextResponse.json({ error: "scheduled_at must be in the future" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("scheduled_at must be in the future");
 	}
 
-	await writeAdminAction({ action: "broadcast_schedule", targetType: "broadcast", targetId: id, payload: { scheduled_at: when.toISOString() } });
+	await writeAdminAction({
+		action: ADMIN_ACTIONS.BROADCAST_SCHEDULE,
+		targetType: "broadcast",
+		targetId: id,
+		payload: { scheduled_at: when.toISOString() },
+	});
 
 	const [row] = await db
 		.update(broadcasts)
@@ -42,9 +45,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		.where(eq(broadcasts.id, id))
 		.returning();
 
-	if (!row) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (!row) return adminErrorResponse("Not found", { status: 404 });
 
-	return NextResponse.json({ data: row }, { headers: adminHeaders() });
+	return adminDetailResponse(row);
 }

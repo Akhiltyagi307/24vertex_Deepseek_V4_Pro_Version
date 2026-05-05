@@ -3,15 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse, adminListResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { broadcasts } from "@/db/schema/broadcasts";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const audienceSchema = z.object({
 	kind: z.enum(["all", "students", "parents", "teachers", "grade", "plan"]),
@@ -45,7 +43,7 @@ export async function GET(request: NextRequest) {
 	const [cntRow] = await db.select({ c: count() }).from(broadcasts);
 	const total = Number(cntRow?.c ?? 0);
 
-	return NextResponse.json({ data: rows, total, page, page_size: pageSize }, { headers: adminHeaders() });
+	return adminListResponse({ data: rows, total, page, pageSize });
 }
 
 export async function POST(request: NextRequest) {
@@ -56,7 +54,7 @@ export async function POST(request: NextRequest) {
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const bodySchema = z.object({
 		subject: z.string().min(1).max(500),
@@ -66,11 +64,11 @@ export async function POST(request: NextRequest) {
 	});
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 	}
 
 	await writeAdminAction({
-		action: "broadcast_create",
+		action: ADMIN_ACTIONS.BROADCAST_CREATE,
 		payload: { subject: parsed.data.subject },
 	});
 
@@ -86,5 +84,5 @@ export async function POST(request: NextRequest) {
 		})
 		.returning();
 
-	return NextResponse.json({ data: row }, { headers: adminHeaders() });
+	return adminDetailResponse(row);
 }

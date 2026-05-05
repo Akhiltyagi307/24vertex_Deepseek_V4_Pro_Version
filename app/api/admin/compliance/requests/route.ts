@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse, adminListResponse } from "@/lib/admin/response";
 import { captureOpenComplianceDeadlineRisk } from "@/lib/compliance/alerts";
 import { complianceDueAtFromLegalBasis } from "@/lib/compliance/due-at";
 import { createComplianceRequestBodySchema } from "@/lib/compliance/schemas";
@@ -11,10 +13,6 @@ import { db } from "@/db";
 import { complianceRequests } from "@/db/schema/compliance-requests";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	const gate = await requireAdminApi();
@@ -66,7 +64,7 @@ export async function GET(request: NextRequest) {
 
 	void captureOpenComplianceDeadlineRisk();
 
-	return NextResponse.json({ data, total, page, page_size: pageSize }, { headers: adminHeaders() });
+	return adminListResponse({ data, total, page, pageSize });
 }
 
 export async function POST(request: NextRequest) {
@@ -77,19 +75,16 @@ export async function POST(request: NextRequest) {
 	try {
 		body = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = createComplianceRequestBodySchema.safeParse(body);
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 	}
 
 	const b = parsed.data;
 	if (!b.subject_user_id && !b.subject_email?.trim()) {
-		return NextResponse.json(
-			{ error: "Provide subject_user_id and/or subject_email" },
-			{ status: 400, headers: adminHeaders() },
-		);
+		return adminErrorResponse("Provide subject_user_id and/or subject_email");
 	}
 
 	const now = new Date();
@@ -110,7 +105,7 @@ export async function POST(request: NextRequest) {
 		.returning();
 
 	await writeAdminAction({
-		action: "compliance_request_created",
+		action: ADMIN_ACTIONS.COMPLIANCE_REQUEST_CREATED,
 		targetType: "compliance_request",
 		targetId: row?.id ?? null,
 		payload: {
@@ -122,5 +117,5 @@ export async function POST(request: NextRequest) {
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ data: row }, { status: 201, headers: adminHeaders() });
+	return adminDetailResponse(row, { status: 201 });
 }

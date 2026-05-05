@@ -5,7 +5,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
-import { ADMIN_RESPONSE_HEADERS } from "@/lib/admin/response";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,13 @@ export async function GET(request: NextRequest) {
 	const gate = await requireAdminApi();
 	if (gate instanceof NextResponse) return gate;
 
-	const rows = await listPracticeAnalyticsEventsOrdered(CSV_EXPORT_LIMIT);
+	let rows: Awaited<ReturnType<typeof listPracticeAnalyticsEventsOrdered>>;
+	try {
+		rows = await listPracticeAnalyticsEventsOrdered(CSV_EXPORT_LIMIT);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : "Internal error";
+		return adminErrorResponse(msg, { status: 500 });
+	}
 
 	// Bulk PII export — every download must leave an audit trail. Logged
 	// before the response is sent so a failed download still records intent.

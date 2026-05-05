@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { getResendApiKey } from "@/lib/env";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 /**
  * Lists bounce / complaint suppressions from Resend (API passthrough).
@@ -22,8 +19,8 @@ export async function GET() {
 	});
 	if (!res.ok) {
 		const t = await res.text();
-		return NextResponse.json({ error: t || "Resend API error" }, { status: 502, headers: adminHeaders() });
+		return adminErrorResponse(t || "Resend API error", { status: 502 });
 	}
 	const data = (await res.json()) as unknown;
-	return NextResponse.json({ data }, { headers: adminHeaders() });
+	return adminDetailResponse(data);
 }

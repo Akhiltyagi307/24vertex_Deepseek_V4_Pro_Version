@@ -2,17 +2,15 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { broadcastBodyToEmailHtml } from "@/lib/admin/broadcast-markdown";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { broadcasts } from "@/db/schema/broadcasts";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(_request: Request, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
@@ -20,16 +18,10 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 
 	const { id } = await ctx.params;
 	const [b] = await db.select().from(broadcasts).where(eq(broadcasts.id, id)).limit(1);
-	if (!b) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (!b) return adminErrorResponse("Not found", { status: 404 });
 
 	const to = process.env.ADMIN_EMAIL?.trim();
-	if (!to) {
-		return NextResponse.json({ error: "ADMIN_EMAIL not configured" }, { status: 500, headers: adminHeaders() });
-	}
-
-	await writeAdminAction({ action: "broadcast_test_send", targetType: "broadcast", targetId: id });
+	if (!to) return adminErrorResponse("ADMIN_EMAIL not configured", { status: 500 });
 
 	const html = broadcastBodyToEmailHtml(b.bodyMd);
 	const { error } = await sendHtmlEmailLogged({
@@ -40,8 +32,15 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 		broadcastId: id,
 	});
 
-	if (error) {
-		return NextResponse.json({ error }, { status: 500, headers: adminHeaders() });
-	}
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	if (error) return adminErrorResponse(error, { status: 500 });
+
+	// Strict audit: a test-send actually dispatches mail through Resend; an
+	// admin send-mail action without an audit row is a compliance hole.
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.BROADCAST_TEST_SEND,
+		targetType: "broadcast",
+		targetId: id,
+	});
+
+	return adminAckResponse();
 }

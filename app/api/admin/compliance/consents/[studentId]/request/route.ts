@@ -4,7 +4,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { sendParentalConsentRerequestEmail } from "@/lib/email/compliance-emails";
 import { adminGetUserById } from "@/lib/admin/users-list";
 import { db } from "@/db";
@@ -13,23 +15,17 @@ import { parentStudentLinks } from "@/db/schema/profiles";
 
 export const runtime = "nodejs";
 
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
-
 export async function POST(request: NextRequest, ctx: { params: Promise<{ studentId: string }> }) {
 	const gate = await requireAdminApi();
 	if (gate instanceof NextResponse) return gate;
 
 	const { studentId } = await ctx.params;
 	const uuid = z.string().uuid().safeParse(studentId);
-	if (!uuid.success) {
-		return NextResponse.json({ error: "Invalid student id" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!uuid.success) return adminErrorResponse("Invalid student id");
 
 	const student = await adminGetUserById(uuid.data);
 	if (!student || student.role !== "student") {
-		return NextResponse.json({ error: "Student not found" }, { status: 404, headers: adminHeaders() });
+		return adminErrorResponse("Student not found", { status: 404 });
 	}
 
 	const [link] = await db
@@ -52,21 +48,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ studen
 			.limit(1);
 		parentEmail = consent?.parentEmail?.trim() ?? null;
 	}
-	if (!parentEmail) {
-		return NextResponse.json({ error: "No parent email on file" }, { status: 409, headers: adminHeaders() });
-	}
+	if (!parentEmail) return adminErrorResponse("No parent email on file", { status: 409 });
 
 	const { error } = await sendParentalConsentRerequestEmail({
 		to: parentEmail,
 		studentName: student.full_name ?? "Student",
 		studentId: uuid.data,
 	});
-	if (error) {
-		return NextResponse.json({ error }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error, { status: 500 });
 
-	await writeAdminAction({
-		action: "parental_consent_rerequest_sent",
+	// Strict audit: dispatched mail through Resend asking a parent to renew
+	// consent — both compliance and outbound-mail tracks must record it.
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.PARENTAL_CONSENT_RERREQUEST_SENT,
 		targetType: "profile",
 		targetId: uuid.data,
 		payload: { parent_email: parentEmail },
@@ -74,5 +68,5 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ studen
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	return adminAckResponse();
 }

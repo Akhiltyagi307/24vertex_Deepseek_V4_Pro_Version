@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	minutes: z.number().int().min(1).max(180),
@@ -25,12 +23,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = bodySchema.safeParse(json);
-	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!parsed.success) return adminErrorResponse("Invalid body");
 
 	const admin = createServiceRoleClient();
 	const { data: row, error: gErr } = await admin
@@ -38,9 +34,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		.select("time_limit_seconds, admin_extensions")
 		.eq("id", id)
 		.maybeSingle();
-	if (gErr || !row) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (gErr || !row) return adminErrorResponse("Not found", { status: 404 });
 
 	const addSec = parsed.data.minutes * 60;
 	const nextLimit = (row.time_limit_seconds ?? 3600) + addSec;
@@ -55,12 +49,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		})
 		.eq("id", id);
 
-	if (error) {
-		return NextResponse.json({ error: error.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error.message, { status: 500 });
 
 	await writeAdminAction({
-		action: "test_extend_timer",
+		action: ADMIN_ACTIONS.TEST_EXTEND_TIMER,
 		targetType: "test",
 		targetId: id,
 		payload: { minutes: parsed.data.minutes, new_time_limit_seconds: nextLimit },
@@ -68,5 +60,5 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true, time_limit_seconds: nextLimit }, { headers: adminHeaders() });
+	return adminAckResponse({ time_limit_seconds: nextLimit });
 }

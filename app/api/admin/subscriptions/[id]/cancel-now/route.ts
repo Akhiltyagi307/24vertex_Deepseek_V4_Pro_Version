@@ -5,16 +5,14 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { cancelSubscription } from "@/lib/billing/razorpay";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 /** Immediate cancel: Razorpay (when linked) then DB `cancelled`. */
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -25,9 +23,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid subscription id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid subscription id");
 
 		const rows = await db
 			.select({
@@ -40,12 +36,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.limit(1);
 
 		const sub = rows[0];
-		if (!sub) {
-			return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-		}
-		if (sub.status === "cancelled") {
-			return NextResponse.json({ ok: true, noop: true }, { headers: adminHeaders() });
-		}
+		if (!sub) return adminErrorResponse("Not found", { status: 404 });
+		if (sub.status === "cancelled") return adminAckResponse({ noop: true });
 
 		if (sub.razorpaySubscriptionId) {
 			try {
@@ -53,10 +45,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			} catch (e) {
 				Sentry.captureException(e, { tags: { feature: "admin", admin_action: "subscription_cancel_now_rzp" } });
 				const msg = e instanceof Error ? e.message : String(e);
-				return NextResponse.json(
-					{ error: "Razorpay immediate cancel failed; subscription unchanged.", detail: msg },
-					{ status: 502, headers: adminHeaders() },
-				);
+				return adminErrorResponse("Razorpay immediate cancel failed; subscription unchanged.", {
+					status: 502,
+					details: { detail: msg },
+				});
 			}
 		}
 
@@ -70,8 +62,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			})
 			.where(eq(subscriptions.id, uuid.data));
 
-		await writeAdminAction({
-			action: "subscription_cancel_now",
+		// Strict audit: cancels the Razorpay subscription (when linked) and
+		// flips the DB status. Mutating an external billing system requires a
+		// guaranteed audit row.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.SUBSCRIPTION_CANCEL_NOW,
 			targetType: "subscription",
 			targetId: uuid.data,
 			payload: {
@@ -82,6 +77,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

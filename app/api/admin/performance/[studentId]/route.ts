@@ -2,15 +2,12 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminDetailResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { subjects, topics } from "@/db/schema/academic";
 import { performanceTracker } from "@/db/schema/assessment";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(_request: Request, ctx: { params: Promise<{ studentId: string }> }) {
 	const gate = await requireAdminApi();
@@ -35,5 +32,5 @@ export async function GET(_request: Request, ctx: { params: Promise<{ studentId:
 		.innerJoin(subjects, eq(performanceTracker.subjectId, subjects.id))
 		.where(eq(performanceTracker.studentId, studentId));
 
-	return NextResponse.json({ data: rows }, { headers: adminHeaders() });
+	return adminDetailResponse(rows);
 }

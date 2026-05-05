@@ -4,17 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { contentBlacklist } from "@/db/schema/content-blacklist";
 import { embedText1536 } from "@/lib/ai/moderation";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const postSchema = z.object({
 	pattern_type: z.enum(["regex", "embedding"]),
@@ -30,7 +28,7 @@ export async function GET() {
 		if (gate instanceof NextResponse) return gate;
 
 		const rows = await db.select().from(contentBlacklist).orderBy(desc(contentBlacklist.createdAt)).limit(200);
-		return NextResponse.json({ data: rows }, { headers: adminHeaders() });
+		return adminDetailResponse(rows);
 	});
 }
 
@@ -44,21 +42,16 @@ export async function POST(request: NextRequest) {
 		try {
 			json = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = postSchema.safeParse(json);
-		if (!parsed.success) {
-			return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!parsed.success) return adminErrorResponse("Invalid body");
 
 		let embedding: number[] | null = null;
 		if (parsed.data.pattern_type === "embedding") {
 			embedding = await embedText1536(parsed.data.pattern);
 			if (!embedding) {
-				return NextResponse.json(
-					{ error: "Could not compute embedding (OPENAI_API_KEY / network)." },
-					{ status: 400, headers: adminHeaders() },
-				);
+				return adminErrorResponse("Could not compute embedding (OPENAI_API_KEY / network).");
 			}
 		}
 
@@ -73,8 +66,11 @@ export async function POST(request: NextRequest) {
 			})
 			.returning({ id: contentBlacklist.id });
 
-		await writeAdminAction({
-			action: "moderation_blacklist_add",
+		// Strict audit: a blacklist row immediately filters production traffic
+		// through the moderation gate. Missing audit row would make it
+		// impossible to attribute who blocked a pattern.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.MODERATION_BLACKLIST_ADD,
 			targetType: "content_blacklist",
 			targetId: row?.id ?? "",
 			payload: { pattern_type: parsed.data.pattern_type },
@@ -82,6 +78,6 @@ export async function POST(request: NextRequest) {
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ data: { id: row?.id } }, { headers: adminHeaders() });
+		return adminDetailResponse({ id: row?.id });
 	});
 }

@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { adminGetTestReport, adminLoadQuestionAnomalies } from "@/lib/admin/tests-admin";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
@@ -20,9 +18,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 	const admin = createServiceRoleClient();
 
 	const { data: test, error: tErr } = await admin.from("tests").select("*").eq("id", id).maybeSingle();
-	if (tErr || !test) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (tErr || !test) return adminErrorResponse("Not found", { status: 404 });
 
 	const { data: questions, error: qErr } = await admin
 		.from("questions")
@@ -30,21 +26,19 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 		.eq("test_id", id)
 		.order("question_number", { ascending: true });
 
-	if (qErr) {
-		return NextResponse.json({ error: qErr.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (qErr) return adminErrorResponse(qErr.message, { status: 500 });
 
 	const { data: answers, error: aErr } = await admin.from("student_answers").select("*").eq("test_id", id);
-	if (aErr) {
-		return NextResponse.json({ error: aErr.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (aErr) return adminErrorResponse(aErr.message, { status: 500 });
 
 	const qAnomalies = await adminLoadQuestionAnomalies(id);
 	const report = await adminGetTestReport(id);
 
+	// Multi-section response (test + questions + answers + anomalies + report)
+	// — keep client contract.
 	return NextResponse.json(
 		{ test, questions: questions ?? [], answers: answers ?? [], question_anomalies: qAnomalies, report },
-		{ headers: adminHeaders() },
+		{ headers: { ...ADMIN_RESPONSE_HEADERS } },
 	);
 }
 
@@ -65,17 +59,17 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		})
 		.eq("id", id);
 
-	if (error) {
-		return NextResponse.json({ error: error.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error.message, { status: 500 });
 
-	await writeAdminAction({
-		action: "test_soft_delete",
+	// Strict audit: high-stakes assessment override (the test is now expired
+	// from the student's perspective).
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.TEST_SOFT_DELETE,
 		targetType: "test",
 		targetId: id,
 		ipAddress: clientIpFromRequest(request),
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	return adminAckResponse();
 }

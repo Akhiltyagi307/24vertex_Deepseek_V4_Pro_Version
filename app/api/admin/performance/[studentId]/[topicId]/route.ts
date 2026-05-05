@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const patchSchema = z.object({
 	status: z.string().max(20).optional(),
@@ -29,12 +27,10 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ stude
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = patchSchema.safeParse(json);
-	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!parsed.success) return adminErrorResponse("Invalid body");
 
 	const admin = createServiceRoleClient();
 	const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -49,12 +45,10 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ stude
 		.eq("student_id", studentId)
 		.eq("topic_id", topicId);
 
-	if (error) {
-		return NextResponse.json({ error: error.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error.message, { status: 500 });
 
 	await writeAdminAction({
-		action: "performance_tracker_patch",
+		action: ADMIN_ACTIONS.PERFORMANCE_TRACKER_PATCH,
 		targetType: "performance_tracker",
 		targetId: `${studentId}:${topicId}`,
 		payload: { ...patch, reason: parsed.data.reason ?? null },
@@ -62,5 +56,5 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ stude
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	return adminAckResponse();
 }

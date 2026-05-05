@@ -6,14 +6,12 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { anonymizeProfile } from "@/lib/admin/anonymize";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { adminGetUserById } from "@/lib/admin/users-list";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -23,19 +21,18 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid user id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid user id");
 
 		const before = await adminGetUserById(uuid.data);
-		if (!before) {
-			return NextResponse.json({ error: "User not found" }, { status: 404, headers: adminHeaders() });
-		}
+		if (!before) return adminErrorResponse("User not found", { status: 404 });
 
 		await anonymizeProfile(uuid.data);
 
-		await writeAdminAction({
-			action: "user_soft_delete",
+		// Strict audit: PII anonymization is irreversible. Without an audit
+		// row we lose any record of who anonymized whom, and the `payload`
+		// snapshot is the last surviving copy of the original email/name.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.USER_SOFT_DELETE,
 			targetType: "profile",
 			targetId: uuid.data,
 			payload: { email_snapshot: before.email, full_name_snapshot: before.full_name },
@@ -43,6 +40,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

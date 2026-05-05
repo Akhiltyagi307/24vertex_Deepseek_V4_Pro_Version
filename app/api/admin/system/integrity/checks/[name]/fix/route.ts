@@ -3,14 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	dry_run: z.boolean(),
@@ -31,12 +29,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ name: 
 		try {
 			json = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(json);
-		if (!parsed.success) {
-			return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!parsed.success) return adminErrorResponse("Invalid body");
 
 		const proposed: string[] = [
 			`-- dry_run=${parsed.data.dry_run} check=${name}`,
@@ -44,7 +40,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ name: 
 		];
 
 		await writeAdminAction({
-			action: "integrity_check_fix",
+			action: ADMIN_ACTIONS.INTEGRITY_CHECK_FIX,
 			targetType: "integrity_check",
 			targetId: name,
 			payload: { dry_run: parsed.data.dry_run, row_ids: parsed.data.row_ids ?? [] },
@@ -52,9 +48,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ name: 
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json(
-			{ data: { dry_run: parsed.data.dry_run, proposed_sql: proposed.join("\n") } },
-			{ headers: adminHeaders() },
-		);
+		return adminDetailResponse({ dry_run: parsed.data.dry_run, proposed_sql: proposed.join("\n") });
 	});
 }

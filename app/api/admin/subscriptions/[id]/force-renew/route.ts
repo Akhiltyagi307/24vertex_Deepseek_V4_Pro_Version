@@ -5,16 +5,14 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { addPlanBillingInterval } from "@/lib/billing/add-plan-billing-interval";
 import { db } from "@/db";
 import { plans, subscriptions, usagePeriods } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	/** When set, extends `current_period_end` by this many whole days instead of plan interval. */
@@ -33,9 +31,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const subId = z.string().uuid().safeParse(id);
-		if (!subId.success) {
-			return NextResponse.json({ error: "Invalid subscription id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!subId.success) return adminErrorResponse("Invalid subscription id");
 
 		let raw: unknown = {};
 		try {
@@ -45,7 +41,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		}
 		const parsed = bodySchema.safeParse(raw);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const rows = await db
@@ -58,16 +54,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(subscriptions.id, subId.data))
 			.limit(1);
 		const row = rows[0];
-		if (!row) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!row) return adminErrorResponse("Not found", { status: 404 });
 
 		const sub = row.sub;
 		if (sub.razorpaySubscriptionId && process.env.ADMIN_BILLING_FORCE_RENEW_RZP !== "1") {
-			return NextResponse.json(
-				{
-					error:
-						"Razorpay-linked subscription: renewal must go through billing webhooks. Set ADMIN_BILLING_FORCE_RENEW_RZP=1 only for controlled break-glass.",
-				},
-				{ status: 400, headers: adminHeaders() },
+			return adminErrorResponse(
+				"Razorpay-linked subscription: renewal must go through billing webhooks. Set ADMIN_BILLING_FORCE_RENEW_RZP=1 only for controlled break-glass.",
 			);
 		}
 
@@ -95,8 +87,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			}
 		});
 
-		await writeAdminAction({
-			action: "subscription_force_renew",
+		// Strict audit: pushing current_period_end forward grants free access
+		// without a real charge — comp value that must always be attributable.
+		// Especially critical on the break-glass branch (ADMIN_BILLING_FORCE_RENEW_RZP=1).
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.SUBSCRIPTION_FORCE_RENEW,
 			targetType: "subscription",
 			targetId: sub.id,
 			payload: {
@@ -109,9 +104,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json(
-			{ ok: true, current_period_end: newEnd.toISOString() },
-			{ headers: adminHeaders() },
-		);
+		return adminAckResponse({ current_period_end: newEnd.toISOString() });
 	});
 }

@@ -4,17 +4,15 @@ import * as Sentry from "@sentry/nextjs";
 
 import { triggerOperatorJobsProcessInBackground } from "@/lib/admin/operator-worker-trigger";
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { operatorJobs } from "@/db/schema/operator-jobs";
 import { resetOperatorJobForRetry } from "@/lib/jobs/operator-job-mirror";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -25,15 +23,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		const { id } = await ctx.params;
 		const rows = await db.select().from(operatorJobs).where(eq(operatorJobs.id, id)).limit(1);
 		const row = rows[0];
-		if (!row) {
-			return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-		}
+		if (!row) return adminErrorResponse("Not found", { status: 404 });
 
 		if (row.status !== "failed") {
-			return NextResponse.json(
-				{ error: "Only failed jobs can be re-queued.", status: row.status },
-				{ status: 400, headers: adminHeaders() },
-			);
+			return adminErrorResponse("Only failed jobs can be re-queued.", {
+				details: { status: row.status },
+			});
 		}
 
 		await resetOperatorJobForRetry(id);
@@ -43,13 +38,15 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(and(eq(operatorJobs.id, id), eq(operatorJobs.status, "queued")))
 			.limit(1);
 		if (!updated[0]) {
-			return NextResponse.json({ error: "Could not re-queue job." }, { status: 409, headers: adminHeaders() });
+			return adminErrorResponse("Could not re-queue job.", { status: 409 });
 		}
 
 		void triggerOperatorJobsProcessInBackground();
 
-		await writeAdminAction({
-			action: "operator_job_retry",
+		// Strict audit: re-queueing a failed job re-triggers its side effects;
+		// missing audit row would obscure who manually re-ran it.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.OPERATOR_JOB_RETRY,
 			targetType: "job",
 			targetId: id,
 			payload: { queue: row.queue },
@@ -57,6 +54,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

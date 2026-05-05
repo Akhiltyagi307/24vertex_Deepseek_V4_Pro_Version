@@ -7,15 +7,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { coupons, plans } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	count: z.number().int().min(1).max(200),
@@ -43,17 +41,15 @@ export async function POST(request: NextRequest) {
 		try {
 			raw = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(raw);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const planOk = await db.select({ code: plans.code }).from(plans).where(eq(plans.code, parsed.data.grants_plan_code)).limit(1);
-		if (!planOk[0]) {
-			return NextResponse.json({ error: "grants_plan_code not found" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!planOk[0]) return adminErrorResponse("grants_plan_code not found");
 
 		const prefix = parsed.data.code_prefix.toUpperCase();
 		const createdCodes: string[] = [];
@@ -86,15 +82,15 @@ export async function POST(request: NextRequest) {
 				}
 			}
 			if (attempts >= 8) {
-				return NextResponse.json(
-					{ error: "Could not allocate unique coupon codes", partial_codes: createdCodes },
-					{ status: 500, headers: adminHeaders() },
-				);
+				return adminErrorResponse("Could not allocate unique coupon codes", {
+					status: 500,
+					details: { partial_codes: createdCodes },
+				});
 			}
 		}
 
 		await writeAdminAction({
-			action: "coupon_bulk_generate",
+			action: ADMIN_ACTIONS.COUPON_BULK_GENERATE,
 			targetType: "coupon",
 			targetId: parsed.data.grants_plan_code,
 			payload: { count: createdCodes.length, grants_plan_code: parsed.data.grants_plan_code, prefix },
@@ -102,6 +98,6 @@ export async function POST(request: NextRequest) {
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true, codes: createdCodes }, { status: 201, headers: adminHeaders() });
+		return adminAckResponse({ codes: createdCodes }, { status: 201 });
 	});
 }

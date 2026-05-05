@@ -5,16 +5,14 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { topics } from "@/db/schema/academic";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const postSchema = z.object({
 	subject_id: z.string().uuid(),
@@ -37,16 +35,12 @@ export async function GET(request: NextRequest) {
 		const sp = request.nextUrl.searchParams;
 		const subjectId = sp.get("subject_id");
 		const sid = subjectId ? z.string().uuid().safeParse(subjectId) : null;
-		if (!sid?.success) {
-			return NextResponse.json({ error: "subject_id (uuid) required" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!sid?.success) return adminErrorResponse("subject_id (uuid) required");
 
 		const limit = Math.min(500, Math.max(1, Number(sp.get("limit") ?? "50") || 50));
 		const after = sp.get("after");
 		const afterId = after ? z.string().uuid().safeParse(after) : null;
-		if (after && !afterId?.success) {
-			return NextResponse.json({ error: "after must be uuid" }, { status: 400, headers: adminHeaders() });
-		}
+		if (after && !afterId?.success) return adminErrorResponse("after must be uuid");
 
 		const base = and(eq(topics.subjectId, sid.data));
 		const whereSql = afterId?.success ? and(base, gt(topics.id, afterId.data)) : base;
@@ -61,7 +55,11 @@ export async function GET(request: NextRequest) {
 		const page = hasMore ? rows.slice(0, limit) : rows;
 		const nextAfter = hasMore ? page[page.length - 1]?.id : null;
 
-		return NextResponse.json({ data: page, next_after: nextAfter }, { headers: adminHeaders() });
+		// Cursor-pagination shape (`data` + `next_after`) — keep client contract.
+		return NextResponse.json(
+			{ data: page, next_after: nextAfter },
+			{ headers: { ...ADMIN_RESPONSE_HEADERS } },
+		);
 	});
 }
 
@@ -75,11 +73,11 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = postSchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		const b = parsed.data;
 
@@ -101,7 +99,7 @@ export async function POST(request: NextRequest) {
 		const id = inserted[0]?.id;
 		if (id) {
 			await writeAdminAction({
-				action: "topic_create",
+				action: ADMIN_ACTIONS.TOPIC_CREATE,
 				targetType: "topic",
 				targetId: id,
 				ipAddress: clientIpFromRequest(request),
@@ -110,6 +108,6 @@ export async function POST(request: NextRequest) {
 		}
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true, id }, { status: 201, headers: adminHeaders() });
+		return adminAckResponse({ id }, { status: 201 });
 	});
 }

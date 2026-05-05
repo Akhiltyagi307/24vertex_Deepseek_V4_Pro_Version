@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const patchSchema = z.object({
 	score_earned: z.string().max(20),
@@ -26,12 +24,10 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = patchSchema.safeParse(json);
-	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!parsed.success) return adminErrorResponse("Invalid body");
 
 	const admin = createServiceRoleClient();
 	const { error } = await admin
@@ -43,12 +39,11 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		.eq("id", answerId)
 		.eq("test_id", testId);
 
-	if (error) {
-		return NextResponse.json({ error: error.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error.message, { status: 500 });
 
-	await writeAdminAction({
-		action: "test_answer_override_score",
+	// Strict audit: per-answer score override is a direct grade manipulation.
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.TEST_ANSWER_OVERRIDE_SCORE,
 		targetType: "student_answer",
 		targetId: answerId,
 		payload: { test_id: testId, score_earned: parsed.data.score_earned, reason: parsed.data.reason ?? null },
@@ -56,5 +51,5 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	return adminAckResponse();
 }

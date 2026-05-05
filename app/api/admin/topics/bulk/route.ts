@@ -5,7 +5,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { topics } from "@/db/schema/academic";
@@ -23,10 +25,6 @@ const bodySchema = z.discriminatedUnion("action", [
 	}),
 ]);
 
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
-
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");
@@ -37,11 +35,11 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const active = parsed.data.action === "activate";
@@ -51,7 +49,7 @@ export async function POST(request: NextRequest) {
 			.where(inArray(topics.id, parsed.data.ids));
 
 		await writeAdminAction({
-			action: "topic_bulk",
+			action: ADMIN_ACTIONS.TOPIC_BULK,
 			targetType: "topics",
 			payload: { action: parsed.data.action, count: parsed.data.ids.length },
 			ipAddress: clientIpFromRequest(request),
@@ -59,6 +57,6 @@ export async function POST(request: NextRequest) {
 		});
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

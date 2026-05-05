@@ -4,15 +4,13 @@ import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { coupons } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 function normalizeCouponParam(raw: string): string {
 	return decodeURIComponent(raw).trim().toUpperCase();
@@ -25,18 +23,16 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ code: 
 		if (gate instanceof NextResponse) return gate;
 
 		const code = normalizeCouponParam((await ctx.params).code);
-		if (!code) {
-			return NextResponse.json({ error: "Invalid code" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!code) return adminErrorResponse("Invalid code");
 
 		const rows = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1);
 		const row = rows[0];
-		if (!row) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!row) return adminErrorResponse("Not found", { status: 404 });
 
 		await db.update(coupons).set({ isActive: false }).where(eq(coupons.code, code));
 
 		await writeAdminAction({
-			action: "coupon_disable",
+			action: ADMIN_ACTIONS.COUPON_DISABLE,
 			targetType: "coupon",
 			targetId: row.id,
 			payload: { code },
@@ -44,6 +40,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ code: 
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

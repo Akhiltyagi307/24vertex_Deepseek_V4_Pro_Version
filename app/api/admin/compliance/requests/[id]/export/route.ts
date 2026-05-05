@@ -4,7 +4,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { recordComplianceEvent } from "@/lib/compliance/events";
 import { buildComplianceExportZip } from "@/lib/compliance/export-user-data";
 import { getComplianceExportsBucket } from "@/lib/env";
@@ -15,35 +17,27 @@ import { complianceRequests } from "@/db/schema/compliance-requests";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
-
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
 	if (gate instanceof NextResponse) return gate;
 
 	const { id } = await ctx.params;
 	const uuid = z.string().uuid().safeParse(id);
-	if (!uuid.success) {
-		return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!uuid.success) return adminErrorResponse("Invalid id");
 
 	const [reqRow] = await db.select().from(complianceRequests).where(eq(complianceRequests.id, uuid.data)).limit(1);
-	if (!reqRow) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (!reqRow) return adminErrorResponse("Not found", { status: 404 });
 	if (!reqRow.identityVerified) {
-		return NextResponse.json({ error: "Identity must be verified before export" }, { status: 409, headers: adminHeaders() });
+		return adminErrorResponse("Identity must be verified before export", { status: 409 });
 	}
 	if (!reqRow.subjectUserId) {
-		return NextResponse.json({ error: "subject_user_id is required for export" }, { status: 409, headers: adminHeaders() });
+		return adminErrorResponse("subject_user_id is required for export", { status: 409 });
 	}
 
 	const subjectUserId = reqRow.subjectUserId;
 
 	await writeAdminAction({
-		action: "compliance_export_started",
+		action: ADMIN_ACTIONS.COMPLIANCE_EXPORT_STARTED,
 		targetType: "compliance_request",
 		targetId: uuid.data,
 		payload: { subject_user_id: subjectUserId },
@@ -98,7 +92,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	});
 	if (upErr) {
 		await writeAdminAction({
-			action: "compliance_export_failed",
+			action: ADMIN_ACTIONS.COMPLIANCE_EXPORT_FAILED,
 			targetType: "compliance_request",
 			targetId: uuid.data,
 			payload: { error: upErr.message, storage_path: storagePath },
@@ -112,7 +106,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			errorMessage: upErr.message,
 			payload: { storage_path: storagePath },
 		});
-		return NextResponse.json({ error: upErr.message }, { status: 500, headers: adminHeaders() });
+		return adminErrorResponse(upErr.message, { status: 500 });
 	}
 
 	const signedTtl = 60 * 60 * 24 * 7;
@@ -125,11 +119,14 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			errorMessage: signErr?.message ?? "Could not sign URL",
 			payload: { storage_path: storagePath },
 		});
-		return NextResponse.json({ error: signErr?.message ?? "Could not sign URL" }, { status: 500, headers: adminHeaders() });
+		return adminErrorResponse(signErr?.message ?? "Could not sign URL", { status: 500 });
 	}
 
-	await writeAdminAction({
-		action: "compliance_export_ready",
+	// Strict audit: the upload + signed-URL succeeded — this is the
+	// "export ready" compliance evidence row. Missing audit row would leave
+	// a downloadable evidence package without a trail of who issued it.
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.COMPLIANCE_EXPORT_READY,
 		targetType: "compliance_request",
 		targetId: uuid.data,
 		payload: { storage_path: storagePath, manifest, signed_ttl_seconds: signedTtl },
@@ -151,8 +148,9 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		})
 		.where(eq(complianceRequests.id, uuid.data));
 
+	// Custom shape — preserves the client contract for the export payload.
 	return NextResponse.json(
 		{ signed_url: signed.signedUrl, storage_path: storagePath, manifest, expires_in_seconds: signedTtl },
-		{ headers: adminHeaders() },
+		{ headers: { ...ADMIN_RESPONSE_HEADERS } },
 	);
 }

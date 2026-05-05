@@ -3,16 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminErrorResponse, adminListResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/auth-users";
 import { couponRedemptions, coupons } from "@/db/schema/billing";
 import { profiles } from "@/db/schema/profiles";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 function normalizeCouponParam(raw: string): string {
 	return decodeURIComponent(raw).trim().toUpperCase();
@@ -25,13 +22,11 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ code: s
 		if (gate instanceof NextResponse) return gate;
 
 		const code = normalizeCouponParam((await ctx.params).code);
-		if (!code) {
-			return NextResponse.json({ error: "Invalid code" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!code) return adminErrorResponse("Invalid code");
 
 		const cRows = await db.select({ id: coupons.id }).from(coupons).where(eq(coupons.code, code)).limit(1);
 		const coupon = cRows[0];
-		if (!coupon) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!coupon) return adminErrorResponse("Not found", { status: 404 });
 
 		const sp = request.nextUrl.searchParams;
 		const page = Math.max(1, Number(sp.get("page") ?? "1") || 1);
@@ -60,21 +55,18 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ code: s
 			.from(couponRedemptions)
 			.where(eq(couponRedemptions.couponId, coupon.id));
 
-		return NextResponse.json(
-			{
-				data: rows.map((r) => ({
-					id: r.id,
-					profile_id: r.profileId,
-					subscription_id: r.subscriptionId,
-					redeemed_at: r.redeemedAt.toISOString(),
-					full_name: r.fullName,
-					email: r.email,
-				})),
-				total: Number(total ?? 0),
-				page,
-				page_size: pageSize,
-			},
-			{ headers: adminHeaders() },
-		);
+		return adminListResponse({
+			data: rows.map((r) => ({
+				id: r.id,
+				profile_id: r.profileId,
+				subscription_id: r.subscriptionId,
+				redeemed_at: r.redeemedAt.toISOString(),
+				full_name: r.fullName,
+				email: r.email,
+			})),
+			total: Number(total ?? 0),
+			page,
+			pageSize,
+		});
 	});
 }

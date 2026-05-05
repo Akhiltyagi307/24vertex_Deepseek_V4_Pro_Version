@@ -2,15 +2,13 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { emailTemplates } from "@/db/schema/email-templates";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(_request: Request, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
@@ -18,12 +16,10 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 
 	const { id } = await ctx.params;
 	const [row] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id)).limit(1);
-	if (!row) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (!row) return adminErrorResponse("Not found", { status: 404 });
 
 	await writeAdminAction({
-		action: "email_template_activate",
+		action: ADMIN_ACTIONS.EMAIL_TEMPLATE_ACTIVATE,
 		targetType: "email_template",
 		targetId: id,
 		payload: { slug: row.slug, version: row.version },
@@ -35,5 +31,5 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
 	});
 
 	const [updated] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id)).limit(1);
-	return NextResponse.json({ data: updated }, { headers: adminHeaders() });
+	return adminDetailResponse(updated);
 }

@@ -2,13 +2,10 @@ import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 /**
  * Monthly signup cohort sizes (students). Retention cells can be layered on later.
@@ -28,6 +25,14 @@ export async function GET() {
 		order by 1 asc
 	`;
 
-	const rows = await db.execute(q);
-	return NextResponse.json({ cohorts: rows as unknown as { cohort_month: string; cohort_size: number }[] }, { headers: adminHeaders() });
+	try {
+		const rows = await db.execute(q);
+		return NextResponse.json(
+			{ cohorts: rows as unknown as { cohort_month: string; cohort_size: number }[] },
+			{ headers: { ...ADMIN_RESPONSE_HEADERS } },
+		);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : "Internal error";
+		return adminErrorResponse(msg, { status: 500 });
+	}
 }

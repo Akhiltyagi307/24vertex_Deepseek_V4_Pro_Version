@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { adminListTests } from "@/lib/admin/tests-admin";
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminListResponse } from "@/lib/admin/response";
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
@@ -22,6 +19,6 @@ export async function GET(request: NextRequest) {
 
 		const { rows, total } = await adminListTests({ page, pageSize, status, q });
 
-		return NextResponse.json({ data: rows, total, page, page_size: pageSize }, { headers: adminHeaders() });
+		return adminListResponse({ data: rows, total, page, pageSize });
 	});
 }

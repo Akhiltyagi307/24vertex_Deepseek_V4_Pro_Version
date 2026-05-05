@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { ADMIN_RESPONSE_HEADERS } from "@/lib/admin/response";
+import { adminDetailResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { adminSessions } from "@/db/schema/admin-sessions";
 
@@ -41,6 +41,6 @@ export async function GET() {
 		}));
 
 		// `{ data }` shape (no totals — admin sessions are a small list).
-		return NextResponse.json({ data }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
+		return adminDetailResponse(data);
 	});
 }

@@ -4,16 +4,14 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { moderationFlags } from "@/db/schema/moderation-flags";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	status: z.enum(["open", "reviewing", "upheld", "dismissed"]),
@@ -32,12 +30,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		try {
 			json = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(json);
-		if (!parsed.success) {
-			return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!parsed.success) return adminErrorResponse("Invalid body");
 
 		const now = new Date();
 		await db
@@ -51,7 +47,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(moderationFlags.id, id));
 
 		await writeAdminAction({
-			action: "moderation_flag_resolve",
+			action: ADMIN_ACTIONS.MODERATION_FLAG_RESOLVE,
 			targetType: "moderation_flag",
 			targetId: id,
 			payload: parsed.data,
@@ -59,6 +55,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

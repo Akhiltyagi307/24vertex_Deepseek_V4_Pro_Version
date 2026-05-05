@@ -3,15 +3,12 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminErrorResponse, adminListResponse } from "@/lib/admin/response";
 import { adminListUsers, type AdminUserListRole } from "@/lib/admin/users-list";
 
 export const runtime = "nodejs";
 
 const roleSchema = z.enum(["student", "parent", "teacher"]);
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
@@ -22,7 +19,7 @@ export async function GET(request: NextRequest) {
 		const sp = request.nextUrl.searchParams;
 		const roleParsed = roleSchema.safeParse(sp.get("role"));
 		if (!roleParsed.success) {
-			return NextResponse.json({ error: "role must be student|parent|teacher" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("role must be student|parent|teacher");
 		}
 		const role = roleParsed.data as AdminUserListRole;
 
@@ -50,6 +47,6 @@ export async function GET(request: NextRequest) {
 			sort,
 		});
 
-		return NextResponse.json({ data: rows, total, page, page_size: pageSize }, { headers: adminHeaders() });
+		return adminListResponse({ data: rows, total, page, pageSize });
 	});
 }

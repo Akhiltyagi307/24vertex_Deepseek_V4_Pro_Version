@@ -5,15 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { billingEvents } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -23,9 +21,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid id");
 
 		const now = new Date();
 		const updated = await db
@@ -34,12 +30,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(billingEvents.id, uuid.data))
 			.returning({ id: billingEvents.id });
 
-		if (!updated[0]) {
-			return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-		}
+		if (!updated[0]) return adminErrorResponse("Not found", { status: 404 });
 
 		await writeAdminAction({
-			action: "billing_event_resolve",
+			action: ADMIN_ACTIONS.BILLING_EVENT_RESOLVE,
 			targetType: "billing_event",
 			targetId: uuid.data,
 			payload: {},
@@ -47,6 +41,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

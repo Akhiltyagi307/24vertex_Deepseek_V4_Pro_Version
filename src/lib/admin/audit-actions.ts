@@ -127,9 +127,13 @@ export const ADMIN_ACTIONS = {
 	COMPLIANCE_EXPORT_STARTED: "compliance_export_started",
 	COMPLIANCE_EXPORT_READY: "compliance_export_ready",
 	COMPLIANCE_EXPORT_FAILED: "compliance_export_failed",
+	COMPLIANCE_ERASURE_DRY_RUN: "compliance_erasure_dry_run",
+	COMPLIANCE_ERASURE_COMMIT: "compliance_erasure_commit",
 	PARENTAL_CONSENT_RERREQUEST_SENT: "parental_consent_rerequest_sent",
 	PARENTAL_CONSENT_REVOKED: "parental_consent_revoked",
 	RETENTION_POLICY_UPDATED: "retention_policy_updated",
+	RETENTION_PURGE_DRY_RUN: "retention_purge_dry_run",
+	RETENTION_PURGE_COMMIT: "retention_purge_commit",
 
 	// System ops — jobs, integrity, health, SQL console, analytics
 	OPERATOR_JOB_CANCEL: "operator_job_cancel",

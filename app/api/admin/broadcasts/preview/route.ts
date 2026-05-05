@@ -3,12 +3,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { countBroadcastAudience, type BroadcastAudienceJson } from "@/lib/admin/broadcast-audience";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const audienceSchema = z.object({
 	kind: z.enum(["all", "students", "parents", "teachers", "grade", "plan"]),
@@ -26,13 +23,13 @@ export async function POST(request: NextRequest) {
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = z.object({ audience: audienceSchema }).safeParse(json);
 	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 	}
 	const audience = parsed.data.audience as BroadcastAudienceJson;
 	const count = await countBroadcastAudience(audience);
-	return NextResponse.json({ count }, { headers: adminHeaders() });
+	return NextResponse.json({ count }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 }

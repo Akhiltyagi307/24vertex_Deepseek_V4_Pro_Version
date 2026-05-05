@@ -3,16 +3,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { contentBlacklist } from "@/db/schema/content-blacklist";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -23,8 +21,10 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		const { id } = await ctx.params;
 		await db.delete(contentBlacklist).where(eq(contentBlacklist.id, id));
 
-		await writeAdminAction({
-			action: "moderation_blacklist_delete",
+		// Strict audit: hard delete of a blacklist row immediately re-allows
+		// the previously-blocked pattern through the moderation gate.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.MODERATION_BLACKLIST_DELETE,
 			targetType: "content_blacklist",
 			targetId: id,
 			payload: {},
@@ -32,6 +32,6 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

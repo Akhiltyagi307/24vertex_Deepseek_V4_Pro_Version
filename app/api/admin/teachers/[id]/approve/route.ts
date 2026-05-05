@@ -4,16 +4,14 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { sendTeacherApprovedEmail } from "@/lib/email/teacher-approved-email";
 import { insertTeacherWelcomeNotification, setTeacherVerified } from "@/lib/admin/teacher-approval";
 import { adminGetUserById } from "@/lib/admin/users-list";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -23,19 +21,15 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid id");
 
 		const profile = await adminGetUserById(uuid.data);
 		if (!profile || profile.role !== "teacher") {
-			return NextResponse.json({ error: "Teacher not found" }, { status: 404, headers: adminHeaders() });
+			return adminErrorResponse("Teacher not found", { status: 404 });
 		}
 
 		const ok = await setTeacherVerified(uuid.data, true);
-		if (!ok) {
-			return NextResponse.json({ error: "Update failed" }, { status: 500, headers: adminHeaders() });
-		}
+		if (!ok) return adminErrorResponse("Update failed", { status: 500 });
 
 		if (profile.email) {
 			const sent = await sendTeacherApprovedEmail(profile.email, profile.full_name);
@@ -50,14 +44,17 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			"Your teacher account has been approved. You can sign in from the teacher portal.",
 		);
 
-		await writeAdminAction({
-			action: "teacher_approve",
+		// Strict audit: approval flips a profile flag, dispatches an email
+		// through Resend, and inserts a notification — three side effects we
+		// must be able to attribute.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.TEACHER_APPROVE,
 			targetType: "profile",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

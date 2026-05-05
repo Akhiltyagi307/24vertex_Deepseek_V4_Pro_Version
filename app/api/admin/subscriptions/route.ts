@@ -3,13 +3,10 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminErrorResponse, adminListResponse } from "@/lib/admin/response";
 import { adminListSubscriptions } from "@/lib/admin/billing/subscriptions-list";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const statusSchema = z.string().trim().min(1).max(40).optional();
 
@@ -25,9 +22,7 @@ export async function GET(request: NextRequest) {
 
 		const statusRaw = sp.get("status")?.trim();
 		const statusParsed = statusRaw ? statusSchema.safeParse(statusRaw) : { success: true as const, data: undefined };
-		if (!statusParsed.success) {
-			return NextResponse.json({ error: "Invalid status filter" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!statusParsed.success) return adminErrorResponse("Invalid status filter");
 
 		const q = sp.get("q")?.trim() ?? null;
 
@@ -55,6 +50,6 @@ export async function GET(request: NextRequest) {
 			updated_at: r.updated_at ? r.updated_at.toISOString() : null,
 		}));
 
-		return NextResponse.json({ data, total, page, page_size: pageSize }, { headers: adminHeaders() });
+		return adminListResponse({ data, total, page, pageSize });
 	});
 }

@@ -3,16 +3,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { adminRefundTestCredit } from "@/lib/admin/billing/test-refund";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	refund_credit: z.boolean().optional(),
@@ -31,15 +29,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		json = {};
 	}
 	const parsed = bodySchema.safeParse(json);
-	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!parsed.success) return adminErrorResponse("Invalid body");
 
 	const admin = createServiceRoleClient();
 	const { data: test, error: tErr } = await admin.from("tests").select("student_id").eq("id", testId).maybeSingle();
-	if (tErr || !test?.student_id) {
-		return NextResponse.json({ error: "Test not found" }, { status: 404, headers: adminHeaders() });
-	}
+	if (tErr || !test?.student_id) return adminErrorResponse("Test not found", { status: 404 });
 
 	if (parsed.data.refund_credit) {
 		const reason = parsed.data.refund_reason?.trim() || "void_test_refund";
@@ -50,7 +44,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			idempotencyKey: randomUUID(),
 		});
 		if (!refund.ok && refund.code !== "nothing_to_refund") {
-			return NextResponse.json({ error: refund.message }, { status: 500, headers: adminHeaders() });
+			return adminErrorResponse(refund.message, { status: 500 });
 		}
 	}
 
@@ -65,12 +59,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		})
 		.eq("id", testId);
 
-	if (error) {
-		return NextResponse.json({ error: error.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error.message, { status: 500 });
 
-	await writeAdminAction({
-		action: "test_void",
+	// Strict audit: voiding a test ends the attempt and may refund a credit
+	// — combined assessment + billing impact.
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.TEST_VOID,
 		targetType: "test",
 		targetId: testId,
 		payload: { refund_credit: Boolean(parsed.data.refund_credit) },
@@ -78,5 +72,5 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	return adminAckResponse();
 }

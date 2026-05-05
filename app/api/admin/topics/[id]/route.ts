@@ -5,16 +5,14 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { topics } from "@/db/schema/academic";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -24,13 +22,11 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid id");
 
 		const rows = await db.select().from(topics).where(eq(topics.id, uuid.data)).limit(1);
-		if (!rows[0]) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-		return NextResponse.json({ data: rows[0] }, { headers: adminHeaders() });
+		if (!rows[0]) return adminErrorResponse("Not found", { status: 404 });
+		return adminDetailResponse(rows[0]);
 	});
 }
 
@@ -42,15 +38,13 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid id");
 
 		let body: Record<string, unknown>;
 		try {
 			body = (await request.json()) as Record<string, unknown>;
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 
 		const patch: Partial<typeof topics.$inferInsert> = { updatedAt: new Date() };
@@ -63,7 +57,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		await db.update(topics).set(patch).where(eq(topics.id, uuid.data));
 
 		await writeAdminAction({
-			action: "topic_update",
+			action: ADMIN_ACTIONS.TOPIC_UPDATE,
 			targetType: "topic",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
@@ -71,7 +65,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		});
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }
 
@@ -83,14 +77,15 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid id");
 
 		await db.delete(topics).where(eq(topics.id, uuid.data));
 
-		await writeAdminAction({
-			action: "topic_delete",
+		// Strict audit: hard delete of curriculum content row, no soft-delete
+		// column to fall back on. Missing audit row would erase the record
+		// without a trail.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.TOPIC_DELETE,
 			targetType: "topic",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
@@ -98,6 +93,6 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		});
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

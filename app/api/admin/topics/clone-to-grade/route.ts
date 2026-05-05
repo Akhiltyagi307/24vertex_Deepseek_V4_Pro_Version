@@ -4,7 +4,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { cloneTopicsToGrade } from "@/lib/admin/topics/clone-to-grade";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 
@@ -14,10 +16,6 @@ const bodySchema = z.object({
 	source_topic_ids: z.array(z.string().uuid()).min(1),
 	target_grade: z.number().int().min(1).max(12),
 });
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
@@ -29,27 +27,27 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		try {
 			const count = await cloneTopicsToGrade(parsed.data.source_topic_ids, parsed.data.target_grade);
 			await writeAdminAction({
-				action: "topic_clone_to_grade",
+				action: ADMIN_ACTIONS.TOPIC_CLONE_TO_GRADE,
 				targetType: "topics",
 				payload: { count, target_grade: parsed.data.target_grade },
 				ipAddress: clientIpFromRequest(request),
 				userAgent: userAgentFromRequest(request),
 			});
 			revalidateCurriculumTopicCaches();
-			return NextResponse.json({ ok: true, inserted: count }, { headers: adminHeaders() });
+			return adminAckResponse({ inserted: count });
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "clone failed";
-			return NextResponse.json({ error: msg }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse(msg);
 		}
 	});
 }

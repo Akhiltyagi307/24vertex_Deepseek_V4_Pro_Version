@@ -5,7 +5,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { profiles } from "@/db/schema/profiles";
 
@@ -15,10 +17,6 @@ const bodySchema = z.object({
 	reason: z.string().max(2000).optional(),
 });
 
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
-
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");
@@ -27,9 +25,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
-		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid user id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!uuid.success) return adminErrorResponse("Invalid user id");
 
 		let body: unknown;
 		try {
@@ -39,7 +35,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		}
 		const parsed = bodySchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		const reason = parsed.data.reason ?? null;
 		const now = new Date();
@@ -55,12 +51,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(profiles.id, uuid.data))
 			.returning({ id: profiles.id });
 
-		if (!updated[0]) {
-			return NextResponse.json({ error: "User not found" }, { status: 404, headers: adminHeaders() });
-		}
+		if (!updated[0]) return adminErrorResponse("User not found", { status: 404 });
 
 		await writeAdminAction({
-			action: "user_suspend",
+			action: ADMIN_ACTIONS.USER_SUSPEND,
 			targetType: "profile",
 			targetId: uuid.data,
 			payload: { reason },
@@ -68,6 +62,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

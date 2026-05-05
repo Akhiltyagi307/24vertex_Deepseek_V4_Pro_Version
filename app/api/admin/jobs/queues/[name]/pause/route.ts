@@ -2,15 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse } from "@/lib/admin/response";
 import { setOperatorQueuePaused } from "@/lib/jobs/operator-queue-pause";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ name: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -21,8 +19,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ name: 
 		const { name } = await ctx.params;
 		await setOperatorQueuePaused(name, true);
 
-		await writeAdminAction({
-			action: "operator_queue_pause",
+		// Strict audit: queue pause stops production-affecting workers; needs
+		// a clear audit trail.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.OPERATOR_QUEUE_PAUSE,
 			targetType: "queue",
 			targetId: name,
 			payload: {},
@@ -30,6 +30,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ name: 
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

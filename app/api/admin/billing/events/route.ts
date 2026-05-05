@@ -1,16 +1,13 @@
-import { and, count, desc, eq, ilike, isNull, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, isNull, isNotNull, or, type SQL } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminListResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { billingEvents } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
@@ -57,24 +54,21 @@ export async function GET(request: NextRequest) {
 		const countQ = db.select({ total: count() }).from(billingEvents);
 		const [{ total }] = await (whereSql ? countQ.where(whereSql) : countQ);
 
-		return NextResponse.json(
-			{
-				data: rows.map((r) => ({
-					id: r.id,
-					razorpay_event_id: r.razorpayEventId,
-					event_type: r.eventType,
-					processed_at: r.processedAt?.toISOString() ?? null,
-					error: r.error,
-					created_at: r.createdAt.toISOString(),
-					replay_count: r.replayCount,
-					last_replay_at: r.lastReplayAt?.toISOString() ?? null,
-					resolved_at: r.resolvedAt?.toISOString() ?? null,
-				})),
-				total: Number(total ?? 0),
-				page,
-				page_size: pageSize,
-			},
-			{ headers: adminHeaders() },
-		);
+		return adminListResponse({
+			data: rows.map((r) => ({
+				id: r.id,
+				razorpay_event_id: r.razorpayEventId,
+				event_type: r.eventType,
+				processed_at: r.processedAt?.toISOString() ?? null,
+				error: r.error,
+				created_at: r.createdAt.toISOString(),
+				replay_count: r.replayCount,
+				last_replay_at: r.lastReplayAt?.toISOString() ?? null,
+				resolved_at: r.resolvedAt?.toISOString() ?? null,
+			})),
+			total: Number(total ?? 0),
+			page,
+			pageSize,
+		});
 	});
 }

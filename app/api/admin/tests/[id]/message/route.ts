@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	body: z.string().min(1).max(2000),
@@ -25,12 +23,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const parsed = bodySchema.safeParse(json);
-	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!parsed.success) return adminErrorResponse("Invalid body");
 
 	const admin = createServiceRoleClient();
 	const { error } = await admin.from("admin_test_messages").insert({
@@ -38,12 +34,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		body: parsed.data.body,
 	});
 
-	if (error) {
-		return NextResponse.json({ error: error.message }, { status: 500, headers: adminHeaders() });
-	}
+	if (error) return adminErrorResponse(error.message, { status: 500 });
 
 	await writeAdminAction({
-		action: "test_admin_message",
+		action: ADMIN_ACTIONS.TEST_ADMIN_MESSAGE,
 		targetType: "test",
 		targetId: id,
 		payload: { preview: parsed.data.body.slice(0, 120) },
@@ -51,5 +45,5 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+	return adminAckResponse();
 }

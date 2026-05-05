@@ -4,15 +4,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { parentalConsents } from "@/db/schema/parental-consents";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ studentId: string }> }) {
 	const gate = await requireAdminApi();
@@ -20,9 +18,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ studen
 
 	const { studentId } = await ctx.params;
 	const uuid = z.string().uuid().safeParse(studentId);
-	if (!uuid.success) {
-		return NextResponse.json({ error: "Invalid student id" }, { status: 400, headers: adminHeaders() });
-	}
+	if (!uuid.success) return adminErrorResponse("Invalid student id");
 
 	const [latest] = await db
 		.select()
@@ -31,9 +27,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ studen
 		.orderBy(desc(parentalConsents.grantedAt))
 		.limit(1);
 
-	if (!latest) {
-		return NextResponse.json({ error: "No active consent row to revoke" }, { status: 404, headers: adminHeaders() });
-	}
+	if (!latest) return adminErrorResponse("No active consent row to revoke", { status: 404 });
 
 	const now = new Date();
 	const [updated] = await db
@@ -42,8 +36,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ studen
 		.where(eq(parentalConsents.id, latest.id))
 		.returning();
 
-	await writeAdminAction({
-		action: "parental_consent_revoked",
+	// Strict audit: parental consent withdrawal is a high-stakes compliance
+	// state change with downstream effects on what the student account can do.
+	await writeAdminActionStrict({
+		action: ADMIN_ACTIONS.PARENTAL_CONSENT_REVOKED,
 		targetType: "parental_consent",
 		targetId: latest.id,
 		payload: { student_id: uuid.data },
@@ -51,5 +47,5 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ studen
 		userAgent: userAgentFromRequest(request),
 	});
 
-	return NextResponse.json({ data: updated }, { headers: adminHeaders() });
+	return adminDetailResponse(updated);
 }

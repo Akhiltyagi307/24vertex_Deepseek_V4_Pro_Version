@@ -5,7 +5,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { isCouponSingleUseGlobalExhausted } from "@/lib/billing/coupon-policy";
 import { PLAN_CATALOG, tokenQuotaForGrade, type PlanCode } from "@/lib/billing/plans";
 import { db } from "@/db";
@@ -14,10 +16,6 @@ import { profiles } from "@/db/schema/profiles";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	coupon_code: z.string().trim().min(2).max(40),
@@ -34,19 +32,17 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const subId = z.string().uuid().safeParse(id);
-		if (!subId.success) {
-			return NextResponse.json({ error: "Invalid subscription id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!subId.success) return adminErrorResponse("Invalid subscription id");
 
 		let raw: unknown;
 		try {
 			raw = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(raw);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		const code = parsed.data.coupon_code.toUpperCase();
 
@@ -60,12 +56,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(subscriptions.id, subId.data))
 			.limit(1);
 		const sub = subRows[0];
-		if (!sub) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!sub) return adminErrorResponse("Not found", { status: 404 });
 
 		if (sub.status === "active" || sub.status === "grace" || sub.status === "past_due") {
-			return NextResponse.json(
-				{ error: "Subscription is in a paid/active billing state; cancel or wait before stacking a coupon." },
-				{ status: 409, headers: adminHeaders() },
+			return adminErrorResponse(
+				"Subscription is in a paid/active billing state; cancel or wait before stacking a coupon.",
+				{ status: 409 },
 			);
 		}
 
@@ -75,26 +71,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(coupons.code, code))
 			.limit(1);
 		const coupon = couponRows[0];
-		if (!coupon) {
-			return NextResponse.json({ error: "Unknown coupon code" }, { status: 404, headers: adminHeaders() });
-		}
+		if (!coupon) return adminErrorResponse("Unknown coupon code", { status: 404 });
 		if (coupon.kind === "checkout_discount") {
-			return NextResponse.json(
-				{ error: "Checkout discount coupons apply at Razorpay subscribe time, not via entitlement apply." },
-				{ status: 400, headers: adminHeaders() },
+			return adminErrorResponse(
+				"Checkout discount coupons apply at Razorpay subscribe time, not via entitlement apply.",
 			);
 		}
-		if (!coupon.grantsPlanCode) {
-			return NextResponse.json({ error: "Coupon has no grants_plan_code" }, { status: 400, headers: adminHeaders() });
-		}
-		if (!coupon.isActive) {
-			return NextResponse.json({ error: "Coupon inactive" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!coupon.grantsPlanCode) return adminErrorResponse("Coupon has no grants_plan_code");
+		if (!coupon.isActive) return adminErrorResponse("Coupon inactive");
 		if (coupon.expiresAt && coupon.expiresAt.getTime() < Date.now()) {
-			return NextResponse.json({ error: "Coupon expired" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Coupon expired");
 		}
 		if (coupon.redemptionsCount >= coupon.maxRedemptions) {
-			return NextResponse.json({ error: "Coupon exhausted" }, { status: 409, headers: adminHeaders() });
+			return adminErrorResponse("Coupon exhausted", { status: 409 });
 		}
 
 		const admin = createServiceRoleClient();
@@ -106,13 +95,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 				anyRedemptionExists: Boolean(alreadyAny),
 			})
 		) {
-			return NextResponse.json({ error: "Single-use coupon already redeemed somewhere" }, { status: 409, headers: adminHeaders() });
+			return adminErrorResponse("Single-use coupon already redeemed somewhere", { status: 409 });
 		}
 
 		const profileRows = await db.select().from(profiles).where(eq(profiles.id, sub.profileId)).limit(1);
 		const profile = profileRows[0];
 		if (!profile || profile.role !== "student") {
-			return NextResponse.json({ error: "Subscription profile is not a student" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Subscription profile is not a student");
 		}
 
 		const planRows = await db.select().from(plans).where(eq(plans.code, coupon.grantsPlanCode)).limit(1);
@@ -145,17 +134,15 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			p_tokens_quota: tokensQuota,
 		});
 
-		if (redeemErr) {
-			return NextResponse.json({ error: redeemErr.message }, { status: 500, headers: adminHeaders() });
-		}
+		if (redeemErr) return adminErrorResponse(redeemErr.message, { status: 500 });
 		const redeemRow = Array.isArray(redeemRows) ? redeemRows[0] : redeemRows;
 		if (!redeemRow?.ok) {
 			const errorCode = String(redeemRow?.error_code ?? "database_error");
-			return NextResponse.json({ error: errorCode }, { status: 409, headers: adminHeaders() });
+			return adminErrorResponse(errorCode, { status: 409 });
 		}
 
 		await writeAdminAction({
-			action: "subscription_apply_coupon",
+			action: ADMIN_ACTIONS.SUBSCRIPTION_APPLY_COUPON,
 			targetType: "subscription",
 			targetId: sub.id,
 			payload: { coupon_code: code, subscription_id_rpc: redeemRow.subscription_id },
@@ -163,9 +150,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json(
-			{ ok: true, subscription_id: redeemRow.subscription_id as string },
-			{ headers: adminHeaders() },
-		);
+		return adminAckResponse({ subscription_id: redeemRow.subscription_id as string });
 	});
 }

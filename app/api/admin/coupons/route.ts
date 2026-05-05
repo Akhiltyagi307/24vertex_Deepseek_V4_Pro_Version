@@ -5,15 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse, adminListResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { coupons, plans } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const couponBase = z.object({
 	code: z.string().trim().min(2).max(40),
@@ -86,15 +84,12 @@ export async function GET(request: NextRequest) {
 		const countFiltered = whereSql ? countBase.where(whereSql) : countBase;
 		const [{ total }] = await countFiltered;
 
-		return NextResponse.json(
-			{
-				data: rows.map((r) => serializeCoupon(r)!),
-				total: Number(total ?? 0),
-				page,
-				page_size: pageSize,
-			},
-			{ headers: adminHeaders() },
-		);
+		return adminListResponse({
+			data: rows.map((r) => serializeCoupon(r)!),
+			total: Number(total ?? 0),
+			page,
+			pageSize,
+		});
 	});
 }
 
@@ -108,24 +103,22 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = createSchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const code = parsed.data.code.toUpperCase();
 		const expiresAt = parsed.data.expires_at ? new Date(parsed.data.expires_at) : null;
 		if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-			return NextResponse.json({ error: "Invalid expires_at" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid expires_at");
 		}
 
 		if (parsed.data.kind === "entitlement") {
 			const planRows = await db.select({ code: plans.code }).from(plans).where(eq(plans.code, parsed.data.grants_plan_code)).limit(1);
-			if (!planRows[0]) {
-				return NextResponse.json({ error: "grants_plan_code not found" }, { status: 400, headers: adminHeaders() });
-			}
+			if (!planRows[0]) return adminErrorResponse("grants_plan_code not found");
 		}
 
 		let inserted;
@@ -172,16 +165,16 @@ export async function POST(request: NextRequest) {
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			if (/unique|duplicate/i.test(msg)) {
-				return NextResponse.json({ error: "Coupon code already exists" }, { status: 409, headers: adminHeaders() });
+				return adminErrorResponse("Coupon code already exists", { status: 409 });
 			}
 			throw e;
 		}
 
 		const row = inserted[0];
-		if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500, headers: adminHeaders() });
+		if (!row) return adminErrorResponse("Insert failed", { status: 500 });
 
 		await writeAdminAction({
-			action: "coupon_create",
+			action: ADMIN_ACTIONS.COUPON_CREATE,
 			targetType: "coupon",
 			targetId: row.id,
 			payload: {
@@ -194,6 +187,6 @@ export async function POST(request: NextRequest) {
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ data: serializeCoupon(row) }, { status: 201, headers: adminHeaders() });
+		return adminDetailResponse(serializeCoupon(row), { status: 201 });
 	});
 }

@@ -5,16 +5,14 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { plans, subscriptions, usagePeriods } from "@/db/schema/billing";
 import { profiles } from "@/db/schema/profiles";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 /**
  * Re-aligns the current (or latest) `usage_periods` quotas with the `plans` row
@@ -29,9 +27,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const { id } = await ctx.params;
 		const subId = z.string().uuid().safeParse(id);
-		if (!subId.success) {
-			return NextResponse.json({ error: "Invalid subscription id" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!subId.success) return adminErrorResponse("Invalid subscription id");
 
 		const rows = await db
 			.select({
@@ -45,7 +41,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(subscriptions.id, subId.data))
 			.limit(1);
 		const row = rows[0];
-		if (!row) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!row) return adminErrorResponse("Not found", { status: 404 });
 
 		const plan = row.plan;
 		const tokensQuota =
@@ -67,9 +63,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 				return s <= nowMs && e > nowMs;
 			}) ?? periodRows[0];
 
-		if (!usage) {
-			return NextResponse.json({ error: "No usage_periods rows for subscription" }, { status: 404, headers: adminHeaders() });
-		}
+		if (!usage) return adminErrorResponse("No usage_periods rows for subscription", { status: 404 });
 
 		await db
 			.update(usagePeriods)
@@ -80,7 +74,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			.where(eq(usagePeriods.id, usage.id));
 
 		await writeAdminAction({
-			action: "subscription_recompute_usage",
+			action: ADMIN_ACTIONS.SUBSCRIPTION_RECOMPUTE_USAGE,
 			targetType: "subscription",
 			targetId: row.sub.id,
 			payload: {
@@ -93,14 +87,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json(
-			{
-				ok: true,
-				usage_period_id: usage.id,
-				tests_quota: testsQuota,
-				tokens_quota: tokensQuota,
-			},
-			{ headers: adminHeaders() },
-		);
+		return adminAckResponse({
+			usage_period_id: usage.id,
+			tests_quota: testsQuota,
+			tokens_quota: tokensQuota,
+		});
 	});
 }

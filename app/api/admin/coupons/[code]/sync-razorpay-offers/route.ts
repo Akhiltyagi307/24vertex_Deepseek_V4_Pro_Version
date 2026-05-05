@@ -4,7 +4,9 @@ import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { coupons, plans } from "@/db/schema/billing";
 import { PAID_CHECKOUT_PLAN_CODES, type PlanCode } from "@/lib/billing/plans";
@@ -12,10 +14,6 @@ import { createSubscriptionPercentOffer } from "@/lib/billing/razorpay-subscript
 import { logServerError } from "@/lib/server/log-supabase-error";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 function normalizeCouponParam(raw: string): string {
 	return decodeURIComponent(raw).trim().toUpperCase();
@@ -29,26 +27,24 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ code: 
 		if (gate instanceof NextResponse) return gate;
 
 		const code = normalizeCouponParam((await ctx.params).code);
-		if (!code) {
-			return NextResponse.json({ error: "Invalid code" }, { status: 400, headers: adminHeaders() });
-		}
+		if (!code) return adminErrorResponse("Invalid code");
 
 		const rows = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1);
 		const row = rows[0];
-		if (!row) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!row) return adminErrorResponse("Not found", { status: 404 });
 		if (row.kind !== "checkout_discount") {
-			return NextResponse.json({ error: "Only checkout_discount coupons can sync Razorpay offers." }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Only checkout_discount coupons can sync Razorpay offers.");
 		}
 		const pct = row.discountPercent;
 		if (pct == null || pct < 1 || pct > 100) {
-			return NextResponse.json({ error: "Coupon discount_percent is invalid." }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Coupon discount_percent is invalid.");
 		}
 
 		const eligible: PlanCode[] = row.eligiblePlanCodes?.length
 			? row.eligiblePlanCodes.filter((c): c is PlanCode => PAID_CHECKOUT_PLAN_CODES.includes(c as PlanCode))
 			: [...PAID_CHECKOUT_PLAN_CODES];
 		if (eligible.length === 0) {
-			return NextResponse.json({ error: "No eligible paid plans for this coupon." }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("No eligible paid plans for this coupon.");
 		}
 
 		const targets = await db
@@ -60,10 +56,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ code: 
 
 		for (const p of targets) {
 			if (!p.razorpayPlanId) {
-				return NextResponse.json(
-					{ error: `Plan ${p.code} has no razorpay_plan_id. Seed Razorpay plans first.` },
-					{ status: 400, headers: adminHeaders() },
-				);
+				return adminErrorResponse(`Plan ${p.code} has no razorpay_plan_id. Seed Razorpay plans first.`);
 			}
 			try {
 				const created = await createSubscriptionPercentOffer({
@@ -75,19 +68,20 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ code: 
 				map[p.code] = created.id;
 			} catch (e) {
 				logServerError("admin.coupon.sync_rzp_offer", e, { planCode: p.code });
-				return NextResponse.json(
-					{
-						error: `Razorpay offer create failed for ${p.code}: ${e instanceof Error ? e.message : String(e)}`,
-					},
-					{ status: 502, headers: adminHeaders() },
+				return adminErrorResponse(
+					`Razorpay offer create failed for ${p.code}: ${e instanceof Error ? e.message : String(e)}`,
+					{ status: 502 },
 				);
 			}
 		}
 
 		await db.update(coupons).set({ razorpayOffersByPlan: map }).where(eq(coupons.id, row.id));
 
-		await writeAdminAction({
-			action: "coupon_sync_razorpay_offers",
+		// Strict audit: each iteration above mutated Razorpay (created an
+		// offer). Missing audit row leaves us unable to attribute who created
+		// which offer.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.COUPON_SYNC_RAZORPAY_OFFERS,
 			targetType: "coupon",
 			targetId: row.id,
 			payload: { code: row.code, plan_codes: Object.keys(map) },
@@ -95,6 +89,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ code: 
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true, razorpay_offers_by_plan: map }, { headers: adminHeaders() });
+		return adminAckResponse({ razorpay_offers_by_plan: map });
 	});
 }
