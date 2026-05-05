@@ -14,6 +14,7 @@ export default defineConfig([
 			"src/lib/admin/**",
 			"src/lib/compliance/**",
 			"src/lib/internal/**",
+			"src/lib/parent/**",
 			"app/api/**",
 			"src/lib/practice/**",
 			"src/lib/cache/**",

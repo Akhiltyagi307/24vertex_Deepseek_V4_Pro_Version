@@ -1,17 +1,15 @@
 import { cookies } from "next/headers";
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
 
 import { verifyAdminJwt } from "@/lib/admin/auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminAction } from "@/lib/admin/audit";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 import { adminSessionCookieDescriptor, revokeAdminSessionByJti } from "@/lib/admin/login-core";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse } from "@/lib/admin/response";
 import * as Sentry from "@sentry/nextjs";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
@@ -25,11 +23,11 @@ export async function POST(request: NextRequest) {
 			const payload = await verifyAdminJwt(token);
 			if (payload) {
 				await revokeAdminSessionByJti(payload.jti);
-				await writeAdminAction({ action: "logout", payload: {} });
+				await writeAdminAction({ action: ADMIN_ACTIONS.LOGOUT, payload: {} });
 			}
 		}
 
-		const res = NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		const res = adminAckResponse();
 		res.cookies.set(name, "", cleared);
 		return res;
 	});

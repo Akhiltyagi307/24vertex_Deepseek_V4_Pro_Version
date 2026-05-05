@@ -3,14 +3,11 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS } from "@/lib/admin/response";
 import { db } from "@/db";
 import { adminSessions } from "@/db/schema/admin-sessions";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET() {
 	return Sentry.withScope(async (scope) => {
@@ -43,6 +40,7 @@ export async function GET() {
 			is_current: r.jwtId === gate.jti,
 		}));
 
-		return NextResponse.json({ data }, { headers: adminHeaders() });
+		// `{ data }` shape (no totals — admin sessions are a small list).
+		return NextResponse.json({ data }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 	});
 }

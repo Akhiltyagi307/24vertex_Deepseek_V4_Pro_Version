@@ -2,6 +2,7 @@ import { desc, lt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS } from "@/lib/admin/response";
 import { db } from "@/db";
 import { adminActionLog } from "@/db/schema/admin-action-log";
 import * as Sentry from "@sentry/nextjs";
@@ -45,6 +46,10 @@ export async function GET(request: NextRequest) {
 		const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 		const nextCursor = hasMore ? String(page[PAGE_SIZE - 1]?.id) : null;
 
+		// This endpoint uses cursor pagination (`next_cursor`), not the totals
+		// + page + page_size shape that `adminListResponse` enforces. Keeping
+		// the existing client contract — but applying the canonical headers
+		// via `ADMIN_RESPONSE_HEADERS` so admin pages still get noindex.
 		return NextResponse.json(
 			{
 				data: page.map((r) => ({
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
 				})),
 				next_cursor: nextCursor,
 			},
-			{ headers: { "X-Robots-Tag": "noindex, nofollow" } },
+			{ headers: { ...ADMIN_RESPONSE_HEADERS } },
 		);
 	});
 }

@@ -1,13 +1,10 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
 
 import { adminSessionCookieDescriptor, performAdminLogin } from "@/lib/admin/login-core";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import * as Sentry from "@sentry/nextjs";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest) {
 	try {
@@ -19,7 +16,7 @@ export async function POST(request: NextRequest) {
 				try {
 					body = (await request.json()) as typeof body;
 				} catch {
-					return NextResponse.json({ error: "Invalid JSON", code: "bad_request" }, { status: 400, headers: adminHeaders() });
+					return adminErrorResponse("Invalid JSON", { code: "bad_request" });
 				}
 			} else if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
 				const form = await request.formData();
@@ -29,10 +26,7 @@ export async function POST(request: NextRequest) {
 					totp: form.get("totp") ? String(form.get("totp")) : undefined,
 				};
 			} else {
-				return NextResponse.json(
-					{ error: "Unsupported content type", code: "bad_request" },
-					{ status: 415, headers: adminHeaders() },
-				);
+				return adminErrorResponse("Unsupported content type", { status: 415, code: "bad_request" });
 			}
 
 			const email = String(body.email ?? "");
@@ -44,32 +38,25 @@ export async function POST(request: NextRequest) {
 				result = await performAdminLogin(request, { email, password, totp });
 			} catch (e) {
 				Sentry.captureException(e, { tags: { feature: "admin" } });
-				return NextResponse.json(
-					{ error: "Could not complete sign-in", code: "internal_error" },
-					{ status: 500, headers: adminHeaders() },
-				);
+				return adminErrorResponse("Could not complete sign-in", {
+					status: 500,
+					code: "internal_error",
+				});
 			}
 			if (!result.ok) {
-				return NextResponse.json(
-					{ error: result.message, code: result.code },
-					{ status: result.status, headers: adminHeaders() },
-				);
+				return adminErrorResponse(result.message, { status: result.status, code: result.code });
 			}
 
 			const { name, options } = adminSessionCookieDescriptor(request);
-			const res = NextResponse.json({ ok: true }, { headers: adminHeaders() });
+			const res = adminAckResponse();
 			res.cookies.set(name, result.token, options);
 			return res;
 		});
 	} catch (e) {
 		Sentry.captureException(e, { tags: { feature: "admin", admin_login_fatal: "route" } });
-		return NextResponse.json(
-			{
-				error:
-					"Unexpected error while finishing sign-in (often a session cookie issue over HTTP). Check Sentry for admin_login_fatal.",
-				code: "login_route_crash",
-			},
-			{ status: 500, headers: adminHeaders() },
+		return adminErrorResponse(
+			"Unexpected error while finishing sign-in (often a session cookie issue over HTTP). Check Sentry for admin_login_fatal.",
+			{ status: 500, code: "login_route_crash" },
 		);
 	}
 }

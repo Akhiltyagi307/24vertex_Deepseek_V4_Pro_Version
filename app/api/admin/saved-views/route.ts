@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { adminSavedViews } from "@/db/schema/admin-saved-views";
 
@@ -15,10 +16,6 @@ const postSchema = z.object({
 	state: z.record(z.unknown()).default({}),
 });
 
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
-
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");
@@ -27,7 +24,7 @@ export async function GET(request: NextRequest) {
 
 		const listId = request.nextUrl.searchParams.get("list_id")?.trim();
 		if (!listId) {
-			return NextResponse.json({ error: "list_id required" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("list_id required");
 		}
 
 		const rows = await db
@@ -40,7 +37,10 @@ export async function GET(request: NextRequest) {
 			.where(eq(adminSavedViews.listId, listId))
 			.orderBy(asc(adminSavedViews.name));
 
-		return NextResponse.json({ data: rows }, { headers: adminHeaders() });
+		// The existing client contract is `{ data: rows }` (no totals or
+		// pagination — the count is small). Keep that shape but apply the
+		// canonical headers via `ADMIN_RESPONSE_HEADERS`.
+		return NextResponse.json({ data: rows }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 	});
 }
 
@@ -54,11 +54,11 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = postSchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const { list_id, name, state } = parsed.data;
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 				.update(adminSavedViews)
 				.set({ state: state as object, updatedAt: new Date() })
 				.where(eq(adminSavedViews.id, existing[0].id));
-			return NextResponse.json({ ok: true, id: existing[0].id, updated: true }, { headers: adminHeaders() });
+			return adminAckResponse({ id: existing[0].id, updated: true });
 		}
 
 		const inserted = await db
@@ -86,6 +86,6 @@ export async function POST(request: NextRequest) {
 			})
 			.returning({ id: adminSavedViews.id });
 
-		return NextResponse.json({ ok: true, id: inserted[0]?.id, updated: false }, { status: 201, headers: adminHeaders() });
+		return adminAckResponse({ id: inserted[0]?.id, updated: false }, { status: 201 });
 	});
 }

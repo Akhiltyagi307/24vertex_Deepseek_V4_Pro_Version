@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { recordComplianceEvent } from "@/lib/compliance/events";
 import { buildComplianceExportZip } from "@/lib/compliance/export-user-data";
 import { getComplianceExportsBucket } from "@/lib/env";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -49,15 +50,48 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		ipAddress: clientIpFromRequest(request),
 		userAgent: userAgentFromRequest(request),
 	});
+	await recordComplianceEvent({
+		requestId: uuid.data,
+		phase: "build",
+		status: "started",
+		payload: { subject_user_id: subjectUserId },
+	});
 
-	const { buffer, manifest } = await buildComplianceExportZip({
-		subjectUserId: subjectUserId,
-		complianceRequestId: uuid.data,
+	let buffer: Buffer;
+	let manifest: Awaited<ReturnType<typeof buildComplianceExportZip>>["manifest"];
+	try {
+		const built = await buildComplianceExportZip({
+			subjectUserId: subjectUserId,
+			complianceRequestId: uuid.data,
+		});
+		buffer = built.buffer;
+		manifest = built.manifest;
+	} catch (e) {
+		const errMessage = e instanceof Error ? e.message : String(e);
+		await recordComplianceEvent({
+			requestId: uuid.data,
+			phase: "build",
+			status: "failed",
+			errorMessage: errMessage,
+		});
+		throw e;
+	}
+	await recordComplianceEvent({
+		requestId: uuid.data,
+		phase: "build",
+		status: "ok",
+		payload: { manifest },
 	});
 
 	const bucket = getComplianceExportsBucket();
 	const storagePath = `dsr/${uuid.data}/${Date.now()}.zip`;
 	const admin = createServiceRoleClient();
+	await recordComplianceEvent({
+		requestId: uuid.data,
+		phase: "upload",
+		status: "started",
+		payload: { storage_path: storagePath },
+	});
 	const { error: upErr } = await admin.storage.from(bucket).upload(storagePath, buffer, {
 		contentType: "application/zip",
 		upsert: false,
@@ -71,12 +105,26 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			ipAddress: clientIpFromRequest(request),
 			userAgent: userAgentFromRequest(request),
 		});
+		await recordComplianceEvent({
+			requestId: uuid.data,
+			phase: "upload",
+			status: "failed",
+			errorMessage: upErr.message,
+			payload: { storage_path: storagePath },
+		});
 		return NextResponse.json({ error: upErr.message }, { status: 500, headers: adminHeaders() });
 	}
 
 	const signedTtl = 60 * 60 * 24 * 7;
 	const { data: signed, error: signErr } = await admin.storage.from(bucket).createSignedUrl(storagePath, signedTtl);
 	if (signErr || !signed?.signedUrl) {
+		await recordComplianceEvent({
+			requestId: uuid.data,
+			phase: "upload",
+			status: "failed",
+			errorMessage: signErr?.message ?? "Could not sign URL",
+			payload: { storage_path: storagePath },
+		});
 		return NextResponse.json({ error: signErr?.message ?? "Could not sign URL" }, { status: 500, headers: adminHeaders() });
 	}
 
@@ -87,6 +135,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		payload: { storage_path: storagePath, manifest, signed_ttl_seconds: signedTtl },
 		ipAddress: clientIpFromRequest(request),
 		userAgent: userAgentFromRequest(request),
+	});
+	await recordComplianceEvent({
+		requestId: uuid.data,
+		phase: "upload",
+		status: "ok",
+		payload: { storage_path: storagePath, manifest, signed_ttl_seconds: signedTtl },
 	});
 
 	await db

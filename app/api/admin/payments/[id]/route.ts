@@ -4,16 +4,13 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/auth-users";
 import { payments } from "@/db/schema/billing";
 import { profiles } from "@/db/schema/profiles";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -24,7 +21,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid payment id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid payment id");
 		}
 
 		const rows = await db
@@ -40,34 +37,29 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 			.limit(1);
 
 		const row = rows[0];
-		if (!row) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!row) return adminErrorResponse("Not found", { status: 404 });
 		const p = row.p;
 
-		return NextResponse.json(
-			{
-				data: {
-					id: p.id,
-					subscription_id: p.subscriptionId,
-					profile_id: p.profileId,
-					razorpay_payment_id: p.razorpayPaymentId,
-					razorpay_invoice_id: p.razorpayInvoiceId,
-					razorpay_order_id: p.razorpayOrderId,
-					amount_paise: p.amountPaise,
-					currency: p.currency,
-					status: p.status,
-					method: p.method,
-					invoice_short_url: p.invoiceShortUrl,
-					captured_at: p.capturedAt?.toISOString() ?? null,
-					metadata: p.metadata,
-					created_at: p.createdAt.toISOString(),
-					razorpay_refund_id: p.razorpayRefundId,
-					refund_amount_paise: p.refundAmountPaise,
-					refunded_at: p.refundedAt?.toISOString() ?? null,
-					full_name: row.fullName,
-					email: row.email,
-				},
-			},
-			{ headers: adminHeaders() },
-		);
+		return adminDetailResponse({
+			id: p.id,
+			subscription_id: p.subscriptionId,
+			profile_id: p.profileId,
+			razorpay_payment_id: p.razorpayPaymentId,
+			razorpay_invoice_id: p.razorpayInvoiceId,
+			razorpay_order_id: p.razorpayOrderId,
+			amount_paise: p.amountPaise,
+			currency: p.currency,
+			status: p.status,
+			method: p.method,
+			invoice_short_url: p.invoiceShortUrl,
+			captured_at: p.capturedAt?.toISOString() ?? null,
+			metadata: p.metadata,
+			created_at: p.createdAt.toISOString(),
+			razorpay_refund_id: p.razorpayRefundId,
+			refund_amount_paise: p.refundAmountPaise,
+			refunded_at: p.refundedAt?.toISOString() ?? null,
+			full_name: row.fullName,
+			email: row.email,
+		});
 	});
 }

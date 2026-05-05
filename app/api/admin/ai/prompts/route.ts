@@ -3,15 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_RESPONSE_HEADERS, adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { aiPrompts } from "@/db/schema/ai-prompts";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	const gate = await requireAdminApi();
@@ -22,7 +20,7 @@ export async function GET(request: NextRequest) {
 		? await db.select().from(aiPrompts).where(eq(aiPrompts.feature, feature)).orderBy(desc(aiPrompts.version))
 		: await db.select().from(aiPrompts).orderBy(desc(aiPrompts.createdAt)).limit(500);
 
-	return NextResponse.json({ data: rows }, { headers: adminHeaders() });
+	return NextResponse.json({ data: rows }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 }
 
 export async function POST(request: NextRequest) {
@@ -33,7 +31,7 @@ export async function POST(request: NextRequest) {
 	try {
 		json = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid JSON");
 	}
 	const schema = z.object({
 		feature: z.string().min(1).max(64),
@@ -46,7 +44,7 @@ export async function POST(request: NextRequest) {
 	});
 	const parsed = schema.safeParse(json);
 	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 	}
 
 	const [verRow] = await db
@@ -57,7 +55,7 @@ export async function POST(request: NextRequest) {
 	const nextVersion = (verRow?.maxv ?? 0) + 1;
 
 	await writeAdminAction({
-		action: "ai_prompt_version_create",
+		action: ADMIN_ACTIONS.AI_PROMPT_VERSION_CREATE,
 		payload: { feature: parsed.data.feature, version: nextVersion },
 	});
 
@@ -77,5 +75,5 @@ export async function POST(request: NextRequest) {
 		})
 		.returning();
 
-	return NextResponse.json({ data: row }, { headers: adminHeaders() });
+	return adminDetailResponse(row);
 }

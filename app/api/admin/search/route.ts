@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { adminGlobalSearch } from "@/lib/admin/search";
 
 export const runtime = "nodejs";
@@ -13,10 +14,6 @@ const querySchema = z.object({
 
 const SEARCH_SLO_MS = 300;
 
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
-
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");
@@ -26,10 +23,9 @@ export async function GET(request: NextRequest) {
 		const raw = request.nextUrl.searchParams.get("q") ?? "";
 		const parsed = querySchema.safeParse({ q: raw });
 		if (!parsed.success) {
-			return NextResponse.json(
-				{ error: parsed.error.flatten().fieldErrors.q?.[0] ?? "Invalid query", code: "bad_request" },
-				{ status: 400, headers: adminHeaders() },
-			);
+			return adminErrorResponse(parsed.error.flatten().fieldErrors.q?.[0] ?? "Invalid query", {
+				code: "bad_request",
+			});
 		}
 
 		const t0 = performance.now();
@@ -50,6 +46,11 @@ export async function GET(request: NextRequest) {
 			});
 		}
 
-		return NextResponse.json({ data: hits, meta: { duration_ms: durationMs } }, { headers: adminHeaders() });
+		// Custom shape (`{ data, meta }`) — clients want the duration_ms
+		// alongside the hits. Keep the shape but apply canonical headers.
+		return NextResponse.json(
+			{ data: hits, meta: { duration_ms: durationMs } },
+			{ headers: { ...ADMIN_RESPONSE_HEADERS } },
+		);
 	});
 }

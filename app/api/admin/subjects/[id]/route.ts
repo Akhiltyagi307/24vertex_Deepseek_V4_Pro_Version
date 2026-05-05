@@ -5,17 +5,15 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { adminSubjectCreateSchema } from "@/lib/admin/schemas/subject";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -26,12 +24,12 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid id");
 		}
 
 		const rows = await db.select().from(subjects).where(eq(subjects.id, uuid.data)).limit(1);
-		if (!rows[0]) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
-		return NextResponse.json({ data: rows[0] }, { headers: adminHeaders() });
+		if (!rows[0]) return adminErrorResponse("Not found", { status: 404 });
+		return adminDetailResponse(rows[0]);
 	});
 }
 
@@ -44,18 +42,18 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid id");
 		}
 
 		const existing = await db.select().from(subjects).where(eq(subjects.id, uuid.data)).limit(1);
 		const cur = existing[0];
-		if (!cur) return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		if (!cur) return adminErrorResponse("Not found", { status: 404 });
 
 		let body: unknown;
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const merged = {
 			name: (body as { name?: string }).name ?? cur.name,
@@ -67,7 +65,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		};
 		const parsed = adminSubjectCreateSchema.safeParse(merged);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		const b = parsed.data;
 
@@ -85,7 +83,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 			.where(eq(subjects.id, uuid.data));
 
 		await writeAdminAction({
-			action: "subject_update",
+			action: ADMIN_ACTIONS.SUBJECT_UPDATE,
 			targetType: "subject",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
@@ -93,7 +91,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		});
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }
 
@@ -106,7 +104,7 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid id");
 		}
 
 		await db
@@ -115,7 +113,7 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 			.where(eq(subjects.id, uuid.data));
 
 		await writeAdminAction({
-			action: "subject_soft_delete",
+			action: ADMIN_ACTIONS.SUBJECT_SOFT_DELETE,
 			targetType: "subject",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
@@ -123,6 +121,6 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		});
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

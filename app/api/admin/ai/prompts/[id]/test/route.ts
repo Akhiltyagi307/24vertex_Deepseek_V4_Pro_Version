@@ -6,14 +6,11 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { aiPrompts } from "@/db/schema/ai-prompts";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
@@ -22,7 +19,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	const { id } = await ctx.params;
 	const [row] = await db.select().from(aiPrompts).where(eq(aiPrompts.id, id)).limit(1);
 	if (!row) {
-		return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+		return adminErrorResponse("Not found", { status: 404 });
 	}
 
 	let json: unknown;
@@ -33,7 +30,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	}
 	const parsed = z.object({ user: z.string().min(1).max(8000).optional() }).safeParse(json);
 	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid body" }, { status: 400, headers: adminHeaders() });
+		return adminErrorResponse("Invalid body");
 	}
 
 	const userMsg = parsed.data.user ?? "Reply with OK if you receive this test.";
@@ -56,9 +53,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			latencyMs: Date.now() - t0,
 			status: "ok",
 		});
+		// Test response includes the `usage` block alongside the generated text;
+		// keep the existing custom shape with canonical headers.
 		return NextResponse.json(
 			{ text: result.text, usage },
-			{ headers: adminHeaders() },
+			{ headers: { ...ADMIN_RESPONSE_HEADERS } },
 		);
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
@@ -72,6 +71,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			status: "error",
 			error: msg,
 		});
-		return NextResponse.json({ error: msg }, { status: 500, headers: adminHeaders() });
+		return adminErrorResponse(msg, { status: 500 });
 	}
 }

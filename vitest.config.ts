@@ -49,9 +49,14 @@ export default defineConfig({
 		},
 	},
 	resolve: {
-		alias: {
-			"@": path.resolve(__dirname, "./src"),
-			"server-only": path.resolve(__dirname, "./src/test/shims/server-only.ts"),
-		},
+		alias: [
+			// `@/app/...` resolves to the Next.js app router, which lives outside
+			// `src/`. Tests for route handlers (under `app/api/...`) need this so
+			// they can `import { POST } from "@/app/api/.../route"` without
+			// reaching out with `../../../`.
+			{ find: /^@\/app\//, replacement: path.resolve(__dirname, "./app/") + "/" },
+			{ find: "@", replacement: path.resolve(__dirname, "./src") },
+			{ find: "server-only", replacement: path.resolve(__dirname, "./src/test/shims/server-only.ts") },
+		],
 	},
 });

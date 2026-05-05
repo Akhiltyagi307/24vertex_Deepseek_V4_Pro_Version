@@ -5,15 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { freeTrialClaims } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const bodySchema = z.object({
 	identity_key: z.string().trim().min(1).max(512),
@@ -31,11 +29,11 @@ export async function POST(request: NextRequest) {
 		try {
 			raw = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(raw);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const now = new Date();
@@ -51,14 +49,14 @@ export async function POST(request: NextRequest) {
 			.returning({ identityKey: freeTrialClaims.identityKey });
 
 		if (!updated[0]) {
-			return NextResponse.json(
-				{ error: "No active claim for that identity_key (already released or unknown)." },
-				{ status: 404, headers: adminHeaders() },
+			return adminErrorResponse(
+				"No active claim for that identity_key (already released or unknown).",
+				{ status: 404 },
 			);
 		}
 
 		await writeAdminAction({
-			action: "trial_claim_release",
+			action: ADMIN_ACTIONS.TRIAL_CLAIM_RELEASE,
 			targetType: "trial_claim",
 			targetId: parsed.data.identity_key,
 			payload: { reason: parsed.data.reason ?? null },
@@ -66,6 +64,6 @@ export async function POST(request: NextRequest) {
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

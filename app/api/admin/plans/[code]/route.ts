@@ -5,15 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminDetailResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { plans } from "@/db/schema/billing";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const codeSchema = z.string().trim().min(1).max(32);
 
@@ -39,14 +37,14 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ code: 
 		const decoded = decodeURIComponent(raw);
 		const parsed = codeSchema.safeParse(decoded);
 		if (!parsed.success) {
-			return NextResponse.json({ error: "Invalid plan code" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid plan code");
 		}
 
 		const rows = await db.select().from(plans).where(eq(plans.code, parsed.data)).limit(1);
 		if (!rows[0]) {
-			return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+			return adminErrorResponse("Not found", { status: 404 });
 		}
-		return NextResponse.json({ data: rows[0] }, { headers: adminHeaders() });
+		return adminDetailResponse(rows[0]);
 	});
 }
 
@@ -60,26 +58,26 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ code:
 		const decoded = decodeURIComponent(raw);
 		const parsedCode = codeSchema.safeParse(decoded);
 		if (!parsedCode.success) {
-			return NextResponse.json({ error: "Invalid plan code" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid plan code");
 		}
 
 		let body: unknown;
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = patchBodySchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		if (Object.keys(parsed.data).length === 0) {
-			return NextResponse.json({ error: "No fields to update" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("No fields to update");
 		}
 
 		const rows = await db.select().from(plans).where(eq(plans.code, parsedCode.data)).limit(1);
 		if (!rows[0]) {
-			return NextResponse.json({ error: "Not found" }, { status: 404, headers: adminHeaders() });
+			return adminErrorResponse("Not found", { status: 404 });
 		}
 
 		const now = new Date();
@@ -101,7 +99,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ code:
 			.where(eq(plans.code, parsedCode.data));
 
 		await writeAdminAction({
-			action: "plan_patch",
+			action: ADMIN_ACTIONS.PLAN_PATCH,
 			targetType: "plan",
 			targetId: parsedCode.data,
 			payload: patch,
@@ -110,6 +108,6 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ code:
 		});
 
 		const next = await db.select().from(plans).where(eq(plans.code, parsedCode.data)).limit(1);
-		return NextResponse.json({ data: next[0] }, { headers: adminHeaders() });
+		return adminDetailResponse(next[0]);
 	});
 }

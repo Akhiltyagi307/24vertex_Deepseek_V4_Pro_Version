@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { recordComplianceEvent } from "@/lib/compliance/events";
 import { verifyIdentityBodySchema } from "@/lib/compliance/schemas";
 import { db } from "@/db";
 import { complianceRequests } from "@/db/schema/compliance-requests";
@@ -33,6 +34,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	}
 	const parsed = verifyIdentityBodySchema.safeParse(body);
 	if (!parsed.success) {
+		await recordComplianceEvent({
+			requestId: uuid.data,
+			phase: "identity_verification",
+			status: "failed",
+			errorMessage: "validation_failed",
+		});
 		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
 	}
 
@@ -58,6 +65,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		payload: { evidence_url: parsed.data.evidence_url ?? null },
 		ipAddress: clientIpFromRequest(request),
 		userAgent: userAgentFromRequest(request),
+	});
+	await recordComplianceEvent({
+		requestId: uuid.data,
+		phase: "identity_verification",
+		status: "ok",
+		payload: { evidence_url: parsed.data.evidence_url ?? null },
 	});
 
 	return NextResponse.json({ data: updated }, { headers: adminHeaders() });

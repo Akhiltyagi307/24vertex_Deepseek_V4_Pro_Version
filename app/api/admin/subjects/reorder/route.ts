@@ -5,7 +5,9 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
@@ -15,10 +17,6 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	ids: z.array(z.string().uuid()).min(1),
 });
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
@@ -30,21 +28,21 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = bodySchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
 		const ids = parsed.data.ids;
 		const rows = await db.select({ id: subjects.id, grade: subjects.grade }).from(subjects).where(inArray(subjects.id, ids));
 		if (rows.length !== ids.length) {
-			return NextResponse.json({ error: "Unknown subject id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Unknown subject id");
 		}
 		const grades = new Set(rows.map((r) => r.grade));
 		if (grades.size !== 1) {
-			return NextResponse.json({ error: "All ids must be the same grade" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("All ids must be the same grade");
 		}
 
 		await db.transaction(async (tx) => {
@@ -57,7 +55,7 @@ export async function POST(request: NextRequest) {
 		});
 
 		await writeAdminAction({
-			action: "subject_reorder",
+			action: ADMIN_ACTIONS.SUBJECT_REORDER,
 			targetType: "subjects",
 			payload: { ids },
 			ipAddress: clientIpFromRequest(request),
@@ -65,6 +63,6 @@ export async function POST(request: NextRequest) {
 		});
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

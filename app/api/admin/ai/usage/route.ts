@@ -2,14 +2,11 @@ import { and, count, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
+import { ADMIN_RESPONSE_HEADERS } from "@/lib/admin/response";
 import { db } from "@/db";
 import { aiCalls } from "@/db/schema/ai-calls";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET(request: NextRequest) {
 	const gate = await requireAdminApi();
@@ -63,12 +60,10 @@ export async function GET(request: NextRequest) {
 		.orderBy(desc(aiCalls.createdAt))
 		.limit(50);
 
+	// Multi-section response (`by_feature` + `top_users` + `recent`) — keep
+	// the existing client shape; apply canonical headers.
 	return NextResponse.json(
-		{
-			by_feature: byFeature,
-			top_users: topUsers,
-			recent,
-		},
-		{ headers: adminHeaders() },
+		{ by_feature: byFeature, top_users: topUsers, recent },
+		{ headers: { ...ADMIN_RESPONSE_HEADERS } },
 	);
 }

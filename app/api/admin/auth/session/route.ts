@@ -3,13 +3,10 @@ import { NextResponse } from "next/server";
 
 import { verifyAdminJwt } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import * as Sentry from "@sentry/nextjs";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET() {
 	return Sentry.withScope(async (scope) => {
@@ -17,12 +14,14 @@ export async function GET() {
 		const jar = await cookies();
 		const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
 		if (!token) {
-			return NextResponse.json({ valid: false }, { status: 401, headers: adminHeaders() });
+			return adminErrorResponse("Unauthorized", { status: 401, code: "unauthenticated" });
 		}
 		const payload = await verifyAdminJwt(token);
 		if (!payload) {
-			return NextResponse.json({ valid: false }, { status: 401, headers: adminHeaders() });
+			return adminErrorResponse("Unauthorized", { status: 401, code: "unauthenticated" });
 		}
-		return NextResponse.json({ valid: true }, { headers: adminHeaders() });
+		// `{ valid: true }` is the existing client contract — keep the shape but
+		// apply canonical headers via `ADMIN_RESPONSE_HEADERS`.
+		return NextResponse.json({ valid: true }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 	});
 }

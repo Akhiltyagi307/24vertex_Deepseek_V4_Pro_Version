@@ -5,15 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { topicContextChunks } from "@/db/schema/topic-context-chunks";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
@@ -24,14 +22,14 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid id");
 		}
 
 		let body: Record<string, unknown>;
 		try {
 			body = (await request.json()) as Record<string, unknown>;
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 
 		const patch: Partial<typeof topicContextChunks.$inferInsert> = {};
@@ -43,14 +41,14 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		await db.update(topicContextChunks).set(patch).where(eq(topicContextChunks.id, uuid.data));
 
 		await writeAdminAction({
-			action: "context_chunk_update",
+			action: ADMIN_ACTIONS.CONTEXT_CHUNK_UPDATE,
 			targetType: "topic_context_chunk",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }
 
@@ -63,19 +61,22 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) {
-			return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid id");
 		}
 
 		await db.delete(topicContextChunks).where(eq(topicContextChunks.id, uuid.data));
 
-		await writeAdminAction({
-			action: "context_chunk_delete",
+		// Strict audit: `db.delete` is a hard-delete with no soft-delete column
+		// on this table. A missing audit row would erase any record of which
+		// chunk was removed.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.CONTEXT_CHUNK_DELETE,
 			targetType: "topic_context_chunk",
 			targetId: uuid.data,
 			ipAddress: clientIpFromRequest(request),
 			userAgent: userAgentFromRequest(request),
 		});
 
-		return NextResponse.json({ ok: true }, { headers: adminHeaders() });
+		return adminAckResponse();
 	});
 }

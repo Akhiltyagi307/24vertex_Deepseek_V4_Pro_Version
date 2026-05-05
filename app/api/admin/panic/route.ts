@@ -1,16 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
+import { writeAdminActionStrict } from "@/lib/admin/audit";
+import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { bumpAdminJwtVersion } from "@/lib/admin/runtime-pg";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 import { getAdminNotificationRecipients } from "@/lib/env";
 import * as Sentry from "@sentry/nextjs";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 /**
  * Reads the admin panic token from a request header — never the URL query —
@@ -51,14 +49,17 @@ async function handlePanic(request: NextRequest): Promise<NextResponse> {
 		const token = readPanicTokenFromHeaders(request);
 		const expected = process.env.ADMIN_PANIC_TOKEN?.trim();
 		if (!expected || !token || token !== expected) {
-			return NextResponse.json(
-				{ error: "Forbidden", code: "forbidden" },
-				{ status: 403, headers: adminHeaders() },
-			);
+			return adminErrorResponse("Forbidden", { status: 403, code: "forbidden" });
 		}
 
 		const v = await bumpAdminJwtVersion();
-		await writeAdminAction({ action: "panic_revoke_all", payload: { jwt_version: v } });
+		// Strict audit: panic revokes EVERY admin session and is the
+		// highest-stakes operator action in the system. A missing audit row
+		// here is unacceptable.
+		await writeAdminActionStrict({
+			action: ADMIN_ACTIONS.PANIC_REVOKE_ALL,
+			payload: { jwt_version: v },
+		});
 
 		const recipients = getAdminNotificationRecipients();
 		await Promise.allSettled(
@@ -77,6 +78,6 @@ async function handlePanic(request: NextRequest): Promise<NextResponse> {
 			}),
 		);
 
-		return NextResponse.json({ ok: true, jwt_version: v }, { headers: adminHeaders() });
+		return adminAckResponse({ jwt_version: v });
 	});
 }

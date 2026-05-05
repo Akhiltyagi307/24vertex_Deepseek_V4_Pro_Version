@@ -11,6 +11,7 @@ import { notifications, userPreferences } from "@/db/schema/comms-audit";
 import { complianceRequests } from "@/db/schema/compliance-requests";
 import { doubtConversations, doubtMessages } from "@/db/schema/doubt";
 import { profiles, parentStudentLinks } from "@/db/schema/profiles";
+import { recordComplianceEvent } from "@/lib/compliance/events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 /** Tables we never delete in compliance erasure (audit + billing law). */
@@ -181,6 +182,12 @@ export async function performComplianceErasure(
 	if (dsrId) {
 		await setDsrInProgress(dsrId);
 		await appendDsrNote(dsrId, "saga_started", `subject=${userId}`);
+		await recordComplianceEvent({
+			requestId: dsrId,
+			phase: "saga_started",
+			status: "started",
+			payload: { subject_user_id: userId },
+		});
 	}
 
 	const testIds = await loadTestIdsForStudent(userId);
@@ -227,8 +234,15 @@ export async function performComplianceErasure(
 				.where(eq(profiles.id, userId));
 		});
 	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
 		if (dsrId) {
-			await appendDsrNote(dsrId, "db_failed", e instanceof Error ? e.message : String(e));
+			await appendDsrNote(dsrId, "db_failed", msg);
+			await recordComplianceEvent({
+				requestId: dsrId,
+				phase: "db_transaction",
+				status: "failed",
+				errorMessage: msg,
+			});
 		}
 		Sentry.captureException(e, {
 			tags: { component: "compliance.erasure", phase: "db_transaction" },
@@ -239,6 +253,11 @@ export async function performComplianceErasure(
 
 	if (dsrId) {
 		await appendDsrNote(dsrId, "db_committed");
+		await recordComplianceEvent({
+			requestId: dsrId,
+			phase: "db_transaction",
+			status: "ok",
+		});
 	}
 
 	const auth = createServiceRoleClient().auth.admin;
@@ -250,6 +269,12 @@ export async function performComplianceErasure(
 		// supabase auth.updateUserById is a no-op when the email already matches.
 		if (dsrId) {
 			await appendDsrNote(dsrId, "auth_failed", authErr.message);
+			await recordComplianceEvent({
+				requestId: dsrId,
+				phase: "auth_pseudonymize",
+				status: "failed",
+				errorMessage: authErr.message,
+			});
 		}
 		Sentry.captureException(new Error(`Compliance erasure auth pseudonymize failed: ${authErr.message}`), {
 			tags: {
@@ -264,6 +289,12 @@ export async function performComplianceErasure(
 
 	if (dsrId) {
 		await appendDsrNote(dsrId, "auth_pseudonymized", pseudoEmail);
+		await recordComplianceEvent({
+			requestId: dsrId,
+			phase: "auth_pseudonymize",
+			status: "ok",
+			payload: { pseudo_email: pseudoEmail },
+		});
 	}
 
 	return snapshot;

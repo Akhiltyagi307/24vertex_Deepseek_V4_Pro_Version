@@ -1,20 +1,18 @@
-import { asc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { adminSubjectCreateSchema } from "@/lib/admin/schemas/subject";
 import { revalidateCurriculumTopicCaches } from "@/lib/cache/curriculum-topic-counts";
 import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 export async function GET() {
 	return Sentry.withScope(async (scope) => {
@@ -27,7 +25,7 @@ export async function GET() {
 			.from(subjects)
 			.orderBy(asc(subjects.grade), asc(subjects.sortOrder), asc(subjects.name));
 
-		return NextResponse.json({ data: rows }, { headers: adminHeaders() });
+		return NextResponse.json({ data: rows }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 	});
 }
 
@@ -41,11 +39,11 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = adminSubjectCreateSchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		const b = parsed.data;
 		const inserted = await db
@@ -63,7 +61,7 @@ export async function POST(request: NextRequest) {
 		const id = inserted[0]?.id;
 		if (id) {
 			await writeAdminAction({
-				action: "subject_create",
+				action: ADMIN_ACTIONS.SUBJECT_CREATE,
 				targetType: "subject",
 				targetId: id,
 				payload: { name: b.name, grade: b.grade },
@@ -73,6 +71,6 @@ export async function POST(request: NextRequest) {
 		}
 
 		revalidateCurriculumTopicCaches();
-		return NextResponse.json({ ok: true, id }, { status: 201, headers: adminHeaders() });
+		return adminAckResponse({ id }, { status: 201 });
 	});
 }

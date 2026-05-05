@@ -5,15 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
+import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
+import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { topicContextChunks } from "@/db/schema/topic-context-chunks";
 
 export const runtime = "nodejs";
-
-function adminHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow" };
-}
 
 const postSchema = z.object({
 	topic_id: z.string().uuid(),
@@ -32,7 +30,7 @@ export async function GET(request: NextRequest) {
 		const topicId = request.nextUrl.searchParams.get("topic_id");
 		const tid = topicId ? z.string().uuid().safeParse(topicId) : null;
 		if (!tid?.success) {
-			return NextResponse.json({ error: "topic_id (uuid) required" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("topic_id (uuid) required");
 		}
 
 		const rows = await db
@@ -41,7 +39,8 @@ export async function GET(request: NextRequest) {
 			.where(eq(topicContextChunks.topicId, tid.data))
 			.orderBy(asc(topicContextChunks.createdAt));
 
-		return NextResponse.json({ data: rows }, { headers: adminHeaders() });
+		// `{ data: rows }` — chunks per topic; no pagination on the admin UI.
+		return NextResponse.json({ data: rows }, { headers: { ...ADMIN_RESPONSE_HEADERS } });
 	});
 }
 
@@ -55,11 +54,11 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid JSON");
 		}
 		const parsed = postSchema.safeParse(body);
 		if (!parsed.success) {
-			return NextResponse.json({ error: parsed.error.flatten() }, { status: 400, headers: adminHeaders() });
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 		const b = parsed.data;
 
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
 		const id = inserted[0]?.id;
 		if (id) {
 			await writeAdminAction({
-				action: "context_chunk_create",
+				action: ADMIN_ACTIONS.CONTEXT_CHUNK_CREATE,
 				targetType: "topic_context_chunk",
 				targetId: id,
 				ipAddress: clientIpFromRequest(request),
@@ -85,6 +84,6 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		return NextResponse.json({ ok: true, id }, { status: 201, headers: adminHeaders() });
+		return adminAckResponse({ id }, { status: 201 });
 	});
 }
