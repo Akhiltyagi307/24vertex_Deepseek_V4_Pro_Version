@@ -32,7 +32,7 @@ describe("usePracticeSessionTimer", () => {
 		h.cleanup();
 	});
 
-	it("counts down once per second from the anchor", () => {
+	it("counts down once per second from the anchor", async () => {
 		const h = renderHook(() =>
 			usePracticeSessionTimer({
 				sessionStartedAt: ANCHOR,
@@ -45,12 +45,12 @@ describe("usePracticeSessionTimer", () => {
 		expect(h.current).toBe(100);
 		// `advanceTimersByTime` advances both fake time AND fires timers — no
 		// separate `setSystemTime` (would double-count).
-		act(() => vi.advanceTimersByTime(5_000));
+		await act(() => vi.advanceTimersByTime(5_000));
 		expect(h.current).toBe(95);
 		h.cleanup();
 	});
 
-	it("subtracts accumulated server-reported pause time", () => {
+	it("subtracts accumulated server-reported pause time", async () => {
 		const h = renderHook(() =>
 			usePracticeSessionTimer({
 				sessionStartedAt: ANCHOR,
@@ -60,13 +60,13 @@ describe("usePracticeSessionTimer", () => {
 				accumulatedPauseSeconds: 30,
 			}),
 		);
-		act(() => vi.advanceTimersByTime(50_000));
+		await act(() => vi.advanceTimersByTime(50_000));
 		// 50s elapsed - 30s accumulated pause = 20s effective; 100 - 20 = 80
 		expect(h.current).toBe(80);
 		h.cleanup();
 	});
 
-	it("clamps remaining at 0 when the limit is exceeded", () => {
+	it("clamps remaining at 0 when the limit is exceeded", async () => {
 		const h = renderHook(() =>
 			usePracticeSessionTimer({
 				sessionStartedAt: ANCHOR,
@@ -76,12 +76,12 @@ describe("usePracticeSessionTimer", () => {
 				accumulatedPauseSeconds: 0,
 			}),
 		);
-		act(() => vi.advanceTimersByTime(60_000));
+		await act(() => vi.advanceTimersByTime(60_000));
 		expect(h.current).toBe(0);
 		h.cleanup();
 	});
 
-	it("freezes when clientPaused is true (no interval, no recompute)", () => {
+	it("freezes when clientPaused is true (no interval, no recompute)", async () => {
 		const h = renderHook(() =>
 			usePracticeSessionTimer({
 				sessionStartedAt: ANCHOR,
@@ -92,12 +92,12 @@ describe("usePracticeSessionTimer", () => {
 			}),
 		);
 		const before = h.current;
-		act(() => vi.advanceTimersByTime(5_000));
+		await act(() => vi.advanceTimersByTime(5_000));
 		expect(h.current).toBe(before);
 		h.cleanup();
 	});
 
-	it("freezes when serverPaused is true", () => {
+	it("freezes when serverPaused is true", async () => {
 		const h = renderHook(() =>
 			usePracticeSessionTimer({
 				sessionStartedAt: ANCHOR,
@@ -108,7 +108,7 @@ describe("usePracticeSessionTimer", () => {
 			}),
 		);
 		const before = h.current;
-		act(() => vi.advanceTimersByTime(5_000));
+		await act(() => vi.advanceTimersByTime(5_000));
 		expect(h.current).toBe(before);
 		h.cleanup();
 	});

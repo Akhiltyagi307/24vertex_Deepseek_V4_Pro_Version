@@ -70,4 +70,39 @@ export default defineConfig([
 			],
 		},
 	},
+	{
+		// Type-aware ratchet (PATH_TO_95.md §8 follow-up). Catches floating
+		// promises and misused void-returning callbacks at lint time so they
+		// can't reach Sentry as unhandled rejections. Type-aware rules need
+		// `parserOptions.project`; scoped to ts/tsx and skips test/script trees
+		// to keep cold-cache lint under target.
+		name: "eduai-type-aware",
+		files: ["**/*.{ts,tsx}"],
+		ignores: ["scripts/**", "tests/e2e/**", "**/*.cjs", "**/*.mjs"],
+		languageOptions: {
+			parserOptions: {
+				project: ["./tsconfig.json"],
+				tsconfigRootDir: import.meta.dirname,
+			},
+		},
+		rules: {
+			"@typescript-eslint/no-floating-promises": [
+				"error",
+				{
+					ignoreVoid: true,
+					ignoreIIFE: true,
+				},
+			],
+			"@typescript-eslint/no-misused-promises": [
+				"error",
+				{
+					checksConditionals: true,
+					// `attributes: false` keeps `<Button onClick={async ...} />`
+					// idiomatic React valid; the rule otherwise flags every JSX
+					// async event handler.
+					checksVoidReturn: { attributes: false },
+				},
+			],
+		},
+	},
 ]);

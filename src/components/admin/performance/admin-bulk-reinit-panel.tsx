@@ -36,10 +36,17 @@ export function AdminBulkReinitPanel() {
 
 	React.useEffect(() => {
 		if (!jobId) return;
-		const id = window.setInterval(async () => {
-			const res = await fetch(`/api/admin/performance/jobs/bulk-reinit/${jobId}`, { credentials: "include" });
-			const j = await res.json();
-			setPoll(j.data ?? j);
+		const id = window.setInterval(() => {
+			// fire-and-forget: timer can't catch async rejections; swallow per-tick failures and rely on the next tick
+			void (async () => {
+				try {
+					const res = await fetch(`/api/admin/performance/jobs/bulk-reinit/${jobId}`, { credentials: "include" });
+					const j = await res.json();
+					setPoll(j.data ?? j);
+				} catch {
+					// transient poll failure — next tick retries
+				}
+			})();
 		}, 2000);
 		return () => window.clearInterval(id);
 	}, [jobId]);

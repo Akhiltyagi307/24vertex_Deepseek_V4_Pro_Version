@@ -53,24 +53,24 @@ describe("usePracticeTabBlurReporter", () => {
 		h.cleanup();
 	});
 
-	it("throttles repeat blur events within the configured window", () => {
+	it("throttles repeat blur events within the configured window", async () => {
 		const h = renderHook(() =>
 			usePracticeTabBlurReporter({ testId: TEST_ID, throttleMs: 30_000 }),
 		);
 		setVisibility("hidden");
-		act(() => document.dispatchEvent(new Event("visibilitychange")));
-		act(() => document.dispatchEvent(new Event("visibilitychange")));
-		act(() => document.dispatchEvent(new Event("visibilitychange")));
+		await act(() => document.dispatchEvent(new Event("visibilitychange")));
+		await act(() => document.dispatchEvent(new Event("visibilitychange")));
+		await act(() => document.dispatchEvent(new Event("visibilitychange")));
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 		h.cleanup();
 	});
 
-	it("supports a custom endpoint", () => {
+	it("supports a custom endpoint", async () => {
 		const h = renderHook(() =>
 			usePracticeTabBlurReporter({ testId: TEST_ID, endpoint: "/custom/blur" }),
 		);
 		setVisibility("hidden");
-		act(() => document.dispatchEvent(new Event("visibilitychange")));
+		await act(() => document.dispatchEvent(new Event("visibilitychange")));
 		expect(fetchSpy!.mock.calls[0]![0]).toBe("/custom/blur");
 		h.cleanup();
 	});

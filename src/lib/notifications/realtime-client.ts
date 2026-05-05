@@ -67,6 +67,7 @@ export function subscribeToMyNotifications(
 		.subscribe();
 
 	return () => {
-		supabase.removeChannel(channel);
+		// fire-and-forget: best-effort realtime cleanup on unmount
+		void supabase.removeChannel(channel);
 	};
 }

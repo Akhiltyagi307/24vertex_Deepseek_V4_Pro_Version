@@ -76,12 +76,19 @@ export function MessageThread({
 			}
 			console.error("doubt chat", err);
 		},
-		onFinish: async () => {
-			const res = await getDoubtUsageSummaryAction({ conversationId });
-			if (res.ok) {
-				setUsage(res.summary);
-			}
-			router.refresh();
+		onFinish: () => {
+			// fire-and-forget: useChat's onFinish expects `() => void`; reject inside this branch must not become an unhandled rejection
+			void (async () => {
+				try {
+					const res = await getDoubtUsageSummaryAction({ conversationId });
+					if (res.ok) {
+						setUsage(res.summary);
+					}
+					router.refresh();
+				} catch (err) {
+					console.error("doubt chat onFinish", err);
+				}
+			})();
 		},
 	});
 
