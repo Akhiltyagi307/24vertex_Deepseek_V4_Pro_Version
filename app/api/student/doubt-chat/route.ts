@@ -1,10 +1,10 @@
 import { convertToModelMessages, type UIMessage, streamText } from "ai";
-import { z } from "zod";
 
 import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/doubt-prompt-templates";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
+import { doubtChatBodySchema } from "@/lib/doubt/request-schema";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
 import { getOpenAIChatModel } from "@/lib/env";
@@ -26,23 +26,13 @@ import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 120;
 
-const bodySchema = z.object({
-	/** @ai-sdk/react chat id (optional) */
-	id: z.string().optional(),
-	messages: z.array(z.unknown()).min(1, "At least one message is required."),
-	subjectId: z.string().uuid("Invalid subject."),
-	topicId: z.string().uuid("Invalid topic."),
-	conversationId: z.string().uuid("Open or start a chat before sending a message."),
-	tutorMode: z.enum(["explain", "solve_with_me"]).default("explain"),
-});
-
 function toUIMessageList(raw: unknown[]): UIMessage[] {
 	return raw as UIMessage[];
 }
 
 export async function POST(req: Request) {
 	const json = await req.json().catch(() => null);
-	const parsed = bodySchema.safeParse(json);
+	const parsed = doubtChatBodySchema.safeParse(json);
 	if (!parsed.success) {
 		return new Response(
 			JSON.stringify({ error: "Invalid request", details: parsed.error.flatten() }),

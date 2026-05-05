@@ -3,6 +3,11 @@ import {
 	runPracticeGenerationAfterResolve,
 	safeParseGenerationInput,
 } from "@/lib/practice/practice-generation-pipeline";
+import {
+	envelopeForPartial,
+	envelopeForResult,
+	envelopeForThrown,
+} from "@/lib/practice/generate-stream-envelope";
 import { getApiRequestUser } from "@/lib/auth/api-request-user";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +82,7 @@ export async function POST(request: Request) {
 					{
 						useStreamObject: true,
 						onPartialObject: (partial) => {
-							send({ type: "partial" as const, partial });
+							send(envelopeForPartial(partial));
 						},
 						// When the client closes the connection, request.signal fires
 						// and the in-flight OpenAI HTTP call is cancelled — no more
@@ -85,10 +90,12 @@ export async function POST(request: Request) {
 						abortSignal: request.signal,
 					},
 				);
-				send({ type: "done" as const, result });
+				// envelopeForResult guarantees success → `done`, failure → `error`.
+				// Wrapping a failure inside `done` would look like success to a
+				// naive client.
+				send(envelopeForResult(result));
 			} catch (e) {
-				const message = e instanceof Error ? e.message : "Generation failed.";
-				send({ type: "error" as const, message: message.length > 400 ? `${message.slice(0, 400)}…` : message });
+				send(envelopeForThrown(e));
 			} finally {
 				controller.close();
 			}

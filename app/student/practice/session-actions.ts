@@ -378,7 +378,13 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 		return { ok: false, message: "Test is not in progress." };
 	}
 
-	// Use the existing topics in this test to stay in scope.
+	// Use the existing topics in this test to stay in scope. We additionally
+	// filter to `is_active=true` here: the original test was generated against
+	// active topics, but an admin may have soft-deleted one between test
+	// creation and the student requesting adaptive follow-ups. Generating a
+	// follow-up on an inactive topic would persist a question that students
+	// can't legitimately practise on, and the admin's intent (to retire the
+	// topic) would be silently undone.
 	const admin = createServiceRoleClient();
 	const { data: qRows, error: qErr } = await admin
 		.from("questions")
@@ -387,13 +393,23 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 	if (qErr || !qRows?.length) {
 		return { ok: false, message: "Could not load test topics." };
 	}
-	const topicIds = [...new Set(qRows.map((r) => r.topic_id as string))];
+	const allTopicIdsInTest = [...new Set(qRows.map((r) => r.topic_id as string))];
 
 	const { data: topicRows } = await admin
 		.from("topics")
 		.select("id, topic_name")
-		.in("id", topicIds);
-	const topicNameById = new Map((topicRows ?? []).map((t) => [t.id as string, String(t.topic_name)]));
+		.in("id", allTopicIdsInTest)
+		.eq("is_active", true);
+	const activeTopicRows = topicRows ?? [];
+	const topicIds = activeTopicRows.map((t) => t.id as string);
+	if (topicIds.length === 0) {
+		return {
+			ok: false,
+			message:
+				"None of this test's topics are still active. Start a new test to continue with adaptive follow-ups.",
+		};
+	}
+	const topicNameById = new Map(activeTopicRows.map((t) => [t.id as string, String(t.topic_name)]));
 
 	const count = parsed.data.count ?? 5;
 	const running = parsed.data.runningScore ?? 70;

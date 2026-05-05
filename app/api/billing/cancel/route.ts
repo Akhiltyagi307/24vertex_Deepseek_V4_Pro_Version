@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
 	const { data: sub, error } = await admin
 		.from("subscriptions")
-		.select("id, razorpay_subscription_id, status")
+		.select("id, razorpay_subscription_id, status, cancel_at_period_end")
 		.eq("profile_id", targetProfileId)
 		.maybeSingle();
 	if (error || !sub) {
@@ -71,6 +71,19 @@ export async function POST(req: Request) {
 	}
 	if (!sub.razorpay_subscription_id) {
 		return Response.json({ ok: false, message: "No paid subscription to cancel." }, { status: 400 });
+	}
+
+	// Idempotency: if `cancel_at_period_end` is already true, the soft cancel
+	// landed on a previous request. Returning 200 without re-calling Razorpay
+	// avoids:
+	//   - double network calls on a rapid double-click before the UI updates
+	//   - 502s on retries (some Razorpay error shapes aren't safe to replay)
+	//   - duplicate `subscription_cancelled` analytics events
+	// The `subscription.cancelled` webhook is the authoritative state-flip
+	// when the cycle ends; this short-circuit is purely about the soft-cancel
+	// intent step.
+	if (sub.cancel_at_period_end) {
+		return Response.json({ ok: true, deduped: true });
 	}
 
 	try {

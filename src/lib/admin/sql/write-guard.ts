@@ -13,15 +13,46 @@ export function hashSqlStatement(sqlText: string): string {
 	return createHash("sha256").update(sqlText).digest("hex").slice(0, 24);
 }
 
+/**
+ * Pull the target table out of an INSERT / UPDATE / DELETE statement.
+ *
+ * Previously this regex only matched bare lowercase identifiers
+ * (`[a-zA-Z0-9_]+`), which silently dropped:
+ *   - quoted identifiers with hyphens ("user-audit"), spaces, or punctuation
+ *   - schema-qualified names (public.profiles)
+ *
+ * In both cases, a legitimate operator-typed statement was rejected with
+ * "Could not parse target table". Worse, anyone wanting to bypass the
+ * allowlist could quote a table name and slip through without the verb
+ * being matched at all (the regex returned null and the guard refused —
+ * defensive but a footgun).
+ *
+ * The new extractor:
+ *   - Accepts an optional schema prefix (`schema.` or `"sch ema".`).
+ *   - Accepts a bare or quoted target identifier.
+ *   - Inside double quotes, allows any character except the closing quote
+ *     itself (Postgres rule); `""` is the literal-quote escape.
+ *   - Returns the table name lowercased and unquoted, so it can be matched
+ *     verbatim against `ADMIN_SQL_WRITE_ALLOWLIST_TABLES`.
+ *
+ * Schema is captured but not currently used for allowlisting — schemas in
+ * EduAI's admin context are always `public`, so we ignore it. If we ever
+ * allow non-public schemas, extend the allowlist key to `schema.table`.
+ */
+const VERB_PATTERN = /^(?:update|delete\s+from|insert\s+into)\s+(?:only\s+)?(?:(?:"((?:[^"]|"")+)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\.\s*)?(?:"((?:[^"]|"")+)"|([a-zA-Z_][a-zA-Z0-9_]*))/i;
+
+function unquotePgIdentifier(s: string): string {
+	return s.replace(/""/g, '"');
+}
+
 function firstDmlTable(inner: string): string | null {
 	const s = inner.trim();
-	let m = /^update\s+(only\s+)?("?)([a-zA-Z0-9_]+)\2/i.exec(s);
-	if (m) return m[3].toLowerCase();
-	m = /^delete\s+from\s+(only\s+)?("?)([a-zA-Z0-9_]+)\2/i.exec(s);
-	if (m) return m[3].toLowerCase();
-	m = /^insert\s+into\s+(only\s+)?("?)([a-zA-Z0-9_]+)\2/i.exec(s);
-	if (m) return m[3].toLowerCase();
-	return null;
+	const m = VERB_PATTERN.exec(s);
+	if (!m) return null;
+	const quotedTable = m[3];
+	const unquotedTable = m[4];
+	const raw = quotedTable !== undefined ? unquotePgIdentifier(quotedTable) : unquotedTable;
+	return raw ? raw.toLowerCase() : null;
 }
 
 export function parseWritableAdminSql(

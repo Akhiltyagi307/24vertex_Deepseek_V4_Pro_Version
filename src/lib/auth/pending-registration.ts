@@ -175,8 +175,25 @@ export async function consumePendingRegistration(
 	const envelope = pending.envelope;
 	const authEmail = user.email?.trim().toLowerCase() ?? "";
 	const pendingEmail = envelope.payload.email.trim().toLowerCase();
-	// After PKCE exchange, `user.email` can be briefly unset on some clients; do not block on empty.
-	if (authEmail && pendingEmail && authEmail !== pendingEmail) {
+	// Both emails MUST be present and match. The previous version skipped the
+	// equality check when `authEmail` was empty (a PKCE-exchange quirk on some
+	// clients). That made the registration step open: a session whose
+	// `user.email` was momentarily blank could complete profile creation under
+	// a pendingEmail belonging to someone else's signup. Refusing is safe — a
+	// retry after the session refreshes restores `user.email` and proceeds
+	// normally; logSupabaseError tags the case so we can spot legitimate
+	// stuck users in production.
+	if (!authEmail || !pendingEmail || authEmail !== pendingEmail) {
+		logSupabaseError(
+			"consumePendingRegistration.email_mismatch",
+			{ message: "auth/pending email mismatch", code: "auth_email_mismatch" },
+			{
+				role: envelope.role,
+				auth_email_present: Boolean(authEmail),
+				pending_email_present: Boolean(pendingEmail),
+				match: authEmail === pendingEmail,
+			},
+		);
 		return "failed";
 	}
 

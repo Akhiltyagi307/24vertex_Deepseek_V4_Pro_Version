@@ -60,10 +60,28 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		return NextResponse.json({ error: "Request already fulfilled" }, { status: 409, headers: adminHeaders() });
 	}
 
-	const totpRequired = await isAdminTotpRequired();
-	if (totpRequired && !verifyAdminTotpIfConfigured(parsed.data.totp)) {
-		return NextResponse.json({ error: "TOTP required" }, { status: 401, headers: adminHeaders() });
+	// TOTP is mandatory for any compliance erasure path — dry-run included.
+	// The previous check tied enforcement to `isAdminTotpRequired()`, which
+	// meant a deployment with the feature flag off (or `ADMIN_TOTP_SECRET`
+	// unset) could process a DSR erasure with only a session cookie. That's
+	// an irreversible operation on a real student's data and must always
+	// have a second factor. Same hardening shape as the SQL writable
+	// runner: refuse if the secret isn't configured, then verify.
+	const totpSecretConfigured = Boolean(process.env.ADMIN_TOTP_SECRET?.trim());
+	if (!totpSecretConfigured) {
+		return NextResponse.json(
+			{ error: "ADMIN_TOTP_SECRET must be configured before any compliance erasure can run" },
+			{ status: 403, headers: adminHeaders() },
+		);
 	}
+	if (!parsed.data.totp?.trim() || !verifyAdminTotpIfConfigured(parsed.data.totp)) {
+		return NextResponse.json({ error: "Valid TOTP required" }, { status: 401, headers: adminHeaders() });
+	}
+	// `isAdminTotpRequired()` is preserved as an audit signal — telemetry
+	// and the audit row should still record "TOTP enforced" vs "TOTP optional"
+	// at the org-level for compliance reporting, even though we always
+	// enforce here at the route level.
+	const totpRequired = await isAdminTotpRequired();
 
 	const subjectUserId = reqRow.subjectUserId;
 

@@ -1,4 +1,5 @@
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
+import { beginCronRun, completeCronRun, readIdempotencyKey } from "@/lib/internal/cron-idempotency";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { utcIsoWeekKey } from "@/lib/admin/digest/week-key";
 import { buildAdminWeeklyDigestHtml } from "@/lib/admin/digest/weekly";
@@ -8,6 +9,8 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const CRON_ROUTE = "/api/internal/admin/weekly-digest";
 
 type DigestDedupResult = { sent: boolean; readError: string | null };
 
@@ -30,6 +33,24 @@ async function digestAlreadySentThisWeek(digestWeek: string): Promise<DigestDedu
 }
 
 async function runWeeklyDigest(request: Request): Promise<Response> {
+	// Belt-and-braces dedup. The per-week guard below queries
+	// admin_action_log for an existing send and is the canonical "did this
+	// week already go out?" check. The cron_run_log layer here additionally
+	// short-circuits BEFORE we build the digest HTML when pg_cron double-
+	// fires within the same tick (e.g. failover). Without it, both fires
+	// pay to render the digest before only the first one passes the
+	// per-week guard.
+	const idempotencyKey = readIdempotencyKey(request);
+	const claim = await beginCronRun({ cronRoute: CRON_ROUTE, key: idempotencyKey });
+	if (claim.kind === "duplicate") {
+		return Response.json({
+			ok: true,
+			deduped: true,
+			first_seen_at: claim.firstSeenAt,
+			completed_at: claim.completedAt,
+		});
+	}
+
 	const recipients = getAdminNotificationRecipients();
 	if (recipients.length === 0) {
 		return Response.json(
@@ -47,6 +68,9 @@ async function runWeeklyDigest(request: Request): Promise<Response> {
 		);
 	}
 	if (dedup.sent) {
+		if (claim.kind === "fresh" && idempotencyKey) {
+			await completeCronRun({ key: idempotencyKey, result: { skipped: true, reason: "already_sent_this_week" } });
+		}
 		return Response.json({ ok: true, skipped: true, digest_week: digestWeek });
 	}
 
@@ -86,6 +110,13 @@ async function runWeeklyDigest(request: Request): Promise<Response> {
 		payload: { to: sentTo, failed, digest_week: digestWeek },
 		userAgent: request.headers.get("user-agent"),
 	});
+
+	if (claim.kind === "fresh" && idempotencyKey) {
+		await completeCronRun({
+			key: idempotencyKey,
+			result: { digest_week: digestWeek, sent_to: sentTo.length, failed: failed.length },
+		});
+	}
 
 	return Response.json({ ok: true, digest_week: digestWeek, sent_to: sentTo, failed });
 }

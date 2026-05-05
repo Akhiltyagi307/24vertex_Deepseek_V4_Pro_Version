@@ -1,4 +1,5 @@
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
+import { beginCronRun, completeCronRun, readIdempotencyKey } from "@/lib/internal/cron-idempotency";
 import { sendTrialEndingEmail } from "@/lib/email/subscription-notifications";
 import { getNotificationPrefs } from "@/lib/notifications/prefs";
 import { shouldSendTrialReminder } from "@/lib/notifications/should-send-trial-reminder";
@@ -8,24 +9,47 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const CRON_ROUTE = "/api/internal/billing/trial-emails";
+
 /**
- * Daily cron: sends "trial ending in N days" emails once per trial. We tag the
- * subscription's `metadata.trial_emails_sent` JSON to dedupe so the student
- * never receives the same reminder twice.
+ * Daily cron: sends "trial ending in N days" emails once per trial.
+ *
+ * Two layers of dedup:
+ *   1. cron_run_log keyed on the `Idempotency-Key` header. A pg_cron double
+ *      fire (failover, manual replay) sends the same key twice and the
+ *      second invocation short-circuits without touching subscriptions.
+ *   2. Per-subscription bucket tracking via `subscriptions.metadata
+ *      .trial_emails_sent` — protects against the same student getting two
+ *      reminders even across genuinely different cron ticks.
+ *
+ * Both layers are needed: the first protects against duplicate firings of
+ * one tick; the second protects against legitimate re-runs that would
+ * otherwise re-process the same in-window subscriptions.
  */
 export async function POST(request: Request) {
 	const unauth = assertCronRequestAuthorized(request);
 	if (unauth) return unauth;
-	return runTrialEmails();
+	return runTrialEmails(request);
 }
 
 export async function GET(request: Request) {
 	const unauth = assertCronRequestAuthorized(request);
 	if (unauth) return unauth;
-	return runTrialEmails();
+	return runTrialEmails(request);
 }
 
-async function runTrialEmails(): Promise<Response> {
+async function runTrialEmails(request: Request): Promise<Response> {
+	const idempotencyKey = readIdempotencyKey(request);
+	const claim = await beginCronRun({ cronRoute: CRON_ROUTE, key: idempotencyKey });
+	if (claim.kind === "duplicate") {
+		// Caller already ran this tick. Return 200 so pg_cron doesn't retry.
+		return Response.json({
+			ok: true,
+			deduped: true,
+			first_seen_at: claim.firstSeenAt,
+			completed_at: claim.completedAt,
+		});
+	}
 	const admin = createServiceRoleClient();
 	const now = Date.now();
 	const windowEnd = new Date(now + 4 * 86_400_000).toISOString();
@@ -92,6 +116,13 @@ async function runTrialEmails(): Promise<Response> {
 		} catch (e) {
 			logServerError("billing.trial_emails.loop", e, { subId: sub.id });
 		}
+	}
+
+	// Mark the run as complete so admin views can show duration + outcome.
+	// Skipped when there was no key (claim.kind === "no_key") since there's
+	// no row to update.
+	if (claim.kind === "fresh" && idempotencyKey) {
+		await completeCronRun({ key: idempotencyKey, result: { sent } });
 	}
 
 	return Response.json({ ok: true, sent });

@@ -13,6 +13,7 @@ export default defineConfig([
 			"src/lib/supabase/admin.ts",
 			"src/lib/admin/**",
 			"src/lib/compliance/**",
+			"src/lib/internal/**",
 			"app/api/**",
 			"src/lib/practice/**",
 			"src/lib/cache/**",

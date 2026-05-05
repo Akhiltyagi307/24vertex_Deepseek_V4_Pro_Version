@@ -28,6 +28,10 @@ function sqlWriteEnabled(): boolean {
 	return v === "true" || v === "1" || v === "yes";
 }
 
+function isAdminTotpSecretConfigured(): boolean {
+	return Boolean(process.env.ADMIN_TOTP_SECRET?.trim());
+}
+
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");
@@ -58,9 +62,22 @@ export async function POST(request: NextRequest) {
 				);
 			}
 
-			if (!verifyAdminTotpIfConfigured(totp)) {
+			// Hardening: writable SQL must always require TOTP. Previously, when
+			// `ADMIN_TOTP_SECRET` was unset, `verifyAdminTotpIfConfigured` returned
+			// true (no secret to compare against) and the check fell through. That
+			// meant an admin without 2FA could run INSERT/UPDATE/DELETE just by
+			// having `ADMIN_SQL_WRITE_ENABLED=true` and a valid session cookie.
+			// Now: if no secret is configured, refuse — operators must enroll TOTP
+			// before they can execute writes. If configured, the token must verify.
+			if (!isAdminTotpSecretConfigured()) {
 				return NextResponse.json(
-					{ error: "Valid TOTP required for writable SQL when ADMIN_TOTP_SECRET is set" },
+					{ error: "ADMIN_TOTP_SECRET must be configured before writable SQL can run" },
+					{ status: 403, headers: adminHeaders() },
+				);
+			}
+			if (!totp?.trim() || !verifyAdminTotpIfConfigured(totp)) {
+				return NextResponse.json(
+					{ error: "Valid TOTP required for writable SQL" },
 					{ status: 400, headers: adminHeaders() },
 				);
 			}

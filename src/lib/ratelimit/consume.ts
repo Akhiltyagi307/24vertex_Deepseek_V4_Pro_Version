@@ -2,7 +2,7 @@ import "server-only";
 
 import { ratelimitSql } from "@/db";
 
-import { isCircuitOpen, recordFailure, recordSuccess } from "./circuit-breaker";
+import { isCircuitFailClosedMode, isCircuitOpen, recordFailure, recordSuccess } from "./circuit-breaker";
 import { isCachedDenied, recordDeny } from "./lru";
 
 export interface RlConsumeArgs {
@@ -21,8 +21,11 @@ export interface RlConsumeResult {
 	/**
 	 * Set when the verdict was not produced by a fresh DB call.
 	 * - `circuit_open`: rate-limit DB has been flaky, defaulting to allow.
+	 * - `circuit_fail_closed`: rate-limit DB has been flapping; defaulting
+	 *   to deny so an attacker can't trigger DB errors specifically to
+	 *   bypass the rate limit.
 	 */
-	degraded?: "circuit_open";
+	degraded?: "circuit_open" | "circuit_fail_closed";
 }
 
 interface RlConsumeRow {
@@ -37,6 +40,21 @@ function failOpen(windowSec: number): RlConsumeResult {
 		remaining: 0,
 		resetAt: new Date(Date.now() + windowSec * 1000),
 		degraded: "circuit_open",
+	};
+}
+
+/**
+ * Sustained flap → treat the rate-limit infra as unavailable and DENY.
+ * Single transient blip still falls through to `failOpen`. Callers
+ * receive `degraded: "circuit_fail_closed"` so they can emit the right
+ * status code (typically 503) and surface a "service degraded" UX.
+ */
+function failClosed(windowSec: number): RlConsumeResult {
+	return {
+		allowed: false,
+		remaining: 0,
+		resetAt: new Date(Date.now() + windowSec * 1000),
+		degraded: "circuit_fail_closed",
 	};
 }
 
@@ -57,6 +75,13 @@ export async function rlConsume(args: RlConsumeArgs): Promise<RlConsumeResult> {
 			remaining: 0,
 			resetAt: new Date(Date.now() + 1000),
 		};
+	}
+
+	// Sustained-flap → fail closed. Checked BEFORE the per-call
+	// `isCircuitOpen()` shortcut so a flapping breaker can't slip through
+	// just because the current window happens to be cooled down.
+	if (isCircuitFailClosedMode()) {
+		return failClosed(args.windowSec);
 	}
 
 	if (isCircuitOpen()) {
@@ -84,6 +109,12 @@ export async function rlConsume(args: RlConsumeArgs): Promise<RlConsumeResult> {
 		};
 	} catch (err) {
 		recordFailure(err);
+		// recordFailure may have just escalated us into fail-closed mode;
+		// re-check before returning so the very call that triggered the
+		// escalation respects the new policy.
+		if (isCircuitFailClosedMode()) {
+			return failClosed(args.windowSec);
+		}
 		return failOpen(args.windowSec);
 	}
 }

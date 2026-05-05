@@ -26,6 +26,15 @@ function adminHeaders(): HeadersInit {
  * revocation still happens via the JWT version bump on /api/admin/panic
  * (which all routes re-check at the edge in proxy-guard).
  *
+ * Implementation is a true LRU using `Map`'s insertion-order semantics:
+ * every read promotes the entry to the end (delete + set), and eviction
+ * always removes the oldest (`keys().next()`). The previous version
+ * evicted the first N inserted entries when full, which under sustained
+ * traffic could thrash recent entries while keeping cold ones — and a
+ * revoked session that happened to be at the head was unusable for up
+ * to 10s without the read promoting it. With proper LRU, a key that is
+ * being actively used always stays warm; a quiet key falls off naturally.
+ *
  * Pinned on globalThis so HMR / dev rebuilds don't reset it.
  */
 interface AdminSessionCacheEntry {
@@ -43,13 +52,14 @@ if (!globalForAdminCache.__eduAiAdminSessionCache) {
 	globalForAdminCache.__eduAiAdminSessionCache = adminSessionCache;
 }
 
-function evictAdminSessionCacheIfFull() {
-	if (adminSessionCache.size <= ADMIN_SESSION_CACHE_MAX) return;
-	const overflow = adminSessionCache.size - ADMIN_SESSION_CACHE_MAX;
-	let i = 0;
-	for (const k of adminSessionCache.keys()) {
-		if (i++ >= overflow) break;
-		adminSessionCache.delete(k);
+function evictOldestAdminSessionEntries(): void {
+	while (adminSessionCache.size > ADMIN_SESSION_CACHE_MAX) {
+		// `keys()` iterates in insertion order; the first key is the oldest.
+		// Each read of a hit promotes the key to the end via cacheAdminSession,
+		// so the head is genuinely the least-recently-used.
+		const oldest = adminSessionCache.keys().next();
+		if (oldest.done) break;
+		adminSessionCache.delete(oldest.value);
 	}
 }
 
@@ -60,13 +70,23 @@ function isAdminSessionCacheHit(jti: string): boolean {
 		adminSessionCache.delete(jti);
 		return false;
 	}
+	// Promote on read: re-insert so this key is now the most recently used.
+	// Without this, an actively-used session can still be the LRU head and
+	// get evicted under cache pressure.
+	adminSessionCache.delete(jti);
+	adminSessionCache.set(jti, entry);
 	return true;
 }
 
 function cacheAdminSession(jti: string): void {
 	adminSessionCache.delete(jti);
 	adminSessionCache.set(jti, { cachedAt: Date.now() });
-	evictAdminSessionCacheIfFull();
+	evictOldestAdminSessionEntries();
+}
+
+/** Test/admin-action hook: drop a single jti immediately (e.g. on revoke). */
+export function invalidateAdminSessionCache(jti: string): void {
+	adminSessionCache.delete(jti);
 }
 
 /** Test-only — clear the cache. */

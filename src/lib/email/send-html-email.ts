@@ -74,10 +74,27 @@ async function findExistingLogForDedup(
 	return rows[0] ?? null;
 }
 
+/** Postgres unique_violation — raised by the partial unique index added in 20260527120000. */
+function isPgUniqueViolation(err: unknown): boolean {
+	return (
+		typeof err === "object" &&
+		err !== null &&
+		(err as { code?: string }).code === "23505"
+	);
+}
+
 /**
  * Sends via Resend and mirrors the attempt in `email_log` (queued → sent/failed).
  * If a DB-backed template is active for {@link SendHtmlEmailLoggedParams.templateSlug}, it overrides subject/html.
  * Pass {@link SendHtmlEmailLoggedParams.dedupKey} to skip duplicate sends across retries / racing call paths.
+ *
+ * Two-layer dedup:
+ *   1. Pre-flight read of `email_log` for an existing (template, dedup_key)
+ *      row in `('sent', 'queued')` status — fast, catches sequential retries.
+ *   2. DB partial unique index `email_log_dedup_unique_idx` — closes the
+ *      race where two concurrent calls both pass step 1. The second insert
+ *      raises 23505 unique_violation, which we treat as "already in flight"
+ *      and return ok.
  */
 export async function sendHtmlEmailLogged(params: SendHtmlEmailLoggedParams): Promise<{ error: string | null }> {
 	if (params.dedupKey) {
@@ -91,18 +108,29 @@ export async function sendHtmlEmailLogged(params: SendHtmlEmailLoggedParams): Pr
 
 	const initialPayload = params.dedupKey ? { dedup_key: params.dedupKey } : null;
 
-	const [inserted] = await db
-		.insert(emailLog)
-		.values({
-			recipientEmail: params.to,
-			recipientId: params.recipientUserId ?? null,
-			subject,
-			template: params.templateSlug,
-			status: "queued",
-			broadcastId: params.broadcastId ?? null,
-			providerPayload: initialPayload,
-		})
-		.returning({ id: emailLog.id });
+	let inserted: { id: string } | undefined;
+	try {
+		[inserted] = await db
+			.insert(emailLog)
+			.values({
+				recipientEmail: params.to,
+				recipientId: params.recipientUserId ?? null,
+				subject,
+				template: params.templateSlug,
+				status: "queued",
+				broadcastId: params.broadcastId ?? null,
+				providerPayload: initialPayload,
+			})
+			.returning({ id: emailLog.id });
+	} catch (e) {
+		// The partial unique index rejected this insert because another caller
+		// raced ahead and is already sending the same (template, dedup_key).
+		// Treat as deduped — the other caller will land the actual send.
+		if (params.dedupKey && isPgUniqueViolation(e)) {
+			return { error: null };
+		}
+		throw e;
+	}
 
 	const logId = inserted?.id;
 	if (!logId) {

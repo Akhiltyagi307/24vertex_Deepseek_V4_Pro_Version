@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import {
 	classifyLinkParentRpc,
@@ -7,7 +8,7 @@ import {
 	userMessageForLinkParentRpcFailure,
 } from "@/lib/auth/link-parent-rpc-errors";
 import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import { logSupabaseError, logServerError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 import { linkParentSchema } from "@/lib/validations/auth";
 import {
@@ -46,14 +47,43 @@ export async function linkParentToStudent(
 		return { error: message };
 	}
 
+	// Notifications are a side-effect after the link RPC has already
+	// committed — if Resend or the in-app notify fails, the parent IS
+	// linked and we MUST still redirect them. Previously these awaits
+	// could throw synchronously and bubble up, leaving the parent on a
+	// broken form even though the link succeeded. Wrap each call so
+	// notification failures land in Sentry as warnings (not errors —
+	// the user-visible operation succeeded) and the redirect proceeds.
 	const {
 		data: { user: parentUser },
 	} = await supabase.auth.getUser();
 	if (parentUser?.id) {
 		const studentId = await resolveStudentProfileIdForLinkRef(supabase, parsed.data.studentId);
 		if (studentId) {
-			await notifyParentLinkedToStudent({ studentId, parentId: parentUser.id });
-			await notifyParentChildLinkConfirmed({ studentId, parentId: parentUser.id });
+			try {
+				await notifyParentLinkedToStudent({ studentId, parentId: parentUser.id });
+			} catch (e) {
+				logServerError("linkParentToStudent.notifyParentLinkedToStudent", e, {
+					studentId,
+					parentId: parentUser.id,
+				});
+				Sentry.captureException(e, {
+					level: "warning",
+					tags: { feature: "parent.link", phase: "notify_linked" },
+				});
+			}
+			try {
+				await notifyParentChildLinkConfirmed({ studentId, parentId: parentUser.id });
+			} catch (e) {
+				logServerError("linkParentToStudent.notifyParentChildLinkConfirmed", e, {
+					studentId,
+					parentId: parentUser.id,
+				});
+				Sentry.captureException(e, {
+					level: "warning",
+					tags: { feature: "parent.link", phase: "notify_confirmed" },
+				});
+			}
 		}
 	}
 

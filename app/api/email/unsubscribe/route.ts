@@ -1,8 +1,11 @@
+import * as Sentry from "@sentry/nextjs";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { userPreferences } from "@/db/schema/comms-audit";
 import { verifyUnsubscribeToken } from "@/lib/email/unsubscribe-token";
+import { rlConsume } from "@/lib/ratelimit/consume";
+import { clientIpFromHeaders } from "@/lib/admin/api-request-meta";
 import { logServerError } from "@/lib/server/log-supabase-error";
 
 export const runtime = "nodejs";
@@ -59,7 +62,46 @@ function renderConfirmationHtml(state: "ok" | "expired" | "invalid"): string {
 </body></html>`;
 }
 
+// Per-IP rate limit on unsubscribe attempts. The endpoint accepts an HMAC
+// token in `?t=`; without throttling, an attacker could brute-force valid
+// tokens (16^64 search space is theoretically large but the gate would log
+// a verification attempt for each guess at full network speed). 20 attempts
+// per 5 minutes is generous for a real user (one click per email) and harsh
+// for any automated probe. Rate limit is keyed on IP because we don't have
+// a user identity until the token verifies.
+const UNSUBSCRIBE_RATE_LIMIT_PER_WINDOW = 20;
+const UNSUBSCRIBE_RATE_WINDOW_SEC = 300;
+
 async function handle(request: NextRequest, method: "GET" | "POST"): Promise<NextResponse> {
+	const ip = clientIpFromHeaders(request.headers);
+	const rl = await rlConsume({
+		key: `unsubscribe:ip:${ip}`,
+		limit: UNSUBSCRIBE_RATE_LIMIT_PER_WINDOW,
+		windowSec: UNSUBSCRIBE_RATE_WINDOW_SEC,
+	});
+	if (!rl.allowed) {
+		// Capture the rate-limit hit so we can spot brute-force patterns.
+		// Sentry already de-duplicates similar events; this won't spam.
+		Sentry.captureMessage("email.unsubscribe.rate_limited", {
+			level: "warning",
+			tags: { feature: "email.unsubscribe", phase: "rate_limit" },
+		});
+		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
+		return method === "POST"
+			? NextResponse.json(
+					{ ok: false, error: "rate_limited" },
+					{ status: 429, headers: { ...noindexHeaders(), "Retry-After": String(retryAfterSec) } },
+				)
+			: new NextResponse(renderConfirmationHtml("invalid"), {
+					status: 429,
+					headers: {
+						...noindexHeaders(),
+						"content-type": "text/html; charset=utf-8",
+						"Retry-After": String(retryAfterSec),
+					},
+				});
+	}
+
 	// RFC 8058 one-click unsubscribe sends `List-Unsubscribe=One-Click` as the
 	// POST body. We don't require it (some clients send empty), but if the
 	// body is set it must say so — otherwise this looks like a CSRF probe.
@@ -94,6 +136,13 @@ async function handle(request: NextRequest, method: "GET" | "POST"): Promise<Nex
 
 	const decoded = verifyUnsubscribeToken(token);
 	if (!decoded) {
+		// Failed verification gets a Sentry warning so a probing pattern
+		// shows up (the per-IP rate limit alone wouldn't tell us "many IPs
+		// each tried 5 different tokens" — Sentry aggregations will).
+		Sentry.captureMessage("email.unsubscribe.token_invalid", {
+			level: "warning",
+			tags: { feature: "email.unsubscribe", phase: "verify_token" },
+		});
 		// We can't tell expired vs invalid from the verify result; expired tokens
 		// are far more common in practice, so we surface that copy when the
 		// payload looks well-formed (two segments) and "invalid" otherwise.

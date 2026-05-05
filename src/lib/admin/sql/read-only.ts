@@ -7,22 +7,28 @@ export function stripTrailingSemicolons(s: string): string {
 }
 
 /**
- * Enforces a trailing LIMIT ≤ {@link ADMIN_SQL_MAX_RESULT_ROWS} for SELECT / WITH queries.
- * Only adjusts a LIMIT at the very end of the string (common admin-console pattern).
+ * Wraps the user's read-only query in a CTE and applies the row cap on the
+ * outer SELECT. This is materially stronger than the previous tail-regex
+ * approach, which only matched a LIMIT at the very end of the string and
+ * therefore did not bound:
+ *
+ *   - subqueries that themselves contained LIMIT
+ *     `SELECT * FROM (SELECT * FROM x LIMIT 50000) q LIMIT 10`
+ *   - WITH … SELECT FROM cte where the cte is unbounded
+ *   - non-trailing LIMITs followed by trailing comments / whitespace tricks
+ *
+ * Postgres allows LIMIT on the outer SELECT to take precedence regardless of
+ * what's inside the CTE, so wrapping is the simplest reliable cap that
+ * doesn't require a SQL parser. EXPLAIN is short-circuited by the caller
+ * (`assertReadOnlySelect`) so its plan is not affected.
+ *
+ * The CTE alias name is internal and quoted to avoid colliding with a user-
+ * defined name in their query (PG identifier visibility rules already make
+ * collisions hard, but quoting makes it certain).
  */
 export function enforceSelectMaxRows(inner: string): string {
-	const trimmed = inner.trimEnd();
-	const re = /\blimit\s+(\d+)\s*$/i;
-	const m = trimmed.match(re);
-	if (m && m.index !== undefined) {
-		const n = Number.parseInt(m[1], 10);
-		const head = trimmed.slice(0, m.index).trimEnd();
-		if (Number.isFinite(n) && n > ADMIN_SQL_MAX_RESULT_ROWS) {
-			return `${head} LIMIT ${ADMIN_SQL_MAX_RESULT_ROWS}`;
-		}
-		return trimmed;
-	}
-	return `${trimmed} LIMIT ${ADMIN_SQL_MAX_RESULT_ROWS}`;
+	const trimmed = inner.trim();
+	return `WITH "__admin_console_outer__" AS (${trimmed}) SELECT * FROM "__admin_console_outer__" LIMIT ${ADMIN_SQL_MAX_RESULT_ROWS}`;
 }
 
 export function assertReadOnlySelect(

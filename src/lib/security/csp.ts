@@ -75,6 +75,15 @@ export function buildCsp(nonce: string): string {
 
 	if (process.env.VERCEL_ENV === "production") {
 		directives.push("upgrade-insecure-requests");
+		// Trusted Types for script-execution sinks (Function constructor, eval).
+		// Browsers that don't support TT silently ignore the directive, so this
+		// is purely additive. We scope to 'script' (not 'script html'); HTML
+		// sinks like innerHTML are NOT constrained because Tiptap, MJML, and a
+		// few server-rendered components emit raw HTML strings without going
+		// through a TT policy. Restricted to production: Next dev/Turbopack
+		// uses `'unsafe-eval'` for HMR (line above) which is incompatible with
+		// `require-trusted-types-for 'script'`.
+		directives.push("require-trusted-types-for 'script'");
 	}
 
 	return directives.join("; ");
