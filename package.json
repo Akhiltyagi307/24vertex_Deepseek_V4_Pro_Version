@@ -125,7 +125,7 @@
       "esbuild": "^0.25.0",
       "hono": "^4.12.14",
       "postcss": "^8.5.10",
-      "uuid": "^14.0.0"
+      "uuid": "^11.0.0"
     },
     "onlyBuiltDependencies": [
       "@sentry/cli",
