@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation";
+// KaTeX CSS is loaded only on student-portal pages (where the doubt-chat
+// tutor renders LaTeX). Public/marketing/login pages don't need it, so we
+// avoid the ~25KB on cold loads outside the authenticated surface.
+import "katex/dist/katex.min.css";
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { StudentShell } from "@/components/student/student-shell";

@@ -2,7 +2,9 @@
 
 import { memo, useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 import { cn } from "@/lib/utils";
 
@@ -158,7 +160,8 @@ function TutorMarkdownImpl({
 			)}
 		>
 			<ReactMarkdown
-				remarkPlugins={[remarkGfm]}
+				remarkPlugins={[remarkGfm, remarkMath]}
+				rehypePlugins={[rehypeKatex]}
 				components={components}
 				skipHtml
 				urlTransform={safeMarkdownUrl}

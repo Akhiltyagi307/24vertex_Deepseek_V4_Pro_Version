@@ -14,6 +14,15 @@ export const ADAPTIVE_FOLLOWUPS_RATE_LIMIT_WINDOW_SECONDS = 3600;
 export const DOUBT_CHAT_RATE_LIMIT_N = 40;
 export const DOUBT_CHAT_RATE_LIMIT_WINDOW_SECONDS = 3600;
 
+/**
+ * Read-side bucket for cheap doubt-chat queries (entitlement summary, usage
+ * summary). Separate from the write bucket so a per-turn refresh doesn't eat
+ * the user's chat-send budget. Generous because these calls are bounded by
+ * the UI's natural cadence (one tick per `useChat` onFinish).
+ */
+export const DOUBT_CHAT_READ_RATE_LIMIT_N = 240;
+export const DOUBT_CHAT_READ_RATE_LIMIT_WINDOW_SECONDS = 3600;
+
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
 function rateLimitFailClosed(): boolean {
@@ -127,6 +136,20 @@ export async function consumeDoubtChatRateLimit(
 		limitExceededMessage: (reset) => {
 			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
 			return `You have used the doubt chat assistant too many times in the last hour.${resetHint}`;
+		},
+	});
+}
+
+export async function consumeDoubtChatReadRateLimit(
+	supabase: ServerSupabase,
+): Promise<{ ok: true } | { ok: false; message: string; resetAt: string | null }> {
+	return consumePracticeRateLimit(supabase, {
+		bucket: "doubt_chat_reads",
+		limitN: DOUBT_CHAT_READ_RATE_LIMIT_N,
+		windowSeconds: DOUBT_CHAT_READ_RATE_LIMIT_WINDOW_SECONDS,
+		limitExceededMessage: (reset) => {
+			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
+			return `Too many doubt chat status refreshes recently.${resetHint}`;
 		},
 	});
 }

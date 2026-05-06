@@ -144,7 +144,14 @@ describe("POST /api/student/doubt-chat", () => {
 			user: VALID_USER,
 			tables: {
 				doubt_conversations: () => MATCHING_CONVO,
-				doubt_messages: { data: null, error: null },
+				// Route now does `.insert(...).select("id").maybeSingle()` to capture
+				// the freshly-inserted message id (used to bind attachments). The
+				// mock must return a row.
+				doubt_messages: {
+					data: { id: "44444444-4444-4444-4444-444444444444" },
+					error: null,
+				},
+				doubt_message_attachments: { data: [], error: null },
 			},
 		});
 		mockAi.current = makeMockAi({ streamText: { text: "ok" } });

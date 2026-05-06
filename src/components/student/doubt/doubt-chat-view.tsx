@@ -14,7 +14,7 @@ import {
 } from "@/lib/doubt/doubt-actions";
 import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { chapterKeyFromRow, groupTopicRowsByChapter } from "@/lib/doubt/chapter-group";
-import type { DoubtChatTopicRow, DoubtChatConversationRow } from "@/lib/doubt/loaders";
+import type { DoubtChatTopicRow, DoubtChatConversationRow, DoubtChatEntitlement } from "@/lib/doubt/loaders";
 import { parseDoubtChatListLabel } from "@/lib/doubt/doubt-conversation-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,7 @@ export function DoubtChatView(props: {
 		usage: UsageSummary;
 		initialTutorMode: DoubtTutorMode;
 	};
+	entitlement: DoubtChatEntitlement;
 }) {
 	const router = useRouter();
 	const sp = useSearchParams();
@@ -283,6 +284,7 @@ export function DoubtChatView(props: {
 									initialMessages={props.initialFromUrl.messages}
 									initialUsage={props.initialFromUrl.usage}
 									initialTutorMode={props.initialFromUrl.initialTutorMode}
+									initialEntitlement={props.entitlement}
 								/>
 							</motion.div>
 						) : null}

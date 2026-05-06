@@ -15,6 +15,12 @@ export type UsageSummary = {
 	lastCompletionTokens: number | null;
 };
 
+export type EntitlementSummary = {
+	tokensUsed: number;
+	tokensQuota: number;
+	tokensLeft: number;
+};
+
 export type DoubtChatThreadProps = {
 	conversationId: string;
 	subjectId: string;
@@ -25,6 +31,7 @@ export type DoubtChatThreadProps = {
 	initialMessages: UIMessage[];
 	initialUsage: UsageSummary;
 	initialTutorMode: import("@/lib/doubt/doubt-tutor-mode").DoubtTutorMode;
+	initialEntitlement: EntitlementSummary;
 };
 
 export const SUGGESTED_PROMPTS = [

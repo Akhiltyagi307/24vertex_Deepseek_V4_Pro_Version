@@ -13,9 +13,17 @@ import { assignmentSubmissions } from "@/db/schema/teaching";
 import { couponRedemptions, freeTrialClaims, payments, subscriptions, usagePeriods } from "@/db/schema/billing";
 import { complianceRequests } from "@/db/schema/compliance-requests";
 import { auditLogs, emailLog, notifications, userPreferences } from "@/db/schema/comms-audit";
-import { doubtConversations, doubtMessages } from "@/db/schema/doubt";
+import { doubtConversations, doubtMessageAttachments, doubtMessages } from "@/db/schema/doubt";
 import { parentalConsents } from "@/db/schema/parental-consents";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+
+/**
+ * Signed URLs included in the export are valid for 7 days. Long enough for
+ * the user to download, short enough that an export ZIP leaked years later
+ * doesn't unlock storage objects.
+ */
+const ATTACHMENT_DOWNLOAD_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 function escapeHtml(s: string): string {
 	return s
@@ -90,8 +98,54 @@ export async function buildComplianceExportZip(input: {
 	const doubtConvos = await db.select().from(doubtConversations).where(eq(doubtConversations.studentId, userId)).limit(10_000);
 	const convoIds = doubtConvos.map((c) => c.id);
 	let doubtMsgRows: (typeof doubtMessages.$inferSelect)[] = [];
+	let doubtAttRows: (typeof doubtMessageAttachments.$inferSelect)[] = [];
 	if (convoIds.length) {
 		doubtMsgRows = await db.select().from(doubtMessages).where(inArray(doubtMessages.conversationId, convoIds)).limit(200_000);
+		doubtAttRows = await db
+			.select()
+			.from(doubtMessageAttachments)
+			.where(inArray(doubtMessageAttachments.conversationId, convoIds))
+			.limit(50_000);
+	}
+
+	// Build signed download URLs for each attachment so the export ZIP gives
+	// the user a real way to retrieve their uploaded files (GDPR data
+	// portability). URLs valid for 7 days; failure on any individual row is
+	// recorded so the user can see which files we couldn't sign.
+	type AttachmentDownload = {
+		attachment_id: string;
+		conversation_id: string;
+		message_id: string | null;
+		kind: string;
+		mime: string;
+		size_bytes: number;
+		storage_path: string;
+		download_url: string | null;
+		expires_at: string | null;
+		error: string | null;
+	};
+	const attachmentDownloads: AttachmentDownload[] = [];
+	if (doubtAttRows.length > 0) {
+		const supabase = createServiceRoleClient();
+		const expiresAt = new Date(Date.now() + ATTACHMENT_DOWNLOAD_TTL_SECONDS * 1000).toISOString();
+		for (const row of doubtAttRows) {
+			const path = row.storagePath as string;
+			const { data, error } = await supabase.storage
+				.from("doubt-attachments")
+				.createSignedUrl(path, ATTACHMENT_DOWNLOAD_TTL_SECONDS);
+			attachmentDownloads.push({
+				attachment_id: row.id,
+				conversation_id: row.conversationId,
+				message_id: row.messageId ?? null,
+				kind: row.kind,
+				mime: row.mime,
+				size_bytes: row.sizeBytes,
+				storage_path: path,
+				download_url: data?.signedUrl ?? null,
+				expires_at: data?.signedUrl ? expiresAt : null,
+				error: error?.message ?? null,
+			});
+		}
 	}
 
 	const slices: { name: string; rows: unknown[] }[] = [
@@ -120,6 +174,8 @@ export async function buildComplianceExportZip(input: {
 		{ name: "ai_calls.json", rows: aiRows },
 		{ name: "doubt_conversations.json", rows: doubtConvos },
 		{ name: "doubt_messages.json", rows: doubtMsgRows },
+		{ name: "doubt_message_attachments.json", rows: doubtAttRows },
+		{ name: "doubt_attachments_downloads.json", rows: attachmentDownloads },
 	];
 
 	for (const s of slices) {

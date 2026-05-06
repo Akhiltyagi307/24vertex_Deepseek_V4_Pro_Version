@@ -4,9 +4,31 @@ import type { UIMessage } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isDoubtTutorMode, type DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
+import { getEntitlements, type EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { createClient } from "@/lib/supabase/server";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { loadStudentSubjects, type StudentSubjectsProfileRow } from "@/lib/student/load-student-subjects";
+
+/**
+ * Slimmed entitlement view used by the doubt-chat composer's quota meter — we
+ * only need the three numbers, not the full snapshot. Keeps the UI prop tight.
+ */
+export type DoubtChatEntitlement = {
+	tokensUsed: number;
+	tokensQuota: number;
+	tokensLeft: number;
+};
+
+function toDoubtChatEntitlement(snapshot: EntitlementSnapshot | null): DoubtChatEntitlement {
+	if (!snapshot) {
+		return { tokensUsed: 0, tokensQuota: 0, tokensLeft: 0 };
+	}
+	return {
+		tokensUsed: snapshot.tokensUsed,
+		tokensQuota: snapshot.tokensQuota,
+		tokensLeft: snapshot.tokensLeft,
+	};
+}
 
 export type DoubtChatTopicRow = {
 	id: string;
@@ -102,6 +124,7 @@ export async function loadDoubtPageBundle(userId: string) {
 
 	const subj = await loadStudentSubjects(supabase, profileRow);
 	const conversations = await loadDoubtConversationsList(userId);
+	const entitlement = toDoubtChatEntitlement(await getEntitlements(supabase, userId));
 
 	return {
 		ok: true as const,
@@ -109,6 +132,7 @@ export async function loadDoubtPageBundle(userId: string) {
 		subjects: subj.subjects,
 		subjectsLoadError: subj.loadError,
 		conversations,
+		entitlement,
 	};
 }
 
@@ -256,21 +280,41 @@ export async function loadLastDoubtTutorModeForConversation(
 	return raw;
 }
 
+/**
+ * Loads doubt-chat messages for a conversation as `UIMessage[]`.
+ *
+ * `opts.limit` (turns) — when set, returns at most `limit * 2` of the most
+ * recent messages, in chronological order. Used by the route handler to cap
+ * the context sent to OpenAI; full history is still returned when `limit` is
+ * omitted (compliance export, page bundle, parent view all need the full
+ * thread).
+ */
 export async function loadDoubtMessagesForConversationWithClient(
 	supabase: SupabaseClient,
 	conversationId: string,
+	opts?: { limit?: number },
 ): Promise<UIMessage[]> {
-	const { data, error } = await supabase
+	const turnLimit = opts?.limit;
+	const messageCap = typeof turnLimit === "number" && turnLimit > 0 ? turnLimit * 2 : null;
+
+	const baseQuery = supabase
 		.from("doubt_messages")
 		.select("id, role, content, created_at")
 		.eq("conversation_id", conversationId)
-		.in("role", ["user", "assistant"])
-		.order("created_at", { ascending: true });
+		.in("role", ["user", "assistant"]);
+
+	const { data, error } =
+		messageCap == null
+			? await baseQuery.order("created_at", { ascending: true })
+			: await baseQuery.order("created_at", { ascending: false }).limit(messageCap);
+
 	if (error) {
 		logSupabaseError("loadDoubtMessagesForConversationWithClient", error, { conversationId });
 		return [];
 	}
-	return (data ?? []).map((r) => {
+	const rows = data ?? [];
+	const ordered = messageCap == null ? rows : [...rows].reverse();
+	return ordered.map((r) => {
 		const role = r.role as "user" | "assistant";
 		return {
 			id: r.id,

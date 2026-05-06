@@ -27,6 +27,12 @@ export const doubtChatBodySchema = z.object({
 	topicId: z.string().uuid("Invalid topic."),
 	conversationId: z.string().uuid("Open or start a chat before sending a message."),
 	tutorMode: z.enum(["explain", "solve_with_me"]).default("explain"),
+	/**
+	 * IDs from `doubt_message_attachments` already uploaded to Storage. The
+	 * route validates ownership via the conversation join and then either
+	 * sends image parts to the model or extracts PDF text inline.
+	 */
+	attachmentIds: z.array(z.string().uuid()).max(3).default([]),
 });
 
 export type DoubtChatBody = z.infer<typeof doubtChatBodySchema>;

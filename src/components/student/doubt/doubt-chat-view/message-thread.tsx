@@ -4,10 +4,16 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ArrowDown, Sparkles } from "lucide-react";
 
 import { usePaywall } from "@/components/student/subscription/paywall-dialog";
-import { getDoubtUsageSummaryAction } from "@/lib/doubt/doubt-actions";
+import {
+	getDoubtEntitlementSummaryAction,
+	getDoubtUsageSummaryAction,
+	regenerateLastAssistantAction,
+} from "@/lib/doubt/doubt-actions";
+import type { AttachmentRow } from "@/lib/doubt/attachments/types";
 import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +21,12 @@ import { TutorMarkdown } from "../tutor-markdown";
 import { ChatComposer } from "./chat-composer";
 import { EmptyState } from "./empty-state";
 import { MessageActions, TypingIndicator } from "./message-actions";
-import { extractText, type DoubtChatThreadProps, type UsageSummary } from "./types";
+import {
+	extractText,
+	type DoubtChatThreadProps,
+	type EntitlementSummary,
+	type UsageSummary,
+} from "./types";
 
 export function MessageThread({
 	conversationId,
@@ -27,16 +38,27 @@ export function MessageThread({
 	initialMessages,
 	initialUsage,
 	initialTutorMode,
+	initialEntitlement,
 }: DoubtChatThreadProps) {
 	const router = useRouter();
 	const [input, setInput] = useState("");
 	const [tutorMode, setTutorMode] = useState<DoubtTutorMode>(initialTutorMode ?? "explain");
 	const [usage, setUsage] = useState<UsageSummary>(initialUsage);
+	const [entitlement, setEntitlement] = useState<EntitlementSummary>(initialEntitlement);
+	const [regenPending, setRegenPending] = useState(false);
+	const [pendingAttachments, setPendingAttachments] = useState<AttachmentRow[]>([]);
 	const [showScrollDown, setShowScrollDown] = useState(false);
 	const paywall = usePaywall();
 
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+	// Latest pending attachments are read via a ref so the transport closure
+	// doesn't re-create on every chip add/remove (which would tear down useChat).
+	const pendingAttachmentsRef = useRef<AttachmentRow[]>(pendingAttachments);
+	useEffect(() => {
+		pendingAttachmentsRef.current = pendingAttachments;
+	}, [pendingAttachments]);
 
 	const transport = useMemo(
 		() =>
@@ -48,12 +70,13 @@ export function MessageThread({
 					topicId,
 					conversationId,
 					tutorMode,
+					attachmentIds: pendingAttachmentsRef.current.map((a) => a.id),
 				}),
 			}),
 		[subjectId, topicId, conversationId, tutorMode],
 	);
 
-	const { messages, sendMessage, status, error, stop } = useChat({
+	const chat = useChat({
 		id: `doubt-${conversationId}`,
 		messages: initialMessages,
 		transport,
@@ -80,9 +103,15 @@ export function MessageThread({
 			// fire-and-forget: useChat's onFinish expects `() => void`; reject inside this branch must not become an unhandled rejection
 			void (async () => {
 				try {
-					const res = await getDoubtUsageSummaryAction({ conversationId });
-					if (res.ok) {
-						setUsage(res.summary);
+					const [usageRes, entRes] = await Promise.all([
+						getDoubtUsageSummaryAction({ conversationId }),
+						getDoubtEntitlementSummaryAction(),
+					]);
+					if (usageRes.ok) {
+						setUsage(usageRes.summary);
+					}
+					if (entRes.ok) {
+						setEntitlement(entRes.entitlement);
 					}
 					router.refresh();
 				} catch (err) {
@@ -91,6 +120,8 @@ export function MessageThread({
 			})();
 		},
 	});
+
+	const { messages, sendMessage, status, error, stop, regenerate, setMessages } = chat;
 
 	const busy = status === "submitted" || status === "streaming";
 	const thinking = status === "submitted";
@@ -128,9 +159,43 @@ export function MessageThread({
 			if (!t || busy) return;
 			setInput("");
 			void sendMessage({ text: t });
+			// Clear chips after the message goes — they're now bound to the row.
+			setPendingAttachments([]);
 		},
 		[busy, sendMessage],
 	);
+
+	const onRegenerate = useCallback(async () => {
+		if (busy || regenPending) return;
+		setRegenPending(true);
+		try {
+			const res = await regenerateLastAssistantAction({ conversationId });
+			if (!res.ok) {
+				toast.error(res.message);
+				return;
+			}
+			// Optimistically drop any trailing assistant rows from the local
+			// `messages` state so the UI matches the server before we re-stream.
+			// Without this, the old (now stale) assistant bubble lingers until
+			// the new stream replaces it.
+			setMessages((prev) => {
+				const out = [...prev];
+				while (out.length > 0 && out[out.length - 1]!.role === "assistant") {
+					out.pop();
+				}
+				return out;
+			});
+			// `regenerate` is part of the AI SDK v6 useChat return type — it
+			// re-fetches the AI response for the current latest user message
+			// without appending a new one.
+			await regenerate();
+		} catch (err) {
+			console.error("doubt chat regenerate", err);
+			toast.error("Could not regenerate. Try again.");
+		} finally {
+			setRegenPending(false);
+		}
+	}, [busy, regenPending, conversationId, regenerate, setMessages]);
 
 	const onSubmit = useCallback(
 		(e: React.FormEvent) => {
@@ -206,7 +271,7 @@ export function MessageThread({
 							/>
 						) : null}
 
-						{messages.map((m) => {
+						{messages.map((m, idx) => {
 							const text = extractText(m);
 							if (m.role === "user") {
 								return (
@@ -226,6 +291,11 @@ export function MessageThread({
 									</div>
 								);
 							}
+							const isLastAssistant =
+								idx === messages.length - 1 ||
+								messages.slice(idx + 1).every((later) => later.role !== "assistant");
+							const canRegenerate =
+								isLastAssistant && !busy && !regenPending && Boolean(text);
 							return (
 								<div
 									key={m.id}
@@ -240,7 +310,14 @@ export function MessageThread({
 									<div className="min-w-0 flex-1">
 										<TutorMarkdown>{text || ""}</TutorMarkdown>
 										{!text && thinking ? <TypingIndicator /> : null}
-										{text ? <MessageActions text={text} /> : null}
+										{text ? (
+											<MessageActions
+												text={text}
+												canRegenerate={canRegenerate}
+												regenPending={regenPending && isLastAssistant}
+												onRegenerate={canRegenerate ? () => void onRegenerate() : undefined}
+											/>
+										) : null}
 									</div>
 								</div>
 							);
@@ -294,7 +371,14 @@ export function MessageThread({
 				tutorMode={tutorMode}
 				onTutorModeChange={setTutorMode}
 				usage={usage}
+				entitlement={entitlement}
 				error={error ?? null}
+				conversationId={conversationId}
+				pendingAttachments={pendingAttachments}
+				onAttachmentAdded={(a) => setPendingAttachments((prev) => [...prev, a])}
+				onAttachmentRemoved={(id) =>
+					setPendingAttachments((prev) => prev.filter((a) => a.id !== id))
+				}
 			/>
 		</div>
 	);

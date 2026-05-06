@@ -1,5 +1,10 @@
 "use client";
 
+import { useReducedMotion } from "motion/react";
+import { useRef, useState } from "react";
+import { FileText, Image as ImageIcon, Loader2, Paperclip, X } from "lucide-react";
+import { toast } from "sonner";
+
 import {
 	Select,
 	SelectContent,
@@ -10,9 +15,20 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TopicChatComposer } from "@/components/ui/multimodal-ai-chat-input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AnimatedMeter } from "@/components/student/subscription/animated-meter";
+import { formatTokens } from "@/lib/billing/format-tokens";
 import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
+import {
+	ATTACHMENT_MAX_PER_TURN,
+	IMAGE_MIME_ALLOWLIST,
+	PDF_MIME,
+	type AttachmentRow,
+} from "@/lib/doubt/attachments/types";
+import { uploadDoubtAttachment } from "@/lib/doubt/attachments/upload";
+import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
-import type { UsageSummary } from "./types";
+import type { EntitlementSummary, UsageSummary } from "./types";
 
 export type ChatComposerProps = {
 	textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -25,8 +41,21 @@ export type ChatComposerProps = {
 	tutorMode: DoubtTutorMode;
 	onTutorModeChange: (mode: DoubtTutorMode) => void;
 	usage: UsageSummary;
+	entitlement: EntitlementSummary;
 	error: Error | null;
+	conversationId: string;
+	pendingAttachments: AttachmentRow[];
+	onAttachmentAdded: (a: AttachmentRow) => void;
+	onAttachmentRemoved: (id: string) => void;
 };
+
+const ACCEPT = [...IMAGE_MIME_ALLOWLIST, PDF_MIME].join(",");
+
+function bytesToHuman(n: number): string {
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+	return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export function ChatComposer({
 	textareaRef,
@@ -39,8 +68,67 @@ export function ChatComposer({
 	tutorMode,
 	onTutorModeChange,
 	usage,
+	entitlement,
 	error,
+	conversationId,
+	pendingAttachments,
+	onAttachmentAdded,
+	onAttachmentRemoved,
 }: ChatComposerProps) {
+	const reduceMotion = useReducedMotion();
+	const showMeter = entitlement.tokensQuota > 0;
+	const usagePct = showMeter
+		? Math.min(100, Math.round((entitlement.tokensUsed / entitlement.tokensQuota) * 100))
+		: 0;
+	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const [uploadPending, setUploadPending] = useState(false);
+
+	async function handleFiles(filesList: FileList | null) {
+		if (!filesList) return;
+		const remaining = ATTACHMENT_MAX_PER_TURN - pendingAttachments.length;
+		if (remaining <= 0) {
+			toast.error(`Up to ${ATTACHMENT_MAX_PER_TURN} attachments per message.`);
+			return;
+		}
+		const files = Array.from(filesList).slice(0, remaining);
+		setUploadPending(true);
+		try {
+			const supabase = createClient();
+			const { data: userData } = await supabase.auth.getUser();
+			const studentId = userData.user?.id;
+			if (!studentId) {
+				toast.error("Sign in to attach files.");
+				return;
+			}
+			for (const file of files) {
+				const res = await uploadDoubtAttachment(supabase, conversationId, studentId, file);
+				if (!res.ok) {
+					toast.error(res.message);
+					continue;
+				}
+				onAttachmentAdded(res.attachment);
+			}
+		} finally {
+			setUploadPending(false);
+			if (fileInputRef.current) fileInputRef.current.value = "";
+		}
+	}
+
+	async function removeAttachment(att: AttachmentRow) {
+		try {
+			const supabase = createClient();
+			// Best-effort delete; the row's RLS allows the owner.
+			await supabase.from("doubt_message_attachments").delete().eq("id", att.id);
+			await supabase.storage.from("doubt-attachments").remove([att.storagePath]);
+		} catch {
+			// best-effort cleanup; the chip removal still proceeds.
+		}
+		onAttachmentRemoved(att.id);
+	}
+
+	const attachDisabled =
+		busy || uploadPending || pendingAttachments.length >= ATTACHMENT_MAX_PER_TURN;
+
 	return (
 		<div className="shrink-0 px-4 pt-1 pb-4 medium:px-6">
 			<div className="mx-auto w-full min-w-0 max-w-full">
@@ -50,6 +138,48 @@ export function ChatComposer({
 						<AlertDescription>{error.message}</AlertDescription>
 					</Alert>
 				) : null}
+
+				{pendingAttachments.length > 0 ? (
+					<div className="mb-2 flex w-full min-w-0 flex-wrap gap-1.5" aria-label="Attachments">
+						{pendingAttachments.map((a) => (
+							<div
+								key={a.id}
+								className={cn(
+									"inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-1 text-[12px]",
+									"border-border/70 text-foreground/85",
+								)}
+							>
+								{a.kind === "image" ? (
+									<ImageIcon className="size-3.5 text-emerald-600" aria-hidden />
+								) : (
+									<FileText className="size-3.5 text-emerald-600" aria-hidden />
+								)}
+								<span className="max-w-[12rem] truncate">{a.storagePath.split("/").at(-1)}</span>
+								<span className="text-muted-foreground tabular-nums text-[11px]">
+									{bytesToHuman(a.sizeBytes)}
+								</span>
+								<button
+									type="button"
+									onClick={() => void removeAttachment(a)}
+									aria-label={`Remove ${a.kind} attachment`}
+									className="text-muted-foreground hover:text-foreground inline-flex size-4 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+								>
+									<X className="size-3" aria-hidden />
+								</button>
+							</div>
+						))}
+					</div>
+				) : null}
+
+				<input
+					ref={fileInputRef}
+					type="file"
+					accept={ACCEPT}
+					multiple
+					className="sr-only"
+					aria-label="Attach worksheet image or PDF"
+					onChange={(e) => void handleFiles(e.target.files)}
+				/>
 
 				<TopicChatComposer
 					id="doubt-chat-composer"
@@ -62,6 +192,34 @@ export function ChatComposer({
 					placeholder={placeholder}
 					toolbar={
 						<div className="flex min-w-0 flex-nowrap items-center gap-2">
+							<Tooltip>
+								<TooltipTrigger
+									render={
+										<button
+											type="button"
+											aria-label="Attach worksheet image or PDF"
+											disabled={attachDisabled}
+											onClick={() => fileInputRef.current?.click()}
+											className={cn(
+												"text-muted-foreground hover:text-foreground hover:bg-muted/60 inline-flex size-9 items-center justify-center rounded-md",
+												"focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+												"disabled:opacity-50 disabled:cursor-not-allowed",
+											)}
+										/>
+									}
+								>
+									{uploadPending ? (
+										<Loader2 className="size-4 animate-spin" aria-hidden />
+									) : (
+										<Paperclip className="size-4" aria-hidden />
+									)}
+								</TooltipTrigger>
+								<TooltipContent>
+									{pendingAttachments.length >= ATTACHMENT_MAX_PER_TURN
+										? `Up to ${ATTACHMENT_MAX_PER_TURN} attachments`
+										: "Attach image or PDF"}
+								</TooltipContent>
+							</Tooltip>
 							<span className="text-muted-foreground shrink-0 text-[12px] font-medium">
 								Mode
 							</span>
@@ -88,30 +246,65 @@ export function ChatComposer({
 					}
 				/>
 
-				<div className="text-muted-foreground/80 mt-2.5 flex w-full min-w-0 items-center justify-between gap-3 text-[11px] leading-snug">
+				<div className="text-muted-foreground/80 mt-2.5 flex w-full min-w-0 flex-col gap-2 text-[11px] leading-snug medium:flex-row medium:items-center medium:justify-between medium:gap-3">
 					<span className="min-w-0 truncate">
 						Tutor can be wrong; double-check important facts.
 					</span>
-					<Tooltip>
-						<TooltipTrigger
-							render={
-								<button
-									type="button"
-									className="hover:text-foreground flex shrink-0 cursor-help items-center gap-1 tabular-nums transition-colors focus-visible:outline-none"
-								/>
-							}
-						>
-							<span>
-								{usage.lastPromptTokens != null ? usage.lastPromptTokens : "—"} in ·{" "}
-								{usage.lastCompletionTokens != null ? usage.lastCompletionTokens : "—"} out
-							</span>
-						</TooltipTrigger>
-						<TooltipContent>
-							<span className="tabular-nums">
-								Session: {usage.totalPromptTokens} in / {usage.totalCompletionTokens} out
-							</span>
-						</TooltipContent>
-					</Tooltip>
+					<div className="flex min-w-0 items-center gap-3">
+						{showMeter ? (
+							<Tooltip>
+								<TooltipTrigger
+									render={
+										<button
+											type="button"
+											className="flex min-w-0 max-w-full cursor-help items-center gap-2 rounded px-1 transition-colors hover:text-foreground focus-visible:outline-none"
+										/>
+									}
+								>
+									<AnimatedMeter
+										label="Tokens"
+										display={`${formatTokens(entitlement.tokensUsed)}/${formatTokens(entitlement.tokensQuota)}`}
+										pct={usagePct}
+										reduceMotion={Boolean(reduceMotion)}
+										className="w-[12rem] medium:w-[14rem]"
+									/>
+								</TooltipTrigger>
+								<TooltipContent>
+									<div className="flex flex-col gap-1 tabular-nums">
+										<span>
+											Last turn:{" "}
+											{usage.lastPromptTokens != null ? usage.lastPromptTokens : "—"} in ·{" "}
+											{usage.lastCompletionTokens != null ? usage.lastCompletionTokens : "—"} out
+										</span>
+										<span>
+											Session: {usage.totalPromptTokens} in / {usage.totalCompletionTokens} out
+										</span>
+									</div>
+								</TooltipContent>
+							</Tooltip>
+						) : (
+							<Tooltip>
+								<TooltipTrigger
+									render={
+										<button
+											type="button"
+											className="hover:text-foreground flex shrink-0 cursor-help items-center gap-1 tabular-nums transition-colors focus-visible:outline-none"
+										/>
+									}
+								>
+									<span>
+										{usage.lastPromptTokens != null ? usage.lastPromptTokens : "—"} in ·{" "}
+										{usage.lastCompletionTokens != null ? usage.lastCompletionTokens : "—"} out
+									</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									<span className="tabular-nums">
+										Session: {usage.totalPromptTokens} in / {usage.totalCompletionTokens} out
+									</span>
+								</TooltipContent>
+							</Tooltip>
+						)}
+					</div>
 				</div>
 			</div>
 		</div>

@@ -6,10 +6,16 @@ import { ArrowUpRightIcon, CrownIcon, SparklesIcon, ZapIcon } from "lucide-react
 
 import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import { useSidebar } from "@/components/ui/sidebar";
+import { AnimatedMeter } from "@/components/student/subscription/animated-meter";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
+import { formatTokens } from "@/lib/billing/format-tokens";
 import { PLAN_CATALOG } from "@/lib/billing/plans";
 import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
 import { cn } from "@/lib/utils";
+
+// Re-exports for backwards compatibility — older imports still go through this module.
+export { AnimatedMeter };
+export { formatTokens };
 
 const TRIAL_TOTAL_DAYS = 14;
 
@@ -54,12 +60,6 @@ export function statusTone(e: EntitlementSnapshot): Tone {
 	if (e.status === "active" || e.status === "coupon") return "ok";
 	if (e.status === "trialing") return "neutral";
 	return "neutral";
-}
-
-function formatTokens(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
-	if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
-	return n.toLocaleString("en-IN");
 }
 
 const toneStyles: Record<
@@ -214,12 +214,14 @@ export function SidebarPlanCard({
 							display={`${entitlement.testsUsed}/${entitlement.testsQuota}`}
 							pct={testsPct}
 							reduceMotion={!!reduceMotion}
+							surface="sidebar"
 						/>
 						<AnimatedMeter
 							label="AI output"
 							display={`${formatTokens(entitlement.tokensUsed)}/${formatTokens(entitlement.tokensQuota)}`}
 							pct={tokensPct}
 							reduceMotion={!!reduceMotion}
+							surface="sidebar"
 						/>
 					</div>
 
@@ -271,43 +273,3 @@ export function SidebarPlanCard({
 	);
 }
 
-function AnimatedMeter({
-	label,
-	display,
-	pct,
-	reduceMotion,
-}: {
-	label: string;
-	display: string;
-	pct: number;
-	reduceMotion: boolean;
-}) {
-	const barColor =
-		pct >= 100 ? "bg-rose-500" : pct >= 80 ? "bg-amber-400" : "bg-primary";
-
-	return (
-		<div
-			role="meter"
-			aria-label={label}
-			aria-valuenow={pct}
-			aria-valuemin={0}
-			aria-valuemax={100}
-			className="flex items-center gap-2 text-[11px] leading-none"
-		>
-			<span className="w-12 shrink-0 font-medium text-sidebar-foreground/80">{label}</span>
-			<div className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-				<motion.div
-					className={cn("h-full rounded-full", barColor)}
-					initial={{ width: "0%" }}
-					animate={{ width: `${pct}%` }}
-					transition={
-						reduceMotion
-							? { duration: 0 }
-							: { duration: 0.7, ease: [0.25, 0.1, 0.25, 1], delay: 0.2 }
-					}
-				/>
-			</div>
-			<span className="shrink-0 tabular-nums text-sidebar-foreground/60">{display}</span>
-		</div>
-	);
-}

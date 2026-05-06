@@ -9,7 +9,7 @@ import { adminTestMessages, performanceTracker, questionFlags, studentAnswers, t
 import { assignmentSubmissions } from "@/db/schema/teaching";
 import { notifications, userPreferences } from "@/db/schema/comms-audit";
 import { complianceRequests } from "@/db/schema/compliance-requests";
-import { doubtConversations, doubtMessages } from "@/db/schema/doubt";
+import { doubtConversations, doubtMessageAttachments, doubtMessages } from "@/db/schema/doubt";
 import { profiles, parentStudentLinks } from "@/db/schema/profiles";
 import { recordComplianceEvent } from "@/lib/compliance/events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -101,7 +101,15 @@ export async function countErasureImpact(userId: string): Promise<ErasureCounts>
 			.from(doubtMessages)
 			.where(inArray(doubtMessages.conversationId, convoIds));
 		counts.doubt_messages_deleted = Number(dm ?? 0);
-	} else counts.doubt_messages_deleted = 0;
+		const [{ c: da }] = await db
+			.select({ c: sql<number>`count(*)::int` })
+			.from(doubtMessageAttachments)
+			.where(inArray(doubtMessageAttachments.conversationId, convoIds));
+		counts.doubt_message_attachments_deleted = Number(da ?? 0);
+	} else {
+		counts.doubt_messages_deleted = 0;
+		counts.doubt_message_attachments_deleted = 0;
+	}
 	counts.doubt_conversations_deleted = convoIds.length;
 
 	const [{ c: ai }] = await db.select({ c: sql<number>`count(*)::int` }).from(aiCalls).where(eq(aiCalls.userId, userId));
@@ -195,6 +203,22 @@ export async function performComplianceErasure(
 		await db.select({ id: doubtConversations.id }).from(doubtConversations).where(eq(doubtConversations.studentId, userId))
 	).map((c) => c.id);
 
+	// Snapshot doubt-attachment storage paths BEFORE the DB transaction. The
+	// rows will be cascaded; the actual files in `doubt-attachments` Storage
+	// don't FK back, so without this enumeration they leak. We delete the
+	// objects AFTER the transaction commits so a transaction rollback doesn't
+	// leave us with deleted files but live DB rows.
+	let attachmentStoragePaths: string[] = [];
+	if (convoIds.length) {
+		const rows = await db
+			.select({ storagePath: doubtMessageAttachments.storagePath })
+			.from(doubtMessageAttachments)
+			.where(inArray(doubtMessageAttachments.conversationId, convoIds));
+		attachmentStoragePaths = rows
+			.map((r) => r.storagePath)
+			.filter((p): p is string => Boolean(p));
+	}
+
 	try {
 		await db.transaction(async (tx) => {
 			if (testIds.length) {
@@ -211,6 +235,9 @@ export async function performComplianceErasure(
 				.delete(parentStudentLinks)
 				.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId))!);
 			if (convoIds.length) {
+				await tx
+					.delete(doubtMessageAttachments)
+					.where(inArray(doubtMessageAttachments.conversationId, convoIds));
 				await tx.delete(doubtMessages).where(inArray(doubtMessages.conversationId, convoIds));
 				await tx.delete(doubtConversations).where(eq(doubtConversations.studentId, userId));
 			}
@@ -258,6 +285,56 @@ export async function performComplianceErasure(
 			phase: "db_transaction",
 			status: "ok",
 		});
+	}
+
+	// Storage cleanup for doubt-chat attachments. Runs AFTER the DB tx commits
+	// so a rollback doesn't leave us with missing files but live rows. Failure
+	// here is non-fatal — the rows are gone, the files become orphans that an
+	// admin sweep can vacuum later. We log + DSR-note so the gap is visible.
+	if (attachmentStoragePaths.length > 0) {
+		try {
+			const supabase = createServiceRoleClient();
+			// Supabase storage `remove` accepts up to ~1000 keys per call. Chunk
+			// to keep within that limit on extreme cases.
+			const CHUNK = 500;
+			for (let i = 0; i < attachmentStoragePaths.length; i += CHUNK) {
+				const batch = attachmentStoragePaths.slice(i, i + CHUNK);
+				const { error: rmErr } = await supabase.storage
+					.from("doubt-attachments")
+					.remove(batch);
+				if (rmErr) {
+					Sentry.captureException(
+						new Error(`doubt-attachments storage remove failed: ${rmErr.message}`),
+						{
+							tags: { component: "compliance.erasure", phase: "storage_cleanup" },
+							extra: { userId, batchSize: batch.length },
+						},
+					);
+					if (dsrId) {
+						await appendDsrNote(dsrId, "storage_cleanup_failed", rmErr.message);
+					}
+				}
+			}
+			if (dsrId) {
+				await appendDsrNote(
+					dsrId,
+					"storage_cleanup_ok",
+					`removed=${attachmentStoragePaths.length}`,
+				);
+			}
+		} catch (e) {
+			Sentry.captureException(e, {
+				tags: { component: "compliance.erasure", phase: "storage_cleanup" },
+				extra: { userId, count: attachmentStoragePaths.length },
+			});
+			if (dsrId) {
+				await appendDsrNote(
+					dsrId,
+					"storage_cleanup_failed",
+					e instanceof Error ? e.message : String(e),
+				);
+			}
+		}
 	}
 
 	const auth = createServiceRoleClient().auth.admin;

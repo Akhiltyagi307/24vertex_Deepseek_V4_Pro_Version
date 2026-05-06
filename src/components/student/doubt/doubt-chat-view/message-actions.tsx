@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export function MessageActions({ text }: { text: string }) {
+export function MessageActions({
+	text,
+	canRegenerate,
+	regenPending,
+	onRegenerate,
+}: {
+	text: string;
+	canRegenerate?: boolean;
+	regenPending?: boolean;
+	onRegenerate?: () => void;
+}) {
 	const [copied, setCopied] = useState(false);
 
 	async function onCopy() {
@@ -49,6 +59,32 @@ export function MessageActions({ text }: { text: string }) {
 				</TooltipTrigger>
 				<TooltipContent>{copied ? "Copied" : "Copy"}</TooltipContent>
 			</Tooltip>
+			{canRegenerate ? (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<button
+								type="button"
+								onClick={() => onRegenerate?.()}
+								disabled={regenPending}
+								aria-label={regenPending ? "Regenerating" : "Regenerate this answer"}
+								className={cn(
+									"text-muted-foreground hover:text-foreground hover:bg-muted/70 inline-flex size-7 items-center justify-center rounded-md",
+									"focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+									"disabled:opacity-50 disabled:cursor-not-allowed",
+								)}
+							/>
+						}
+					>
+						{regenPending ? (
+							<Loader2 className="size-3.5 animate-spin" aria-hidden />
+						) : (
+							<RefreshCw className="size-3.5" aria-hidden />
+						)}
+					</TooltipTrigger>
+					<TooltipContent>{regenPending ? "Regenerating" : "Regenerate"}</TooltipContent>
+				</Tooltip>
+			) : null}
 		</div>
 	);
 }

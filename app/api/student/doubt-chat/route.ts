@@ -4,6 +4,11 @@ import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/d
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
+import {
+	bindAttachmentsToMessage,
+	decorateUserMessageWithAttachments,
+	loadAttachmentsForRequest,
+} from "@/lib/doubt/attachments/build-model-parts";
 import { doubtChatBodySchema } from "@/lib/doubt/request-schema";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
@@ -20,6 +25,14 @@ import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
  * acceptable, large enough that 5 simultaneous turns can't all sneak past.
  */
 const DOUBT_CHAT_PRE_DEBIT_TOKENS = 150;
+
+/**
+ * Sliding-window cap for messages sent to OpenAI per turn. The topic context
+ * (subject / chapter / topic / learning objectives) lives in the system prompt,
+ * so older turns are safe to drop. 10 turns = 20 messages keeps input tokens
+ * bounded at ~3-5K worst-case regardless of conversation length.
+ */
+const DOUBT_CHAT_HISTORY_TURN_CAP = 10;
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { loadDoubtMessagesForConversationWithClient } from "@/lib/doubt/loaders";
 import { createClient } from "@/lib/supabase/server";
@@ -46,6 +59,7 @@ export async function POST(req: Request) {
 		topicId,
 		conversationId: rawConvId,
 		tutorMode,
+		attachmentIds,
 	} = parsed.data;
 	const messages = toUIMessageList(rawMessages);
 	const headers = new Headers();
@@ -85,8 +99,13 @@ export async function POST(req: Request) {
 	// Reserve a conservative chunk of tokens BEFORE we start streaming so
 	// concurrent turns observed before any onFinish runs cannot all pass the
 	// canStartDoubtChat gate while having only one turn's worth of quota left.
-	// Reconciled in onFinish below.
-	await consumeTokens(supabase, user.id, DOUBT_CHAT_PRE_DEBIT_TOKENS);
+	// Reconciled in onFinish below. Vision turns reserve a bit more because
+	// image tokens are denser per pixel than plain text.
+	const hasAttachments = attachmentIds.length > 0;
+	const preDebit = hasAttachments
+		? Math.round(DOUBT_CHAT_PRE_DEBIT_TOKENS * 1.7)
+		: DOUBT_CHAT_PRE_DEBIT_TOKENS;
+	await consumeTokens(supabase, user.id, preDebit);
 
 	const scope = await validateDoubtScope(supabase, { subjectId, topicId });
 	if (!scope.ok) {
@@ -146,6 +165,16 @@ export async function POST(req: Request) {
 	}
 	const conversationId = existing.id;
 
+	// Validate attachment ownership (must belong to this conversation, which
+	// we've already verified belongs to the user).
+	const attachments = await loadAttachmentsForRequest(supabase, conversationId, attachmentIds);
+	if (attachments.length !== attachmentIds.length) {
+		return new Response(
+			JSON.stringify({ error: "One or more attachments could not be found." }),
+			{ status: 400, headers: { "content-type": "application/json" } },
+		);
+	}
+
 	const userMessageBase = {
 		conversation_id: conversationId,
 		role: "user" as const,
@@ -154,25 +183,63 @@ export async function POST(req: Request) {
 		completion_tokens: null,
 		model: null,
 	};
-	let { error: userMsgErr } = await supabase
+	let userInsert = await supabase
 		.from("doubt_messages")
-		.insert({ ...userMessageBase, tutor_mode: tutorMode });
-	if (userMsgErr && isPostgresUndefinedColumnError(userMsgErr)) {
-		({ error: userMsgErr } = await supabase.from("doubt_messages").insert(userMessageBase));
+		.insert({ ...userMessageBase, tutor_mode: tutorMode })
+		.select("id")
+		.maybeSingle();
+	if (userInsert.error && isPostgresUndefinedColumnError(userInsert.error)) {
+		userInsert = await supabase
+			.from("doubt_messages")
+			.insert(userMessageBase)
+			.select("id")
+			.maybeSingle();
 	}
-	if (userMsgErr) {
-		logSupabaseError("doubt_chat.insert_user_message", userMsgErr, { conversationId });
+	if (userInsert.error || !userInsert.data?.id) {
+		logSupabaseError("doubt_chat.insert_user_message", userInsert.error ?? { message: "no id" }, {
+			conversationId,
+		});
 		return new Response(JSON.stringify({ error: "Could not save your message." }), {
 			status: 500,
 			headers: { "content-type": "application/json" },
 		});
 	}
+	const userMessageId = userInsert.data.id as string;
 
-	const threadFromDb = await loadDoubtMessagesForConversationWithClient(supabase, conversationId);
+	// Bind freshly-uploaded attachments to the just-saved user message.
+	if (attachmentIds.length > 0) {
+		try {
+			await bindAttachmentsToMessage(supabase, attachmentIds, userMessageId);
+		} catch (e) {
+			logSupabaseError(
+				"doubt_chat.bind_attachments",
+				{ message: e instanceof Error ? e.message : String(e) },
+				{ conversationId, userMessageId },
+			);
+		}
+	}
+
+	const threadFromDb = await loadDoubtMessagesForConversationWithClient(supabase, conversationId, {
+		limit: DOUBT_CHAT_HISTORY_TURN_CAP,
+	});
 	const forModel = threadFromDb.map((m) => {
 		const { id: _i, ...rest } = m;
 		return rest;
 	}) as UIMessage[];
+
+	// Decorate the most recent user message with PDF transcripts + image
+	// parts so the model can reason over the attachments.
+	if (attachments.length > 0 && forModel.length > 0) {
+		const lastIdx = forModel.length - 1;
+		const lastModelMsg = forModel[lastIdx];
+		if (lastModelMsg && lastModelMsg.role === "user") {
+			forModel[lastIdx] = await decorateUserMessageWithAttachments(
+				supabase,
+				lastModelMsg,
+				attachments,
+			);
+		}
+	}
 
 	let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>>;
 	try {
@@ -196,6 +263,7 @@ export async function POST(req: Request) {
 		onFinish: async ({ text, totalUsage, finishReason }) => {
 			const promptT = totalUsage?.inputTokens ?? null;
 			const compT = totalUsage?.outputTokens ?? null;
+			// Telemetry runs unconditionally — we want visibility on aborts/errors too.
 			void recordAiCall({
 				feature: "doubt.chat",
 				model: modelId,
@@ -207,32 +275,54 @@ export async function POST(req: Request) {
 				status: "ok",
 			});
 			// Bill only normal completions (not provider errors, aborts, or tool loops).
+			// Aborted/errored streams skip persistence entirely so the sidebar doesn't
+			// reorder for half-baked answers.
 			const billableTurn = finishReason === "stop" || finishReason === "length";
-			const { error: asstErr } = await supabase.from("doubt_messages").insert({
-				conversation_id: conversationId,
-				role: "assistant",
-				content: text,
-				prompt_tokens: promptT,
-				completion_tokens: compT,
-				model: modelId,
-			});
-			if (asstErr) {
-				logSupabaseError("doubt_chat.insert_assistant", asstErr, { conversationId });
-			}
-			const { error: updErr } = await supabase
-				.from("doubt_conversations")
-				.update({ updated_at: new Date().toISOString(), model: modelId })
-				.eq("id", conversationId);
-			if (updErr) {
-				logSupabaseError("doubt_chat.touch_conversation", updErr, { conversationId });
-			}
-			// Reconcile against the pre-debit. If actual output exceeded the
-			// reservation, top up the difference. If it was lower, keep the small
-			// over-debit (we don't refund — keeps the gate strict against
-			// short-turn flooding and the magnitude is bounded by the constant).
-			const outputTokens = compT ?? 0;
-			if (billableTurn && !asstErr && outputTokens > DOUBT_CHAT_PRE_DEBIT_TOKENS) {
-				await consumeTokens(supabase, user.id, outputTokens - DOUBT_CHAT_PRE_DEBIT_TOKENS);
+			let asstErr: { message: string } | null = null;
+			if (billableTurn) {
+				// Run the two independent writes in parallel — saves 150–300ms per turn.
+				const [insertResult, updateResult] = await Promise.allSettled([
+					supabase.from("doubt_messages").insert({
+						conversation_id: conversationId,
+						role: "assistant",
+						content: text,
+						prompt_tokens: promptT,
+						completion_tokens: compT,
+						model: modelId,
+					}),
+					supabase
+						.from("doubt_conversations")
+						.update({ updated_at: new Date().toISOString(), model: modelId })
+						.eq("id", conversationId),
+				]);
+				if (insertResult.status === "fulfilled" && insertResult.value.error) {
+					logSupabaseError("doubt_chat.insert_assistant", insertResult.value.error, { conversationId });
+					asstErr = { message: insertResult.value.error.message ?? "insert failed" };
+				} else if (insertResult.status === "rejected") {
+					logSupabaseError(
+						"doubt_chat.insert_assistant",
+						{ message: String(insertResult.reason) },
+						{ conversationId },
+					);
+					asstErr = { message: String(insertResult.reason) };
+				}
+				if (updateResult.status === "fulfilled" && updateResult.value.error) {
+					logSupabaseError("doubt_chat.touch_conversation", updateResult.value.error, { conversationId });
+				} else if (updateResult.status === "rejected") {
+					logSupabaseError(
+						"doubt_chat.touch_conversation",
+						{ message: String(updateResult.reason) },
+						{ conversationId },
+					);
+				}
+				// Reconcile against the pre-debit. If actual output exceeded the
+				// reservation, top up the difference. If it was lower, keep the small
+				// over-debit (we don't refund — keeps the gate strict against
+				// short-turn flooding and the magnitude is bounded by the constant).
+				const outputTokens = compT ?? 0;
+				if (!asstErr && outputTokens > preDebit) {
+					await consumeTokens(supabase, user.id, outputTokens - preDebit);
+				}
 			}
 		},
 	});

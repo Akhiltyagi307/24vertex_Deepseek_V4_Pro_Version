@@ -72,6 +72,7 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 				subjectsLoadError={bundle.subjectsLoadError}
 				conversations={bundle.conversations}
 				initialFromUrl={initialFromUrl}
+				entitlement={bundle.entitlement}
 			/>
 		</div>
 	);

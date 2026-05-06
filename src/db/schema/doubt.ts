@@ -1,4 +1,15 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import {
+	check,
+	index,
+	integer,
+	jsonb,
+	pgTable,
+	text,
+	timestamp,
+	uuid,
+	varchar,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { subjects, topics } from "./academic";
 import { profiles } from "./profiles";
@@ -47,5 +58,38 @@ export const doubtMessages = pgTable(
 	},
 	(t) => [
 		index("idx_doubt_messages_conversation_created").on(t.conversationId, t.createdAt),
+	],
+);
+
+/**
+ * Worksheet photos / PDFs uploaded by students. Lifecycle:
+ *   1. Composer client uploads to the `doubt-attachments` Storage bucket and
+ *      inserts a row here with `messageId = null`.
+ *   2. On send, the route handler binds the row(s) to the freshly-created
+ *      user message by setting `messageId`.
+ *   3. PDFs may have `ocrText` populated server-side on first use.
+ */
+export const doubtMessageAttachments = pgTable(
+	"doubt_message_attachments",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		conversationId: uuid("conversation_id")
+			.notNull()
+			.references(() => doubtConversations.id, { onDelete: "cascade" }),
+		messageId: uuid("message_id").references(() => doubtMessages.id, {
+			onDelete: "cascade",
+		}),
+		kind: varchar("kind", { length: 10 }).notNull(),
+		storagePath: text("storage_path").notNull(),
+		mime: varchar("mime", { length: 80 }).notNull(),
+		sizeBytes: integer("size_bytes").notNull(),
+		ocrText: text("ocr_text"),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_doubt_attachments_conversation").on(t.conversationId),
+		index("idx_doubt_attachments_message").on(t.messageId),
+		check("doubt_attachments_kind_check", sql`${t.kind} IN ('image','pdf')`),
+		check("doubt_attachments_size_nonneg", sql`${t.sizeBytes} >= 0`),
 	],
 );
