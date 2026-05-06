@@ -148,10 +148,10 @@ export function Features() {
 							className="bg-card pointer-events-none absolute inset-0 overflow-hidden rounded-[12px]"
 							aria-hidden
 						>
-							{/* Plain <img> keeps GIF animation; Next/Image may strip frames. */}
+							{/* Plain <img> keeps animated WebP frames; Next/Image may strip them. */}
 							{/* eslint-disable-next-line @next/next/no-img-element */}
 							<img
-								src="/marketing/subjects.gif"
+								src="/marketing/subjects.webp"
 								alt=""
 								loading="lazy"
 								decoding="async"
