@@ -76,8 +76,12 @@ tw-debug.css
 # TestSprite generated suites (local tooling output)
 testsprite_tests/
 
-# Product / design markdown (kept local; not versioned in this repo)
-docs/
+# Product / design markdown (kept local; not versioned in this repo).
+# Exception: doubt-chat prompt templates are loaded at runtime by
+# src/lib/ai/doubt-prompt-templates.ts and must ship with the deploy.
+docs/*
+!docs/explain-mode-prompt.md
+!docs/solve-with-me-mode-prompt.md
 
 # One-off local notes at repo root (keep out of git)
 EduAI_PRD_v3_2_TestSprite_Backend.md

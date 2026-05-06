@@ -7,7 +7,11 @@
 .claude/
 artifacts/
 .cursor/
-docs/
+# Most of docs/ stays local-only, but the doubt-chat prompt templates are
+# loaded at runtime by src/lib/ai/doubt-prompt-templates.ts and must ship.
+docs/*
+!docs/explain-mode-prompt.md
+!docs/solve-with-me-mode-prompt.md
 testsprite_tests/
 tests/
 node_modules/

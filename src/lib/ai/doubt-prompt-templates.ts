@@ -11,9 +11,9 @@ const PROMPT_MARKERS = {
 	end: "DOUBT_PROMPT",
 } as const;
 
-const DOC_PATH: Record<DoubtTutorMode, string> = {
-	explain: "docs/explain-mode-prompt.md",
-	solve_with_me: "docs/solve-with-me-mode-prompt.md",
+const DOC_FILE: Record<DoubtTutorMode, string> = {
+	explain: "explain-mode-prompt.md",
+	solve_with_me: "solve-with-me-mode-prompt.md",
 };
 
 let cachedTemplates: Record<DoubtTutorMode, string> | null = null;
@@ -34,24 +34,14 @@ function extractTemplateFromDoc(filePath: string): string {
 	return fromBody.slice(0, endIdx).trim();
 }
 
-/** Resolves the repo root that contains `docs/explain-mode-prompt.md` (supports linked git worktrees). */
-function resolveRepoRootWithDocs(): string {
-	const marker = path.join("docs", "explain-mode-prompt.md");
-	let dir = path.resolve(process.cwd());
-	for (let i = 0; i < 12; i++) {
-		if (fs.existsSync(path.join(dir, marker))) return dir;
-		const parent = path.dirname(dir);
-		if (parent === dir) break;
-		dir = parent;
-	}
-	return path.resolve(process.cwd());
-}
-
 function loadTemplatesFromDisk(): Record<DoubtTutorMode, string> {
-	const root = resolveRepoRootWithDocs();
+	// Statically scoped to `<cwd>/docs/<known-file>.md` so Turbopack/NFT
+	// doesn't conservatively over-trace the project (which previously caused
+	// `next.config.ts` to be pulled into unrelated lambdas).
+	const docsDir = path.join(process.cwd(), "docs");
 	return {
-		explain: extractTemplateFromDoc(path.join(root, DOC_PATH.explain)),
-		solve_with_me: extractTemplateFromDoc(path.join(root, DOC_PATH.solve_with_me)),
+		explain: extractTemplateFromDoc(path.join(docsDir, DOC_FILE.explain)),
+		solve_with_me: extractTemplateFromDoc(path.join(docsDir, DOC_FILE.solve_with_me)),
 	};
 }
 

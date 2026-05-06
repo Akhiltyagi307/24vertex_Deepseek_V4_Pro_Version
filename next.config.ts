@@ -1,9 +1,4 @@
 import type { NextConfig } from "next";
-import bundleAnalyzer from "@next/bundle-analyzer";
-
-const withBundleAnalyzer = bundleAnalyzer({
-	enabled: process.env.ANALYZE === "true",
-});
 
 function supabaseStorageRemotePatterns() {
 	const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -118,4 +113,10 @@ const nextConfig: NextConfig = {
 	},
 };
 
-export default withBundleAnalyzer(nextConfig);
+export default async function loadConfig(): Promise<NextConfig> {
+	if (process.env.ANALYZE === "true") {
+		const { default: bundleAnalyzer } = await import("@next/bundle-analyzer");
+		return bundleAnalyzer({ enabled: true })(nextConfig);
+	}
+	return nextConfig;
+}
