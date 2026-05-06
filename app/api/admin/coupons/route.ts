@@ -16,10 +16,17 @@ export const runtime = "nodejs";
 const couponBase = z.object({
 	code: z.string().trim().min(2).max(40),
 	description: z.string().max(2000).optional().nullable(),
-	max_redemptions: z.number().int().positive().max(1_000_000),
+	// W2.4: explicit min(1). Was z.number().int().positive() — equivalent in
+	// practice (positive() is >0) but min(1) gives a clearer Zod error string
+	// to clients ("expected number greater than or equal to 1").
+	max_redemptions: z.number().int().min(1).max(1_000_000),
 	expires_at: z.string().datetime().optional().nullable(),
 });
 
+// Discriminated union requires ZodObject members, not ZodEffects, so the
+// cross-field refines (W2.3 free-plan-grant rejection, W2.4 high-discount
+// confirmation) live in the POST handler below rather than on these inner
+// schemas. Same enforcement, different layer.
 const entitlementCreate = couponBase.extend({
 	kind: z.literal("entitlement"),
 	grants_plan_code: z.string().trim().min(1).max(32),
@@ -32,6 +39,7 @@ const checkoutCreate = couponBase.extend({
 	discount_percent: z.number().int().min(1).max(100),
 	eligible_plan_codes: z.array(z.enum(["pro_monthly", "pro_annual"])).max(2).nullable().optional(),
 	duration_days: z.number().int().min(0).max(3650).default(0),
+	confirm_high_discount: z.boolean().optional().default(false),
 });
 
 const createSchema = z.discriminatedUnion("kind", [entitlementCreate, checkoutCreate]);
@@ -110,6 +118,26 @@ export async function POST(request: NextRequest) {
 			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 		}
 
+		// W2.3: never grant the free plan via a coupon. The coupon system models
+		// "free comp for N days" via the `coupon` subscription status; a "free
+		// plan grant" via entitlement is meaningless. Defense-in-depth at the
+		// RPC layer (billing_redeem_coupon_atomic_v2) rejects this too.
+		if (parsed.data.kind === "entitlement" && parsed.data.grants_plan_code === "free") {
+			return adminErrorResponse("free plan cannot be granted via coupon");
+		}
+
+		// W2.4: ≥95% discount creates a near-free coupon and is almost always a
+		// typo. Require the admin to explicitly tick a confirmation flag.
+		if (
+			parsed.data.kind === "checkout_discount" &&
+			parsed.data.discount_percent >= 95 &&
+			parsed.data.confirm_high_discount !== true
+		) {
+			return adminErrorResponse(
+				`Discounts ≥95% require confirm_high_discount=true (got ${parsed.data.discount_percent}%).`,
+			);
+		}
+
 		const code = parsed.data.code.toUpperCase();
 		const expiresAt = parsed.data.expires_at ? new Date(parsed.data.expires_at) : null;
 		if (expiresAt && Number.isNaN(expiresAt.getTime())) {
@@ -120,6 +148,12 @@ export async function POST(request: NextRequest) {
 			const planRows = await db.select({ code: plans.code }).from(plans).where(eq(plans.code, parsed.data.grants_plan_code)).limit(1);
 			if (!planRows[0]) return adminErrorResponse("grants_plan_code not found");
 		}
+
+		// W2.5: track the creating admin via session id. The admin auth model
+		// is single-tenant (one ADMIN_EMAIL per env, no Supabase user mapping)
+		// so we use the per-login-session id from admin_sessions, which is
+		// already what the audit log correlates against via jti.
+		const createdBy = gate.sessionId;
 
 		let inserted;
 		try {
@@ -134,7 +168,7 @@ export async function POST(request: NextRequest) {
 						grantsPlanCode: parsed.data.grants_plan_code,
 						expiresAt,
 						isActive: true,
-						createdBy: null,
+						createdBy,
 						kind: "entitlement",
 						singleUseGlobally: parsed.data.single_use_globally,
 						discountPercent: null,
@@ -153,7 +187,7 @@ export async function POST(request: NextRequest) {
 						grantsPlanCode: null,
 						expiresAt,
 						isActive: true,
-						createdBy: null,
+						createdBy,
 						kind: "checkout_discount",
 						singleUseGlobally: false,
 						discountPercent: parsed.data.discount_percent,

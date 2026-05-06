@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,17 +19,34 @@ export function AdminCouponCreateForm() {
 	const [expiresAt, setExpiresAt] = useState("");
 	const [singleUseGlobally, setSingleUseGlobally] = useState(false);
 	const [discountPercent, setDiscountPercent] = useState("10");
+	const [confirmHighDiscount, setConfirmHighDiscount] = useState(false);
 
 	useEffect(() => {
 		void (async () => {
 			const res = await fetch("/api/admin/plans", { credentials: "include" });
 			const j = (await res.json()) as { data?: { code: string }[] };
 			if (res.ok && j.data?.length) {
-				setPlanCodes(j.data.map((p) => p.code));
-				setGrantsPlanCode((c) => c || j.data![0]!.code);
+				// W2.3: never offer 'free' as a coupon-grant target. The API and
+				// RPC also reject this; filtering at the UI layer just keeps the
+				// dropdown honest.
+				const paidCodes = j.data.map((p) => p.code).filter((c) => c !== "free");
+				setPlanCodes(paidCodes);
+				setGrantsPlanCode((c) => c || paidCodes[0] || "");
 			}
 		})();
 	}, []);
+
+	const discountPctNum = Number(discountPercent || "0");
+	const requiresHighDiscountConfirm = kind === "checkout_discount" && discountPctNum >= 95;
+	const submitBlocked = useMemo(() => {
+		if (busy) return true;
+		if (!code.trim()) return true;
+		if (kind === "entitlement" && !grantsPlanCode) return true;
+		if (Number(maxRedemptions) < 1) return true;
+		if (kind === "checkout_discount" && (discountPctNum < 1 || discountPctNum > 100)) return true;
+		if (requiresHighDiscountConfirm && !confirmHighDiscount) return true;
+		return false;
+	}, [busy, code, kind, grantsPlanCode, maxRedemptions, discountPctNum, requiresHighDiscountConfirm, confirmHighDiscount]);
 
 	return (
 		<form
@@ -59,6 +76,7 @@ export function AdminCouponCreateForm() {
 									discount_percent: Number(discountPercent),
 									duration_days: 0,
 									eligible_plan_codes: null,
+									confirm_high_discount: confirmHighDiscount,
 								};
 					const res = await fetch("/api/admin/coupons", {
 						method: "POST",
@@ -117,10 +135,14 @@ export function AdminCouponCreateForm() {
 						id="cc-max"
 						className="h-9"
 						inputMode="numeric"
+						min={1}
 						value={maxRedemptions}
 						onChange={(e) => setMaxRedemptions(e.target.value.replace(/\D/g, ""))}
 						required
 					/>
+					{Number(maxRedemptions) < 1 ? (
+						<span className="text-xs text-destructive">Must be at least 1.</span>
+					) : null}
 				</div>
 
 				{kind === "entitlement" ? (
@@ -173,11 +195,40 @@ export function AdminCouponCreateForm() {
 								id="cc-pct"
 								className="h-9"
 								inputMode="numeric"
+								min={1}
+								max={100}
 								value={discountPercent}
-								onChange={(e) => setDiscountPercent(e.target.value.replace(/\D/g, ""))}
+								onChange={(e) => {
+									const v = e.target.value.replace(/\D/g, "");
+									if (v === "") {
+										setDiscountPercent("");
+										return;
+									}
+									const n = Math.min(100, Math.max(0, Number(v)));
+									setDiscountPercent(String(n));
+								}}
 								required
 							/>
+							{discountPctNum >= 1 && discountPctNum <= 100 ? null : (
+								<span className="text-xs text-destructive">Must be between 1 and 100.</span>
+							)}
 						</div>
+						{requiresHighDiscountConfirm ? (
+							<div className="flex flex-col gap-1 sm:col-span-2">
+								<label className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-sm">
+									<input
+										type="checkbox"
+										className="mt-0.5"
+										checked={confirmHighDiscount}
+										onChange={(e) => setConfirmHighDiscount(e.target.checked)}
+									/>
+									<span>
+										I understand a {discountPctNum}% discount makes the first cycle nearly free. Razorpay will charge the
+										prorated amount; renewals are full price.
+									</span>
+								</label>
+							</div>
+						) : null}
 					</>
 				)}
 
@@ -194,7 +245,7 @@ export function AdminCouponCreateForm() {
 				</label>
 				<Input id="cc-desc" className="h-9" value={description} onChange={(e) => setDescription(e.target.value)} />
 			</div>
-			<Button type="submit" disabled={busy || !code.trim() || (kind === "entitlement" && !grantsPlanCode)}>
+			<Button type="submit" disabled={submitBlocked}>
 				{busy ? "Creating…" : "Create coupon"}
 			</Button>
 		</form>

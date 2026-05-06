@@ -38,6 +38,7 @@ function adminHeaders(): HeadersInit {
  * Pinned on globalThis so HMR / dev rebuilds don't reset it.
  */
 interface AdminSessionCacheEntry {
+	sessionId: string;
 	cachedAt: number;
 }
 const ADMIN_SESSION_CACHE_TTL_MS = 10_000;
@@ -63,24 +64,24 @@ function evictOldestAdminSessionEntries(): void {
 	}
 }
 
-function isAdminSessionCacheHit(jti: string): boolean {
+function isAdminSessionCacheHit(jti: string): { sessionId: string } | null {
 	const entry = adminSessionCache.get(jti);
-	if (!entry) return false;
+	if (!entry) return null;
 	if (Date.now() - entry.cachedAt > ADMIN_SESSION_CACHE_TTL_MS) {
 		adminSessionCache.delete(jti);
-		return false;
+		return null;
 	}
 	// Promote on read: re-insert so this key is now the most recently used.
 	// Without this, an actively-used session can still be the LRU head and
 	// get evicted under cache pressure.
 	adminSessionCache.delete(jti);
 	adminSessionCache.set(jti, entry);
-	return true;
+	return { sessionId: entry.sessionId };
 }
 
-function cacheAdminSession(jti: string): void {
+function cacheAdminSession(jti: string, sessionId: string): void {
 	adminSessionCache.delete(jti);
-	adminSessionCache.set(jti, { cachedAt: Date.now() });
+	adminSessionCache.set(jti, { sessionId, cachedAt: Date.now() });
 	evictOldestAdminSessionEntries();
 }
 
@@ -94,7 +95,7 @@ export function __resetAdminSessionCacheForTest(): void {
 	adminSessionCache.clear();
 }
 
-export async function requireAdminApi(): Promise<{ jti: string } | NextResponse> {
+export async function requireAdminApi(): Promise<{ jti: string; sessionId: string } | NextResponse> {
 	const jar = await cookies();
 	const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
 	if (!token) {
@@ -111,8 +112,9 @@ export async function requireAdminApi(): Promise<{ jti: string } | NextResponse>
 	// Cache fast-path: if we verified this jti in the last 10s, skip the DB
 	// roundtrip. Cache only stores valid sessions; nothing to forge here since
 	// the JWT signature was just verified above.
-	if (isAdminSessionCacheHit(payload.jti)) {
-		return { jti: payload.jti };
+	const cached = isAdminSessionCacheHit(payload.jti);
+	if (cached) {
+		return { jti: payload.jti, sessionId: cached.sessionId };
 	}
 
 	try {
@@ -124,8 +126,9 @@ export async function requireAdminApi(): Promise<{ jti: string } | NextResponse>
 		if (!rows[0]) {
 			return NextResponse.json({ error: "Unauthorized", code: "admin_session_revoked" }, { status: 401, headers: adminHeaders() });
 		}
-		cacheAdminSession(payload.jti);
-		return { jti: payload.jti };
+		const sessionId = rows[0].id;
+		cacheAdminSession(payload.jti, sessionId);
+		return { jti: payload.jti, sessionId };
 	} catch (e) {
 		const cause = e instanceof DrizzleQueryError ? e.cause : undefined;
 		const dbAtCapacity = isPostgresTooManyConnectionsError(e);

@@ -37,4 +37,5 @@ export const ADMIN_LIST_ID = {
 	billingEvents: "billing.events",
 	billingPayments: "billing.payments",
 	billingTrialClaims: "billing.trial_claims",
+	billingActionFailures: "billing.action_failures",
 } as const;

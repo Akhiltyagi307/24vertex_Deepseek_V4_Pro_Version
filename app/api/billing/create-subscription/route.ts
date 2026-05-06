@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
 	createOrFetchCustomer,
 	createSubscription,
+	RazorpayCustomerCollisionError,
 } from "@/lib/billing/razorpay";
 import { getApiRequestUser } from "@/lib/auth/api-request-user";
 import { quoteCheckoutCouponForPlan } from "@/lib/billing/checkout-coupon";
@@ -190,8 +191,38 @@ export async function POST(req: Request) {
 			email: user.email ?? "",
 			contact: profile?.phone ?? undefined,
 			notes: { profile_id: targetProfileId },
+			expectedProfileId: targetProfileId,
 		});
 	} catch (e) {
+		// W1.3: a collision means Razorpay returned a customer whose
+		// notes.profile_id belongs to a different profile (typically a
+		// shared-email household). We refuse to reuse and audit on the sub row
+		// so support can investigate. Returning 409 with a clear message lets
+		// the user contact us; the alternative — reusing — would couple two
+		// unrelated billing lifecycles into one Razorpay customer_id.
+		if (e instanceof RazorpayCustomerCollisionError) {
+			logServerError("billing.create-subscription.customer_collision", e, {
+				razorpay_customer_id: e.razorpayCustomerId,
+				owner_profile_id: e.ownerProfileId,
+				attempted_profile_id: e.attemptedProfileId,
+			});
+			await admin
+				.from("subscriptions")
+				.update({
+					razorpay_customer_email_collision_at: new Date().toISOString(),
+					updated_at: new Date().toISOString(),
+				})
+				.eq("profile_id", targetProfileId);
+			return Response.json(
+				{
+					ok: false,
+					code: "customer_collision",
+					message:
+						"This email is already linked to a different EduAI account in Razorpay. Contact support to resolve before subscribing.",
+				},
+				{ status: 409 },
+			);
+		}
 		logServerError("billing.create-subscription.customer", e);
 		return Response.json({ ok: false, message: "Could not create Razorpay customer." }, { status: 500 });
 	}
@@ -236,6 +267,22 @@ export async function POST(req: Request) {
 		});
 	} catch (e) {
 		logServerError("billing.create-subscription.rzp", e);
+		// W4.4: the customer was just created at Razorpay (orphan) but the
+		// subscription failed. Log to billing_action_failures so admins can
+		// reconcile in the action-failures admin page; the recovery is
+		// usually "retry checkout" since createOrFetchCustomer dedups by
+		// (email, contact) and will return the same customer next time.
+		await admin.from("billing_action_failures").insert({
+			kind: "orphan_customer",
+			profile_id: targetProfileId,
+			error_message: `Subscription create failed after customer create: ${e instanceof Error ? e.message : String(e)}`,
+			payload: {
+				razorpay_customer_id: customer.id,
+				razorpay_customer_email: customer.email,
+				plan_code: plan.code,
+				start_mode: parsed.data.startMode,
+			},
+		});
 		return Response.json({ ok: false, message: "Could not start Razorpay checkout." }, { status: 502 });
 	}
 
@@ -243,6 +290,7 @@ export async function POST(req: Request) {
 		.from("subscriptions")
 		.update({
 			razorpay_customer_id: customer.id,
+			razorpay_customer_email: typeof customer.email === "string" ? customer.email : null,
 			razorpay_subscription_id: razorpaySubscription.id,
 			pending_plan_code: plan.code,
 			updated_at: new Date().toISOString(),

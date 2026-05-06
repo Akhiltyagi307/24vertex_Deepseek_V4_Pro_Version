@@ -39,6 +39,9 @@ export const subscriptions = pgTable(
 		cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
 		razorpaySubscriptionId: varchar("razorpay_subscription_id", { length: 80 }),
 		razorpayCustomerId: varchar("razorpay_customer_id", { length: 80 }),
+		razorpayCustomerEmail: text("razorpay_customer_email"),
+		razorpayCustomerEmailCollisionAt: timestamp("razorpay_customer_email_collision_at", { withTimezone: true }),
+		pausedAt: timestamp("paused_at", { withTimezone: true }),
 		pendingPlanCode: varchar("pending_plan_code", { length: 32 }).references(() => plans.code),
 		staffOverride: boolean("staff_override").notNull().default(false),
 		metadata: jsonb("metadata").notNull().default({}),
@@ -67,6 +70,7 @@ export const usagePeriods = pgTable(
 		testsUsed: integer("tests_used").notNull().default(0),
 		tokensQuota: integer("tokens_quota").notNull(),
 		tokensUsed: integer("tokens_used").notNull().default(0),
+		prePauseQuota: jsonb("pre_pause_quota").$type<{ testsQuota: number; tokensQuota: number } | null>(),
 		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	},
 	(t) => [
@@ -153,6 +157,7 @@ export const adminRefundIdempotency = pgTable("admin_refund_idempotency", {
 		.notNull()
 		.references(() => payments.id, { onDelete: "cascade" }),
 	razorpayRefundId: varchar("razorpay_refund_id", { length: 80 }),
+	state: text("state").notNull().default("pending"),
 	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -194,8 +199,75 @@ export const couponRedemptions = pgTable(
 			.references(() => profiles.id, { onDelete: "cascade" }),
 		subscriptionId: uuid("subscription_id").references(() => subscriptions.id, { onDelete: "set null" }),
 		redeemedAt: timestamp("redeemed_at", { withTimezone: true }).notNull().defaultNow(),
+		refundedAt: timestamp("refunded_at", { withTimezone: true }),
 	},
 	(t) => [unique("coupon_redemptions_unique").on(t.couponId, t.profileId)],
+);
+
+export const billingPlanChanges = pgTable(
+	"billing_plan_changes",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		subscriptionId: uuid("subscription_id")
+			.notNull()
+			.references(() => subscriptions.id, { onDelete: "cascade" }),
+		fromPlanCode: varchar("from_plan_code", { length: 32 }),
+		toPlanCode: varchar("to_plan_code", { length: 32 }).notNull(),
+		whenApplied: varchar("when_applied", { length: 16 }).notNull(),
+		prorationDeltaPaise: integer("proration_delta_paise"),
+		prorationPaymentId: varchar("proration_payment_id", { length: 80 }),
+		initiatedByUserId: uuid("initiated_by_user_id"),
+		initiatedByAdminSessionId: uuid("initiated_by_admin_session_id"),
+		errorMessage: text("error_message"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+	},
+	(t) => [index("idx_billing_plan_changes_subscription_created").on(t.subscriptionId, t.createdAt)],
+);
+
+export const billingReconciliationDrift = pgTable(
+	"billing_reconciliation_drift",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		subscriptionId: uuid("subscription_id").references(() => subscriptions.id, { onDelete: "set null" }),
+		paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
+		idempotencyKey: text("idempotency_key"),
+		field: text("field").notNull(),
+		localValue: text("local_value"),
+		razorpayValue: text("razorpay_value"),
+		detectedAt: timestamp("detected_at", { withTimezone: true }).notNull().defaultNow(),
+		resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+		resolvedByJti: text("resolved_by_jti"),
+		resolutionNote: text("resolution_note"),
+	},
+	(t) => [
+		index("idx_billing_reconciliation_drift_detected").on(t.detectedAt),
+	],
+);
+
+export const billingActionFailures = pgTable(
+	"billing_action_failures",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		kind: text("kind").notNull(),
+		couponId: uuid("coupon_id").references(() => coupons.id, { onDelete: "set null" }),
+		profileId: uuid("profile_id").references(() => profiles.id, { onDelete: "set null" }),
+		subscriptionId: uuid("subscription_id").references(() => subscriptions.id, { onDelete: "set null" }),
+		paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
+		razorpayEventId: varchar("razorpay_event_id", { length: 120 }),
+		errorMessage: text("error_message").notNull(),
+		payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+		retryCount: integer("retry_count").notNull().default(0),
+		lastRetryAt: timestamp("last_retry_at", { withTimezone: true }),
+		resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+		resolvedByJti: text("resolved_by_jti"),
+		resolutionNote: text("resolution_note"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		index("idx_billing_action_failures_open_kind_created").on(t.kind, t.createdAt),
+		index("idx_billing_action_failures_profile_created").on(t.profileId, t.createdAt),
+	],
 );
 
 export const billingEvents = pgTable(

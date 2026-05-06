@@ -4,6 +4,15 @@ import crypto from "node:crypto";
 import Razorpay from "razorpay";
 
 import { getRazorpayKeyId, getRazorpayKeySecret, getRazorpayWebhookSecret } from "@/lib/env";
+import {
+	RazorpayCustomerSchema,
+	RazorpayInvoiceSchema,
+	RazorpayPlanCreatedSchema,
+	RazorpayPlanFetchedSchema,
+	RazorpayRefundSchema,
+	RazorpayRefundsListSchema,
+	RazorpaySubscriptionSchema,
+} from "./razorpay-schemas";
 
 let _client: Razorpay | null = null;
 
@@ -22,7 +31,40 @@ export type RazorpayCustomer = {
 	name?: string | null;
 	email?: string | null;
 	contact?: string | null;
+	notes?: Record<string, unknown> | null;
 };
+
+/**
+ * Thrown by createOrFetchCustomer when Razorpay's email-and-contact dedup
+ * returned a customer that was originally created for a different profile.
+ *
+ * The caller (create-subscription route) catches this specifically, audits
+ * the collision on the subscription row, and returns 409 to the client. We do
+ * NOT silently reuse the existing customer because the two profiles would then
+ * share lifecycle events (cancel one, the other surprises break).
+ */
+export class RazorpayCustomerCollisionError extends Error {
+	readonly razorpayCustomerId: string;
+	readonly ownerProfileId: string;
+	readonly attemptedProfileId: string;
+	readonly customerEmail: string | null;
+
+	constructor(opts: {
+		razorpayCustomerId: string;
+		ownerProfileId: string;
+		attemptedProfileId: string;
+		customerEmail: string | null;
+	}) {
+		super(
+			`Razorpay customer ${opts.razorpayCustomerId} already owned by profile ${opts.ownerProfileId}; cannot reuse for profile ${opts.attemptedProfileId}.`,
+		);
+		this.name = "RazorpayCustomerCollisionError";
+		this.razorpayCustomerId = opts.razorpayCustomerId;
+		this.ownerProfileId = opts.ownerProfileId;
+		this.attemptedProfileId = opts.attemptedProfileId;
+		this.customerEmail = opts.customerEmail;
+	}
+}
 
 export async function createOrFetchCustomer(input: {
 	existingCustomerId?: string | null;
@@ -30,27 +72,55 @@ export async function createOrFetchCustomer(input: {
 	email: string;
 	contact?: string | null;
 	notes?: Record<string, string>;
+	/**
+	 * Profile id that this customer is being created/fetched for. When set,
+	 * we validate that any returned customer's notes.profile_id matches —
+	 * otherwise we throw RazorpayCustomerCollisionError.
+	 */
+	expectedProfileId?: string;
 }): Promise<RazorpayCustomer> {
 	const rzp = getRazorpayClient();
 	if (input.existingCustomerId) {
-		const existing = await rzp.customers.fetch(input.existingCustomerId);
-		return existing as unknown as RazorpayCustomer;
+		const existing = RazorpayCustomerSchema.parse(await rzp.customers.fetch(input.existingCustomerId));
+		assertCustomerOwnership(existing, input.expectedProfileId);
+		return existing;
 	}
 	try {
-		// `fail_existing=0` returns the existing record if the email is already registered.
-		const created = (await rzp.customers.create({
-			name: input.name,
-			email: input.email,
-			contact: input.contact ?? undefined,
-			fail_existing: 0,
-			notes: input.notes,
-		})) as unknown as RazorpayCustomer;
+		// `fail_existing=0` returns the existing record if the email+contact pair
+		// is already registered. We must validate ownership on the response —
+		// see RazorpayCustomerCollisionError above.
+		const created = RazorpayCustomerSchema.parse(
+			await rzp.customers.create({
+				name: input.name,
+				email: input.email,
+				contact: input.contact ?? undefined,
+				fail_existing: 0,
+				notes: input.notes,
+			}),
+		);
+		assertCustomerOwnership(created, input.expectedProfileId);
 		return created;
 	} catch (e) {
+		if (e instanceof RazorpayCustomerCollisionError) throw e;
 		throw new Error(
 			`Razorpay customer create failed: ${e instanceof Error ? e.message : String(e)}`,
 		);
 	}
+}
+
+function assertCustomerOwnership(customer: RazorpayCustomer, expectedProfileId: string | undefined): void {
+	if (!expectedProfileId) return;
+	const ownerProfileId = typeof customer.notes?.profile_id === "string" ? customer.notes.profile_id : null;
+	// If notes.profile_id is missing entirely, the customer pre-dates our
+	// notes-tagging convention — treat as legacy/unowned and allow reuse.
+	if (!ownerProfileId) return;
+	if (ownerProfileId === expectedProfileId) return;
+	throw new RazorpayCustomerCollisionError({
+		razorpayCustomerId: customer.id,
+		ownerProfileId,
+		attemptedProfileId: expectedProfileId,
+		customerEmail: typeof customer.email === "string" ? customer.email : null,
+	});
 }
 
 // ------------------------------------------------------------
@@ -86,8 +156,18 @@ export type RazorpaySubscription = {
 	notes?: Record<string, string> | null;
 };
 
+// W5.3: Razorpay's documented limit is 9999 cycles. Asserting at the
+// boundary means a typo-bumped 99999 fails fast in our process, not at
+// Razorpay with a generic 4xx that's a pain to trace.
+const RAZORPAY_MAX_TOTAL_COUNT = 9999;
+
 export async function createSubscription(input: CreateSubscriptionInput): Promise<RazorpaySubscription> {
 	const rzp = getRazorpayClient();
+	if (!Number.isInteger(input.totalCount) || input.totalCount < 1 || input.totalCount > RAZORPAY_MAX_TOTAL_COUNT) {
+		throw new Error(
+			`Invalid totalCount=${input.totalCount}; Razorpay accepts 1..${RAZORPAY_MAX_TOTAL_COUNT}.`,
+		);
+	}
 	const body: Record<string, unknown> = {
 		plan_id: input.planId,
 		total_count: input.totalCount,
@@ -99,13 +179,12 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
 	if (input.customerId) body.customer_id = input.customerId;
 	if (input.offerId) body.offer_id = input.offerId;
 	if (input.notes) body.notes = input.notes;
-	const sub = (await rzp.subscriptions.create(body as never)) as unknown as RazorpaySubscription;
-	return sub;
+	return RazorpaySubscriptionSchema.parse(await rzp.subscriptions.create(body as never));
 }
 
 export async function fetchSubscription(subscriptionId: string): Promise<RazorpaySubscription> {
 	const rzp = getRazorpayClient();
-	return (await rzp.subscriptions.fetch(subscriptionId)) as unknown as RazorpaySubscription;
+	return RazorpaySubscriptionSchema.parse(await rzp.subscriptions.fetch(subscriptionId));
 }
 
 export async function cancelSubscription(
@@ -114,18 +193,46 @@ export async function cancelSubscription(
 ): Promise<RazorpaySubscription> {
 	const rzp = getRazorpayClient();
 	const cancelAtCycleEnd = opts.cancelAtCycleEnd ? 1 : 0;
-	return (await rzp.subscriptions.cancel(
-		subscriptionId,
-		cancelAtCycleEnd as unknown as boolean,
-	)) as unknown as RazorpaySubscription;
+	return RazorpaySubscriptionSchema.parse(
+		await rzp.subscriptions.cancel(subscriptionId, cancelAtCycleEnd as unknown as boolean),
+	);
 }
 
-export async function updateSubscriptionPlan(subscriptionId: string, newPlanId: string): Promise<RazorpaySubscription> {
+export async function pauseSubscription(
+	subscriptionId: string,
+	opts: { pauseAt?: "now" } = {},
+): Promise<RazorpaySubscription> {
 	const rzp = getRazorpayClient();
-	return (await rzp.subscriptions.update(subscriptionId, {
-		plan_id: newPlanId,
-		schedule_change_at: "now",
-	} as never)) as unknown as RazorpaySubscription;
+	const pauseFn = (rzp.subscriptions as unknown as {
+		pause: (id: string, body: Record<string, unknown>) => Promise<unknown>;
+	}).pause;
+	return RazorpaySubscriptionSchema.parse(await pauseFn(subscriptionId, { pause_at: opts.pauseAt ?? "now" }));
+}
+
+export async function resumeSubscription(
+	subscriptionId: string,
+	opts: { resumeAt?: "now" } = {},
+): Promise<RazorpaySubscription> {
+	const rzp = getRazorpayClient();
+	const resumeFn = (rzp.subscriptions as unknown as {
+		resume: (id: string, body: Record<string, unknown>) => Promise<unknown>;
+	}).resume;
+	return RazorpaySubscriptionSchema.parse(await resumeFn(subscriptionId, { resume_at: opts.resumeAt ?? "now" }));
+}
+
+export async function updateSubscriptionPlan(
+	subscriptionId: string,
+	newPlanId: string,
+	opts: { scheduleChangeAt?: "now" | "cycle_end"; customerNotify?: 0 | 1 } = {},
+): Promise<RazorpaySubscription> {
+	const rzp = getRazorpayClient();
+	return RazorpaySubscriptionSchema.parse(
+		await rzp.subscriptions.update(subscriptionId, {
+			plan_id: newPlanId,
+			schedule_change_at: opts.scheduleChangeAt ?? "now",
+			customer_notify: opts.customerNotify ?? 1,
+		} as never),
+	);
 }
 
 // ------------------------------------------------------------
@@ -152,23 +259,24 @@ export type RazorpayPlanFetched = {
 /** Loads a plan from Razorpay (amount in paise on `item.amount`). */
 export async function fetchRazorpayPlan(planId: string): Promise<RazorpayPlanFetched> {
 	const rzp = getRazorpayClient();
-	return (await rzp.plans.fetch(planId)) as unknown as RazorpayPlanFetched;
+	return RazorpayPlanFetchedSchema.parse(await rzp.plans.fetch(planId));
 }
 
 export async function createPlan(input: RazorpayPlanInput): Promise<{ id: string }> {
 	const rzp = getRazorpayClient();
-	const plan = (await rzp.plans.create({
-		period: input.period,
-		interval: input.interval,
-		item: {
-			name: input.name,
-			amount: input.amountPaise,
-			currency: input.currency ?? "INR",
-			description: input.description,
-		},
-		notes: input.notes,
-	} as never)) as unknown as { id: string };
-	return plan;
+	return RazorpayPlanCreatedSchema.parse(
+		await rzp.plans.create({
+			period: input.period,
+			interval: input.interval,
+			item: {
+				name: input.name,
+				amount: input.amountPaise,
+				currency: input.currency ?? "INR",
+				description: input.description,
+			},
+			notes: input.notes,
+		} as never),
+	);
 }
 
 // ------------------------------------------------------------
@@ -187,10 +295,17 @@ export type RazorpayInvoice = {
 
 export async function fetchInvoice(invoiceId: string): Promise<RazorpayInvoice> {
 	const rzp = getRazorpayClient();
-	return (await rzp.invoices.fetch(invoiceId)) as unknown as RazorpayInvoice;
+	return RazorpayInvoiceSchema.parse(await rzp.invoices.fetch(invoiceId));
 }
 
-export type RazorpayRefund = { id: string; amount?: number; status?: string };
+export type RazorpayRefund = {
+	id: string;
+	amount?: number;
+	status?: string;
+	payment_id?: string;
+	created_at?: number;
+	notes?: Record<string, unknown> | null;
+};
 
 /** Partial refund when `amountPaise` is set; else full refund. */
 export async function refundPayment(
@@ -201,7 +316,19 @@ export async function refundPayment(
 	const body: Record<string, unknown> = {};
 	if (opts.amountPaise != null) body.amount = opts.amountPaise;
 	if (opts.notes) body.notes = opts.notes;
-	return (await rzp.payments.refund(razorpayPaymentId, body as never)) as unknown as RazorpayRefund;
+	return RazorpayRefundSchema.parse(await rzp.payments.refund(razorpayPaymentId, body as never));
+}
+
+/**
+ * List all refunds attached to a Razorpay payment. Used by the W3.3
+ * reconciliation cron to recover orphan idempotency rows: when our
+ * post-Razorpay-update DB write failed, we don't have the refund_id locally
+ * but we know the payment_id, so we ask Razorpay which refunds it has.
+ */
+export async function fetchPaymentRefunds(razorpayPaymentId: string): Promise<RazorpayRefund[]> {
+	const rzp = getRazorpayClient();
+	const parsed = RazorpayRefundsListSchema.parse(await rzp.payments.fetchMultipleRefund(razorpayPaymentId));
+	return parsed.items;
 }
 
 // ------------------------------------------------------------

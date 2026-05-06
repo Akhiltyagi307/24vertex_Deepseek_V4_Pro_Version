@@ -10,6 +10,7 @@ import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
 import { consumeAdminActionRateLimit, adminActionScope } from "@/lib/admin/rate-limit-action";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { refundPayment } from "@/lib/billing/razorpay";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { db } from "@/db";
 import { adminRefundIdempotency, payments } from "@/db/schema/billing";
 
@@ -85,7 +86,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		if (!pay.razorpayPaymentId) {
 			return adminErrorResponse("Payment has no Razorpay id");
 		}
-		if (pay.refundedAt) {
+		// Either flag set means a refund already landed (or at least Razorpay-issued
+		// the id). Checking only refundedAt missed the case where the post-refund
+		// payments UPDATE failed but razorpayRefundId still got written.
+		if (pay.refundedAt || pay.razorpayRefundId) {
 			return adminErrorResponse("Already refunded", { status: 409 });
 		}
 
@@ -98,18 +102,50 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			);
 		}
 
+		// State-aware idempotency:
+		//   pending   — reservation exists, Razorpay outcome unknown (in flight or
+		//               post-call DB update failed). Block retries until the W3.3
+		//               reconciliation cron determines whether Razorpay actually
+		//               processed the refund.
+		//   succeeded — row carries razorpay_refund_id; safe to return on dedup.
+		//   orphan    — reconciliation determined no refund will land; admin must
+		//               clear the row before retrying.
 		const reserved = await db
 			.insert(adminRefundIdempotency)
-			.values({ idempotencyKey, paymentId: pay.id, razorpayRefundId: null })
+			.values({ idempotencyKey, paymentId: pay.id, razorpayRefundId: null, state: "pending" })
 			.onConflictDoNothing({ target: adminRefundIdempotency.idempotencyKey })
 			.returning({ key: adminRefundIdempotency.idempotencyKey });
 		if (!reserved[0]) {
 			const prev = await db
-				.select({ razorpayRefundId: adminRefundIdempotency.razorpayRefundId })
+				.select({
+					razorpayRefundId: adminRefundIdempotency.razorpayRefundId,
+					state: adminRefundIdempotency.state,
+				})
 				.from(adminRefundIdempotency)
 				.where(eq(adminRefundIdempotency.idempotencyKey, idempotencyKey))
 				.limit(1);
-			return adminAckResponse({ deduped: true, razorpay_refund_id: prev[0]?.razorpayRefundId ?? null });
+			const row = prev[0];
+			if (!row) {
+				// Insert was raced and the row is gone — extremely unlikely under the
+				// onConflictDoNothing pattern, but treat it like "in flight".
+				return adminErrorResponse("Refund attempt in flight; retry in 30s.", {
+					status: 409,
+					code: "in_flight",
+				});
+			}
+			if (row.state === "succeeded" && row.razorpayRefundId) {
+				return adminAckResponse({ deduped: true, razorpay_refund_id: row.razorpayRefundId });
+			}
+			if (row.state === "pending") {
+				return adminErrorResponse(
+					"Refund attempt is still being reconciled with Razorpay. Reconciliation runs hourly. Do not retry with the same Idempotency-Key until it resolves.",
+					{ status: 409, code: "in_flight" },
+				);
+			}
+			return adminErrorResponse(
+				"Refund attempt is in 'orphan' state. Resolve in admin → Billing → Reconciliation before retrying.",
+				{ status: 422, code: "orphan" },
+			);
 		}
 
 		let rzpRefundId: string;
@@ -120,16 +156,31 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			});
 			rzpRefundId = r.id;
 		} catch (e) {
-			await db.delete(adminRefundIdempotency).where(eq(adminRefundIdempotency.idempotencyKey, idempotencyKey));
+			// Critical: never delete the idempotency row here. Razorpay may have
+			// processed the refund but our request errored on the response (network
+			// blip, timeout, gateway). Deleting the row would make a retry with the
+			// same Idempotency-Key issue a second refund. Leave the row in 'pending'
+			// state and let the reconciliation cron (W3.3) check Razorpay directly
+			// to determine outcome.
+			Sentry.captureException(e, {
+				tags: { component: "billing.refund", phase: "razorpay_call" },
+				extra: { idempotency_key: idempotencyKey, payment_id: pay.id },
+			});
 			const msg = e instanceof Error ? e.message : String(e);
-			return adminErrorResponse(msg, { status: 502 });
+			return adminErrorResponse(
+				`Razorpay refund call failed; status uncertain. The hourly reconciliation job will determine outcome — do not retry with the same Idempotency-Key until it resolves. Underlying error: ${msg}`,
+				{ status: 502 },
+			);
 		}
 
 		const amountRefunded = parsed.data.amount_paise ?? pay.amountPaise;
 		const now = new Date();
+		// Mark idempotency row 'succeeded' with the refund id atomically. If this
+		// UPDATE fails the row stays 'pending' and the reconciliation cron will
+		// pick it up — Razorpay's record is the source of truth.
 		await db
 			.update(adminRefundIdempotency)
-			.set({ razorpayRefundId: rzpRefundId })
+			.set({ razorpayRefundId: rzpRefundId, state: "succeeded" })
 			.where(eq(adminRefundIdempotency.idempotencyKey, idempotencyKey));
 		await db
 			.update(payments)
@@ -140,6 +191,34 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 				status: "refunded",
 			})
 			.where(eq(payments.id, pay.id));
+
+		// W3.2: roll back any coupon redemption tied to this payment's
+		// subscription. Idempotent — refund.processed webhook will be a no-op
+		// if it lands later; admin-side fires first because we already have
+		// the row in hand and don't want to depend on webhook reliability.
+		if (pay.subscriptionId) {
+			const admin = createServiceRoleClient();
+			const { error: rollbackErr } = await admin.rpc("billing_rollback_coupon_redemption_atomic", {
+				p_subscription_id: pay.subscriptionId,
+				p_profile_id: pay.profileId,
+			});
+			if (rollbackErr) {
+				// Surface in admin UI for retry — refund itself succeeded.
+				await admin.from("billing_action_failures").insert({
+					kind: "refund_coupon_rollback",
+					payment_id: pay.id,
+					profile_id: pay.profileId,
+					subscription_id: pay.subscriptionId,
+					error_message: `rollback_coupon_redemption_atomic (admin route): ${rollbackErr.message}`,
+					payload: { razorpay_refund_id: rzpRefundId },
+				});
+				Sentry.captureMessage("billing.refund.coupon_rollback_failed", {
+					level: "warning",
+					tags: { component: "billing.refund", phase: "coupon_rollback" },
+					extra: { payment_id: pay.id, error: rollbackErr.message },
+				});
+			}
+		}
 
 		// Strict variant: a refund WITHOUT an audit row is a compliance hole, so
 		// we fail-closed on audit failure (the actual refund already executed at

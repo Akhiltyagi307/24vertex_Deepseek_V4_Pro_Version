@@ -133,7 +133,7 @@ export async function sendSubscriptionActiveEmail(params: SubscriptionActivePara
 	});
 }
 
-export type PaymentFailedParams = CommonParams;
+export type PaymentFailedParams = CommonParams & { dedupKey?: string };
 export async function sendPaymentFailedEmail(params: PaymentFailedParams): Promise<{ error: string | null }> {
 	const subject = "We couldn't collect your EduAI payment";
 	const studentName = escapeHtml(params.studentName ?? "there");
@@ -157,6 +157,59 @@ export async function sendPaymentFailedEmail(params: PaymentFailedParams): Promi
 		html,
 		templateSlug: "subscription-payment-failed",
 		templateVariables: { student_name: params.studentName ?? "there" },
+		dedupKey: params.dedupKey,
+	});
+}
+
+/**
+ * W4.3 — dunning reminder for day-3 / day-7 of a halted/past_due subscription.
+ *
+ * The day-0 message goes out via sendPaymentFailedEmail when the
+ * subscription.halted/payment.failed webhook fires. Day-3 and day-7 ramp up
+ * urgency before the day-14 hard cancel.
+ */
+export type DunningReminderParams = CommonParams & {
+	dayNumber: 3 | 7;
+	subscriptionId: string;
+};
+
+export async function sendDunningReminderEmail(
+	params: DunningReminderParams,
+): Promise<{ error: string | null }> {
+	const studentName = escapeHtml(params.studentName ?? "there");
+	const subject =
+		params.dayNumber === 3
+			? "Reminder: payment still pending on EduAI"
+			: "Final reminder: your EduAI subscription will be cancelled in 7 days";
+	const urgency =
+		params.dayNumber === 3
+			? "It's been 3 days since we couldn't collect your subscription payment."
+			: "It's been a week since your last successful payment.";
+	const callout =
+		params.dayNumber === 3
+			? "Update your payment method now to keep practice access uninterrupted."
+			: "If we don't hear from you in the next 7 days we'll cancel the subscription. You can resubscribe any time.";
+
+	const html = renderEmailShell({
+		preheader: urgency,
+		greeting: `Hi ${studentName},`,
+		title: subject,
+		paragraphs: [
+			urgency,
+			"Common causes are an expired card, paused UPI mandate, or insufficient balance at the time of charge.",
+		],
+		callout: { tone: "warning", text: callout },
+		primaryCta: { label: "Update payment method", href: `${getAppUrl()}/student/subscription` },
+	});
+
+	return sendHtmlEmailLogged({
+		to: params.to,
+		recipientUserId: params.recipientUserId ?? null,
+		subject,
+		html,
+		templateSlug: `subscription-dunning-day-${params.dayNumber}`,
+		templateVariables: { student_name: params.studentName ?? "there", day_number: String(params.dayNumber) },
+		dedupKey: `${params.subscriptionId}:dunning-day-${params.dayNumber}`,
 	});
 }
 

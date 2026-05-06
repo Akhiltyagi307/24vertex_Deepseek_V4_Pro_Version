@@ -38,6 +38,8 @@ const links = [
 	{ href: "/admin/billing/events", label: "Billing · Webhook events" },
 	{ href: "/admin/billing/coupons", label: "Billing · Coupons" },
 	{ href: "/admin/billing/trial-claims", label: "Billing · Trial claims" },
+	{ href: "/admin/billing/action-failures", label: "Billing · Action failures" },
+	{ href: "/admin/billing/reconciliation", label: "Billing · Reconciliation" },
 	{ href: "/admin/system/sql-console", label: "System · SQL" },
 	{ href: "/admin/system/jobs", label: "System · Jobs" },
 	{ href: "/admin/system/health", label: "System · Health" },

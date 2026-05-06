@@ -64,14 +64,27 @@ function preconnectRazorpayOnce(): void {
 	document.head.appendChild(dnsPrefetch);
 }
 
+// W7.3: cap the script load wait so a hanging CDN doesn't strand the user
+// with a "Opening…" button forever. 10s is generous — if checkout.js hasn't
+// loaded by then, fall back to hosted checkout via shortUrl.
+const SCRIPT_LOAD_TIMEOUT_MS = 10_000;
+
 async function ensureRazorpayScript(): Promise<boolean> {
 	if (typeof window === "undefined") return false;
 	if (window.Razorpay) return true;
 	return new Promise<boolean>((resolve) => {
+		let settled = false;
+		const settle = (ok: boolean): void => {
+			if (settled) return;
+			settled = true;
+			window.clearTimeout(timeoutId);
+			resolve(ok);
+		};
+		const timeoutId = window.setTimeout(() => settle(false), SCRIPT_LOAD_TIMEOUT_MS);
 		const existing = document.querySelector<HTMLScriptElement>(`script[src="${CHECKOUT_SRC}"]`);
 		if (existing) {
-			existing.addEventListener("load", () => resolve(Boolean(window.Razorpay)));
-			existing.addEventListener("error", () => resolve(false));
+			existing.addEventListener("load", () => settle(Boolean(window.Razorpay)));
+			existing.addEventListener("error", () => settle(false));
 			return;
 		}
 		const s = document.createElement("script");
@@ -88,10 +101,27 @@ async function ensureRazorpayScript(): Promise<boolean> {
 		// allowlist + per-request nonce (see proxy.ts / src/lib/security/csp.ts)
 		// plus the `frame-src https://api.razorpay.com` carve-out.
 		s.crossOrigin = "anonymous";
-		s.onload = () => resolve(Boolean(window.Razorpay));
-		s.onerror = () => resolve(false);
+		s.onload = () => settle(Boolean(window.Razorpay));
+		s.onerror = () => settle(false);
 		document.body.appendChild(s);
 	});
+}
+
+/**
+ * W7.4: fire-and-forget client telemetry. The endpoint is auth-gated and
+ * narrow-allowlisted; we never block checkout on telemetry success.
+ */
+function trackCheckoutEvent(eventName: string, props: Record<string, unknown> = {}): void {
+	try {
+		void fetch("/api/student/billing/checkout-event", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ event_name: eventName, props }),
+			keepalive: true,
+		});
+	} catch {
+		/* telemetry never blocks UX */
+	}
 }
 
 export type CheckoutButtonProps = {
@@ -121,6 +151,11 @@ export function RazorpayCheckoutButton({
 }: CheckoutButtonProps) {
 	const router = useRouter();
 	const [pending, setPending] = React.useState(false);
+	// W7.1: capture trigger button so we can restore focus when the modal
+	// closes — the Razorpay modal injects an iframe and steals focus to it,
+	// and on dismiss returning focus to the trigger is the WAI-ARIA dialog
+	// pattern. Without this, keyboard users land at <body> after dismissal.
+	const buttonRef = React.useRef<HTMLButtonElement>(null);
 
 	async function onClick() {
 		setPending(true);
@@ -191,13 +226,58 @@ export function RazorpayCheckoutButton({
 				modal: {
 					ondismiss: () => {
 						setPending(false);
+						trackCheckoutEvent("checkout_dismissed", { plan_code: planCode });
+						// W7.1: restore focus to the trigger button on dismiss so
+						// keyboard users don't land on <body>.
+						buttonRef.current?.focus();
 					},
 				},
 			});
-			rzp.on("payment.failed", (response: { error?: { description?: string } }) => {
+			rzp.on("payment.failed", (response: { error?: { description?: string; code?: string } }) => {
 				toast.error(response?.error?.description ?? "Payment failed. Please try again.");
+				trackCheckoutEvent("checkout_payment_failed", {
+					plan_code: planCode,
+					error_code: response?.error?.code ?? null,
+				});
 			});
-			rzp.open();
+			try {
+				rzp.open();
+				trackCheckoutEvent("checkout_opened", { plan_code: planCode });
+			} catch (openErr) {
+				// W4.6: rzp.open() can throw on iOS Safari when the SDK loads
+				// but the modal can't render (popup blockers, restricted iframe
+				// contexts). Fall back to hosted checkout immediately.
+				console.error("rzp.open() threw, falling back to hosted checkout:", openErr);
+				trackCheckoutEvent("checkout_modal_render_failed", { plan_code: planCode, phase: "open_throw" });
+				if (data.shortUrl) {
+					try {
+						window.location.href = safeRazorpayRedirect(data.shortUrl);
+						return;
+					} catch (redirectErr) {
+						toast.error(redirectErr instanceof Error ? redirectErr.message : "Untrusted redirect.");
+						return;
+					}
+				}
+				toast.error("Could not open checkout. Please try again or contact support.");
+				return;
+			}
+
+			// W4.6: 5s observer — if the Razorpay iframe never mounts (silent
+			// failure on some iOS versions where rzp.open() returns without
+			// rendering), fall back to hosted checkout. The Razorpay SDK
+			// injects an iframe whose name attribute starts with "razorpay-".
+			window.setTimeout(() => {
+				const mounted = document.querySelector('iframe[name^="razorpay-"], iframe[src*="razorpay.com"]');
+				if (mounted) return;
+				trackCheckoutEvent("checkout_modal_render_failed", { plan_code: planCode, phase: "no_iframe" });
+				if (data.shortUrl) {
+					try {
+						window.location.href = safeRazorpayRedirect(data.shortUrl);
+					} catch (e) {
+						console.error("Razorpay modal didn't render and fallback failed:", e);
+					}
+				}
+			}, 5_000);
 		} catch (e) {
 			console.error(e);
 			toast.error("Something went wrong starting checkout.");
@@ -208,6 +288,7 @@ export function RazorpayCheckoutButton({
 
 	return (
 		<Button
+			ref={buttonRef}
 			onClick={onClick}
 			onPointerEnter={preconnectRazorpayOnce}
 			onFocus={preconnectRazorpayOnce}

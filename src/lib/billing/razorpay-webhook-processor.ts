@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { subscriptions as subscriptionsTbl, usagePeriods as usagePeriodsTbl } from "@/db/schema/billing";
 import { fetchInvoice } from "@/lib/billing/razorpay";
 import { isPlanCode, PLAN_CATALOG, tokenQuotaForGrade, type PlanCode, type PlanCatalogEntry } from "@/lib/billing/plans";
+import { assertTransition } from "@/lib/billing/subscription-state-machine";
 import {
 	sendPaymentFailedEmail,
 	sendPaymentReceiptEmail,
@@ -46,6 +47,8 @@ type ProfileRow = { id: string; grade: number | null; full_name: string | null }
 type WebhookHandlerContext = {
 	admin: ServiceRoleClient;
 	eventName: string;
+	/** Razorpay's `body.id` (top-level event id). May be null on legacy/test fixtures. */
+	razorpayEventId: string | null;
 	subscriptionId: string;
 	ours: SubscriptionOurs;
 	profile: ProfileRow | null;
@@ -68,15 +71,28 @@ function formatInrPaise(paise: number): string {
 	return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(paise / 100);
 }
 
-/** Records checkout_discount redemption once (idempotent) when notes carry `eduai_coupon_id`. */
+/**
+ * Records checkout_discount redemption once (idempotent) when notes carry
+ * `eduai_coupon_id`. RPC failure is logged to `billing_action_failures` so
+ * an admin can retry from the action-failures admin page (W1.4) — previously
+ * a failure dropped silently with only a context-poor Sentry warning.
+ *
+ * Returns a discriminated outcome (mostly for tests + future telemetry).
+ */
+type CouponRedemptionOutcome =
+	| { status: "no_coupon" }
+	| { status: "applied" }
+	| { status: "duplicate" }
+	| { status: "failed"; reason: string };
+
 async function maybeApplyCheckoutCouponRedemption(
 	admin: ServiceRoleClient,
-	input: { profileId: string; ourSubscriptionId: string; notesUnknown: unknown },
-): Promise<void> {
+	input: { profileId: string; ourSubscriptionId: string; notesUnknown: unknown; razorpayEventId?: string | null },
+): Promise<CouponRedemptionOutcome> {
 	const notes = input.notesUnknown as Record<string, unknown> | undefined;
 	const raw = notes?.eduai_coupon_id ?? notes?.eduai_coupon;
 	const couponId = typeof raw === "string" && /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;
-	if (!couponId) return;
+	if (!couponId) return { status: "no_coupon" };
 
 	const { data, error } = await admin.rpc("billing_apply_checkout_coupon_redemption_atomic", {
 		p_coupon_id: couponId,
@@ -85,8 +101,26 @@ async function maybeApplyCheckoutCouponRedemption(
 	});
 
 	if (error) {
-		Sentry.captureMessage(`billing_apply_checkout_coupon_redemption_atomic: ${error.message}`, { level: "warning" });
-		return;
+		Sentry.captureMessage("billing.webhook.coupon_redemption_rpc_failed", {
+			level: "warning",
+			tags: { component: "billing.webhook", phase: "coupon_redemption" },
+			extra: {
+				coupon_id: couponId,
+				profile_id: input.profileId,
+				our_subscription_id: input.ourSubscriptionId,
+				rpc_error: error.message,
+			},
+		});
+		await admin.from("billing_action_failures").insert({
+			kind: "coupon_redemption",
+			coupon_id: couponId,
+			profile_id: input.profileId,
+			subscription_id: input.ourSubscriptionId,
+			razorpay_event_id: input.razorpayEventId ?? null,
+			error_message: `coupon_redemption_atomic: ${error.message}`,
+			payload: { rpc_args: { p_coupon_id: couponId, p_profile_id: input.profileId, p_our_subscription_id: input.ourSubscriptionId } },
+		});
+		return { status: "failed", reason: error.message };
 	}
 	const row = (Array.isArray(data) ? data[0] : data) as { ok?: boolean; applied?: boolean } | undefined;
 	if (row?.ok && row.applied) {
@@ -95,7 +129,9 @@ async function maybeApplyCheckoutCouponRedemption(
 			event_name: "coupon_redeemed",
 			props: { checkout_discount: true, coupon_id: couponId },
 		});
+		return { status: "applied" };
 	}
+	return { status: "duplicate" };
 }
 
 /**
@@ -147,6 +183,28 @@ async function applySubscriptionStateChangeAtomic(input: {
 	tokensQuota: number;
 }): Promise<void> {
 	await db.transaction(async (tx) => {
+		// W1.2: lock the subscription row before reading or mutating state so
+		// two webhooks for the same razorpay_subscription_id (e.g., activated +
+		// charged firing within milliseconds) serialize cleanly. Without the
+		// lock the second writer overwrites the first with no conflict signal,
+		// and divergent period bounds between events silently lose data.
+		const locked = await tx
+			.select({ id: subscriptionsTbl.id, status: subscriptionsTbl.status })
+			.from(subscriptionsTbl)
+			.where(eq(subscriptionsTbl.id, input.subscriptionId))
+			.for("update")
+			.limit(1);
+		const current = locked[0];
+		if (!current) {
+			throw new Error(`Subscription ${input.subscriptionId} not found during atomic state change.`);
+		}
+
+		// Throws InvalidStateTransitionError on forbidden moves (e.g., a stale
+		// subscription.activated event arriving for a sub already cancelled).
+		// The route catches that specifically and treats it as a soft-failure
+		// (200 + audit) so Razorpay doesn't retry the unrecoverable case.
+		assertTransition(current.status, input.status, input.subscriptionId);
+
 		await tx
 			.update(subscriptionsTbl)
 			.set({
@@ -232,6 +290,7 @@ async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<
 		profileId: ours.profile_id,
 		ourSubscriptionId: ours.id,
 		notesUnknown: ctx.subEntity?.notes,
+		razorpayEventId: ctx.razorpayEventId,
 	});
 }
 
@@ -292,6 +351,36 @@ async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<vo
 		profileId: ours.profile_id,
 		ourSubscriptionId: ours.id,
 		notesUnknown: ctx.subEntity?.notes,
+		razorpayEventId: ctx.razorpayEventId,
+	});
+}
+
+async function handleSubscriptionUpdated(ctx: WebhookHandlerContext): Promise<void> {
+	// W4.1 — plan change. Razorpay fires subscription.updated when a
+	// schedule_change_at="now" plan change goes through (or when cycle_end
+	// is reached on a deferred change). The user-facing route stashed
+	// pending_plan_code; we use that in preference to whatever notes carry,
+	// then apply atomically with new period bounds from the webhook payload.
+	const { admin, ours, profile, targetPlan, targetPlanCode, currentStart, currentEnd } = ctx;
+	const fallbackIso = new Date().toISOString();
+	const periodStartIso = currentStart ?? ours.current_period_end ?? fallbackIso;
+	const periodEndIso = currentEnd ?? ours.current_period_end ?? fallbackIso;
+
+	await applySubscriptionStateChangeAtomic({
+		subscriptionId: ours.id,
+		profileId: ours.profile_id,
+		status: "active",
+		planCode: targetPlanCode,
+		currentPeriodStart: new Date(periodStartIso),
+		currentPeriodEnd: new Date(periodEndIso),
+		testsQuota: targetPlan.testsPerPeriod,
+		tokensQuota: tokenQuotaForGrade(targetPlan, profile?.grade ?? null),
+	});
+
+	await admin.from("practice_analytics_events").insert({
+		student_id: ours.profile_id,
+		event_name: "subscription_plan_updated",
+		props: { plan_code: targetPlanCode, razorpay_subscription_id: ctx.subscriptionId },
 	});
 }
 
@@ -315,12 +404,37 @@ async function handleSubscriptionCancelled(ctx: WebhookHandlerContext): Promise<
 		.eq("id", ours.id);
 }
 
+async function handleSubscriptionPaused(ctx: WebhookHandlerContext): Promise<void> {
+	// Razorpay-confirmed pause. The /api/billing/pause route already mirrored
+	// status locally; this handler is the final source of truth and ensures
+	// state matches even if the user-route call timed out before its DB write.
+	const { admin, ours } = ctx;
+	await admin
+		.from("subscriptions")
+		.update({ status: "paused", paused_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+		.eq("id", ours.id)
+		.is("paused_at", null);
+}
+
+async function handleSubscriptionResumed(ctx: WebhookHandlerContext): Promise<void> {
+	const { admin, ours } = ctx;
+	await admin
+		.from("subscriptions")
+		.update({ status: "active", paused_at: null, updated_at: new Date().toISOString() })
+		.eq("id", ours.id);
+}
+
 async function handleSubscriptionHaltedOrPending(ctx: WebhookHandlerContext): Promise<void> {
+	// Razorpay 'halted' = all auto-retries exhausted; customer must act.
+	// Razorpay 'pending' = inside the retry window.
+	// We map both to non-terminal local states so a later subscription.charged
+	// can recover the sub via the state machine. Previously we mapped halted
+	// to 'expired' (terminal), which silently blocked recovery transitions.
 	const { admin, eventName, ours } = ctx;
 	await admin
 		.from("subscriptions")
 		.update({
-			status: eventName === "subscription.halted" ? "expired" : "grace",
+			status: eventName === "subscription.halted" ? "past_due" : "grace",
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", ours.id);
@@ -393,10 +507,13 @@ async function handlePaymentFailed(ctx: WebhookHandlerContext): Promise<void> {
 	if (studentEmail) {
 		const prefs = await getNotificationPrefs(ours.profile_id);
 		if (prefs.enableEmail) {
+			// W4.3: dedup_key=subscriptionId:dunning-day-0 so the day-0 email
+			// is sent at most once per subscription per failure cycle.
 			void sendPaymentFailedEmail({
 				to: studentEmail,
 				recipientUserId: ours.profile_id,
 				studentName: profile?.full_name ?? undefined,
+				dedupKey: `${ours.id}:dunning-day-0`,
 			});
 		}
 	}
@@ -406,6 +523,9 @@ const BILLING_WEBHOOK_HANDLERS: Record<string, (c: WebhookHandlerContext) => Pro
 	"subscription.authenticated": handleSubscriptionMandateAuthenticated,
 	"subscription.activated": handleSubscriptionActivated,
 	"subscription.charged": handleSubscriptionCharged,
+	"subscription.updated": handleSubscriptionUpdated,
+	"subscription.paused": handleSubscriptionPaused,
+	"subscription.resumed": handleSubscriptionResumed,
 	"subscription.completed": handleSubscriptionCompleted,
 	"subscription.cancelled": handleSubscriptionCancelled,
 	"subscription.halted": handleSubscriptionHaltedOrPending,
@@ -414,10 +534,143 @@ const BILLING_WEBHOOK_HANDLERS: Record<string, (c: WebhookHandlerContext) => Pro
 	"invoice.paid": handleInvoicePaid,
 };
 
+/**
+ * W3.2 — refund event handler (refund.processed / refund.created / refund.failed).
+ *
+ * Razorpay does NOT emit a `payment.refunded` event; the canonical refund
+ * lifecycle is `refund.created` (initiated) → `refund.processed` (funds
+ * actually returned) or `refund.failed`. We act on `refund.processed` to
+ * roll back the coupon redemption (decrement count + mark refunded_at);
+ * `refund.created` is informational; `refund.failed` is escalated to
+ * billing_action_failures so an admin can investigate.
+ */
+async function handleRefundEvent(
+	admin: ServiceRoleClient,
+	body: RazorpayWebhookBody,
+): Promise<void> {
+	const refundEntity = (body.payload?.refund?.entity as Record<string, unknown> | undefined) ?? null;
+	if (!refundEntity) return;
+	const paymentId = typeof refundEntity.payment_id === "string" ? refundEntity.payment_id : null;
+	if (!paymentId) return;
+	const refundId = typeof refundEntity.id === "string" ? refundEntity.id : null;
+	const refundAmount = typeof refundEntity.amount === "number" ? refundEntity.amount : null;
+
+	const { data: pay } = await admin
+		.from("payments")
+		.select("id, subscription_id, profile_id, refunded_at, razorpay_refund_id")
+		.eq("razorpay_payment_id", paymentId)
+		.maybeSingle<{
+			id: string;
+			subscription_id: string | null;
+			profile_id: string;
+			refunded_at: string | null;
+			razorpay_refund_id: string | null;
+		}>();
+
+	if (!pay) {
+		Sentry.captureMessage("billing.webhook.refund.payment_not_found", {
+			level: "warning",
+			tags: { component: "billing.webhook", event: body.event },
+			extra: { razorpay_payment_id: paymentId, razorpay_refund_id: refundId },
+		});
+		return;
+	}
+
+	if (body.event === "refund.failed") {
+		await admin.from("billing_action_failures").insert({
+			kind: "refund_coupon_rollback",
+			payment_id: pay.id,
+			profile_id: pay.profile_id,
+			subscription_id: pay.subscription_id,
+			razorpay_event_id: body.id ?? null,
+			error_message: `Razorpay refund.failed for refund=${refundId ?? "?"} payment=${paymentId}`,
+			payload: { refund_entity: refundEntity },
+		});
+		Sentry.captureMessage("billing.webhook.refund.failed", {
+			level: "error",
+			tags: { component: "billing.webhook" },
+			extra: { razorpay_payment_id: paymentId, razorpay_refund_id: refundId },
+		});
+		return;
+	}
+
+	if (body.event === "refund.created") {
+		// Informational — Razorpay has accepted the refund request but not yet
+		// disbursed funds. Audit only; the rollback waits for processed.
+		await admin.from("practice_analytics_events").insert({
+			student_id: pay.profile_id,
+			event_name: "subscription_refund_created",
+			props: { razorpay_payment_id: paymentId, razorpay_refund_id: refundId },
+		});
+		return;
+	}
+
+	// refund.processed — flush the local payments row + roll back the coupon.
+	if (body.event === "refund.processed") {
+		// Update payments row idempotently (if it wasn't already marked refunded
+		// by the admin route).
+		if (!pay.refunded_at) {
+			await admin
+				.from("payments")
+				.update({
+					razorpay_refund_id: refundId,
+					refund_amount_paise: refundAmount,
+					refunded_at: new Date().toISOString(),
+					status: "refunded",
+				})
+				.eq("id", pay.id);
+		}
+
+		// Roll back the coupon redemption if the original payment used one.
+		// Idempotent: a duplicate webhook delivery (or admin-route + webhook
+		// firing concurrently) finds refunded_at already set and exits cleanly.
+		if (pay.subscription_id) {
+			const { data, error } = await admin.rpc("billing_rollback_coupon_redemption_atomic", {
+				p_subscription_id: pay.subscription_id,
+				p_profile_id: pay.profile_id,
+			});
+			if (error) {
+				await admin.from("billing_action_failures").insert({
+					kind: "refund_coupon_rollback",
+					payment_id: pay.id,
+					profile_id: pay.profile_id,
+					subscription_id: pay.subscription_id,
+					razorpay_event_id: body.id ?? null,
+					error_message: `rollback_coupon_redemption_atomic: ${error.message}`,
+					payload: { razorpay_payment_id: paymentId, razorpay_refund_id: refundId },
+				});
+				Sentry.captureMessage("billing.webhook.refund.rollback_failed", {
+					level: "error",
+					extra: { error: error.message, payment_id: pay.id },
+				});
+			} else {
+				const row = (Array.isArray(data) ? data[0] : data) as
+					| { ok?: boolean; rolled_back?: boolean; coupon_id?: string | null }
+					| undefined;
+				if (row?.rolled_back && row.coupon_id) {
+					await admin.from("practice_analytics_events").insert({
+						student_id: pay.profile_id,
+						event_name: "coupon_redemption_refund_rollback",
+						props: { coupon_id: row.coupon_id, razorpay_payment_id: paymentId },
+					});
+				}
+			}
+		}
+	}
+}
+
 export async function processRazorpayWebhookPayload(
 	admin: ServiceRoleClient,
 	body: RazorpayWebhookBody,
 ): Promise<void> {
+	// Refund events use the refund.entity payload, not subscription.entity.
+	// Handle them before the subscription-id derivation so we don't early-
+	// return on the !subscriptionId guard below.
+	if (body.event === "refund.processed" || body.event === "refund.created" || body.event === "refund.failed") {
+		await handleRefundEvent(admin, body);
+		return;
+	}
+
 	const subEntity = (body.payload?.subscription?.entity as Record<string, unknown> | undefined) ?? null;
 	const paymentEntity = (body.payload?.payment?.entity as Record<string, unknown> | undefined) ?? null;
 	const invoiceEntity = (body.payload?.invoice?.entity as Record<string, unknown> | undefined) ?? null;
@@ -461,6 +714,7 @@ export async function processRazorpayWebhookPayload(
 	const ctx: WebhookHandlerContext = {
 		admin,
 		eventName: body.event,
+		razorpayEventId: typeof body.id === "string" && body.id.length > 0 ? body.id : null,
 		subscriptionId,
 		ours,
 		profile: profile ?? null,

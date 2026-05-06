@@ -39,6 +39,12 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ code: s
 				profileId: couponRedemptions.profileId,
 				subscriptionId: couponRedemptions.subscriptionId,
 				redeemedAt: couponRedemptions.redeemedAt,
+				// W3.2: surface refunded_at so admins can spot which redemptions
+				// have been rolled back by the refund pipeline. The aggregate
+				// counter on `coupons.redemptions_count` is decremented at the
+				// same time as this column is set, so a refunded row stays in
+				// the list for audit but doesn't count toward the global cap.
+				refundedAt: couponRedemptions.refundedAt,
 				fullName: profiles.fullName,
 				email: authUsers.email,
 			})
@@ -61,6 +67,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ code: s
 				profile_id: r.profileId,
 				subscription_id: r.subscriptionId,
 				redeemed_at: r.redeemedAt.toISOString(),
+				refunded_at: r.refundedAt ? r.refundedAt.toISOString() : null,
 				full_name: r.fullName,
 				email: r.email,
 			})),
