@@ -142,6 +142,17 @@ export function getOpenAIChatModel(): string {
 	return "gpt-5.4-mini";
 }
 
+/**
+ * Optional fallback chat model used when the primary returns 429 / overload
+ * / timeout. Useful so a single model deprecation or capacity blip doesn't
+ * fail every generation. Returns `null` when no fallback is configured.
+ */
+export function getOpenAIChatModelFallback(): string | null {
+	const model = readTrimmedEnv("OPENAI_CHAT_MODEL_FALLBACK");
+	if (model) return model;
+	return null;
+}
+
 // ============================================================
 // Billing / SaaS
 // ============================================================

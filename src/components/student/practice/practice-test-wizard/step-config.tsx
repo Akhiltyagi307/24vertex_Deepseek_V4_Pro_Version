@@ -4,7 +4,11 @@ import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { PRACTICE_DURATION_OPTIONS, getPracticeQuestionPlan } from "@/lib/practice";
+import {
+	PRACTICE_DURATION_OPTIONS,
+	getPracticeQuestionPlanForSubject,
+	isMathematicsSubject,
+} from "@/lib/practice";
 import type { PracticeDifficulty } from "@/lib/practice/types";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +17,7 @@ import { DIFFICULTY_OPTIONS } from "./types";
 export type StepConfigProps = {
 	difficulty: PracticeDifficulty;
 	durationSeconds: number;
+	subjectName: string | null;
 	onPickDifficulty: (next: PracticeDifficulty) => void;
 	onPickDurationSeconds: (seconds: number) => void;
 };
@@ -20,10 +25,12 @@ export type StepConfigProps = {
 export function StepConfig({
 	difficulty,
 	durationSeconds,
+	subjectName,
 	onPickDifficulty,
 	onPickDurationSeconds,
 }: StepConfigProps) {
-	const practicePlan = getPracticeQuestionPlan(durationSeconds);
+	const practicePlan = getPracticeQuestionPlanForSubject(durationSeconds, subjectName);
+	const mathOnlyMcq = isMathematicsSubject(subjectName);
 
 	return (
 		<section
@@ -101,16 +108,24 @@ export function StepConfig({
 				<FieldLegend variant="label" className="text-base">
 					Question mix
 				</FieldLegend>
-				<p className="text-foreground text-sm leading-relaxed">
-					<span className="font-medium tabular-nums">{practicePlan.total}</span> questions:{" "}
-					<span className="tabular-nums">{practicePlan.counts.multiple_choice}</span> multiple choice,{" "}
-					<span className="tabular-nums">{practicePlan.counts.fill_in_blank}</span> fill-in-the-blank,{" "}
-					<span className="tabular-nums">{practicePlan.counts.short_answer}</span> short answer,{" "}
-					<span className="tabular-nums">{practicePlan.counts.long_answer}</span> long answer.
-				</p>
+				{mathOnlyMcq ? (
+					<p className="text-foreground text-sm leading-relaxed">
+						<span className="font-medium tabular-nums">{practicePlan.total}</span> multiple-choice
+						questions.
+					</p>
+				) : (
+					<p className="text-foreground text-sm leading-relaxed">
+						<span className="font-medium tabular-nums">{practicePlan.total}</span> questions:{" "}
+						<span className="tabular-nums">{practicePlan.counts.multiple_choice}</span> multiple choice,{" "}
+						<span className="tabular-nums">{practicePlan.counts.fill_in_blank}</span> fill-in-the-blank,{" "}
+						<span className="tabular-nums">{practicePlan.counts.short_answer}</span> short answer,{" "}
+						<span className="tabular-nums">{practicePlan.counts.long_answer}</span> long answer.
+					</p>
+				)}
 				<p className="text-muted-foreground text-sm">
-					For each time limit, we pick a set number and mix of question types (MCQ, short, long, and
-					so on).
+					{mathOnlyMcq
+						? "Math practice tests are graded as multiple choice across all grades for fast, predictable feedback."
+						: "For each time limit, we pick a set number and mix of question types (MCQ, short, long, and so on)."}
 				</p>
 			</FieldSet>
 		</section>

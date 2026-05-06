@@ -19,6 +19,7 @@ export type StepTopicsProps = {
 	canPickEnoughTopics: boolean;
 	focusArea: FocusArea;
 	selectedTrackerIds: Set<string>;
+	maxTopics: number;
 	practiceChapterSections: ChapterSection[];
 	chapterOpenMode: "initial" | "all" | "none";
 	chapterVersion: number;
@@ -37,6 +38,7 @@ export function StepTopics({
 	canPickEnoughTopics,
 	focusArea,
 	selectedTrackerIds,
+	maxTopics,
 	practiceChapterSections,
 	chapterOpenMode,
 	chapterVersion,
@@ -49,6 +51,7 @@ export function StepTopics({
 	bulkSelectTrackers,
 	toggleTracker,
 }: StepTopicsProps) {
+	const atMax = selectedTrackerIds.size >= maxTopics;
 	return (
 		<div className={cn(cardSurfaceFrameClassName, "flex flex-col gap-6 p-5 medium:p-7")}>
 			<div className="space-y-1.5 shrink-0">
@@ -121,12 +124,15 @@ export function StepTopics({
 								<span
 									className={cn(
 										"transition-colors",
-										selectedTrackerIds.size > 0
-											? "text-foreground font-medium"
-											: "text-muted-foreground",
+										atMax
+											? "text-amber-700 dark:text-amber-400 font-medium"
+											: selectedTrackerIds.size > 0
+												? "text-foreground font-medium"
+												: "text-muted-foreground",
 									)}
+									aria-live="polite"
 								>
-									{selectedTrackerIds.size} selected
+									{selectedTrackerIds.size} / {maxTopics} selected
 								</span>
 								{selectedTrackerIds.size > 0 ? (
 									<>
@@ -164,7 +170,14 @@ export function StepTopics({
 						</p>
 						{attemptedContinue && !selectionOk ? (
 							<p className="text-destructive text-sm" role="status">
-								Select at least one topic to continue.
+								{selectedTrackerIds.size > maxTopics
+									? `Too many topics — limit is ${maxTopics}.`
+									: "Select at least one topic to continue."}
+							</p>
+						) : null}
+						{atMax && !attemptedContinue ? (
+							<p className="text-amber-700 dark:text-amber-400 text-xs" role="status" aria-live="polite">
+								You&rsquo;ve reached the {maxTopics}-topic limit. Deselect a topic to add another.
 							</p>
 						) : null}
 						<div

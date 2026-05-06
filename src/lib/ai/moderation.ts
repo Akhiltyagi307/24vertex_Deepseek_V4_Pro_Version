@@ -71,9 +71,66 @@ export type ModerationOutcome =
 	| { ok: true }
 	| { ok: false; reason: string; source: "profanity" | "regex_blacklist" | "embedding_blacklist" };
 
+export type PerQuestionFlag = {
+	index: number;
+	reason: string;
+	source: "profanity" | "regex_blacklist";
+};
+export type PerQuestionModerationResult =
+	| { ok: true; flagged: [] }
+	| { ok: false; flagged: PerQuestionFlag[] };
+
+/**
+ * Per-question regex + profanity moderation. Free (no embedding call). Use this
+ * before the blob-level {@link moderatePracticeGenerationText} so a single
+ * tainted question does not invalidate the whole generation — caller can drop
+ * the flagged indices and keep the rest.
+ */
+export async function moderatePracticeQuestionsPerItem(
+	questionTexts: string[],
+): Promise<PerQuestionModerationResult> {
+	if (!(await isModerationPreCheckEnabled()) || questionTexts.length === 0) {
+		return { ok: true, flagged: [] };
+	}
+
+	const rules = await db
+		.select()
+		.from(contentBlacklist)
+		.where(eq(contentBlacklist.appliesTo, "question_generator"));
+	const compiledRegex: { id: string; re: RegExp }[] = [];
+	for (const row of rules) {
+		if (row.patternType !== "regex") continue;
+		try {
+			compiledRegex.push({ id: row.id, re: new RegExp(row.pattern, "i") });
+		} catch {
+			/* invalid regex — skip */
+		}
+	}
+
+	const flagged: PerQuestionFlag[] = [];
+	for (let i = 0; i < questionTexts.length; i++) {
+		const text = questionTexts[i] ?? "";
+		if (DEFAULT_PROFANITY.test(text)) {
+			flagged.push({ index: i, reason: "profanity_pattern", source: "profanity" });
+			continue;
+		}
+		for (const { id, re } of compiledRegex) {
+			if (re.test(text)) {
+				flagged.push({ index: i, reason: `regex:${id}`, source: "regex_blacklist" });
+				break;
+			}
+		}
+	}
+	return flagged.length === 0 ? { ok: true, flagged: [] } : { ok: false, flagged };
+}
+
 /**
  * Server-side moderation for AI practice output (PDR §4.27).
  * Regex blacklist + optional embedding similarity (≥0.95) against `content_blacklist`.
+ *
+ * Use {@link moderatePracticeQuestionsPerItem} first for per-question regex /
+ * profanity checks; this blob pass exists primarily for the embedding rule
+ * which is most meaningful at the test-as-a-whole level.
  */
 export async function moderatePracticeGenerationText(blob: string): Promise<ModerationOutcome> {
 	if (!(await isModerationPreCheckEnabled())) {

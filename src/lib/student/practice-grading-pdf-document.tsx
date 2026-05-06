@@ -540,14 +540,14 @@ export type PracticeGradingPdfCoverProps = {
 	overallScorePercent: number | null;
 	summary: PracticeGradingSummary;
 	/** Filesystem path to logo PNG for @react-pdf Image, or null to show wordmark */
-	logoSrc: string | null;
+	logoSrc: string | Buffer | null;
 };
 
 export type PracticeGradingPdfDocumentProps = PracticeGradingPdfCoverProps & {
 	questions: PracticeGradingPdfQuestion[];
 };
 
-function BrandedTopRight({ logoSrc }: { logoSrc: string | null }) {
+function BrandedTopRight({ logoSrc }: { logoSrc: string | Buffer | null }) {
 	if (logoSrc) {
 		/* @react-pdf/renderer's Image is not a DOM <img>; no alt in types. */
 		// eslint-disable-next-line jsx-a11y/alt-text -- PDF logo, decorative in document
@@ -556,7 +556,7 @@ function BrandedTopRight({ logoSrc }: { logoSrc: string | null }) {
 	return <Text style={styles.wordmark}>EduAI</Text>;
 }
 
-function QHeaderRight({ logoSrc }: { logoSrc: string | null }) {
+function QHeaderRight({ logoSrc }: { logoSrc: string | Buffer | null }) {
 	if (logoSrc) {
 		// eslint-disable-next-line jsx-a11y/alt-text -- PDF logo, decorative in document
 		return <Image src={logoSrc} style={styles.logoSm} />;
@@ -790,7 +790,7 @@ function ReportCoverPage(props: PracticeGradingPdfCoverProps) {
 
 type QuestionPageHeaderProps = {
 	q: PracticeGradingPdfQuestion;
-	logoSrc: string | null;
+	logoSrc: string | Buffer | null;
 	continued?: boolean;
 	sectionHint?: string;
 };
@@ -860,7 +860,7 @@ function QuestionFooter({ q, nQuestions }: { q: PracticeGradingPdfQuestion; nQue
 function renderQuestionPageSequence(
 	q: PracticeGradingPdfQuestion,
 	nQuestions: number,
-	logoSrc: string | null,
+	logoSrc: string | Buffer | null,
 ): ReactElement[] {
 	const gen = clampGenerationBlockForPdf(q.generation_answer_display);
 	const { page1, page2 } = splitFeedbackForTwoQuestionPages(q.analysis, q.step_by_step_solution);

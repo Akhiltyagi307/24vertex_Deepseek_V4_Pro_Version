@@ -1,5 +1,13 @@
-import { getPracticeQuestionPlan } from "./constants";
+import { getPracticeQuestionPlanForSubject } from "./constants";
+import type { PracticeFocusArea } from "./schemas";
 import type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
+
+const FOCUS_AREA_INSTRUCTION: Record<PracticeFocusArea, string> = {
+	all: "Cover all selected topics evenly. No directional bias from focus_area.",
+	weak: "The student picked 'weak topics only' — every selected topic is a weakness. Pitch questions slightly above the student's current ability so the test exercises improvement without becoming demoralizing. Prefer items that surface common misconceptions over rote recall.",
+	not_tested: "The student picked 'not tested yet' — these topics have no prior performance data. Use the curriculum chunks heavily, start at the lower end of the requested difficulty, and emphasize foundational concept checks before higher-order items.",
+	recent_errors: "The student picked 'recent mistakes' — bias question selection toward concepts in student.recent_errors when present. Vary the framing from the original misses (different scenario, different numbers) so the student is testing the concept, not memorizing the question.",
+};
 
 export type PracticeCoverageMode = "few_topics" | "balanced" | "many_topics";
 
@@ -46,6 +54,13 @@ export type PracticeGroundingMeta = {
 	exercise_char_total: number;
 	truncated: boolean;
 	fetch_error?: string;
+	/**
+	 * `low_context` is set when fewer than half of the selected topics had
+	 * any context chunks at all — the model should fall back to curriculum
+	 * outcomes and avoid claiming specific examples it can't verify.
+	 * `no_context` is the all-empty case: model is told to flag uncertainty.
+	 */
+	context_quality?: "ok" | "low_context" | "no_context";
 };
 
 /** `grounding_meta` as sent to the model: no operational `fetch_error`. */
@@ -77,6 +92,14 @@ export type PracticeUserMessagePayload = {
 		 * used to bias question generation toward spaced repetition.
 		 */
 		recent_errors?: PracticeRecentError[];
+		/**
+		 * The "Quick pick" the student chose on the topics step. Forwarded so
+		 * the model can weight question selection — e.g. "recent_errors" leans
+		 * harder on `recent_errors`, "not_tested" leans on `topic_grounding`
+		 * for items the student has never seen.
+		 */
+		focus_area?: PracticeFocusArea;
+		focus_area_instruction?: string;
 	};
 	subject: {
 		id: string;
@@ -101,6 +124,8 @@ export type PracticeUserMessagePayload = {
 		note: string;
 		/** Instruction for the model; replaces the old parallel `generation_directives` block. */
 		generation_instruction: string;
+		/** Derived from `grounding_meta.context_quality`; tells the model when to stay conservative. */
+		context_quality_instruction: string;
 	};
 	/** Per-topic performance only; curriculum names live under `topic_grounding`. */
 	topics: Array<{
@@ -136,8 +161,15 @@ function defaultGroundingMeta(topicCount: number): PracticeGroundingMeta {
 		context_char_total: 0,
 		exercise_char_total: 0,
 		truncated: false,
+		context_quality: topicCount === 0 ? "ok" : "no_context",
 	};
 }
+
+const CONTEXT_QUALITY_INSTRUCTION: Record<NonNullable<PracticeGroundingMeta["context_quality"]>, string> = {
+	ok: "Curriculum context is available for the selected topics. Ground items in `topic_grounding.content_chunks` and `topic_grounding.exercise_chunks` where it materially helps.",
+	low_context: "Several selected topics have empty `content_chunks` and `exercise_chunks`. For those topics, stick to NCERT-style outcomes implied by `curriculum_hint` and AVOID inventing specific named examples, dates, or formulae you cannot verify.",
+	no_context: "ALL selected topics have empty grounding chunks. You are working from `curriculum_hint` only — keep questions at conceptual / definition level and AVOID specific case studies, named experiments, or numeric data that depend on a textbook source. If a question can't be written safely, prefer a simpler conceptual variant.",
+};
 
 export function buildPracticeUserMessage(input: {
 	studentGrade: number | null;
@@ -146,10 +178,12 @@ export function buildPracticeUserMessage(input: {
 	timeLimitSeconds: number;
 	recentErrors?: PracticeRecentError[];
 	topics: PracticeCanonicalTopic[];
+	/** Quick-pick filter the student chose on the topics step. */
+	focusArea?: PracticeFocusArea;
 	/** When omitted, topic_grounding uses empty chunk arrays (e.g. unit tests). Server paths should pass DB-backed context. */
 	preFetchedTopicContext?: PreFetchedTopicContext;
 }): PracticeUserMessagePayload {
-	const plan = getPracticeQuestionPlan(input.timeLimitSeconds);
+	const plan = getPracticeQuestionPlanForSubject(input.timeLimitSeconds, input.subject.name);
 	const estimated_question_count = plan.total;
 	const question_type_counts = plan.counts;
 	const topic_count = input.topics.length;
@@ -175,6 +209,11 @@ export function buildPracticeUserMessage(input: {
 	});
 
 	const grounding_meta = pre?.meta ?? defaultGroundingMeta(topic_count);
+	const contextQualityKey = grounding_meta.context_quality ?? "ok";
+	const contextQualityInstruction = CONTEXT_QUALITY_INSTRUCTION[contextQualityKey];
+
+	const focusArea = input.focusArea ?? "all";
+	const focusAreaInstruction = FOCUS_AREA_INSTRUCTION[focusArea];
 
 	return {
 		schema_version: 3,
@@ -182,6 +221,8 @@ export function buildPracticeUserMessage(input: {
 		student: {
 			grade: input.studentGrade,
 			recent_errors: input.recentErrors && input.recentErrors.length > 0 ? input.recentErrors : undefined,
+			focus_area: focusArea,
+			focus_area_instruction: focusAreaInstruction,
 		},
 		subject: {
 			id: input.subject.id,
@@ -199,6 +240,7 @@ export function buildPracticeUserMessage(input: {
 			question_type_counts,
 			note: "Question count and per-type counts are fixed by duration. Fill the required questions_by_type buckets exactly before any final ordering.",
 			generation_instruction: GENERATION_DIRECTIVE_INSTRUCTION,
+			context_quality_instruction: contextQualityInstruction,
 		},
 		topics: input.topics.map((t) => ({
 			topic_id: t.topicId,

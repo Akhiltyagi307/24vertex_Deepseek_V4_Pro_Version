@@ -3,8 +3,83 @@
  * No React; safe to import from anywhere. localStorage failures (quota, private
  * mode) are swallowed — these are best-effort caches, never sources of truth.
  */
+import type { PracticeFocusArea } from "@/lib/practice/schemas";
 import type { SessionStudentAnswer } from "@/lib/practice/practice-session-utils";
 import type { PracticeSessionQuestion } from "@/components/student/practice/practice-session-types";
+
+/* ------------------------------ wizard draft ----------------------------- */
+
+const PRACTICE_WIZARD_DRAFT_KEY = "eduai:practice-wizard-draft:v1";
+
+/**
+ * Per-user practice wizard draft. Survives a refresh / accidental nav so a
+ * student doesn't lose their topic selection halfway through configuring.
+ * Tied to userId so a different student on the same device doesn't pick up
+ * stale state. Tied to a one-day TTL so old drafts don't haunt a returning
+ * user.
+ */
+export type PracticeWizardDraftV1 = {
+	v: 1;
+	userId: string;
+	updatedAt: number;
+	step: number;
+	subjectId: string | null;
+	trackerIds: string[];
+	difficulty: "easy" | "medium" | "hard";
+	durationSeconds: number;
+	focusArea: PracticeFocusArea;
+};
+
+const PRACTICE_WIZARD_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
+export function readPracticeWizardDraft(userId: string): PracticeWizardDraftV1 | null {
+	try {
+		const raw = localStorage.getItem(PRACTICE_WIZARD_DRAFT_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as Partial<PracticeWizardDraftV1>;
+		if (
+			parsed.v !== 1 ||
+			parsed.userId !== userId ||
+			typeof parsed.updatedAt !== "number" ||
+			Date.now() - parsed.updatedAt > PRACTICE_WIZARD_DRAFT_TTL_MS
+		) {
+			return null;
+		}
+		if (
+			typeof parsed.step !== "number" ||
+			!Array.isArray(parsed.trackerIds) ||
+			(parsed.subjectId !== null && typeof parsed.subjectId !== "string") ||
+			(parsed.difficulty !== "easy" && parsed.difficulty !== "medium" && parsed.difficulty !== "hard") ||
+			typeof parsed.durationSeconds !== "number"
+		) {
+			return null;
+		}
+		return parsed as PracticeWizardDraftV1;
+	} catch {
+		return null;
+	}
+}
+
+export function writePracticeWizardDraft(draft: Omit<PracticeWizardDraftV1, "v" | "updatedAt">): void {
+	try {
+		const payload: PracticeWizardDraftV1 = {
+			v: 1,
+			updatedAt: Date.now(),
+			...draft,
+		};
+		localStorage.setItem(PRACTICE_WIZARD_DRAFT_KEY, JSON.stringify(payload));
+	} catch {
+		/* quota / private mode */
+	}
+}
+
+export function clearPracticeWizardDraft(): void {
+	try {
+		localStorage.removeItem(PRACTICE_WIZARD_DRAFT_KEY);
+	} catch {
+		/* ignore */
+	}
+}
 
 /* ------------------------------ session start ----------------------------- */
 

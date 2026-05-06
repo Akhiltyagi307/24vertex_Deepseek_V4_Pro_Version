@@ -23,11 +23,17 @@ import { buttonVariants } from "@/components/ui/button";
 import {
 	getPracticeQuestionPlan,
 	PRACTICE_DURATION_OPTIONS,
+	PRACTICE_MAX_TOPICS,
 	PRACTICE_MIN_TOPICS,
 	practiceDifficultySchema,
 	practiceDurationSecondsInputSchema,
 	type PracticeCanonicalTopic,
 } from "@/lib/practice";
+import {
+	clearPracticeWizardDraft,
+	readPracticeWizardDraft,
+	writePracticeWizardDraft,
+} from "@/lib/practice/practice-session-storage";
 import {
 	groupByUnitChapter,
 	type ChapterGroup,
@@ -76,6 +82,8 @@ export type PracticeTestWizardProps = {
 	subjectProgressBySubjectId: Record<string, PracticeSubjectProgress>;
 	/** Phase 4: gates the dev-only "Build prompt preview" affordance. */
 	isAdmin?: boolean;
+	/** Required for wizard draft persistence cache key. */
+	userId: string;
 };
 
 export function PracticeTestWizard({
@@ -84,6 +92,7 @@ export function PracticeTestWizard({
 	loadError,
 	showPromptPreview,
 	subjectProgressBySubjectId,
+	userId,
 }: PracticeTestWizardProps) {
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -184,7 +193,9 @@ export function PracticeTestWizard({
 	]);
 
 	const canPickEnoughTopics = subjectRows.length >= PRACTICE_MIN_TOPICS;
-	const selectionOk = selectedTrackerIds.size >= PRACTICE_MIN_TOPICS;
+	const selectionOk =
+		selectedTrackerIds.size >= PRACTICE_MIN_TOPICS &&
+		selectedTrackerIds.size <= PRACTICE_MAX_TOPICS;
 
 	const isSubmitStep = !showPromptPreview && step === 2;
 	const isResultStep = step === 3;
@@ -254,7 +265,10 @@ export function PracticeTestWizard({
 			return;
 		}
 
-		const trackerIds = new Set(coherentRows.map((r) => r.trackerId));
+		const linkedTrackerIds = coherentRows.map((r) => r.trackerId);
+		const cappedTrackerIds = linkedTrackerIds.slice(0, PRACTICE_MAX_TOPICS);
+		const droppedAtCap = linkedTrackerIds.length - cappedTrackerIds.length;
+		const trackerIds = new Set(cappedTrackerIds);
 		draftDispatch({ type: "set_subject", subjectId: anchorSubjectId });
 		setSelectedTrackerIds(trackerIds);
 		setStepError(null);
@@ -273,9 +287,72 @@ export function PracticeTestWizard({
 				},
 			);
 		}
+		if (droppedAtCap > 0) {
+			toast.warning(`${PRACTICE_MAX_TOPICS}-topic limit applied`, {
+				description: `Selected the first ${PRACTICE_MAX_TOPICS} of ${linkedTrackerIds.length} topics from the link.`,
+			});
+		}
 
 		markHandled(true);
 	}, [performanceRows, router, searchParams]);
+
+	// Hydrate wizard draft from localStorage on first mount (per-user). Skipped
+	// when the URL deep-link path already seeded state, so a `?topicIds=` link
+	// always wins over a stale draft.
+	const hydratedDraftRef = React.useRef(false);
+	React.useEffect(() => {
+		if (hydratedDraftRef.current) return;
+		if (appliedPracticeUrlRef.current === false && searchParams.get("topicIds")?.trim()) {
+			// Wait for URL hydrator to run first.
+			return;
+		}
+		hydratedDraftRef.current = true;
+		const draft = readPracticeWizardDraft(userId);
+		if (!draft) return;
+		// Filter trackerIds to ones that still exist for this user (subject /
+		// curriculum may have changed since the draft was saved).
+		const validTrackerIds = new Set(performanceRows.map((r) => r.trackerId));
+		const restoredTrackerIds = draft.trackerIds.filter((id) => validTrackerIds.has(id));
+		if (draft.subjectId) {
+			draftDispatch({ type: "set_subject", subjectId: draft.subjectId });
+		}
+		draftDispatch({ type: "set_focus_area", value: draft.focusArea });
+		draftDispatch({ type: "set_difficulty", value: draft.difficulty });
+		draftDispatch({
+			type: "set_duration",
+			seconds: draft.durationSeconds as never,
+		});
+		setSelectedTrackerIds(new Set(restoredTrackerIds));
+		// Clamp restored step to a sane value: never resume past step 2 since
+		// step 3 is the result/preview surface and shouldn't auto-restore.
+		const safeStep = Math.max(0, Math.min(2, draft.step));
+		draftDispatch({ type: "go_to_step", step: safeStep });
+		if (restoredTrackerIds.length < draft.trackerIds.length) {
+			toast.info("Some saved topics are no longer available", {
+				description: "We restored what we could from your previous session.",
+			});
+		}
+	}, [userId, performanceRows, searchParams]);
+
+	// Persist on every wizard-draft change (debounced via React batching). Skip
+	// the very first render so we don't immediately overwrite the saved draft
+	// with the initial empty state before hydration completes.
+	const draftWriteEnabledRef = React.useRef(false);
+	React.useEffect(() => {
+		if (!draftWriteEnabledRef.current) {
+			draftWriteEnabledRef.current = true;
+			return;
+		}
+		writePracticeWizardDraft({
+			userId,
+			step,
+			subjectId,
+			trackerIds: [...selectedTrackerIds],
+			difficulty,
+			durationSeconds,
+			focusArea,
+		});
+	}, [userId, step, subjectId, selectedTrackerIds, difficulty, durationSeconds, focusArea]);
 
 	React.useEffect(() => {
 		if (!generating) {
@@ -295,8 +372,19 @@ export function PracticeTestWizard({
 				for (const id of trackerIds) next.delete(id);
 				return next;
 			}
+			let droppedAtCap = 0;
 			for (const id of trackerIds) {
+				if (next.has(id)) continue;
+				if (next.size >= PRACTICE_MAX_TOPICS) {
+					droppedAtCap++;
+					continue;
+				}
 				next.add(id);
+			}
+			if (droppedAtCap > 0) {
+				toast.warning(`${PRACTICE_MAX_TOPICS}-topic limit reached`, {
+					description: `${droppedAtCap} topic${droppedAtCap === 1 ? " was" : "s were"} not added. Deselect some to add more.`,
+				});
 			}
 			return next;
 		});
@@ -309,6 +397,12 @@ export function PracticeTestWizard({
 				next.delete(id);
 				return next;
 			}
+			if (next.size >= PRACTICE_MAX_TOPICS) {
+				toast.warning(`${PRACTICE_MAX_TOPICS}-topic limit reached`, {
+					description: "Deselect a topic before adding another.",
+				});
+				return prev;
+			}
 			next.add(id);
 			return next;
 		});
@@ -317,22 +411,38 @@ export function PracticeTestWizard({
 	const addFocusAreaTopics = React.useCallback(
 		(area: FocusArea) => {
 			if (area === "all") {
-				setSelectedTrackerIds(new Set(subjectRows.map((r) => r.trackerId)));
+				const all = subjectRows.map((r) => r.trackerId);
+				const capped = all.slice(0, PRACTICE_MAX_TOPICS);
+				setSelectedTrackerIds(new Set(capped));
+				if (all.length > PRACTICE_MAX_TOPICS) {
+					toast.warning(`${PRACTICE_MAX_TOPICS}-topic limit applied`, {
+						description: `Selected the first ${PRACTICE_MAX_TOPICS} of ${all.length} topics.`,
+					});
+				}
 				return;
 			}
 			const previous = new Set(selectedTrackerIds);
-			let toAdd: string[] = [];
+			let candidate: string[] = [];
 			if (area === "weak") {
-				toAdd = subjectRows.filter((r) => r.status === "bad" || r.status === "satisfactory").map((r) => r.trackerId);
+				candidate = subjectRows.filter((r) => r.status === "bad" || r.status === "satisfactory").map((r) => r.trackerId);
 			} else if (area === "not_tested") {
-				toAdd = subjectRows.filter((r) => r.status === "not_tested").map((r) => r.trackerId);
+				candidate = subjectRows.filter((r) => r.status === "not_tested").map((r) => r.trackerId);
 			} else if (area === "recent_errors") {
-				toAdd = subjectRows
+				candidate = subjectRows
 					.filter((r) => r.trend === "declining" || r.status === "bad")
 					.map((r) => r.trackerId);
 			}
-			if (toAdd.length === 0) {
+			if (candidate.length === 0) {
 				toast.warning("No matching topics", { description: "Nothing to add for this filter." });
+				return;
+			}
+			const newOnes = candidate.filter((id) => !previous.has(id));
+			const remaining = Math.max(0, PRACTICE_MAX_TOPICS - previous.size);
+			const toAdd = newOnes.slice(0, remaining);
+			if (toAdd.length === 0) {
+				toast.warning(`${PRACTICE_MAX_TOPICS}-topic limit reached`, {
+					description: "Deselect some topics before applying this quick pick.",
+				});
 				return;
 			}
 			setSelectedTrackerIds((prev) => {
@@ -340,8 +450,12 @@ export function PracticeTestWizard({
 				for (const id of toAdd) next.add(id);
 				return next;
 			});
+			const droppedAtCap = newOnes.length - toAdd.length;
 			toast.success(`Added ${toAdd.length} topic${toAdd.length === 1 ? "" : "s"}`, {
-				description: `Focus area: ${FOCUS_AREA_OPTIONS.find((o) => o.value === area)?.label ?? area}.`,
+				description:
+					droppedAtCap > 0 ?
+						`${droppedAtCap} skipped — limit is ${PRACTICE_MAX_TOPICS}.`
+					:	`Focus area: ${FOCUS_AREA_OPTIONS.find((o) => o.value === area)?.label ?? area}.`,
 				action: {
 					label: "Undo",
 					onClick: () => setSelectedTrackerIds(previous),
@@ -383,6 +497,7 @@ export function PracticeTestWizard({
 				trackerIds: [...selectedTrackerIds],
 				difficulty: parsedDifficulty.data,
 				durationSeconds: parsedDuration.data,
+				focusArea,
 			};
 			const useClientStream = process.env.NEXT_PUBLIC_PRACTICE_STREAM === "true";
 
@@ -467,6 +582,10 @@ export function PracticeTestWizard({
 				})),
 				topicDistribution,
 			});
+			// Successful generation — clear the saved draft so a return visit
+			// to /student/practice doesn't auto-restore stale selections from
+			// the test we just kicked off.
+			clearPracticeWizardDraft();
 			router.refresh();
 		} catch (e) {
 			if ((e as Error).message !== "cancelled") {
@@ -514,6 +633,7 @@ export function PracticeTestWizard({
 				trackerIds: [...selectedTrackerIds],
 				difficulty: parsedDifficulty.data,
 				durationSeconds: parsedDuration.data,
+				focusArea,
 			});
 			if (!result.ok) {
 				setActionError(result.message);
@@ -670,6 +790,7 @@ export function PracticeTestWizard({
 								canPickEnoughTopics={canPickEnoughTopics}
 								focusArea={focusArea}
 								selectedTrackerIds={selectedTrackerIds}
+								maxTopics={PRACTICE_MAX_TOPICS}
 								practiceChapterSections={practiceChapterSections}
 								chapterOpenMode={chapterOpenMode}
 								chapterVersion={chapterVersion}
@@ -694,6 +815,7 @@ export function PracticeTestWizard({
 							<StepConfig
 								difficulty={difficulty}
 								durationSeconds={durationSeconds}
+								subjectName={selectedSubjectName}
 								onPickDifficulty={(value) => draftDispatch({ type: "set_difficulty", value })}
 								onPickDurationSeconds={(seconds) => draftDispatch({ type: "set_duration", seconds: seconds as never })}
 							/>

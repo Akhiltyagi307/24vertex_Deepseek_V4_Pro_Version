@@ -1,6 +1,13 @@
 /** Minimum topics a student must select for a practice test configuration. */
 export const PRACTICE_MIN_TOPICS = 1;
 
+/**
+ * Maximum topics a student may select in one test. Caps prompt size and
+ * keeps generation focused — beyond ~20 topics the model spreads thin and
+ * coverage degrades.
+ */
+export const PRACTICE_MAX_TOPICS = 20;
+
 /** Self-practice: only 1 hour or 3 hours. */
 export const PRACTICE_DURATION_OPTIONS = [
 	{ label: "1 hour", seconds: 3600 as const },
@@ -62,4 +69,37 @@ export function getPracticeQuestionPlan(durationSeconds: number): PracticeQuesti
 /** Stored on `tests.question_mix` for new self-practice tests (integer counts). */
 export function practiceTypeCountsToQuestionMixJson(counts: PracticeQuestionTypeCounts): PracticeQuestionTypeCounts {
 	return { ...counts };
+}
+
+/**
+ * Mathematics subjects are graded as MCQ-only across all grades — open-ended
+ * math grading is unreliable at scale and the curriculum exam pattern in
+ * India is overwhelmingly MCQ-driven. Match by name substring (case-insensitive)
+ * so "Mathematics", "Applied Mathematics", "Math (Standard)" all qualify.
+ */
+export function isMathematicsSubject(subjectName: string | null | undefined): boolean {
+	if (!subjectName) return false;
+	return /\bmath/i.test(subjectName);
+}
+
+/**
+ * Subject-aware wrapper around {@link getPracticeQuestionPlan}. For Math
+ * subjects, collapses the per-type counts to all multiple_choice while
+ * preserving the duration-derived total.
+ */
+export function getPracticeQuestionPlanForSubject(
+	durationSeconds: number,
+	subjectName: string | null | undefined,
+): PracticeQuestionPlan {
+	const base = getPracticeQuestionPlan(durationSeconds);
+	if (!isMathematicsSubject(subjectName)) return base;
+	return {
+		total: base.total,
+		counts: {
+			multiple_choice: base.total,
+			fill_in_blank: 0,
+			short_answer: 0,
+			long_answer: 0,
+		},
+	};
 }

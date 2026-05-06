@@ -49,7 +49,7 @@ describe("buildPracticeUserMessage", () => {
 	it("derives question counts from duration (1 hour)", () => {
 		const msg = buildPracticeUserMessage({
 			studentGrade: 9,
-			subject: { id: "33333333-3333-4333-8333-333333333333", name: "Mathematics" },
+			subject: { id: "33333333-3333-4333-8333-333333333333", name: "Physics" },
 			difficulty: "medium",
 			timeLimitSeconds: 3600,
 			topics: TOPICS,
@@ -78,6 +78,40 @@ describe("buildPracticeUserMessage", () => {
 				trend: TOPICS[0]!.trend,
 				last_test_date: TOPICS[0]!.lastTestDate,
 			},
+		});
+	});
+
+	it("collapses to all-MCQ for Mathematics subjects (1 hour)", () => {
+		const msg = buildPracticeUserMessage({
+			studentGrade: 9,
+			subject: { id: "33333333-3333-4333-8333-333333333333", name: "Mathematics" },
+			difficulty: "medium",
+			timeLimitSeconds: 3600,
+			topics: TOPICS,
+		});
+		expect(msg.test_parameters.estimated_question_count).toBe(15);
+		expect(msg.test_parameters.question_type_counts).toEqual({
+			multiple_choice: 15,
+			fill_in_blank: 0,
+			short_answer: 0,
+			long_answer: 0,
+		});
+	});
+
+	it("collapses to all-MCQ for Mathematics subjects (3 hours)", () => {
+		const msg = buildPracticeUserMessage({
+			studentGrade: 11,
+			subject: { id: "44444444-4444-4444-8444-444444444444", name: "Applied Mathematics" },
+			difficulty: "hard",
+			timeLimitSeconds: 10800,
+			topics: TOPICS,
+		});
+		expect(msg.test_parameters.estimated_question_count).toBe(30);
+		expect(msg.test_parameters.question_type_counts).toEqual({
+			multiple_choice: 30,
+			fill_in_blank: 0,
+			short_answer: 0,
+			long_answer: 0,
 		});
 	});
 

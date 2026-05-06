@@ -5,14 +5,20 @@ import { logServerError } from "@/lib/server/log-supabase-error";
 import { tagTopicContextFetchFailed } from "./sentry-tags";
 import type { PracticeGroundingMeta, PracticeTopicChunkLine, PreFetchedTopicContext } from "./user-message";
 
-/** Tunable limits for practice prompt size (per-topic then global trim). */
+/**
+ * Tunable limits for practice prompt size (per-topic then global trim).
+ *
+ * Defaults raised 2026-05 to widen the model's grounding window. Every value
+ * is also overridable per-environment — see `.env.example` for the full list
+ * of `PRACTICE_TOPIC_CONTEXT_*` variables.
+ */
 export const TOPIC_CONTEXT_DEFAULT_LIMITS = {
-	maxContextChunksPerTopic: 12,
-	maxExerciseChunksPerTopic: 10,
-	maxContextCharsPerTopic: 4000,
-	maxExerciseCharsPerTopic: 3500,
-	maxTotalContextChars: 22_000,
-	maxTotalExerciseChars: 16_000,
+	maxContextChunksPerTopic: 33,
+	maxExerciseChunksPerTopic: 28,
+	maxContextCharsPerTopic: 16_500,
+	maxExerciseCharsPerTopic: 13_200,
+	maxTotalContextChars: 88_000,
+	maxTotalExerciseChars: 66_000,
 } as const;
 
 export type TopicContextLimits = {
@@ -192,6 +198,7 @@ function buildMeta(
 	let exerciseChunkCount = 0;
 	let contextCharTotal = 0;
 	let exerciseCharTotal = 0;
+	let topicsWithAnyChunk = 0;
 	for (const tid of topicOrder) {
 		const b = byTopic.get(tid);
 		if (!b) continue;
@@ -199,14 +206,22 @@ function buildMeta(
 		exerciseChunkCount += b.exercise.length;
 		contextCharTotal += charSum(b.context);
 		exerciseCharTotal += charSum(b.exercise);
+		if (b.context.length > 0 || b.exercise.length > 0) topicsWithAnyChunk++;
 	}
+	const totalTopics = topicOrder.length;
+	const context_quality: PracticeGroundingMeta["context_quality"] =
+		totalTopics === 0 ? "ok"
+		: topicsWithAnyChunk === 0 ? "no_context"
+		: topicsWithAnyChunk * 2 < totalTopics ? "low_context"
+		: "ok";
 	return {
-		topic_count: topicOrder.length,
+		topic_count: totalTopics,
 		context_chunk_count: contextChunkCount,
 		exercise_chunk_count: exerciseChunkCount,
 		context_char_total: contextCharTotal,
 		exercise_char_total: exerciseCharTotal,
 		truncated,
+		context_quality,
 		...(fetchError ? { fetch_error: fetchError } : {}),
 	};
 }

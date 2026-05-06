@@ -21,6 +21,7 @@ export type PracticeEvent =
 	| "practice_question_flagged"
 	| "practice_topic_context_truncated"
 	| "practice_topic_context_empty"
+	| "practice_topic_context_quality_degraded"
 	// Billing / subscription funnel events (share the analytics table).
 	| "subscription_mandate_authenticated"
 	| "subscription_started"

@@ -13,6 +13,7 @@ export type StudentPracticeViewProps = {
 	showPromptPreview: boolean;
 	subjectProgressBySubjectId: Record<string, PracticeSubjectProgress>;
 	isAdmin?: boolean;
+	userId: string;
 };
 
 export function StudentPracticeView({
@@ -22,6 +23,7 @@ export function StudentPracticeView({
 	showPromptPreview,
 	subjectProgressBySubjectId,
 	isAdmin,
+	userId,
 }: StudentPracticeViewProps) {
 	const wizardProps: PracticeTestWizardProps = {
 		enrolledSubjects,
@@ -30,6 +32,7 @@ export function StudentPracticeView({
 		showPromptPreview,
 		subjectProgressBySubjectId,
 		isAdmin: Boolean(isAdmin),
+		userId,
 	};
 	return <PracticeTestWizard {...wizardProps} />;
 }

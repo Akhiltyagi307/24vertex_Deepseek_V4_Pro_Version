@@ -7,7 +7,9 @@ import { generateObject } from "ai";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { consumeTest } from "@/lib/billing/entitlements";
-import { notifyTestReportReady } from "@/lib/notifications/report-ready";
+// `notifyTestReportReady` previously fired here; it now fires from the email
+// job (run-jobs route) so the in-app bell only lights up when the PDF link
+// is actually retrievable.
 import { getOpenAIChatModel } from "@/lib/env";
 import {
 	buildPracticeGradingSystemPrompt,
@@ -39,14 +41,24 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type ServerSupabase = SupabaseClient;
 
-function resolvePracticePdfLogoPath(): string | null {
-	const logoPath = path.join(process.cwd(), "public", "brand", "logo-icon.png");
+/**
+ * Loads the PDF logo into a buffer ONCE at module init. Avoids `fs.existsSync`
+ * in the hot path — that call is unreliable in serverless because Vercel
+ * Lambdas may not bundle every public/ asset and the cwd doesn't always
+ * resolve to the project root. A failed read leaves `cachedPdfLogoBuffer`
+ * null and the PDF renders without a logo (graceful fallback).
+ */
+const cachedPdfLogoBuffer: Buffer | null = (() => {
 	try {
-		if (fs.existsSync(logoPath)) return logoPath;
+		const logoPath = path.join(process.cwd(), "public", "brand", "logo-icon.png");
+		return fs.readFileSync(logoPath);
 	} catch {
-		/* ignore */
+		return null;
 	}
-	return null;
+})();
+
+function resolvePracticePdfLogoSrc(): Buffer | null {
+	return cachedPdfLogoBuffer;
 }
 
 // 5 questions per grading call keeps each chunk's output budget under ~6k
@@ -96,6 +108,15 @@ function defaultStudentAnswerForQuestionType(
 	return { kind: "text", value: "" };
 }
 
+/**
+ * Grading uses a flatter schema than generation (no nested `.length()`
+ * arrays), so strict mode is less risky here. Still env-gated so prod can
+ * roll it forward independently of generation.
+ */
+function isStrictJsonSchemaForGradingEnabled(): boolean {
+	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GRADE === "true";
+}
+
 async function runGradingChunk(
 	systemPrompt: string,
 	userPrompt: string,
@@ -116,7 +137,7 @@ async function runGradingChunk(
 			maxOutputTokens,
 			maxRetries: 2,
 			providerOptions: {
-				openai: { strictJsonSchema: false },
+				openai: { strictJsonSchema: isStrictJsonSchemaForGradingEnabled() },
 			},
 		});
 		void recordAiCall({
@@ -132,6 +153,10 @@ async function runGradingChunk(
 	});
 }
 
+// Summary call is a single AI request that runs AFTER all grading chunks have
+// resolved, so it doesn't compete for concurrency with chunks. No `pLimit`
+// guard needed at this layer; if multiple grade jobs run in parallel inside
+// the same worker process they hit the same chunk pLimit upstream.
 async function runSummaryObject(
 	stats: {
 		overallPercent: number;
@@ -163,7 +188,7 @@ async function runSummaryObject(
 			maxOutputTokens: 2_000,
 			maxRetries: 2,
 			providerOptions: {
-				openai: { strictJsonSchema: false },
+				openai: { strictJsonSchema: isStrictJsonSchemaForGradingEnabled() },
 			},
 		});
 		void recordAiCall({
@@ -340,28 +365,63 @@ async function gradePracticeTestWithAiInner(
 	trace.chunks.count = chunks.length;
 	const merged: GradedQuestionItem[] = [];
 
-	try {
-		const tasks = chunks.map((part, ci) => async () => {
-			const c0 = Date.now();
-			const label = `part ${ci + 1} of ${chunks.length} (${part.length} questions)`;
-			const userPrompt = buildPracticeGradingUserPrompt(label, part);
+	type ChunkAttempt =
+		| { ok: true; index: number; graded: GradedQuestionItem[]; ms: number }
+		| { ok: false; index: number; error: unknown };
+
+	const runChunkAttempt = async (part: GradingQuestionInput[], ci: number): Promise<ChunkAttempt> => {
+		const c0 = Date.now();
+		const label = `part ${ci + 1} of ${chunks.length} (${part.length} questions)`;
+		const userPrompt = buildPracticeGradingUserPrompt(label, part);
+		try {
 			const { questions: graded } = await runGradingChunk(systemPrompt, userPrompt, part.length, userId);
-			const chunkMs = Date.now() - c0;
-			trace.chunks.totalChunkMs += chunkMs;
-			if (chunkMs > trace.chunks.maxChunkMs) trace.chunks.maxChunkMs = chunkMs;
-			return graded;
-		});
-		const chunkResults = await pLimit(getGradingConcurrency(), tasks);
-		for (const graded of chunkResults) {
-			merged.push(...graded);
+			return { ok: true, index: ci, graded, ms: Date.now() - c0 };
+		} catch (error) {
+			return { ok: false, index: ci, error };
 		}
-	} catch (e) {
-		const msg = e instanceof Error ? e.message : "AI grading failed.";
-		logServerError("gradePracticeTestWithAi.runGradingChunk", e, {
-			testId,
-			correlationId: ctx.correlationId,
-		});
-		return { ok: false, message: msg.length > 200 ? `${msg.slice(0, 200)}…` : msg };
+	};
+
+	const accumulateAttempt = (attempt: ChunkAttempt) => {
+		if (!attempt.ok) return;
+		trace.chunks.totalChunkMs += attempt.ms;
+		if (attempt.ms > trace.chunks.maxChunkMs) trace.chunks.maxChunkMs = attempt.ms;
+		merged.push(...attempt.graded);
+	};
+
+	const firstResults = await pLimit(
+		getGradingConcurrency(),
+		chunks.map((part, ci) => () => runChunkAttempt(part, ci)),
+	);
+
+	const failedFirst = firstResults.filter((r): r is Extract<ChunkAttempt, { ok: false }> => !r.ok);
+	for (const r of firstResults) accumulateAttempt(r);
+
+	// Preserve progress on partial failure: only the failed chunks are retried,
+	// so a single transient timeout doesn't burn tokens regrading the chunks
+	// that already succeeded. One retry pass; if any chunk still fails, the
+	// whole grading bails out (we can't ship a half-graded report).
+	if (failedFirst.length > 0) {
+		logServerError(
+			"gradePracticeTestWithAi.runGradingChunk.partialFailure",
+			new Error(`${failedFirst.length} of ${chunks.length} chunks failed first pass; retrying.`),
+			{ testId, correlationId: ctx.correlationId },
+		);
+		const retryResults = await pLimit(
+			getGradingConcurrency(),
+			failedFirst.map((f) => () => runChunkAttempt(chunks[f.index]!, f.index)),
+		);
+		const stillFailed = retryResults.filter((r): r is Extract<ChunkAttempt, { ok: false }> => !r.ok);
+		for (const r of retryResults) accumulateAttempt(r);
+		if (stillFailed.length > 0) {
+			const firstError = stillFailed[0]!.error;
+			const msg = firstError instanceof Error ? firstError.message : "AI grading failed.";
+			logServerError("gradePracticeTestWithAi.runGradingChunk", firstError, {
+				testId,
+				correlationId: ctx.correlationId,
+				stillFailedCount: stillFailed.length,
+			});
+			return { ok: false, message: msg.length > 200 ? `${msg.slice(0, 200)}…` : msg };
+		}
 	}
 
 	trace.timingsMs.aiChunks = mark();
@@ -521,25 +581,23 @@ async function gradePracticeTestWithAiInner(
 
 	trace.timingsMs.testReports = mark();
 
-	// Fire-and-forget: in-app "report ready" (emails go after PDF upload + signed URL).
-	void notifyTestReportReady({
-		studentId: userId,
-		testId,
-		subjectName,
-		overallPercent,
-	});
-
+	// Update performance trackers BEFORE the in-app notification so the student
+	// (and any linked parent) opens a report whose tracker rows are already in
+	// sync with the new scores. Tracker failures are logged but don't fail the
+	// grade — partial data still beats no data, and the test report itself
+	// already carries the per-topic rollup payload.
+	const trackerPayloadItems = topicRollups.map((row) => ({
+		topic_id: row.topic_id,
+		average_score: row.average_score,
+		n_incorrect: row.n_incorrect,
+	}));
 	if (topicRollups.length > 0) {
 		const { error: bulkTrackerErr } = await supabase.rpc("practice_update_trackers_bulk", {
 			p_student_id: userId,
 			p_subject_id: subjectId,
 			p_current_test_id: testId,
 			p_now: nowIso,
-			p_items: topicRollups.map((row) => ({
-				topic_id: row.topic_id,
-				average_score: row.average_score,
-				n_incorrect: row.n_incorrect,
-			})),
+			p_items: trackerPayloadItems,
 		});
 		if (bulkTrackerErr) {
 			logSupabaseError("gradePracticeTestWithAi.practice_update_trackers_bulk", bulkTrackerErr, {
@@ -547,24 +605,55 @@ async function gradePracticeTestWithAiInner(
 				correlationId: ctx.correlationId,
 				topicItems: topicRollups.length,
 			});
+			// Best-effort retry: enqueue a `tracker_update` job so the same
+			// rollup payload is replayed by the worker with backoff. Logged
+			// but never blocks the grade pipeline (we have the report row).
+			const { error: enqueueErr } = await supabase.rpc("practice_enqueue_job", {
+				p_job_type: "tracker_update",
+				p_test_id: testId,
+				p_payload: {
+					student_id: userId,
+					subject_id: subjectId,
+					now: nowIso,
+					items: trackerPayloadItems,
+				},
+				p_run_after: new Date(Date.now() + 60_000).toISOString(),
+			});
+			if (enqueueErr) {
+				logSupabaseError(
+					"gradePracticeTestWithAi.tracker_retry_enqueue",
+					enqueueErr,
+					{ testId, correlationId: ctx.correlationId },
+				);
+			}
 		}
+	} else {
+		// Empty rollup means the model returned no per-topic verdicts we could
+		// aggregate — surface it explicitly so it isn't silently swallowed.
+		logServerError(
+			"gradePracticeTestWithAi.empty_topic_rollup",
+			new Error("No topic rollup rows produced; tracker update skipped."),
+			{
+				testId,
+				correlationId: ctx.correlationId,
+				gradedQuestionCount: merged.length,
+			},
+		);
+		logPracticeObs({
+			phase: "grade_pipeline_empty_rollup",
+			correlationId: ctx.correlationId,
+			testId,
+			gradedQuestionCount: merged.length,
+		});
 	}
 
 	trace.timingsMs.trackersBulk = mark();
 
 	const totalScoreStr = formatScoreEarnedForDb(overallPercent);
 
-	const billingAfter = await consumeTest(supabase, userId);
-	if (!billingAfter.ok) {
-		logServerError("gradePracticeTestWithAi.consumeTest", new Error(billingAfter.message), {
-			testId,
-			jobId: ctx.jobId,
-			correlationId: ctx.correlationId,
-			code: billingAfter.code,
-		});
-		return { ok: false, message: billingAfter.message };
-	}
-
+	// Finalize test status BEFORE billing so a billing-system glitch can't
+	// strand a fully-graded test in `grading` state forever (which previously
+	// charged quota AND left the student looking at a half-broken report).
 	const { error: testUpErr } = await supabase
 		.from("tests")
 		.update({
@@ -592,6 +681,27 @@ async function gradePracticeTestWithAiInner(
 	}
 
 	trace.timingsMs.finalizeTest = mark();
+
+	// Best-effort quota deduction. If this fails, the test is already marked
+	// graded and the student sees their report — admin reconciles billing
+	// from logs rather than punishing the student for an internal glitch.
+	const billingAfter = await consumeTest(supabase, userId);
+	if (!billingAfter.ok) {
+		logServerError("gradePracticeTestWithAi.consumeTest", new Error(billingAfter.message), {
+			testId,
+			jobId: ctx.jobId,
+			correlationId: ctx.correlationId,
+			code: billingAfter.code,
+		});
+	}
+
+	// In-app "report ready" notification fires from the email job AFTER the
+	// PDF render completes (see handleEmailJob in app/api/internal/practice/
+	// run-jobs/route.ts), so the bell only lights up once the PDF link in
+	// the report actually resolves. Test status (`graded`) and tracker rows
+	// are already updated above — the report page is functional via the
+	// realtime poll independent of the bell notification.
+
 	trace.ok = true;
 	return { ok: true };
 	} finally {
@@ -809,7 +919,7 @@ export async function buildPracticeGradingReportPdfBuffer(
 		summaryPayload?.overall_percent ?? pdfQuestions.reduce((s, q) => s + q.score, 0) / Math.max(1, pdfQuestions.length),
 	);
 
-	const logoSrc = resolvePracticePdfLogoPath();
+	const logoSrc = resolvePracticePdfLogoSrc();
 
 	try {
 		const raw = await renderToBuffer(
@@ -840,6 +950,15 @@ export async function buildPracticeGradingReportPdfBuffer(
 }
 
 /**
+ * Hard cap for the practice report PDF size before upload. A 40-question test
+ * with rich answers typically renders to ~1–3 MB; anything beyond 15 MB is
+ * almost certainly a runaway / pathological case (long_answer text loop,
+ * embedded image bloat) and Supabase storage caps individual uploads anyway.
+ * Surface as a clean error rather than letting the storage call fail.
+ */
+const MAX_PRACTICE_REPORT_PDF_BYTES = 15 * 1024 * 1024;
+
+/**
  * Uploads a rendered practice report PDF to Storage and sets `test_reports.pdf_storage_path`.
  */
 export async function uploadPracticeGradingReportPdf(
@@ -847,6 +966,16 @@ export async function uploadPracticeGradingReportPdf(
 	testId: string,
 	buffer: Buffer,
 ): Promise<{ ok: true; storagePath: string } | { ok: false; message: string }> {
+	if (buffer.byteLength > MAX_PRACTICE_REPORT_PDF_BYTES) {
+		const sizeMb = (buffer.byteLength / (1024 * 1024)).toFixed(1);
+		const capMb = (MAX_PRACTICE_REPORT_PDF_BYTES / (1024 * 1024)).toFixed(0);
+		logServerError(
+			"uploadPracticeGradingReportPdf.size_cap_exceeded",
+			new Error(`PDF buffer ${sizeMb} MB exceeds ${capMb} MB cap`),
+			{ testId, userId },
+		);
+		return { ok: false, message: `Generated PDF (${sizeMb} MB) exceeds the ${capMb} MB cap.` };
+	}
 	const admin = createServiceRoleClient();
 	const storagePath = `${userId}/${testId}.pdf`;
 	const { error: upStorage } = await admin.storage

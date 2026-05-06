@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { FinalizePracticeConfigInput } from "./schemas";
+import { TOPIC_SATISFACTORY_MIN } from "./topic-rollup";
 import type { PracticeCanonicalTopic } from "./types";
 import type { PracticeRecentError } from "./user-message";
 import { getStudentSubjectsRpc } from "@/lib/student/get-student-subjects-rpc";
@@ -52,25 +53,36 @@ function normalizeTrend(s: string | null | undefined): string {
 /**
  * Server-only: verifies enrollment, tracker rows, and topics; builds canonical topic list.
  * Shared by finalize and generate flows.
+ *
+ * `prefetchedUser` lets callers (the generation pipeline preflight) pass the
+ * `auth.getUser()` result they've already fetched, avoiding a second round-trip
+ * to the auth endpoint inside the same request.
  */
 export async function resolvePracticeConfigForStudent(
 	supabase: SupabaseClient,
 	input: FinalizePracticeConfigInput,
+	prefetchedUser?: { id: string } | null,
 ): Promise<PracticeConfigResolveResult> {
 	const { subjectId, trackerIds } = input;
 
-	const {
-		data: { user },
-		error: userError,
-	} = await supabase.auth.getUser();
-	if (userError || !user) {
-		return { ok: false, code: "unauthorized", message: "Sign in to continue." };
+	let userId: string;
+	if (prefetchedUser?.id) {
+		userId = prefetchedUser.id;
+	} else {
+		const {
+			data: { user },
+			error: userError,
+		} = await supabase.auth.getUser();
+		if (userError || !user) {
+			return { ok: false, code: "unauthorized", message: "Sign in to continue." };
+		}
+		userId = user.id;
 	}
 
 	const { data: profileRow, error: profileErr } = await supabase
 		.from("profiles")
 		.select("grade, stream, elective_subject_id, role")
-		.eq("id", user.id)
+		.eq("id", userId)
 		.maybeSingle();
 
 	if (profileErr || !profileRow || profileRow.role !== "student") {
@@ -111,10 +123,10 @@ export async function resolvePracticeConfigForStudent(
 		supabase
 			.from("performance_tracker")
 			.select("id, topic_id, subject_id, status, last_test_date, average_score, tests_taken, trend")
-			.eq("student_id", user.id)
+			.eq("student_id", userId)
 			.eq("subject_id", subjectId)
 			.in("id", trackerIds),
-		loadRecentErrorsForSubject(supabase, user.id, subjectId),
+		loadRecentErrorsForSubject(supabase, userId, subjectId),
 	]);
 
 	const { data: subjectRow, error: subjectRowErr } = subjectRes;
@@ -223,7 +235,7 @@ export async function resolvePracticeConfigForStudent(
 
 	return {
 		ok: true,
-		userId: user.id,
+		userId,
 		studentGrade: profileRow.grade ?? null,
 		subjectId,
 		subjectName: resolvedSubjectName,
@@ -251,11 +263,16 @@ async function loadRecentErrorsForSubject(
 	const testIds = (recentTests ?? []).map((r) => r.id as string);
 	if (testIds.length === 0) return [];
 
+	// Threshold aligned with TOPIC_SATISFACTORY_MIN (50): only answers below the
+	// "satisfactory" band qualify as recent errors. Previously this was hard-
+	// coded to 75, which pulled in answers that are already above the
+	// satisfactory threshold and biased generation toward re-testing concepts
+	// the student has adequately learned.
 	const { data: answerRows } = await supabase
 		.from("student_answers")
 		.select("test_id, question_id, is_correct, score_earned, ai_feedback")
 		.in("test_id", testIds)
-		.or("is_correct.eq.false,score_earned.lt.75");
+		.or(`is_correct.eq.false,score_earned.lt.${TOPIC_SATISFACTORY_MIN}`);
 	if (!answerRows?.length) return [];
 
 	const questionIds = [...new Set(answerRows.map((r) => r.question_id as string))];
@@ -297,11 +314,39 @@ async function loadRecentErrorsForSubject(
 		});
 	}
 
-	// Keep most recent first, cap to 8.
+	// Keep most recent first, then balance per-topic so one bad topic can't
+	// dominate all 8 slots and crowd out signal from other selected topics.
 	out.sort((x, y) => {
 		const xd = x.last_seen_at ? Date.parse(x.last_seen_at) : 0;
 		const yd = y.last_seen_at ? Date.parse(y.last_seen_at) : 0;
 		return yd - xd;
 	});
-	return out.slice(0, 8);
+	return balanceRecentErrorsPerTopic(out, { perTopicCap: 2, totalCap: 8 });
+}
+
+/**
+ * First-pass: keep the most-recent N entries per topic. Second-pass: fill the
+ * remaining global budget round-robin. Stable order (input order is recency).
+ */
+export function balanceRecentErrorsPerTopic(
+	rows: PracticeRecentError[],
+	limits: { perTopicCap: number; totalCap: number },
+): PracticeRecentError[] {
+	const { perTopicCap, totalCap } = limits;
+	if (rows.length === 0 || totalCap <= 0) return [];
+	const perTopicCount = new Map<string, number>();
+	const firstPass: PracticeRecentError[] = [];
+	const overflow: PracticeRecentError[] = [];
+	for (const row of rows) {
+		const seen = perTopicCount.get(row.topic_id) ?? 0;
+		if (seen < perTopicCap) {
+			perTopicCount.set(row.topic_id, seen + 1);
+			firstPass.push(row);
+		} else {
+			overflow.push(row);
+		}
+	}
+	if (firstPass.length >= totalCap) return firstPass.slice(0, totalCap);
+	const remaining = totalCap - firstPass.length;
+	return firstPass.concat(overflow.slice(0, remaining));
 }

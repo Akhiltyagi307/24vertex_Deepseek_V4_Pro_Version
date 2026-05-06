@@ -1,4 +1,4 @@
-import { notifyTestReportPdfReadyEmails } from "@/lib/notifications/report-ready";
+import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/notifications/report-ready";
 import {
 	gradePracticeTestWithAi,
 	recordGradingFailure,
@@ -42,7 +42,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, jobType: string): Promi
 
 type ClaimedJob = {
 	id: string;
-	job_type: "grade" | "pdf" | "auto_submit";
+	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update";
 	test_id: string;
 	student_id: string;
 	attempts: number;
@@ -155,6 +155,21 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 			// Test is already `graded` at this point; do not mark the grade job failed so a stuck row
 			// will not block the queue or confuse diagnostics.
 		} else {
+			// Inline fallback after PDF enqueue failure. Mirror handleEmailJob:
+			// fire the in-app bell first (idempotent), then attempt emails.
+			try {
+				await notifyTestReportReady({
+					studentId: pdfResult.studentId,
+					testId: job.test_id,
+					subjectName: pdfResult.subjectName,
+					overallPercent: pdfResult.overallPercent,
+				});
+			} catch (err) {
+				logServerError("handleGradeJob.fallback_in_app_notify", err, {
+					testId: job.test_id,
+					jobId: job.id,
+				});
+			}
 			void notifyTestReportPdfReadyEmails({
 				testId: job.test_id,
 				studentId: pdfResult.studentId,
@@ -168,19 +183,150 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 	return { ok: true };
 }
 
+async function handleTrackerUpdateJob(
+	job: ClaimedJob,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const admin = createServiceRoleClient();
+	const payload = job.payload as {
+		student_id?: string;
+		subject_id?: string;
+		now?: string;
+		items?: Array<{ topic_id: string; average_score: number; n_incorrect: number }>;
+	};
+	if (
+		!payload?.student_id ||
+		!payload?.subject_id ||
+		!payload?.now ||
+		!Array.isArray(payload.items) ||
+		payload.items.length === 0
+	) {
+		return { ok: false, message: "Tracker update payload missing required fields." };
+	}
+	const { error } = await admin.rpc("practice_update_trackers_bulk", {
+		p_student_id: payload.student_id,
+		p_subject_id: payload.subject_id,
+		p_current_test_id: job.test_id,
+		p_now: payload.now,
+		p_items: payload.items,
+	});
+	if (error) {
+		logSupabaseError("handleTrackerUpdateJob.practice_update_trackers_bulk", error, {
+			testId: job.test_id,
+			jobId: job.id,
+		});
+		return { ok: false, message: error.message ?? "Tracker update failed." };
+	}
+	return { ok: true };
+}
+
 async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false; message: string }> {
 	const result = await renderAndUploadPracticeReportPdf(job.test_id);
 	if (!result.ok) {
 		return { ok: false, message: result.message };
 	}
-	void notifyTestReportPdfReadyEmails({
-		testId: job.test_id,
-		studentId: result.studentId,
-		subjectName: result.subjectName,
-		overallPercent: result.overallPercent,
-		storagePath: result.storagePath,
+	// Enqueue an email job rather than sending inline. This routes email
+	// retries through the same backoff / dead-letter machinery as grade
+	// and pdf jobs, instead of fire-and-forget without retry.
+	const admin = createServiceRoleClient();
+	const { error: enqueueError } = await admin.rpc("practice_enqueue_job", {
+		p_job_type: "email",
+		p_test_id: job.test_id,
+		p_payload: {
+			student_id: result.studentId,
+			subject_name: result.subjectName,
+			overall_percent: result.overallPercent,
+			storage_path: result.storagePath,
+		},
+		p_run_after: new Date().toISOString(),
 	});
+	if (enqueueError) {
+		logSupabaseError("handlePdfJob.email_enqueue", enqueueError, {
+			testId: job.test_id,
+		});
+		// Inline fallback so an enqueue glitch doesn't silently drop emails OR
+		// the in-app bell. Same in-app-then-email order as handleEmailJob.
+		try {
+			await notifyTestReportReady({
+				studentId: result.studentId,
+				testId: job.test_id,
+				subjectName: result.subjectName,
+				overallPercent: result.overallPercent,
+			});
+		} catch (err) {
+			logServerError("handlePdfJob.fallback_in_app_notify", err, {
+				testId: job.test_id,
+				jobId: job.id,
+			});
+		}
+		const inline = await notifyTestReportPdfReadyEmails({
+			testId: job.test_id,
+			studentId: result.studentId,
+			subjectName: result.subjectName,
+			overallPercent: result.overallPercent,
+			storagePath: result.storagePath,
+		});
+		if (!inline.ok) {
+			logServerError(
+				"handlePdfJob.inline_email_fallback_failed",
+				new Error(inline.reason),
+				{ testId: job.test_id },
+			);
+		}
+	}
 	return { ok: true };
+}
+
+async function handleEmailJob(
+	job: ClaimedJob,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const payload = job.payload as {
+		student_id?: string;
+		subject_name?: string;
+		overall_percent?: number | null;
+		storage_path?: string;
+	};
+	if (!payload?.student_id || !payload?.subject_name || typeof payload?.storage_path !== "string") {
+		// Permanently malformed — mark as failure but don't retry forever.
+		return { ok: false, message: "Email job payload missing required fields." };
+	}
+
+	// In-app "report ready" goes out FIRST so the bell lights up even if the
+	// email half hits a transient SMTP failure and re-queues. Both calls are
+	// idempotent (per-recipient dedup row in `notifications`), so retries
+	// don't produce duplicate cards.
+	try {
+		await notifyTestReportReady({
+			studentId: payload.student_id,
+			testId: job.test_id,
+			subjectName: payload.subject_name,
+			overallPercent: payload.overall_percent ?? null,
+		});
+	} catch (err) {
+		logServerError("handleEmailJob.in_app_notify", err, {
+			testId: job.test_id,
+			jobId: job.id,
+		});
+	}
+
+	const result = await notifyTestReportPdfReadyEmails({
+		testId: job.test_id,
+		studentId: payload.student_id,
+		subjectName: payload.subject_name,
+		overallPercent: payload.overall_percent ?? null,
+		storagePath: payload.storage_path,
+	});
+	if (result.ok) return { ok: true };
+	if (result.permanentlyFailed) {
+		// Don't retry permanent failures. Bump attempts to max so it falls
+		// to dead on the next markJobFailure.
+		logServerError(
+			"handleEmailJob.permanent_failure",
+			new Error(result.reason),
+			{ testId: job.test_id, jobId: job.id },
+		);
+		return { ok: false, message: `permanent: ${result.reason}` };
+	}
+	return { ok: false, message: result.reason };
 }
 
 async function runPracticeJobs(request: Request): Promise<Response> {
@@ -206,7 +352,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 
 	const { data: jobs, error } = await admin.rpc("practice_claim_jobs", {
 		p_worker_id: workerId,
-		p_job_types: ["grade", "pdf"],
+		p_job_types: ["grade", "pdf", "email", "tracker_update"],
 		p_limit: limit,
 	});
 
@@ -223,6 +369,8 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 			const handlerPromise =
 				job.job_type === "grade" ? handleGradeJob(job)
 				: job.job_type === "pdf" ? handlePdfJob(job)
+				: job.job_type === "email" ? handleEmailJob(job)
+				: job.job_type === "tracker_update" ? handleTrackerUpdateJob(job)
 				: Promise.resolve({ ok: false as const, message: `Unsupported job_type ${job.job_type}` });
 
 			// Per-job timeout: a stuck AI call cannot block the whole worker

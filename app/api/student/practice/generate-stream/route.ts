@@ -7,6 +7,7 @@ import {
 	envelopeForPartial,
 	envelopeForResult,
 	envelopeForThrown,
+	httpStatusForGenerateFailure,
 } from "@/lib/practice/generate-stream-envelope";
 import { getApiRequestUser } from "@/lib/auth/api-request-user";
 
@@ -55,17 +56,12 @@ export async function POST(request: Request) {
 		if (r.ok) {
 			return Response.json({ ok: false, message: "Unexpected preflight state." }, { status: 500 });
 		}
-		// r is GeneratePracticeFailure
-		if (r.paywall) {
-			return Response.json(
-				{ ok: false, message: r.message, code: r.code, paywall: true },
-				{ status: 402 },
-			);
-		}
-		if (r.code === "validation_error" || r.message.includes("selection")) {
-			return Response.json({ ok: false, message: r.message, code: r.code }, { status: 400 });
-		}
-		return Response.json({ ok: false, message: r.message, code: r.code }, { status: 400 });
+		// HTTP status mapping centralized in `httpStatusForGenerateFailure` so the
+		// server-action and streaming-route paths can't drift apart silently.
+		return Response.json(
+			{ ok: false, message: r.message, code: r.code, ...(r.paywall ? { paywall: true } : {}) },
+			{ status: httpStatusForGenerateFailure(r) },
+		);
 	}
 
 	const encoder = new TextEncoder();

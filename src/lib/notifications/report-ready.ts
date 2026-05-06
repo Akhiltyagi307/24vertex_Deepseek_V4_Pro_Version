@@ -53,10 +53,23 @@ async function hasExistingReportReadyRow(recipientId: string, testId: string): P
 
 /**
  * Emits the "your report is ready" in-app notification after grading finishes.
- * Idempotent per (recipient × test) — repeat calls are no-ops.
  *
- * Report-ready emails (student + linked parents) are sent from the PDF pipeline
- * with a Supabase signed URL so recipients can open the PDF without EduAI login.
+ * Idempotency contract — both halves below are checked against the
+ * `notifications` table by `(recipientId, referenceType=test, referenceId,
+ * category=test_report_ready)`, so:
+ *
+ *  - Student emit: dedup check → insert (or skip).
+ *  - Parent emit:  per-parent dedup check → insert (or skip) for each linked parent.
+ *
+ * The two halves are independent on purpose: a parent emit failure must NOT
+ * cause the student emit to retry (and vice versa). On any retry, both halves
+ * re-run their dedup checks and only insert rows that don't yet exist —
+ * which is correct behavior, not desync. Do not "unify" by sharing a single
+ * dedup row across roles; the bell UI keys by recipient.
+ *
+ * Report-ready emails (student + linked parents) are sent from the email job
+ * (`handleEmailJob` in `app/api/internal/practice/run-jobs/route.ts`) with a
+ * Supabase signed URL so recipients can open the PDF without EduAI login.
  */
 export async function notifyTestReportReady(input: NotifyTestReportReadyInput): Promise<void> {
 	try {
@@ -142,6 +155,16 @@ export type NotifyTestReportPdfReadyEmailsInput = {
 };
 
 /**
+ * Aggregated email-send result. `permanentlyFailed` is set when the
+ * underlying issue cannot be retried (e.g., null storage path) so the
+ * caller can mark the queue job dead immediately instead of retrying
+ * indefinitely.
+ */
+export type NotifyTestReportPdfReadyEmailsResult =
+	| { ok: true; sent: number }
+	| { ok: false; sent: number; failedCount: number; permanentlyFailed: boolean; reason: string };
+
+/**
  * Sends student + parent "report ready" emails after the PDF is in Storage.
  * Uses a time-limited signed URL so the PDF opens without EduAI authentication.
  *
@@ -149,7 +172,23 @@ export type NotifyTestReportPdfReadyEmailsInput = {
  * (`report-ready:${testId}:${student|parent}:${recipientId}`) so concurrent
  * grading retries do not produce duplicate sends.
  */
-export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfReadyEmailsInput): Promise<void> {
+export async function notifyTestReportPdfReadyEmails(
+	input: NotifyTestReportPdfReadyEmailsInput,
+): Promise<NotifyTestReportPdfReadyEmailsResult> {
+	if (!input.storagePath) {
+		// Permanently terminal: there's no PDF to attach. Caller should NOT
+		// retry — the upstream PDF render didn't complete. We still report
+		// because the queue job needs to know to mark itself dead.
+		return {
+			ok: false,
+			sent: 0,
+			failedCount: 0,
+			permanentlyFailed: true,
+			reason: "missing_storage_path",
+		};
+	}
+	let sent = 0;
+	let failedCount = 0;
 	try {
 		const signed = await createStudentTestReportPdfSignedUrl(input.storagePath);
 		if (!signed.ok) {
@@ -157,7 +196,13 @@ export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfR
 				testId: input.testId,
 				studentId: input.studentId,
 			});
-			return;
+			return {
+				ok: false,
+				sent: 0,
+				failedCount: 0,
+				permanentlyFailed: false,
+				reason: signed.message,
+			};
 		}
 		const pdfSignedUrl = signed.url;
 
@@ -176,11 +221,13 @@ export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfR
 				pdfSignedUrl,
 			});
 			if (error) {
+				failedCount++;
 				logServerError("notifications.report_pdf_ready.student_email", new Error(error), {
 					studentId: input.studentId,
 					testId: input.testId,
 				});
 			} else {
+				sent++;
 				// In-app row was written by `notifyTestReportReady` inside the
 				// grader; mark it `email_sent=true` so admin tooling and the
 				// bell UI know the user got both halves.
@@ -221,12 +268,14 @@ export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfR
 						pdfSignedUrl,
 					});
 					if (error) {
+						failedCount++;
 						logServerError("notifications.report_pdf_ready.parent_email", new Error(error), {
 							parentId,
 							studentId: input.studentId,
 							testId: input.testId,
 						});
 					} else {
+						sent++;
 						const id = await findNotificationIdForEmailRef({
 							recipientId: parentId,
 							referenceType: "test",
@@ -236,6 +285,7 @@ export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfR
 						if (id) await markNotificationEmailSent(id);
 					}
 				} catch (err) {
+					failedCount++;
 					logServerError("notifications.report_pdf_ready.parent", err, {
 						parentId,
 						studentId: input.studentId,
@@ -249,7 +299,22 @@ export async function notifyTestReportPdfReadyEmails(input: NotifyTestReportPdfR
 			studentId: input.studentId,
 			testId: input.testId,
 		});
+		return {
+			ok: false,
+			sent,
+			failedCount: failedCount + 1,
+			permanentlyFailed: false,
+			reason: err instanceof Error ? err.message : "unknown",
+		};
 	}
+	if (failedCount === 0) return { ok: true, sent };
+	return {
+		ok: false,
+		sent,
+		failedCount,
+		permanentlyFailed: false,
+		reason: `${failedCount} email send(s) failed`,
+	};
 }
 
 function buildReportBody(input: NotifyTestReportReadyInput): string {

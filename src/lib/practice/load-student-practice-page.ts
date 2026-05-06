@@ -195,6 +195,8 @@ export type StudentPracticePagePayload = {
 	showPromptPreview: boolean;
 	subjectProgressBySubjectId: Record<string, PracticeSubjectProgress>;
 	isAdmin: boolean;
+	/** Used by the wizard's draft persistence cache key. */
+	userId: string;
 };
 
 /** NormalizePerformanceRows returns PerformanceRowSerialized[] */
@@ -300,5 +302,6 @@ export async function loadStudentPracticePagePayload(
 		showPromptPreview,
 		subjectProgressBySubjectId: practiceProgress.progressBySubjectId,
 		isAdmin,
+		userId,
 	};
 }

@@ -1,8 +1,11 @@
 export {
 	getPracticeQuestionPlan,
+	getPracticeQuestionPlanForSubject,
+	isMathematicsSubject,
 	PRACTICE_DURATION_OPTIONS,
 	PRACTICE_DURATION_SECONDS_MAX,
 	PRACTICE_DURATION_SECONDS_MIN,
+	PRACTICE_MAX_TOPICS,
 	PRACTICE_MIN_TOPICS,
 	PRACTICE_QUESTION_COUNT_MAX,
 	PRACTICE_QUESTION_COUNT_MIN,
@@ -15,7 +18,9 @@ export {
 	practiceDifficultySchema,
 	practiceDurationSecondsInputSchema,
 	practiceDurationSecondsSchema,
+	practiceFocusAreaSchema,
 	type FinalizePracticeConfigInput,
+	type PracticeFocusArea,
 } from "./schemas";
 export {
 	buildPracticeGenerationSharedSystemInstructions,

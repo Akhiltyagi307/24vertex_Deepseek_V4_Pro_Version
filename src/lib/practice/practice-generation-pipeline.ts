@@ -2,11 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { APICallError, generateObject, NoObjectGeneratedError, streamObject } from "ai";
 
-import { insertHeuristicModerationFlag, moderatePracticeGenerationText } from "@/lib/ai/moderation";
+import {
+	insertHeuristicModerationFlag,
+	moderatePracticeGenerationText,
+	moderatePracticeQuestionsPerItem,
+} from "@/lib/ai/moderation";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
-import { getOpenAIChatModel } from "@/lib/env";
+import { getOpenAIChatModel, getOpenAIChatModelFallback } from "@/lib/env";
 import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
 import {
 	mapResolveToGenerateFailure,
@@ -26,7 +30,11 @@ import {
 	type PracticeGenerationGroupedOutput,
 	type PracticeGenerationOutput,
 } from "@/lib/practice";
-import { getPracticeQuestionPlan, practiceTypeCountsToQuestionMixJson } from "@/lib/practice/constants";
+import {
+	getPracticeQuestionPlan,
+	getPracticeQuestionPlanForSubject,
+	practiceTypeCountsToQuestionMixJson,
+} from "@/lib/practice/constants";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
 import { repeatPracticeAiResultUntilSuccessOrExhausted } from "@/lib/practice/ai-retry";
@@ -86,6 +94,9 @@ export async function preflightPracticeGeneration(
 		return { ok: false, result: { ok: false, code: "generation_failed", message: rateGate.message } };
 	}
 
+	// Single auth.getUser() per request — `resolvePracticeConfigForStudent`
+	// previously called this again, doubling the auth round-trip. Pass the
+	// fetched user through so we only hit auth once.
 	const {
 		data: { user: billingUser },
 	} = await supabase.auth.getUser();
@@ -115,11 +126,39 @@ export async function preflightPracticeGeneration(
 		}
 	}
 
-	const resolved = await resolvePracticeConfigForStudent(supabase, parsed);
+	const resolved = await resolvePracticeConfigForStudent(supabase, parsed, billingUser);
 	if (!resolved.ok) {
 		return { ok: false, result: mapResolveToGenerateFailure(resolved) };
 	}
 	return { ok: true, resolved };
+}
+
+/**
+ * Strict JSON-schema mode for generation. Off by default because the practice
+ * generation schema uses `z.array().length(N)` and `z.null().optional()`,
+ * patterns that don't reliably satisfy OpenAI's strict-mode contract — turning
+ * it on globally has historically caused 100% generation failure on some model
+ * versions. Set `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=true` in non-prod to test.
+ */
+function isStrictJsonSchemaForGenerationEnabled(): boolean {
+	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GENERATE === "true";
+}
+
+/**
+ * Errors that should trigger a fallback-model retry (not the same model
+ * with `maxRetries`). Capacity / rate-limit / overload errors typically
+ * persist for many seconds, so retrying the same model just delays a hard
+ * fail; trying a different model recovers immediately.
+ */
+function isRetryableForFallback(e: unknown): boolean {
+	if (APICallError.isInstance(e)) {
+		const code = e.statusCode;
+		if (code === 429 || code === 503 || code === 504) return true;
+	}
+	if (e instanceof Error && /\b(rate[ -]?limit|overloaded|timeout|capacity)\b/i.test(e.message)) {
+		return true;
+	}
+	return false;
 }
 
 async function runModelOnce(
@@ -129,13 +168,14 @@ async function runModelOnce(
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
 	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
 	studentUserId: string,
-): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
+	chatModelId: string = getOpenAIChatModel(),
+): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string; error: unknown }> {
 	// Hard-cap output tokens at 12k regardless of question count. The previous
 	// scaling could request up to 32k for high-question tests, which exceeds
 	// per-request limits on some models and produces unpredictable cost. 12k
 	// fits a 40-question schema comfortably.
 	const maxOutputTokens = Math.min(12_000, Math.max(6_000, estimatedQuestionCount * 900));
-	const model = getOpenAIProvider()(getOpenAIChatModel());
+	const model = getOpenAIProvider()(chatModelId);
 	const baseParams = {
 		model,
 		schema: outputSchema,
@@ -146,12 +186,10 @@ async function runModelOnce(
 		abortSignal: opts.abortSignal,
 		providerOptions: {
 			openai: {
-				strictJsonSchema: false,
+				strictJsonSchema: isStrictJsonSchemaForGenerationEnabled(),
 			},
 		},
 	};
-
-	const chatModelId = getOpenAIChatModel();
 
 	if (opts.useStreamObject) {
 		try {
@@ -182,6 +220,7 @@ async function runModelOnce(
 			return {
 				ok: false,
 				message: `Could not generate the test. ${formatGenerationError(e)}`,
+				error: e,
 			};
 		}
 	}
@@ -204,8 +243,56 @@ async function runModelOnce(
 		return {
 			ok: false,
 			message: `Could not generate the test. ${formatGenerationError(e)}`,
+			error: e,
 		};
 	}
+}
+
+/**
+ * Runs the primary model; on capacity / overload / 429, retries once with
+ * the configured fallback model (if any). Logs which model produced the
+ * eventual result for observability.
+ */
+async function runModelOnceWithFallback(
+	systemPrompt: string,
+	userPrompt: string,
+	estimatedQuestionCount: number,
+	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
+	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
+	studentUserId: string,
+): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
+	const primary = getOpenAIChatModel();
+	const first = await runModelOnce(
+		systemPrompt,
+		userPrompt,
+		estimatedQuestionCount,
+		outputSchema,
+		opts,
+		studentUserId,
+		primary,
+	);
+	if (first.ok) return first;
+
+	const fallback = getOpenAIChatModelFallback();
+	if (!fallback || !isRetryableForFallback(first.error)) {
+		return { ok: false, message: first.message };
+	}
+	logServerError(
+		"generatePracticeTest.modelFallback",
+		`Primary model ${primary} failed retryably; retrying with fallback ${fallback}.`,
+		{ primaryError: first.message },
+	);
+	const second = await runModelOnce(
+		systemPrompt,
+		userPrompt,
+		estimatedQuestionCount,
+		outputSchema,
+		opts,
+		studentUserId,
+		fallback,
+	);
+	if (second.ok) return second;
+	return { ok: false, message: second.message };
 }
 
 /**
@@ -265,7 +352,10 @@ async function runPracticeGenerationAfterResolveCore(
 	);
 
 	const { subjectId, difficulty, durationSeconds } = parsed;
-	const plan = getPracticeQuestionPlan(durationSeconds);
+	// Mathematics subjects collapse to all-MCQ regardless of duration mix —
+	// open-ended math grading is unreliable at scale and the curriculum exam
+	// pattern is overwhelmingly MCQ-driven.
+	const plan = getPracticeQuestionPlanForSubject(durationSeconds, resolved.subjectName);
 	const expectedTypeCounts = plan.counts;
 	const questionMixJson = practiceTypeCountsToQuestionMixJson(plan.counts);
 	const generationOutputSchema = createPracticeGenerationOutputSchema(expectedTypeCounts);
@@ -283,6 +373,7 @@ async function runPracticeGenerationAfterResolveCore(
 		timeLimitSeconds: durationSeconds,
 		recentErrors: resolved.recentErrors,
 		topics: resolved.canonicalTopics,
+		focusArea: parsed.focusArea,
 		preFetchedTopicContext,
 	});
 
@@ -292,6 +383,19 @@ async function runPracticeGenerationAfterResolveCore(
 			supabase,
 			"practice_topic_context_empty",
 			{ topic_count: gmeta.topic_count },
+			{ studentId: resolved.userId },
+		);
+	}
+	if (gmeta.context_quality === "low_context" || gmeta.context_quality === "no_context") {
+		void recordPracticeEvent(
+			supabase,
+			"practice_topic_context_quality_degraded",
+			{
+				topic_count: gmeta.topic_count,
+				context_quality: gmeta.context_quality,
+				context_chunks: gmeta.context_chunk_count,
+				exercise_chunks: gmeta.exercise_chunk_count,
+			},
 			{ studentId: resolved.userId },
 		);
 	}
@@ -337,7 +441,7 @@ async function runPracticeGenerationAfterResolveCore(
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
 		const m0 = Date.now();
-		const r = await runModelOnce(
+		const r = await runModelOnceWithFallback(
 			systemPrompt,
 			userPrompt,
 			expectedCount,
@@ -365,6 +469,44 @@ async function runPracticeGenerationAfterResolveCore(
 				correlationId,
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
+		}
+
+		// Hybrid moderation:
+		// 1) Per-question regex/profanity (free) — flags individual bad items
+		//    so a single tainted question can't kill the whole generation.
+		// 2) Blob-level pass for the embedding rule (paid only when admins
+		//    seed embedding patterns in `content_blacklist`).
+		const perItem = await moderatePracticeQuestionsPerItem(
+			flattened.questions.map((q) => q.question_text),
+		);
+		if (!perItem.ok) {
+			// If too many items are flagged, regenerate the whole test rather
+			// than ship a too-short test. Otherwise we accept losing a few.
+			const retainedCount = flattened.questions.length - perItem.flagged.length;
+			const flaggedTooMany = retainedCount < expectedCount;
+			for (const flag of perItem.flagged) {
+				try {
+					await insertHeuristicModerationFlag({
+						entityType: "practice_generation_question",
+						entityId: randomUUID(),
+						source: flag.source,
+						reason: flag.reason,
+						severity: flag.source === "profanity" ? "high" : "medium",
+					});
+				} catch (e) {
+					logServerError("generatePracticeTest.moderation_flag.per_item", e, { correlationId });
+				}
+			}
+			if (flaggedTooMany) {
+				return {
+					ok: false,
+					message: "Output blocked by moderation filters.",
+					code: "generation_invalid",
+				};
+			}
+			// Drop flagged questions so the rest of the test is preserved.
+			const dropSet = new Set(perItem.flagged.map((f) => f.index));
+			flattened.questions = flattened.questions.filter((_, i) => !dropSet.has(i));
 		}
 
 		const modBlob = JSON.stringify(flattened.questions);
@@ -446,7 +588,13 @@ async function runPracticeGenerationAfterResolveCore(
 	const fullOutput = attempt.value;
 	const totalQ = fullOutput.questions.length;
 
-	const dedupThreshold = Number.parseInt(process.env.PRACTICE_DEDUP_MAX_REGENS ?? "1", 10);
+	// Generation-time dedup is OFF by default (set 2026-05): the product
+	// requirement is that students MUST see important questions, even if
+	// they've appeared in a past test. Earlier behavior regenerated whole
+	// tests when ≥1 question matched a past one ≥0.92 cosine similarity,
+	// which silently removed high-value questions on repeat practice.
+	// Set PRACTICE_DEDUP_MAX_REGENS=1 (or higher) to re-enable.
+	const dedupThreshold = Number.parseInt(process.env.PRACTICE_DEDUP_MAX_REGENS ?? "0", 10);
 	if (Number.isFinite(dedupThreshold) && dedupThreshold > 0) {
 		const dedupT0 = Date.now();
 		try {

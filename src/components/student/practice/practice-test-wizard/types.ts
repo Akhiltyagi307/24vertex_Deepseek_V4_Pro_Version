@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+	PRACTICE_MAX_TOPICS,
 	PRACTICE_MIN_TOPICS,
 	practiceDifficultySchema,
 	practiceDurationSecondsInputSchema,
@@ -78,6 +79,13 @@ export const practiceStep1Schema = z
 					PRACTICE_MIN_TOPICS === 1 ?
 						"Select at least one topic."
 					:	`Select at least ${PRACTICE_MIN_TOPICS} topics.`,
+				path: ["trackerIds"],
+			});
+		}
+		if (data.trackerIds.length > PRACTICE_MAX_TOPICS) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: `Select at most ${PRACTICE_MAX_TOPICS} topics per test.`,
 				path: ["trackerIds"],
 			});
 		}

@@ -28,6 +28,7 @@ describe("StepConfig", () => {
 				<StepConfig
 					difficulty="medium"
 					durationSeconds={3600}
+					subjectName="Physics"
 					onPickDifficulty={() => {}}
 					onPickDurationSeconds={() => {}}
 				/>,
@@ -54,6 +55,7 @@ describe("StepConfig", () => {
 				<StepConfig
 					difficulty="medium"
 					durationSeconds={3600}
+					subjectName="Physics"
 					onPickDifficulty={onPickDifficulty}
 					onPickDurationSeconds={() => {}}
 				/>,

@@ -68,3 +68,22 @@ export function envelopeForThrown(e: unknown): GenerateStreamErrorEnvelope {
 export function envelopeForPartial(partial: unknown): GenerateStreamPartialEnvelope {
 	return { type: "partial", partial };
 }
+
+/**
+ * HTTP status to use for a {@link GeneratePracticeResult} failure surfaced
+ * BEFORE the NDJSON stream opens (i.e., preflight failures from the
+ * generation route). Centralized so the same mapping applies if other
+ * routes ever surface the same failure shape.
+ */
+export function httpStatusForGenerateFailure(
+	failure: Extract<GeneratePracticeResult, { ok: false }>,
+): number {
+	if (failure.paywall) return 402;
+	if (failure.code === "unauthorized") return 401;
+	if (failure.code === "validation_error" || failure.code === "generation_invalid") return 400;
+	if (failure.code === "stale_selection" || failure.code === "subject_not_enrolled" || failure.code === "subject_mismatch" || failure.code === "inactive_topic" || failure.code === "not_student") {
+		return 400;
+	}
+	if (failure.code === "database_error") return 500;
+	return 400;
+}
