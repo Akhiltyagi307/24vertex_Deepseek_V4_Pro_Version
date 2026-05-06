@@ -5,9 +5,24 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { redeemCoupon } from "../../../../app/student/subscription/actions";
+import {
+	redeemCoupon,
+	type StagedCheckoutCoupon,
+} from "../../../../app/student/subscription/actions";
 
-export function CouponRedeemForm({ billingProfileId }: { billingProfileId?: string }) {
+type Props = {
+	billingProfileId?: string;
+	/**
+	 * When provided, a `checkout_discount` coupon is staged on the page (the parent
+	 * component shows it as a chip and forwards the code to Razorpay at upgrade time)
+	 * instead of being treated as an error. Omit on pages without a plan picker
+	 * (e.g. the parent portal) — the form will then point the user to the student
+	 * page for paid-checkout coupons.
+	 */
+	onCheckoutDiscountStaged?: (staged: StagedCheckoutCoupon) => void;
+};
+
+export function CouponRedeemForm({ billingProfileId, onCheckoutDiscountStaged }: Props) {
 	const [code, setCode] = React.useState("");
 	const [pending, startTransition] = React.useTransition();
 	const router = useRouter();
@@ -18,13 +33,29 @@ export function CouponRedeemForm({ billingProfileId }: { billingProfileId?: stri
 		if (!trimmed) return;
 		startTransition(async () => {
 			const res = await redeemCoupon(trimmed, billingProfileId);
-			if (res.ok) {
-				toast.success(res.message);
-				setCode("");
-				router.refresh();
-			} else {
+			if (!res.ok) {
 				toast.error(res.message);
+				return;
 			}
+			if (res.kind === "checkout_discount") {
+				if (onCheckoutDiscountStaged) {
+					onCheckoutDiscountStaged({
+						couponCode: res.couponCode,
+						discountPercent: res.discountPercent,
+						eligiblePlanCodes: res.eligiblePlanCodes,
+					});
+					toast.success(res.message);
+					setCode("");
+				} else {
+					toast.info(
+						"This is a checkout coupon — apply it on the student's subscription page when picking a paid plan.",
+					);
+				}
+				return;
+			}
+			toast.success(res.message);
+			setCode("");
+			router.refresh();
 		});
 	}
 
@@ -52,7 +83,7 @@ export function CouponRedeemForm({ billingProfileId }: { billingProfileId?: stri
 					variant="ghost"
 					disabled={pending || code.trim().length === 0}
 				>
-					{pending ? "Applying\u2026" : "Apply"}
+					{pending ? "Applying…" : "Apply"}
 				</Button>
 			</div>
 		</form>

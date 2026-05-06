@@ -3,16 +3,31 @@
 import { revalidatePath } from "next/cache";
 
 import { cancelSubscription } from "@/lib/billing/razorpay";
+import { quoteCheckoutCouponForPlan } from "@/lib/billing/checkout-coupon";
 import { isCouponSingleUseGlobalExhausted } from "@/lib/billing/coupon-policy";
-import { PLAN_CATALOG, tokenQuotaForGrade } from "@/lib/billing/plans";
+import {
+	PAID_CHECKOUT_PLAN_CODES,
+	PLAN_CATALOG,
+	type PlanCode,
+	isPlanCode,
+	tokenQuotaForGrade,
+} from "@/lib/billing/plans";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
+export type StagedCheckoutCoupon = {
+	couponCode: string;
+	discountPercent: number;
+	/** When set, only these paid plans accept the coupon. `null` means it works on every paid plan. */
+	eligiblePlanCodes: PlanCode[] | null;
+};
+
 export type RedeemCouponResult =
-	| { ok: true; message: string }
+	| { ok: true; kind: "entitlement"; message: string }
+	| ({ ok: true; kind: "checkout_discount"; message: string } & StagedCheckoutCoupon)
 	| {
 			ok: false;
 			code:
@@ -98,7 +113,7 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 	const { data: coupon, error: cErr } = await admin
 		.from("coupons")
 		.select(
-			"id, code, kind, is_active, max_redemptions, redemptions_count, duration_days, grants_plan_code, expires_at, single_use_globally",
+			"id, code, kind, is_active, max_redemptions, redemptions_count, duration_days, grants_plan_code, expires_at, single_use_globally, eligible_plan_codes, razorpay_offers_by_plan",
 		)
 		.eq("code", code)
 		.maybeSingle();
@@ -106,10 +121,44 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		return { ok: false, code: "invalid_code", message: INVALID };
 	}
 	if (coupon.kind === "checkout_discount") {
+		// Pick a plan that satisfies `eligible_plan_codes` *and* has a Razorpay offer
+		// attached so `quoteCheckoutCouponForPlan` can validate end-to-end (active,
+		// not expired, not exhausted, offer synced, plan eligible). We don't know
+		// the user's chosen plan at this point — they apply the code first, then
+		// click an upgrade button. Probing one valid plan is enough to confirm the
+		// coupon is usable; per-plan eligibility is enforced again at checkout time.
+		const offers = (coupon.razorpay_offers_by_plan ?? {}) as Record<string, string>;
+		const eligibleRaw = (coupon.eligible_plan_codes as string[] | null) ?? null;
+		const eligiblePlanCodes: PlanCode[] | null = eligibleRaw
+			? eligibleRaw.filter((p): p is PlanCode => isPlanCode(p) && PAID_CHECKOUT_PLAN_CODES.includes(p))
+			: null;
+		const candidatePlans: readonly PlanCode[] =
+			eligiblePlanCodes && eligiblePlanCodes.length > 0 ? eligiblePlanCodes : PAID_CHECKOUT_PLAN_CODES;
+		const probePlan: PlanCode | null = (() => {
+			for (const planCode of candidatePlans) {
+				if (typeof offers[planCode] === "string" && offers[planCode]!.trim().length > 0) {
+					return planCode;
+				}
+			}
+			return null;
+		})();
+		if (!probePlan) {
+			return { ok: false, code: "invalid_code", message: INVALID };
+		}
+		const quote = await quoteCheckoutCouponForPlan({ couponCode: code, planCode: probePlan });
+		if (!quote.ok) {
+			// Collapse all denials to invalid_code with the generic INVALID message — the
+			// `quoteCheckoutCouponForPlan` helper deliberately unifies its denial messages
+			// to defend against code enumeration (W2.1 in checkout-coupon.ts).
+			return { ok: false, code: "invalid_code", message: INVALID };
+		}
 		return {
-			ok: false,
-			code: "invalid_code",
-			message: "This code is for checkout only. Enter it when you subscribe with Razorpay on the subscription page.",
+			ok: true,
+			kind: "checkout_discount",
+			message: `Code ready — ${quote.discountPercent}% off applies when you upgrade.`,
+			couponCode: quote.couponCode,
+			discountPercent: quote.discountPercent,
+			eligiblePlanCodes: eligiblePlanCodes && eligiblePlanCodes.length > 0 ? eligiblePlanCodes : null,
 		};
 	}
 	if (!coupon.is_active) {
@@ -239,6 +288,7 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 	const forParent = callerProfile?.role === "parent" && targetProfileId !== user.id;
 	return {
 		ok: true,
+		kind: "entitlement",
 		message: forParent
 			? `Coupon applied! This student now has ${coupon.duration_days} days of ${plan.name} access.`
 			: `Coupon applied! You have ${coupon.duration_days} days of ${plan.name} access.`,

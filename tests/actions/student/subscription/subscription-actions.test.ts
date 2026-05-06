@@ -7,12 +7,13 @@
  *   - Parent path: missing billingProfileId from a parent → forbidden
  *   - Parent path: link not active → forbidden
  *   - Coupon not found → invalid_code
- *   - Wrong kind (`checkout_discount`) → invalid_code with checkout-specific message
+ *   - `checkout_discount` kind → ok:true with kind:"checkout_discount" + staged payload
+ *   - `checkout_discount` denied by validator → invalid_code (collapsed message)
  *   - Inactive / expired / fully-redeemed → matched code
  *   - Active subscription blocks redeem → blocked_paid
  *   - RPC error → database_error
  *   - RPC returns ok=false with `error_code` → mapped result
- *   - Happy path → ok message and revalidatePath fan-out fires
+ *   - Happy path → ok with kind:"entitlement" message and revalidatePath fan-out fires
  *
  * What's covered for `cancelAtPeriodEnd`:
  *   - Unauthenticated → ok:false with message
@@ -29,15 +30,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeMockSupabase } from "../../../factories/supabase";
 
-const { mockSupabase, mockAdmin, mockUser, cancelSubscriptionMock, recordPracticeEventMock, revalidatePathMock } =
-	vi.hoisted(() => ({
-		mockSupabase: { current: null as unknown },
-		mockAdmin: { current: null as unknown },
-		mockUser: { current: null as null | { id: string; email?: string } },
-		cancelSubscriptionMock: { current: null as null | ((id: string, opts: unknown) => Promise<unknown>) },
-		recordPracticeEventMock: { current: vi.fn(async () => undefined) },
-		revalidatePathMock: { current: vi.fn(() => undefined) },
-	}));
+const {
+	mockSupabase,
+	mockAdmin,
+	mockUser,
+	cancelSubscriptionMock,
+	quoteCheckoutCouponMock,
+	recordPracticeEventMock,
+	revalidatePathMock,
+} = vi.hoisted(() => ({
+	mockSupabase: { current: null as unknown },
+	mockAdmin: { current: null as unknown },
+	mockUser: { current: null as null | { id: string; email?: string } },
+	cancelSubscriptionMock: { current: null as null | ((id: string, opts: unknown) => Promise<unknown>) },
+	quoteCheckoutCouponMock: {
+		current: null as null | ((input: { couponCode: string; planCode: string }) => Promise<unknown>),
+	},
+	recordPracticeEventMock: { current: vi.fn(async () => undefined) },
+	revalidatePathMock: { current: vi.fn(() => undefined) },
+}));
 
 vi.mock("@/lib/auth/get-server-user", () => ({
 	getServerUser: async () => mockUser.current,
@@ -51,6 +62,12 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/billing/razorpay", () => ({
 	cancelSubscription: (id: string, opts: unknown) =>
 		(cancelSubscriptionMock.current ?? (async () => undefined))(id, opts),
+}));
+vi.mock("@/lib/billing/checkout-coupon", () => ({
+	quoteCheckoutCouponForPlan: (input: { couponCode: string; planCode: string }) =>
+		(quoteCheckoutCouponMock.current ?? (async () => ({ ok: false, code: "invalid_or_unavailable", message: "" })))(
+			input,
+		),
 }));
 vi.mock("@/lib/practice/analytics", () => ({
 	recordPracticeEvent: (...args: unknown[]) =>
@@ -79,6 +96,7 @@ beforeEach(() => {
 	mockSupabase.current = makeMockSupabase({ user: { id: STUDENT_ID } });
 	mockAdmin.current = makeMockSupabase({ user: { id: STUDENT_ID } });
 	cancelSubscriptionMock.current = null;
+	quoteCheckoutCouponMock.current = null;
 	recordPracticeEventMock.current = vi.fn(async () => undefined);
 	revalidatePathMock.current = vi.fn(() => undefined);
 });
@@ -176,24 +194,122 @@ describe("redeemCoupon — coupon validation", () => {
 		expect(out).toEqual({ ok: false, code: "invalid_code", message: expect.any(String) });
 	});
 
-	it("returns invalid_code with checkout copy when kind is `checkout_discount`", async () => {
+	it("stages a `checkout_discount` coupon when the validator approves it", async () => {
 		setStudentCallerWithCoupon({
 			id: COUPON_ID,
-			code: "CHECKOUT",
+			code: "SAVE50",
 			kind: "checkout_discount",
 			is_active: true,
 			max_redemptions: 100,
 			redemptions_count: 0,
 			duration_days: 30,
-			grants_plan_code: "pro_monthly",
+			grants_plan_code: null,
 			expires_at: null,
 			single_use_globally: false,
+			eligible_plan_codes: ["pro_monthly", "pro_annual"],
+			razorpay_offers_by_plan: { pro_monthly: "off_abc", pro_annual: "off_def" },
 		});
-		const out = await redeemCoupon("CHECKOUT");
+		quoteCheckoutCouponMock.current = async () => ({
+			ok: true,
+			couponId: COUPON_ID,
+			couponCode: "SAVE50",
+			planCode: "pro_monthly",
+			discountPercent: 50,
+			offerId: "off_abc",
+		});
+		const out = await redeemCoupon("SAVE50");
+		expect(out.ok).toBe(true);
+		if (out.ok) {
+			expect(out.kind).toBe("checkout_discount");
+			if (out.kind === "checkout_discount") {
+				expect(out.couponCode).toBe("SAVE50");
+				expect(out.discountPercent).toBe(50);
+				expect(out.eligiblePlanCodes).toEqual(["pro_monthly", "pro_annual"]);
+			}
+		}
+	});
+
+	it("returns invalid_code when a `checkout_discount` coupon has no Razorpay offer wired up", async () => {
+		setStudentCallerWithCoupon({
+			id: COUPON_ID,
+			code: "ORPHAN",
+			kind: "checkout_discount",
+			is_active: true,
+			max_redemptions: 100,
+			redemptions_count: 0,
+			duration_days: 30,
+			grants_plan_code: null,
+			expires_at: null,
+			single_use_globally: false,
+			eligible_plan_codes: ["pro_monthly"],
+			razorpay_offers_by_plan: {},
+		});
+		const out = await redeemCoupon("ORPHAN");
 		expect(out.ok).toBe(false);
 		if (!out.ok) {
 			expect(out.code).toBe("invalid_code");
-			expect(out.message).toMatch(/checkout/i);
+		}
+	});
+
+	it("probes a plan from `eligible_plan_codes` when only a subset of plans is allowed", async () => {
+		setStudentCallerWithCoupon({
+			id: COUPON_ID,
+			code: "ANNUAL10",
+			kind: "checkout_discount",
+			is_active: true,
+			max_redemptions: 100,
+			redemptions_count: 0,
+			duration_days: 30,
+			grants_plan_code: null,
+			expires_at: null,
+			single_use_globally: false,
+			eligible_plan_codes: ["pro_annual"],
+			razorpay_offers_by_plan: { pro_monthly: "off_xxx", pro_annual: "off_yyy" },
+		});
+		const calls: Array<{ planCode: string }> = [];
+		quoteCheckoutCouponMock.current = async (input) => {
+			calls.push({ planCode: input.planCode });
+			return {
+				ok: true,
+				couponId: COUPON_ID,
+				couponCode: "ANNUAL10",
+				planCode: input.planCode,
+				discountPercent: 10,
+				offerId: "off_yyy",
+			};
+		};
+		const out = await redeemCoupon("ANNUAL10");
+		expect(calls).toEqual([{ planCode: "pro_annual" }]);
+		expect(out.ok).toBe(true);
+		if (out.ok && out.kind === "checkout_discount") {
+			expect(out.eligiblePlanCodes).toEqual(["pro_annual"]);
+		}
+	});
+
+	it("returns invalid_code when the validator denies a `checkout_discount` coupon (e.g. expired)", async () => {
+		setStudentCallerWithCoupon({
+			id: COUPON_ID,
+			code: "EXPIRED50",
+			kind: "checkout_discount",
+			is_active: true,
+			max_redemptions: 100,
+			redemptions_count: 0,
+			duration_days: 30,
+			grants_plan_code: null,
+			expires_at: null,
+			single_use_globally: false,
+			eligible_plan_codes: null,
+			razorpay_offers_by_plan: { pro_monthly: "off_abc" },
+		});
+		quoteCheckoutCouponMock.current = async () => ({
+			ok: false,
+			code: "invalid_or_unavailable",
+			message: "This coupon code isn't valid for the selected plan.",
+		});
+		const out = await redeemCoupon("EXPIRED50");
+		expect(out.ok).toBe(false);
+		if (!out.ok) {
+			expect(out.code).toBe("invalid_code");
 		}
 	});
 
@@ -344,6 +460,7 @@ describe("redeemCoupon — RPC outcomes", () => {
 		const out = await redeemCoupon("WELCOME");
 		expect(out.ok).toBe(true);
 		if (out.ok) {
+			expect(out.kind).toBe("entitlement");
 			expect(out.message).toMatch(/30 days/);
 		}
 		expect(revalidatePathMock.current).toHaveBeenCalledWith("/student/subscription");

@@ -10,9 +10,9 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { RazorpayCheckoutButton } from "@/components/student/subscription/razorpay-checkout";
 import { PriceDisplay } from "@/components/student/subscription/price-display";
+import type { StagedCheckoutCoupon } from "@/app/student/subscription/actions";
 import { PLAN_CATALOG, type PlanCode } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +27,17 @@ type Props = {
 	planCatalog?: typeof PLAN_CATALOG;
 	/** Parent pays for a linked student's subscription. */
 	billingProfileId?: string;
+	/**
+	 * A `checkout_discount` coupon the user staged via the unified coupon form.
+	 * When set and the plan is eligible, the card renders a discounted price and
+	 * forwards the code to Razorpay at checkout.
+	 */
+	stagedCheckoutCoupon?: StagedCheckoutCoupon | null;
 };
 
 function formatTokens(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}\u00A0M`;
-	if (n >= 1_000) return `${Math.round(n / 1_000)}\u00A0k`;
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)} M`;
+	if (n >= 1_000) return `${Math.round(n / 1_000)} k`;
 	return n.toLocaleString("en-IN");
 }
 
@@ -40,6 +46,20 @@ function formatBillingStart(iso: string | null): string | null {
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return null;
 	return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function isEligibleForStagedCoupon(
+	planCode: PlanCode,
+	staged: StagedCheckoutCoupon | null | undefined,
+): boolean {
+	if (!staged) return false;
+	if (!staged.eligiblePlanCodes) return true;
+	return staged.eligiblePlanCodes.includes(planCode);
+}
+
+function applyDiscount(amountPaise: number, discountPercent: number): number {
+	const discounted = amountPaise * (1 - discountPercent / 100);
+	return Math.max(0, Math.round(discounted));
 }
 
 type PlanCardModel = {
@@ -63,12 +83,12 @@ export function PlanComparison({
 	prefill,
 	planCatalog = PLAN_CATALOG,
 	billingProfileId,
+	stagedCheckoutCoupon,
 }: Props) {
 	const monthly = planCatalog.pro_monthly;
 	const annual = planCatalog.pro_annual;
 	const isSenior = grade != null && grade >= 11;
 	const billingStart = formatBillingStart(trialEndsAt);
-	const [checkoutCoupon, setCheckoutCoupon] = React.useState("");
 
 	const monthlyLabel =
 		currentPlanCode === "pro_monthly"
@@ -82,15 +102,26 @@ export function PlanComparison({
 	const annualLabel =
 		currentPlanCode === "pro_annual" ? "Manage on Razorpay" : "Upgrade to Pro Annual";
 
+	const monthlyHasDiscount = isEligibleForStagedCoupon("pro_monthly", stagedCheckoutCoupon);
+	const annualHasDiscount = isEligibleForStagedCoupon("pro_annual", stagedCheckoutCoupon);
+
+	const monthlyAmount = monthlyHasDiscount && stagedCheckoutCoupon
+		? applyDiscount(monthly.pricePaise, stagedCheckoutCoupon.discountPercent)
+		: monthly.pricePaise;
+	const annualAmount = annualHasDiscount && stagedCheckoutCoupon
+		? applyDiscount(annual.pricePaise, stagedCheckoutCoupon.discountPercent)
+		: annual.pricePaise;
+
 	const cards: PlanCardModel[] = [
 		{
 			code: "pro_monthly",
 			title: monthly.name,
-			subtitle: `${monthly.testsPerPeriod} tests \u00B7 ${formatTokens(
+			subtitle: `${monthly.testsPerPeriod} tests · ${formatTokens(
 				isSenior ? monthly.tokensGrade11to12 : monthly.tokensGrade6to10,
 			)} AI output tokens / month`,
-			amountPaise: monthly.pricePaise,
+			amountPaise: monthlyAmount,
 			period: "month",
+			compareAtPaise: monthlyHasDiscount ? monthly.pricePaise : undefined,
 			bullets: [
 				`${monthly.testsPerPeriod} practice tests / month`,
 				`${formatTokens(isSenior ? monthly.tokensGrade11to12 : monthly.tokensGrade6to10)} AI output tokens / month (doubt chat)`,
@@ -107,17 +138,17 @@ export function PlanComparison({
 					className="w-full"
 					disabled={currentPlanCode === "pro_monthly"}
 					billingProfileId={billingProfileId}
-					checkoutCouponCode={checkoutCoupon}
+					checkoutCouponCode={monthlyHasDiscount ? stagedCheckoutCoupon?.couponCode : undefined}
 				/>
 			),
 		},
 		{
 			code: "pro_annual",
 			title: annual.name,
-			subtitle: `Save \u2248${annual.annualSavingsPercent ?? 17}% \u00B7 12-month pool`,
-			amountPaise: annual.pricePaise,
+			subtitle: `Save ≈${annual.annualSavingsPercent ?? 17}% · 12-month pool`,
+			amountPaise: annualAmount,
 			period: "year",
-			compareAtPaise: monthly.pricePaise * 12,
+			compareAtPaise: annualHasDiscount ? annual.pricePaise : monthly.pricePaise * 12,
 			bullets: [
 				`${annual.testsPerPeriod} tests / year (burn at any pace)`,
 				`${formatTokens(isSenior ? annual.tokensGrade11to12 : annual.tokensGrade6to10)} AI output tokens / year (doubt chat)`,
@@ -134,31 +165,14 @@ export function PlanComparison({
 					className="w-full"
 					disabled={currentPlanCode === "pro_annual"}
 					billingProfileId={billingProfileId}
-					checkoutCouponCode={checkoutCoupon}
+					checkoutCouponCode={annualHasDiscount ? stagedCheckoutCoupon?.couponCode : undefined}
 				/>
 			),
 		},
 	];
 
 	return (
-		<div className="space-y-4">
-			<div className="rounded-lg border border-border bg-muted/20 p-3">
-				<label className="text-xs font-medium text-muted-foreground" htmlFor="checkout-coupon">
-					Checkout coupon (optional)
-				</label>
-				<Input
-					id="checkout-coupon"
-					className="mt-1 h-9 max-w-xs font-mono uppercase"
-					placeholder="e.g. SAVE50"
-					autoComplete="off"
-					value={checkoutCoupon}
-					onChange={(e) => setCheckoutCoupon(e.target.value)}
-				/>
-				<p className="mt-1 text-xs text-muted-foreground">
-					For % off paid checkout only. Entitlement coupons are redeemed in the “Have a code?” box above.
-				</p>
-			</div>
-			<div className="grid gap-4 medium:grid-cols-2 medium:gap-5">
+		<div className="grid gap-4 medium:grid-cols-2 medium:gap-5">
 			{cards.map((c) => {
 				const isCurrent = currentPlanCode === c.code;
 				return (
@@ -193,7 +207,7 @@ export function PlanComparison({
 										/>
 										Current plan
 										{isTrialing && trialDaysLeft != null
-											? ` \u00B7 ${trialDaysLeft}\u00A0day${trialDaysLeft === 1 ? "" : "s"} left`
+											? ` · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`
 											: ""}
 									</span>
 								) : null}
@@ -227,7 +241,6 @@ export function PlanComparison({
 					</Card>
 				);
 			})}
-			</div>
 		</div>
 	);
 }

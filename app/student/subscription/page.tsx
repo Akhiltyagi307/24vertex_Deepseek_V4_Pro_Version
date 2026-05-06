@@ -1,28 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { TicketIcon } from "lucide-react";
 
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
-import { BillingTrustRow } from "@/components/student/subscription/billing-trust-row";
 import { CancelSubscriptionButton } from "@/components/student/subscription/cancel-subscription-button";
-import { CouponRedeemForm } from "@/components/student/subscription/coupon-redeem-form";
 import { DevEnforcementBanner } from "@/components/student/subscription/dev-enforcement-banner";
 import {
 	PaymentHistorySection,
 	type PaymentHistoryRow,
 } from "@/components/student/subscription/payment-history-section";
-import { PlanComparison } from "@/components/student/subscription/plan-comparison";
-import { PlanComparisonTable } from "@/components/student/subscription/plan-comparison-table";
+import { PlansWithCouponSection } from "@/components/student/subscription/plans-with-coupon-section";
 import { TrialStateBand } from "@/components/student/subscription/trial-state-band";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPlanCatalog } from "@/lib/cache/deterministic-lookups";
@@ -131,60 +120,21 @@ export default async function StudentSubscriptionPage() {
 						{
 							key: "plans",
 							content: (
-								<section id="plans" className="flex flex-col gap-4">
-									<div>
-										<h2 className="font-heading text-lg font-medium tracking-tight">Choose a plan</h2>
-										<p className="text-pretty text-sm text-muted-foreground">
-											Pick what fits how often you’ll practice and use the AI tutor. Paid plans use Razorpay with
-											UPI Autopay or card; checkout is secure, and you can cancel from this page.
-										</p>
-									</div>
-									<PlanComparison
-										currentPlanCode={entitlement?.planCode ?? "free"}
-										isTrialing={!!isTrialing}
-										trialEndsAt={entitlement?.trialEndsAt ?? null}
-										trialDaysLeft={entitlement?.trialDaysLeft ?? null}
-										grade={profile.grade ?? null}
-										prefill={prefill}
-										planCatalog={planCatalog}
-									/>
-									<PlanComparisonTable
-										currentPlanCode={entitlement?.planCode ?? "free"}
-										grade={profile.grade ?? null}
-										planCatalog={planCatalog}
-									/>
-									<BillingTrustRow />
-								</section>
+								<PlansWithCouponSection
+									currentPlanCode={entitlement?.planCode ?? "free"}
+									isTrialing={!!isTrialing}
+									trialEndsAt={entitlement?.trialEndsAt ?? null}
+									trialDaysLeft={entitlement?.trialDaysLeft ?? null}
+									grade={profile.grade ?? null}
+									prefill={prefill}
+									planCatalog={planCatalog}
+									isPaid={isPaid}
+								/>
 							),
 						},
 						{
 							key: "payments",
 							content: <PaymentHistorySection payments={payments} />,
-						},
-						{
-							key: "coupon",
-							content: (
-								<Card>
-									<CardHeader>
-										<div className="flex items-center gap-2">
-											<TicketIcon className="size-4 text-muted-foreground" aria-hidden />
-											<CardTitle className="text-base">Have a coupon?</CardTitle>
-										</div>
-										<CardDescription className="text-pretty">
-											If your parent has a code from school or a campaign, you can apply it here for a free month
-											on Pro Monthly, with no card needed.
-										</CardDescription>
-									</CardHeader>
-									<CardContent className="flex flex-col gap-3">
-										<CouponRedeemForm />
-										{isPaid ? (
-											<p className="text-xs text-muted-foreground">
-												You’re already on a paid plan, so a coupon can’t be added on top right now.
-											</p>
-										) : null}
-									</CardContent>
-								</Card>
-							),
 						},
 						{
 							key: "footer",
