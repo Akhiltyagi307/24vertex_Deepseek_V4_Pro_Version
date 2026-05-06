@@ -12,7 +12,7 @@ export function EmptyState({
 }) {
 	return (
 		<div className="flex w-full flex-col items-center gap-4 pt-4 medium:pt-8">
-			<div className="flex w-full min-w-0 max-w-[50%] flex-col items-center gap-4 text-center">
+			<div className="flex w-full min-w-0 flex-col items-center gap-4 text-center">
 				<div className="min-w-0 w-full space-y-1.5">
 					<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
 						{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
