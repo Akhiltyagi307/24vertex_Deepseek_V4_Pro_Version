@@ -75,15 +75,17 @@ export function buildCsp(nonce: string): string {
 
 	if (process.env.VERCEL_ENV === "production") {
 		directives.push("upgrade-insecure-requests");
-		// Trusted Types for script-execution sinks (Function constructor, eval).
-		// Browsers that don't support TT silently ignore the directive, so this
-		// is purely additive. We scope to 'script' (not 'script html'); HTML
-		// sinks like innerHTML are NOT constrained because Tiptap, MJML, and a
-		// few server-rendered components emit raw HTML strings without going
-		// through a TT policy. Restricted to production: Next dev/Turbopack
-		// uses `'unsafe-eval'` for HMR (line above) which is incompatible with
-		// `require-trusted-types-for 'script'`.
-		directives.push("require-trusted-types-for 'script'");
+		// `require-trusted-types-for 'script'` was removed: the original comment
+		// claimed innerHTML/outerHTML were unconstrained by the `'script'`
+		// keyword, but the Trusted Types spec defines the keyword as covering
+		// every TrustedHTML / TrustedScript / TrustedScriptURL sink — including
+		// Element.innerHTML. Tiptap, MJML render output, next-themes' inline
+		// pre-hydration `<script>`, recharts SVG defs, and Sentry replays all
+		// assign raw strings to these sinks, which made every client-side
+		// hydration throw a TypeError caught by the route-level error boundary.
+		// Re-enabling this needs a real default `trustedTypes.createPolicy`
+		// shim (in a top-level client island) plus a per-library audit; until
+		// then keep prod working.
 	}
 
 	return directives.join("; ");
