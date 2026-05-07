@@ -101,7 +101,7 @@ function TableInsertGrid({ editor, onInserted }: { editor: Editor; onInserted: (
 	return (
 		<div
 			className="bg-muted/35 border-border/90 w-full rounded-lg border px-2.5 pb-2.5 pt-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:bg-muted/25 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
-			onMouseLeave={() => setSel(null)}
+			onPointerLeave={() => setSel(null)}
 		>
 			<div
 				className="grid w-fit gap-1"
@@ -126,7 +126,7 @@ function TableInsertGrid({ editor, onInserted }: { editor: Editor; onInserted: (
 									:	"border-foreground/28 bg-popover/90 hover:border-foreground/45 hover:bg-muted/80 dark:border-foreground/35 dark:bg-popover/50 dark:hover:border-foreground/55",
 								)}
 								aria-label={`Insert table with ${cols} columns and ${rows} rows, header row`}
-								onMouseEnter={() => setSel({ rows, cols })}
+								onPointerEnter={() => setSel({ rows, cols })}
 								onFocus={() => setSel({ rows, cols })}
 								onClick={() => {
 									editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();

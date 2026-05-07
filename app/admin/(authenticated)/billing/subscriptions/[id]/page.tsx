@@ -104,7 +104,7 @@ export default async function AdminBillingSubscriptionDetailPage({ params }: Pro
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
 	return (
-		<div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-4">
+		<div className="flex flex-col gap-0.5 medium:flex-row medium:items-baseline medium:gap-4">
 			<dt className="w-52 shrink-0 text-muted-foreground">{label}</dt>
 			<dd className="min-w-0 font-medium">{value}</dd>
 		</div>

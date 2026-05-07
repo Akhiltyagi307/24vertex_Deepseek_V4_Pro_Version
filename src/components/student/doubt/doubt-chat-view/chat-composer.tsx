@@ -130,7 +130,7 @@ export function ChatComposer({
 		busy || uploadPending || pendingAttachments.length >= ATTACHMENT_MAX_PER_TURN;
 
 	return (
-		<div className="shrink-0 px-4 pt-1 pb-4 medium:px-6">
+		<div className="shrink-0 px-4 pt-1 pb-[max(1rem,env(safe-area-inset-bottom))] medium:px-6 medium:pt-1.5 medium:pb-[max(1.25rem,env(safe-area-inset-bottom))]">
 			<div className="mx-auto w-full min-w-0 max-w-full">
 				{error ? (
 					<Alert variant="destructive" className="mb-3 w-full min-w-0 rounded-xl">
@@ -201,7 +201,7 @@ export function ChatComposer({
 											disabled={attachDisabled}
 											onClick={() => fileInputRef.current?.click()}
 											className={cn(
-												"text-muted-foreground hover:text-foreground hover:bg-muted/60 inline-flex size-9 items-center justify-center rounded-md",
+												"text-muted-foreground hover:text-foreground hover:bg-muted/60 inline-flex size-10 medium:size-9 items-center justify-center rounded-md",
 												"focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
 												"disabled:opacity-50 disabled:cursor-not-allowed",
 											)}
@@ -231,7 +231,7 @@ export function ChatComposer({
 								<SelectTrigger
 									id="doubt-tutor-mode"
 									aria-label="Tutor mode"
-									className="border-input bg-background h-9 min-w-0 max-w-[10.5rem] shrink medium:min-w-[9.5rem] medium:max-w-[14rem]"
+									className="border-input bg-background h-10 medium:h-9 min-w-0 max-w-[10.5rem] shrink medium:min-w-[9.5rem] medium:max-w-[14rem]"
 								>
 									<SelectValue placeholder="Explain">
 										{(v) => (v === "solve_with_me" ? "Solve with me" : "Explain")}

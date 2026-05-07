@@ -164,14 +164,14 @@ function CopyableShareableIdSegment({
 						onClick={() => void copyId()}
 						aria-label={ariaLabel}
 						className={cn(
-							"flex cursor-pointer items-center rounded-sm border-0 bg-transparent outline-none",
-							"max-medium:min-h-11 max-medium:min-w-11 max-medium:shrink-0 max-medium:justify-center max-medium:rounded-md max-medium:p-0",
+							"flex cursor-pointer items-center border-0 bg-transparent outline-none",
+							"min-h-11 min-w-11 shrink-0 justify-center rounded-md p-0",
 							"hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-							"medium:min-w-0 medium:max-w-full medium:justify-start medium:gap-2 medium:p-0 medium:text-left",
+							"medium:min-h-0 medium:min-w-0 medium:max-w-full medium:shrink medium:justify-start medium:gap-2 medium:rounded-sm medium:text-left",
 						)}
 					>
 						<IdCardIcon
-							className={cn(iconClassName, "max-medium:size-4")}
+							className={iconClassName}
 							strokeWidth={2}
 							aria-hidden
 						/>

@@ -123,8 +123,8 @@ export function AdminCouponDetailForm({ initial }: Props) {
 				</div>
 			)}
 
-			<div className="grid gap-3 sm:grid-cols-2">
-				<div className="flex flex-col gap-1 sm:col-span-2">
+			<div className="grid gap-3 medium:grid-cols-2">
+				<div className="flex flex-col gap-1 medium:col-span-2">
 					<label className="text-xs font-medium text-muted-foreground" htmlFor="cd-desc">
 						Description
 					</label>
@@ -166,14 +166,14 @@ export function AdminCouponDetailForm({ initial }: Props) {
 						/>
 					</div>
 				)}
-				<div className="flex flex-col gap-1 sm:col-span-2">
+				<div className="flex flex-col gap-1 medium:col-span-2">
 					<label className="text-xs font-medium text-muted-foreground" htmlFor="cd-exp">
 						Expires (optional)
 					</label>
 					<Input id="cd-exp" className="h-9 w-56" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
 				</div>
 				{isCheckout ? (
-					<div className="flex flex-col gap-2 sm:col-span-2 text-sm">
+					<div className="flex flex-col gap-2 medium:col-span-2 text-sm">
 						<span className="text-xs font-medium text-muted-foreground">Eligible paid plans</span>
 						<label className="flex items-center gap-2">
 							<input type="checkbox" checked={elMonthly} onChange={(e) => setElMonthly(e.target.checked)} />
@@ -186,7 +186,7 @@ export function AdminCouponDetailForm({ initial }: Props) {
 					</div>
 				) : null}
 				{!isCheckout ? (
-					<div className="flex flex-col gap-1 sm:col-span-2">
+					<div className="flex flex-col gap-1 medium:col-span-2">
 						<label className="flex items-center gap-2 text-sm">
 							<input type="checkbox" checked={singleUseGlobally} onChange={(e) => setSingleUseGlobally(e.target.checked)} />
 							Strict single redemption globally

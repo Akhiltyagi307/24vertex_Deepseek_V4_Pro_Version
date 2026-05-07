@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { Providers } from "@/components/providers";
@@ -49,6 +49,16 @@ export const metadata: Metadata = {
 		index: true,
 		follow: true,
 	},
+};
+
+// `viewport-fit=cover` lets `env(safe-area-inset-*)` resolve to non-zero values on iOS
+// devices with notches / Dynamic Island and on Android with rounded corners. Fixed and
+// sticky surfaces (sidebar, sheet, dialog, toasts) consume those insets via arbitrary
+// Tailwind utilities to avoid clipping under the system chrome.
+export const viewport: Viewport = {
+	width: "device-width",
+	initialScale: 1,
+	viewportFit: "cover",
 };
 
 // Per-request rendering is required so the CSP nonce generated in `proxy.ts` lands on the

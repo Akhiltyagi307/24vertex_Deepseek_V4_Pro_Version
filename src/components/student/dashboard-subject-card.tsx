@@ -649,9 +649,9 @@ export function SubjectCard({
 					<span className="text-xs font-medium text-muted-foreground group-hover/tile:text-foreground">
 						View topic breakdown
 					</span>
-					<span className="flex items-center gap-0.5 text-xs font-semibold text-foreground/80 group-hover/tile:text-emerald-700 dark:group-hover/tile:text-emerald-400">
+					<span className="flex items-center gap-0.5 text-xs font-semibold text-foreground/80 group-hover/tile:text-emerald-700 group-focus-within/tile:text-emerald-700 dark:group-hover/tile:text-emerald-400 dark:group-focus-within/tile:text-emerald-400">
 						Open
-						<ChevronRight className="size-3.5 opacity-80 group-hover/tile:opacity-100" strokeWidth={2} />
+						<ChevronRight className="size-3.5 opacity-80 group-hover/tile:opacity-100 group-focus-within/tile:opacity-100" strokeWidth={2} />
 					</span>
 				</div>
 			) : null}

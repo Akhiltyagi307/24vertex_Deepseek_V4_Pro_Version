@@ -35,7 +35,7 @@ export function StudentTopBar({
 	parentNotificationsUserId,
 }: StudentTopBarProps) {
 	return (
-		<header className="sticky top-0 z-50 flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-sidebar px-4">
+		<header className="sticky top-[env(safe-area-inset-top)] z-50 flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-sidebar px-4">
 			<div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm medium:gap-x-3">
 				<SidebarTrigger
 					className={cn(

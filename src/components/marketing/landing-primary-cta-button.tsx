@@ -37,12 +37,12 @@ export function LandingPrimaryCtaButton({
 		<Button
 			render={render}
 			className={cn(
-				"group relative h-10 w-fit cursor-pointer overflow-hidden rounded-full border border-primary/70 bg-primary p-1 ps-5 pe-11 text-sm font-semibold text-primary-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.08)] transition-all duration-500 hover:ps-11 hover:pe-5 hover:bg-primary/90",
+				"group relative h-10 w-fit cursor-pointer overflow-hidden rounded-full border border-primary/70 bg-primary p-1 ps-5 pe-11 text-sm font-semibold text-primary-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.08)] transition-all duration-500 hover:ps-11 hover:pe-5 hover:bg-primary/90 focus-visible:ps-11 focus-visible:pe-5 focus-visible:bg-primary/90",
 				className,
 			)}
 		>
 			<span className="relative z-10 transition-all duration-500">{LANDING_ROLE_SIGNUP_PRIMARY_CTA}</span>
-			<span className="absolute right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black text-white shadow-none ring-0 transition-all duration-500 group-hover:right-[calc(100%-36px)] group-hover:rotate-45">
+			<span className="absolute right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black text-white shadow-none ring-0 transition-all duration-500 group-hover:right-[calc(100%-36px)] group-hover:rotate-45 group-focus-visible:right-[calc(100%-36px)] group-focus-visible:rotate-45">
 				<ArrowUpRight className="text-white" size={15} aria-hidden />
 			</span>
 		</Button>

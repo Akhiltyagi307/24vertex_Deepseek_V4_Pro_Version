@@ -123,7 +123,7 @@ export const Footer7 = ({
           <div className="flex w-full flex-col justify-between gap-6 xl:items-start">
             <div className="flex items-center gap-2 xl:justify-start">
               <a href={logo.url}>
-                <Image src={logo.src} alt={logo.alt} title={logo.title} width={32} height={32} className="h-8 w-8 rounded-md object-cover" />
+                <Image src={logo.src} alt={logo.alt} title={logo.title} width={32} height={32} sizes="32px" className="h-8 w-8 rounded-md object-cover" />
               </a>
               <h2 className="text-xl font-semibold">{logo.title}</h2>
             </div>

@@ -122,6 +122,7 @@ export default function CustomersTableCard({
                         alt={customer.role}
                         width={28}
                         height={28}
+                        sizes="28px"
                         loading="lazy"
                       />
                     </div>

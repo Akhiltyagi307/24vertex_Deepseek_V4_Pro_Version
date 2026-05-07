@@ -51,6 +51,7 @@ export function AcmeHero() {
                 width={40}
                 height={40}
                 priority
+                sizes="(min-width: 48rem) 40px, 32px"
                 className="size-8 shrink-0 object-contain medium:size-10"
               />
               <span>24vertex</span>
@@ -124,7 +125,7 @@ export function AcmeHero() {
               <SheetContent side="right" className="w-[240px] medium:w-[300px]">
                 <nav className="flex flex-col gap-4">
                   <Link href="/#home" className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-foreground">
-                    <Image src="/brand/logo-icon.png" alt="24vertex logo" width={36} height={36} className="size-8 shrink-0 object-contain medium:size-9" />
+                    <Image src="/brand/logo-icon.png" alt="24vertex logo" width={36} height={36} sizes="(min-width: 48rem) 36px, 32px" className="size-8 shrink-0 object-contain medium:size-9" />
                     <span>24vertex</span>
                   </Link>
                   <Separator />

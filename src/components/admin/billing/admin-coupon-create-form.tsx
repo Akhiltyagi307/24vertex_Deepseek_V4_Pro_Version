@@ -120,7 +120,7 @@ export function AdminCouponCreateForm() {
 				</p>
 			</div>
 
-			<div className="grid gap-3 sm:grid-cols-2">
+			<div className="grid gap-3 medium:grid-cols-2">
 				<div className="flex flex-col gap-1">
 					<label className="text-xs font-medium text-muted-foreground" htmlFor="cc-code">
 						Code
@@ -178,7 +178,7 @@ export function AdminCouponCreateForm() {
 								required
 							/>
 						</div>
-						<div className="flex flex-col gap-1 sm:col-span-2">
+						<div className="flex flex-col gap-1 medium:col-span-2">
 							<label className="flex items-center gap-2 text-sm">
 								<input type="checkbox" checked={singleUseGlobally} onChange={(e) => setSingleUseGlobally(e.target.checked)} />
 								Strict: only one redemption total (globally), regardless of max redemptions
@@ -214,7 +214,7 @@ export function AdminCouponCreateForm() {
 							)}
 						</div>
 						{requiresHighDiscountConfirm ? (
-							<div className="flex flex-col gap-1 sm:col-span-2">
+							<div className="flex flex-col gap-1 medium:col-span-2">
 								<label className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-sm">
 									<input
 										type="checkbox"
@@ -232,7 +232,7 @@ export function AdminCouponCreateForm() {
 					</>
 				)}
 
-				<div className="flex flex-col gap-1 sm:col-span-2">
+				<div className="flex flex-col gap-1 medium:col-span-2">
 					<label className="text-xs font-medium text-muted-foreground" htmlFor="cc-exp">
 						Expires (optional)
 					</label>

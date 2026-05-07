@@ -109,6 +109,7 @@ const MeetingIllustration = () => {
                 alt={avatar.alt}
                 height={460}
                 width={460}
+                sizes="28px"
               />
             </div>
           ))}
@@ -131,6 +132,7 @@ const CodeReviewIllustration = () => {
               alt="Teacher"
               height={460}
               width={460}
+              sizes="24px"
             />
           </div>
           <div className="flex min-w-0 items-center gap-1">

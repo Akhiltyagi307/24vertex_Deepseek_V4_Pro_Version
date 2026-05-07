@@ -62,7 +62,7 @@ export function AdminPlanEditForm({ initial }: Props) {
 	return (
 		<div className="max-w-2xl space-y-4 rounded-lg border border-border p-4">
 			<h3 className="text-sm font-semibold">Edit plan (local DB)</h3>
-			<div className="grid gap-3 sm:grid-cols-2">
+			<div className="grid gap-3 medium:grid-cols-2">
 				<Field label="Name" id="p-name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} />
 				<Field label="Interval" id="p-int" value={form.interval} onChange={(v) => setForm((f) => ({ ...f, interval: v }))} />
 				<Field label="Price (paise)" id="p-price" value={form.price_paise} onChange={(v) => setForm((f) => ({ ...f, price_paise: v }))} />

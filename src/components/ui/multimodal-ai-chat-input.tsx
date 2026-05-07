@@ -141,7 +141,7 @@ export function TopicChatComposer({
 											nativeButton
 											aria-label="Stop response"
 											className={cn(
-												"size-9 shrink-0 rounded-full border transition-[background-color,transform] duration-150",
+												"size-10 medium:size-9 shrink-0 rounded-full border transition-[background-color,transform] duration-150",
 												"border-emerald-700/35 bg-emerald-600 hover:bg-emerald-600/90 active:scale-[0.97]",
 												"dark:border-emerald-500/35 dark:bg-emerald-700 dark:hover:bg-emerald-700/90",
 											)}
@@ -164,7 +164,7 @@ export function TopicChatComposer({
 											aria-label="Send message"
 											disabled={!value.trim()}
 											className={cn(
-												"size-9 shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150",
+												"size-10 medium:size-9 shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150",
 												"hover:bg-emerald-600/90 active:scale-[0.97]",
 												"disabled:pointer-events-none disabled:opacity-40",
 												"focus-visible:ring-2 focus-visible:ring-emerald-500/45 focus-visible:outline-none",

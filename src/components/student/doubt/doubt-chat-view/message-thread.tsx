@@ -307,7 +307,7 @@ export function MessageThread({
 									>
 										<Sparkles className="size-3.5" strokeWidth={2} />
 									</div>
-									<div className="min-w-0 flex-1">
+									<div className="min-w-0 flex-1 max-w-[68ch] xl:max-w-none">
 										<TutorMarkdown>{text || ""}</TutorMarkdown>
 										{!text && thinking ? <TypingIndicator /> : null}
 										{text ? (

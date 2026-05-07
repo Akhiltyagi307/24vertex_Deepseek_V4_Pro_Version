@@ -74,7 +74,7 @@ export default async function AdminBillingPlanDetailPage({ params }: Props) {
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
 	return (
-		<div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-4">
+		<div className="flex flex-col gap-0.5 medium:flex-row medium:items-baseline medium:gap-4">
 			<dt className="w-48 shrink-0 text-muted-foreground">{label}</dt>
 			<dd className="min-w-0 font-medium">{value}</dd>
 		</div>

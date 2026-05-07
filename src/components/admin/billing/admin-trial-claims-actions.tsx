@@ -24,7 +24,7 @@ export function AdminTrialClaimsActions() {
 	};
 
 	return (
-		<div className="grid max-w-2xl gap-6 rounded-lg border border-border p-4 md:grid-cols-2">
+		<div className="grid max-w-2xl gap-6 rounded-lg border border-border p-4 medium:grid-cols-2">
 			<div className="space-y-2">
 				<h3 className="text-sm font-semibold">Release trial claim</h3>
 				<p className="text-xs text-muted-foreground">Clears the one-trial lock so another profile can claim.</p>

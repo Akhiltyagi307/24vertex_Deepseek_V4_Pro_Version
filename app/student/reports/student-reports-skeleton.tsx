@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /** RSC Suspense fallback while the reports table query runs. */
 export function StudentReportsSkeleton() {
 	return (
-		<div className="flex flex-col gap-6 py-6 md:py-8" aria-busy aria-label="Loading reports">
+		<div className="flex flex-col gap-6 py-6 medium:py-8" aria-busy aria-label="Loading reports">
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<Skeleton className="h-9 w-48 max-w-full" />
 				<Skeleton className="h-5 w-full max-w-md" />
