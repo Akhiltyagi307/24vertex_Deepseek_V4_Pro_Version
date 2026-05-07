@@ -78,7 +78,14 @@ export function DashboardShell({
 						!immersive && "px-4 medium:px-6 xl:px-8",
 					)}
 				>
-					<main id="main-content" tabIndex={-1} className="min-w-0 outline-none">
+					<main
+						id="main-content"
+						tabIndex={-1}
+						className={cn(
+							"min-w-0 outline-none",
+							doubtChat && "flex min-h-0 flex-1 flex-col",
+						)}
+					>
 						{children}
 					</main>
 				</SidebarInset>
