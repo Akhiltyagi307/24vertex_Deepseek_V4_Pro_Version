@@ -235,23 +235,23 @@ export function StudentDashboardView({
 			{/* Row 1: section label (left) + empty cell (right) so Topic progress lines up with subject cards, not the label. */}
 			<div
 				className={cn(
-					"grid w-full min-w-0 max-w-none grid-cols-1 gap-4 medium:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] medium:gap-x-5 medium:gap-y-4",
-					prioritySubjects.length > 0 ? "medium:items-stretch" : "medium:items-start",
+					"grid w-full min-w-0 max-w-none grid-cols-1 gap-4 xl:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] xl:gap-x-5 xl:gap-y-4",
+					prioritySubjects.length > 0 ? "xl:items-stretch" : "xl:items-start",
 				)}
 			>
 				<h2
 					id="subjects-heading"
-					className={cn(SECTION_LABEL_CLASS, "shrink-0 medium:col-start-1 medium:row-start-1")}
+					className={cn(SECTION_LABEL_CLASS, "shrink-0 xl:col-start-1 xl:row-start-1")}
 				>
 					{isParent ? "Subjects" : "Subjects you study"}
 				</h2>
 				<div
-					className="hidden medium:block medium:col-start-2 medium:row-start-1"
+					className="hidden xl:block xl:col-start-2 xl:row-start-1"
 					aria-hidden
 				/>
 				<section
 					aria-labelledby="subjects-heading"
-					className="flex min-w-0 flex-col gap-4 medium:col-start-1 medium:row-start-2"
+					className="flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-2"
 				>
 					{subjectsLoadError ? (
 						<Alert variant="destructive">
@@ -282,7 +282,7 @@ export function StudentDashboardView({
 						<>
 							{prioritySubjects.length > 0 ? (
 								<motion.div
-									className="grid w-full min-w-0 max-w-none grid-cols-1 gap-3.5 medium:grid-cols-2 medium:gap-4"
+									className="grid w-full min-w-0 max-w-none grid-cols-1 gap-3.5 xl:grid-cols-2 xl:gap-4"
 									initial="hidden"
 									animate="show"
 									variants={container}
@@ -312,7 +312,7 @@ export function StudentDashboardView({
 										return (
 											<motion.div
 												key={s.subjectId}
-												className="flex min-h-0 min-w-0 medium:h-full"
+												className="flex min-h-0 min-w-0 xl:h-full"
 												variants={item}
 											>
 												{!hasAttempts ? (
@@ -382,12 +382,12 @@ export function StudentDashboardView({
 				</section>
 
 				<motion.div
-					className="flex min-h-0 w-full min-w-0 flex-col gap-3 medium:col-start-2 medium:row-start-2 medium:h-full medium:min-h-0"
+					className="flex min-h-0 w-full min-w-0 flex-col gap-3 xl:col-start-2 xl:row-start-2 xl:h-full xl:min-h-0"
 					initial="hidden"
 					animate="show"
 					variants={container}
 				>
-					<motion.div variants={item} className="flex min-h-0 min-w-0 flex-1 flex-col medium:min-h-0">
+					<motion.div variants={item} className="flex min-h-0 min-w-0 flex-1 flex-col xl:min-h-0">
 						<Card className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-2 py-5 shadow-none">
 							<CardHeader className="px-5 pb-1 pt-0">
 								<CardTitle className="text-sm font-semibold leading-snug">Topic progress</CardTitle>
@@ -410,7 +410,7 @@ export function StudentDashboardView({
 							</CardHeader>
 							<CardContent className="flex min-h-0 flex-1 flex-col gap-1.5 px-5 pb-0 pt-0">
 								{topicProgressRadar.length > 0 ? (
-									<div className="flex min-h-0 min-w-0 flex-1 flex-col [&_[data-slot=chart]]:min-h-0 [&_[data-slot=chart]]:min-w-0 [&_[data-slot=chart]]:w-full">
+									<div className="flex aspect-[5/4] max-h-[420px] min-w-0 flex-col xl:aspect-auto xl:max-h-none xl:min-h-0 xl:flex-1 [&_[data-slot=chart]]:min-h-0 [&_[data-slot=chart]]:min-w-0 [&_[data-slot=chart]]:w-full">
 										<SubjectTopicRadarChart
 											data={topicProgressRadar}
 											variant="dashboard"
