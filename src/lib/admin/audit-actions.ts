@@ -122,7 +122,6 @@ export const ADMIN_ACTIONS = {
 	// AI prompts / context chunks
 	AI_PROMPT_VERSION_CREATE: "ai_prompt_version_create",
 	AI_PROMPT_ACTIVATE: "ai_prompt_activate",
-	AI_EVAL_RUN_TRIGGER: "ai_eval_run_trigger",
 	CONTEXT_CHUNK_CREATE: "context_chunk_create",
 	CONTEXT_CHUNK_UPDATE: "context_chunk_update",
 	CONTEXT_CHUNK_DELETE: "context_chunk_delete",

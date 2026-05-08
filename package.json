@@ -19,8 +19,6 @@
     "start": "next start",
     "lint": "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint/",
     "test": "vitest run",
-    "evals:practice": "tsx --env-file=.env.local src/lib/practice/__evals__/cli.ts",
-    "evals:diff": "node scripts/diff-eval-runs.mjs",
     "test:e2e": "playwright test",
     "test:e2e:student": "playwright test tests/e2e/auth.setup.ts tests/e2e/smoke.spec.ts tests/e2e/post-login.spec.ts tests/e2e/playwright-env.spec.ts",
     "test:e2e:student:local": "PLAYWRIGHT_START_WEBSERVER=1 pnpm run test:e2e:student",

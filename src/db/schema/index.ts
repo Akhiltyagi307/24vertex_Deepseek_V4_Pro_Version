@@ -6,7 +6,6 @@ export * from "./admin-sessions";
 export * from "./academic";
 export * from "./ai-calls";
 export * from "./ai-prompts";
-export * from "./eval-runs";
 export * from "./assessment";
 export * from "./billing";
 export * from "./broadcasts";

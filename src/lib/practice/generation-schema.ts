@@ -64,18 +64,17 @@ const PRACTICE_BUCKET_KEYS = ["multiple_choice", "fill_in_blank", "short_answer"
 
 export type PracticeGenerationBucketKey = (typeof PRACTICE_BUCKET_KEYS)[number];
 
-export function createPracticeGenerationOutputSchema(_expectedTypeCounts: PracticeQuestionTypeCounts) {
-	// Per-bucket exact-count enforcement intentionally lives in
-	// `validateAndStripGeneration` (returns a friendly "Question mix is off"
-	// message). Enforcing it here via `.length(N)` made `generateObject` throw
-	// `NoObjectGeneratedError` whenever the model was off by one, surfacing the
-	// opaque "did not match the test format" error and bypassing the retry loop.
+export function createPracticeGenerationOutputSchema(expectedTypeCounts: PracticeQuestionTypeCounts) {
 	return z.object({
 		questions_by_type: z.object({
-			multiple_choice: z.array(practiceGeneratedMultipleChoiceDraftSchema),
-			fill_in_blank: z.array(practiceGeneratedWrittenDraftSchema),
-			short_answer: z.array(practiceGeneratedWrittenDraftSchema),
-			long_answer: z.array(practiceGeneratedWrittenDraftSchema),
+			multiple_choice: z
+				.array(practiceGeneratedMultipleChoiceDraftSchema)
+				.length(expectedTypeCounts.multiple_choice),
+			fill_in_blank: z
+				.array(practiceGeneratedWrittenDraftSchema)
+				.length(expectedTypeCounts.fill_in_blank),
+			short_answer: z.array(practiceGeneratedWrittenDraftSchema).length(expectedTypeCounts.short_answer),
+			long_answer: z.array(practiceGeneratedWrittenDraftSchema).length(expectedTypeCounts.long_answer),
 		}),
 		generation_metadata: z.object({
 			adaptation_rationale: z.string(),
@@ -314,19 +313,12 @@ export function validateAndStripGeneration(
 		totalTime += q.estimated_time_seconds;
 	}
 
-	// Heuristic fallback for callers that don't provide `expectedTypeCounts`:
-	// a test with all questions in a single bucket usually means the model got
-	// lazy. When `expectedTypeCounts` IS provided, the per-bucket check below
-	// is authoritative — single-type plans (e.g. Math = MCQ-only via
-	// `getPracticeQuestionPlanForSubject`) are intentional and must be allowed.
-	if (!opts.expectedTypeCounts) {
-		const distinctTypes = (Object.values(typeCounts) as number[]).filter((n) => n > 0).length;
-		if (distinctTypes < 2) {
-			return {
-				ok: false,
-				message: "The test must include at least two question types. Try generating again.",
-			};
-		}
+	const distinctTypes = (Object.values(typeCounts) as number[]).filter((n) => n > 0).length;
+	if (distinctTypes < 2) {
+		return {
+			ok: false,
+			message: "The test must include at least two question types. Try generating again.",
+		};
 	}
 
 	if (opts.expectedTypeCounts) {

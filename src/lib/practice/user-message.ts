@@ -153,12 +153,6 @@ export type PracticeUserMessageForModel = Omit<PracticeUserMessagePayload, "grou
 	grounding_meta: PracticeGroundingMetaForModel;
 };
 
-/** Subset of the user-message payload that the system prompt interpolates. */
-export type PracticeUserMessageSummary = Pick<
-	PracticeUserMessagePayload,
-	"schema_version" | "intent" | "test_parameters" | "constraints"
->;
-
 function defaultGroundingMeta(topicCount: number): PracticeGroundingMeta {
 	return {
 		topic_count: topicCount,

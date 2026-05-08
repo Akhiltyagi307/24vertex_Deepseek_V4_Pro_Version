@@ -23,7 +23,6 @@ export const ADMIN_LIST_ID = {
 	communicationsSuppressions: "communications.email_log.suppressions",
 	communicationsTemplates: "communications.templates",
 	aiPrompts: "ai.prompts",
-	aiEvals: "ai.evals",
 	aiUsage: "ai.usage",
 	analyticsOverview: "analytics.overview",
 	analyticsFunnel: "analytics.funnel",
