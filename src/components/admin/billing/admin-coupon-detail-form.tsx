@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { DestructiveConfirm } from "@/components/admin/destructive-confirm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -26,6 +27,7 @@ type Props = { initial: CouponDetailInitial };
 export function AdminCouponDetailForm({ initial }: Props) {
 	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
+	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [description, setDescription] = useState(initial.description ?? "");
 	const [maxRedemptions, setMaxRedemptions] = useState(String(initial.max_redemptions));
 	const [durationDays, setDurationDays] = useState(String(initial.duration_days));
@@ -244,7 +246,43 @@ export function AdminCouponDetailForm({ initial }: Props) {
 				>
 					Disable
 				</Button>
+				<Button
+					type="button"
+					variant="destructive"
+					size="sm"
+					disabled={busy !== null}
+					onClick={() => setDeleteOpen(true)}
+				>
+					Delete
+				</Button>
 			</div>
+			<DestructiveConfirm
+				open={deleteOpen}
+				onOpenChange={setDeleteOpen}
+				title="Delete coupon"
+				description={
+					<>
+						This permanently deletes the coupon and removes its redemption history. Students who already
+						redeemed it <strong>keep their access</strong> — their subscription and quota are preserved.
+						Type the coupon code to confirm.
+					</>
+				}
+				confirmText={initial.code}
+				submitLabel="Delete coupon"
+				onConfirm={async () => {
+					const res = await fetch(`/api/admin/coupons/${codeEnc}/delete`, {
+						method: "POST",
+						credentials: "include",
+					});
+					const j = (await res.json().catch(() => ({}))) as { error?: string };
+					if (!res.ok) {
+						alert(j.error ?? res.statusText);
+						return;
+					}
+					router.push("/admin/billing/coupons");
+					router.refresh();
+				}}
+			/>
 		</div>
 	);
 }

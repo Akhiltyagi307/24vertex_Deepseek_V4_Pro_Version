@@ -77,6 +77,7 @@ export const ADMIN_ACTIONS = {
 	COUPON_CREATE: "coupon_create",
 	COUPON_PATCH: "coupon_patch",
 	COUPON_DISABLE: "coupon_disable",
+	COUPON_DELETE: "coupon_delete",
 	COUPON_BULK_GENERATE: "coupon_bulk_generate",
 	COUPON_SYNC_RAZORPAY_OFFERS: "coupon_sync_razorpay_offers",
 	COUPON_PATCH_REJECTED: "coupon_patch_rejected",

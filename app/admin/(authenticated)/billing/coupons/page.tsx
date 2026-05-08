@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { AdminCouponBulkForm } from "@/components/admin/billing/admin-coupon-bulk-form";
+import { AdminCouponListRow } from "@/components/admin/billing/admin-coupon-list-row";
 import { AdminServerRowsToolbar } from "@/components/admin/admin-server-rows-toolbar";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
@@ -91,28 +92,23 @@ export default async function AdminCouponsPage() {
 							<th className="px-3 py-2">Uses</th>
 							<th className="px-3 py-2">Active</th>
 							<th className="px-3 py-2">Expires</th>
+							<th className="px-3 py-2 text-right">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
 						{rows.map((r) => (
-							<tr key={r.id} className="border-b border-border/80">
-								<td className="px-3 py-2 font-mono text-xs">
-									<Link className="text-primary underline-offset-4 hover:underline" href={`/admin/billing/coupons/${encodeURIComponent(r.code)}`}>
-										{r.code}
-									</Link>
-								</td>
-								<td className="px-3 py-2 text-xs text-muted-foreground">{r.kind}</td>
-								<td className="px-3 py-2">
-									{r.kind === "checkout_discount" ? `${r.discountPercent ?? "—"}%` : (r.grantsPlanCode ?? "—")}
-								</td>
-								<td className="px-3 py-2 tabular-nums">
-									{r.redemptionsCount}/{r.maxRedemptions}
-								</td>
-								<td className="px-3 py-2">{r.isActive ? "yes" : "no"}</td>
-								<td className="px-3 py-2 text-muted-foreground">
-									{r.expiresAt ? r.expiresAt.toISOString().slice(0, 10) : "—"}
-								</td>
-							</tr>
+							<AdminCouponListRow
+								key={r.id}
+								id={r.id}
+								code={r.code}
+								kind={r.kind}
+								grantsPlanCode={r.grantsPlanCode}
+								discountPercent={r.discountPercent}
+								redemptionsCount={r.redemptionsCount}
+								maxRedemptions={r.maxRedemptions}
+								isActive={r.isActive}
+								expiresAt={r.expiresAt}
+							/>
 						))}
 					</tbody>
 				</table>
