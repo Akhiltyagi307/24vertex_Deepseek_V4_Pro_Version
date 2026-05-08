@@ -63,8 +63,10 @@ export {
 export {
 	createPracticeGenerationOutputSchema,
 	flattenPracticeGenerationOutput,
+	normalizeGroupedEstimatedTimesToPlan,
 	practiceGenerationOutputSchema,
 	summarizeGroupedQuestionTypeCounts,
+	sumGroupedEstimatedSeconds,
 	validateAndStripGeneration,
 	type PracticeGenerationBucketKey,
 	type PracticeGenerationGroupedOutput,

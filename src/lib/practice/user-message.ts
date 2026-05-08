@@ -126,6 +126,8 @@ export type PracticeUserMessagePayload = {
 		generation_instruction: string;
 		/** Derived from `grounding_meta.context_quality`; tells the model when to stay conservative. */
 		context_quality_instruction: string;
+		/** Exact UUID allowlist for topic_id on every question (same as topics[].topic_id). */
+		allowed_topic_ids: string[];
 	};
 	/** Per-topic performance only; curriculum names live under `topic_grounding`. */
 	topics: Array<{
@@ -241,6 +243,7 @@ export function buildPracticeUserMessage(input: {
 			note: "Question count and per-type counts are fixed by duration. Fill the required questions_by_type buckets exactly before any final ordering.",
 			generation_instruction: GENERATION_DIRECTIVE_INSTRUCTION,
 			context_quality_instruction: contextQualityInstruction,
+			allowed_topic_ids: input.topics.map((t) => t.topicId),
 		},
 		topics: input.topics.map((t) => ({
 			topic_id: t.topicId,

@@ -109,6 +109,57 @@ export function summarizeGroupedQuestionTypeCounts(
 	};
 }
 
+/** Sum of per-question times after coercing invalid values to a safe default. */
+export function sumGroupedEstimatedSeconds(raw: PracticeGenerationGroupedOutput): number {
+	let s = 0;
+	for (const k of PRACTICE_BUCKET_KEYS) {
+		for (const q of raw.questions_by_type[k]) {
+			const t = Number(q.estimated_time_seconds);
+			s += Number.isFinite(t) && t >= 1 ? Math.round(t) : 60;
+		}
+	}
+	return s;
+}
+
+/**
+ * Scales every question's `estimated_time_seconds` so the total lies in
+ * [0.6 × duration, 1.2 × duration], matching {@link validateAndStripGeneration}.
+ * Coerces missing or non-positive values to 60 before scaling. Idempotent when
+ * the sum is already in range.
+ */
+export function normalizeGroupedEstimatedTimesToPlan(
+	raw: PracticeGenerationGroupedOutput,
+	durationSeconds: number,
+): PracticeGenerationGroupedOutput {
+	if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+		return structuredClone(raw) as PracticeGenerationGroupedOutput;
+	}
+	const lo = durationSeconds * 0.6;
+	const hi = durationSeconds * 1.2;
+	const clone = structuredClone(raw) as PracticeGenerationGroupedOutput;
+	for (const k of PRACTICE_BUCKET_KEYS) {
+		for (const q of clone.questions_by_type[k]) {
+			const t = Number(q.estimated_time_seconds);
+			q.estimated_time_seconds = Number.isFinite(t) && t >= 1 ? Math.round(t) : 60;
+		}
+	}
+	let sum = sumGroupedEstimatedSeconds(clone);
+	if (sum <= 0) return clone;
+	if (sum >= lo && sum <= hi) return clone;
+	let guard = 0;
+	while ((sum < lo || sum > hi) && guard < 12) {
+		guard++;
+		const factor = sum < lo ? lo / sum : hi / sum;
+		for (const k of PRACTICE_BUCKET_KEYS) {
+			for (const q of clone.questions_by_type[k]) {
+				q.estimated_time_seconds = Math.max(1, Math.round(q.estimated_time_seconds * factor));
+			}
+		}
+		sum = sumGroupedEstimatedSeconds(clone);
+	}
+	return clone;
+}
+
 export function flattenPracticeGenerationOutput(
 	raw: PracticeGenerationGroupedOutput,
 ): PracticeGenerationOutput {
@@ -314,7 +365,20 @@ export function validateAndStripGeneration(
 	}
 
 	const distinctTypes = (Object.values(typeCounts) as number[]).filter((n) => n > 0).length;
-	if (distinctTypes < 2) {
+	const typesRequiredByPlan =
+		opts.expectedTypeCounts != null ?
+			PRACTICE_TYPE_KEYS.filter((k) => (opts.expectedTypeCounts![k] ?? 0) > 0).length
+		:	null;
+	// Variety rule: mixed-type plans must produce ≥2 types. Single-type plans
+	// (e.g. Mathematics → all MCQ) must not be rejected here.
+	if (typesRequiredByPlan == null) {
+		if (distinctTypes < 2) {
+			return {
+				ok: false,
+				message: "The test must include at least two question types. Try generating again.",
+			};
+		}
+	} else if (typesRequiredByPlan >= 2 && distinctTypes < 2) {
 		return {
 			ok: false,
 			message: "The test must include at least two question types. Try generating again.",

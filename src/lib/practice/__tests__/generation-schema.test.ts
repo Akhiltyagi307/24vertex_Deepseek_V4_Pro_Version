@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
 	createPracticeGenerationOutputSchema,
 	flattenPracticeGenerationOutput,
+	normalizeGroupedEstimatedTimesToPlan,
 	practiceGenerationOutputSchema,
 	summarizeGroupedQuestionTypeCounts,
+	sumGroupedEstimatedSeconds,
 	validateAndStripGeneration,
 	type PracticeGenerationGroupedOutput,
 	type PracticeGenerationOutput,
@@ -311,5 +313,97 @@ describe("validateAndStripGeneration - type mix + time budget", () => {
 		if (!out.ok) return;
 		expect(out.questions[0].topic_id).toBe(TOPIC_A);
 		expect(out.questions[1].topic_id).toBe(TOPIC_B);
+	});
+});
+
+describe("normalizeGroupedEstimatedTimesToPlan", () => {
+	it("leaves sums already inside the validator band unchanged", () => {
+		const grouped = makeGroupedGeneration(getPracticeQuestionPlan(3600).counts);
+		const before = sumGroupedEstimatedSeconds(grouped);
+		const out = normalizeGroupedEstimatedTimesToPlan(grouped, 3600);
+		expect(sumGroupedEstimatedSeconds(out)).toBe(before);
+	});
+
+	it("scales down when total time exceeds the high bound", () => {
+		const counts = getPracticeQuestionPlan(10800).counts;
+		const grouped = makeGroupedGeneration(counts);
+		for (const q of grouped.questions_by_type.multiple_choice) {
+			q.estimated_time_seconds = 900;
+		}
+		for (const q of grouped.questions_by_type.fill_in_blank) {
+			q.estimated_time_seconds = 900;
+		}
+		for (const q of grouped.questions_by_type.short_answer) {
+			q.estimated_time_seconds = 900;
+		}
+		for (const q of grouped.questions_by_type.long_answer) {
+			q.estimated_time_seconds = 900;
+		}
+		const out = normalizeGroupedEstimatedTimesToPlan(grouped, 10800);
+		const sum = sumGroupedEstimatedSeconds(out);
+		expect(sum).toBeLessThanOrEqual(Math.round(10800 * 1.2) + 30);
+		expect(sum).toBeGreaterThanOrEqual(Math.round(10800 * 0.6) - 30);
+	});
+});
+
+describe("validateAndStripGeneration - single-type plans (mathematics-style)", () => {
+	it("accepts all MCQ when expectedTypeCounts asks for MCQ only", () => {
+		const n = 5;
+		const perQSeconds = 240;
+		const questions = Array.from({ length: n }, (_, i) =>
+			makeQuestion({
+				question_number: i + 1,
+				topic_id: TOPIC_A,
+				question_type: "multiple_choice",
+				options: { A: "1", B: "2", C: "3", D: "4" },
+				answer_key: {
+					correct_answer: "A",
+					explanation: "x",
+					common_mistakes: [],
+					related_concept: "y",
+				},
+				estimated_time_seconds: perQSeconds,
+			}),
+		);
+		const raw = makeGeneration(questions);
+		const out = validateAndStripGeneration(raw, n, new Set([TOPIC_A]), {
+			expectedTypeCounts: {
+				multiple_choice: n,
+				fill_in_blank: 0,
+				short_answer: 0,
+				long_answer: 0,
+			},
+			// 5 × 240s = 1200s must fall in [0.6T, 1.2T] ⇒ T = 2000 works.
+			expectedDurationSeconds: 2000,
+		});
+		expect(out.ok).toBe(true);
+	});
+
+	it("rejects single produced type when the plan requires multiple types", () => {
+		const raw = makeGeneration([
+			makeQuestion({
+				question_number: 1,
+				question_type: "short_answer",
+				options: null,
+				answer_key: shortAnswerKey,
+			}),
+			makeQuestion({
+				question_number: 2,
+				question_type: "short_answer",
+				options: null,
+				answer_key: shortAnswerKey,
+			}),
+		]);
+		const out = validateAndStripGeneration(raw, 2, new Set([TOPIC_A]), {
+			expectedTypeCounts: {
+				multiple_choice: 1,
+				fill_in_blank: 0,
+				short_answer: 1,
+				long_answer: 0,
+			},
+		});
+		expect(out.ok).toBe(false);
+		if (out.ok) return;
+		expect(out.message).toContain("two question types");
 	});
 });

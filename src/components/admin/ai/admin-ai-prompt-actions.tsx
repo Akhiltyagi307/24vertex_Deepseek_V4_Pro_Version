@@ -32,9 +32,16 @@ export function AdminAiPromptActions({ id }: { id: string }) {
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ user: "Say OK." }),
 			});
-			const j = await res.json();
-			if (!res.ok) throw new Error(j.error ?? "Test failed");
-			setMsg(typeof j.text === "string" ? j.text.slice(0, 400) : JSON.stringify(j));
+			const j = (await res.json()) as { text?: unknown; error?: string; usage?: unknown };
+			if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "Test failed");
+			const rawText = typeof j.text === "string" ? j.text : "";
+			if (rawText.trim()) {
+				setMsg(rawText.slice(0, 400));
+			} else {
+				const usageSnippet =
+					j.usage != null ? ` Usage (truncated): ${JSON.stringify(j.usage).slice(0, 180)}` : "";
+				setMsg(`No assistant text returned.${usageSnippet}`);
+			}
 		} catch (e) {
 			setMsg(e instanceof Error ? e.message : "Failed");
 		} finally {

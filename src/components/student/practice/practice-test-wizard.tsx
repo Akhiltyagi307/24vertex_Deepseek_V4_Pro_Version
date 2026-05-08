@@ -124,6 +124,8 @@ export function PracticeTestWizard({
 	const [generating, setGenerating] = React.useState(false);
 	const [generatingStatusIndex, setGeneratingStatusIndex] = React.useState(0);
 	const generateAbortRef = React.useRef<AbortController | null>(null);
+	/** Prevents overlapping `runGenerate` calls (e.g. rapid double activation before `generating` re-renders). */
+	const generateInFlightRef = React.useRef(false);
 	const [generatedPreview, setGeneratedPreview] = React.useState<{
 		testId: string;
 		subjectName: string;
@@ -488,6 +490,10 @@ export function PracticeTestWizard({
 			setActionError("Invalid configuration. Go back and check your choices.");
 			return;
 		}
+		if (generateInFlightRef.current) {
+			return;
+		}
+		generateInFlightRef.current = true;
 		const abort = new AbortController();
 		generateAbortRef.current = abort;
 		setGenerating(true);
@@ -594,6 +600,7 @@ export function PracticeTestWizard({
 		} finally {
 			setGenerating(false);
 			generateAbortRef.current = null;
+			generateInFlightRef.current = false;
 		}
 	};
 
