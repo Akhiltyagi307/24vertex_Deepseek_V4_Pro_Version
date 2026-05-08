@@ -5,7 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowDown, Sparkles } from "lucide-react";
+import { ArrowDown, PanelLeft, Sparkles } from "lucide-react";
 
 import { usePaywall } from "@/components/student/subscription/paywall-dialog";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/lib/doubt/doubt-actions";
 import type { AttachmentRow } from "@/lib/doubt/attachments/types";
 import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { TutorMarkdown } from "../tutor-markdown";
@@ -39,6 +40,7 @@ export function MessageThread({
 	initialUsage,
 	initialTutorMode,
 	initialEntitlement,
+	onOpenChats,
 }: DoubtChatThreadProps) {
 	const router = useRouter();
 	const [input, setInput] = useState("");
@@ -223,7 +225,19 @@ export function MessageThread({
 	return (
 		<div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
 			<header className="border-border/60 bg-background/95 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-10 shrink-0 border-b px-4 py-2.5 backdrop-blur medium:px-6">
-				<div className="flex w-full min-w-0 items-center gap-3">
+				<div className="flex w-full min-w-0 items-center gap-2 medium:gap-3">
+					{onOpenChats ? (
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							className="text-muted-foreground hover:text-foreground medium:hidden -ml-1 shrink-0"
+							onClick={onOpenChats}
+							aria-label="Past chats"
+						>
+							<PanelLeft className="size-4" aria-hidden />
+						</Button>
+					) : null}
 					<div
 						aria-hidden
 						className="border-emerald-500/30 bg-emerald-500/10 flex size-8 shrink-0 items-center justify-center rounded-lg border text-emerald-600 dark:text-emerald-400"

@@ -84,6 +84,21 @@ describe("DashboardShell", () => {
 		expect(inset?.className).not.toMatch(/overflow-auto/);
 	});
 
+	it("makes #main-content a flex column that grows on immersive routes", () => {
+		pathnameRef.current = "/student/doubt-chat";
+		mountShell();
+		const main = container!.querySelector("#main-content");
+		expect(main?.className).toMatch(/\bflex-1\b/);
+		expect(main?.className).toMatch(/\bflex-col\b/);
+	});
+
+	it("does not add flex growth classes to #main-content on non-immersive routes", () => {
+		pathnameRef.current = "/student/dashboard";
+		mountShell();
+		const main = container!.querySelector("#main-content");
+		expect(main?.className).not.toMatch(/\bflex-1\b/);
+	});
+
 	it("applies the regular shell layout outside doubt-chat", () => {
 		pathnameRef.current = "/student/dashboard";
 		mountShell();

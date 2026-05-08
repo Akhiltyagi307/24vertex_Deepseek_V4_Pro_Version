@@ -17,6 +17,14 @@ import { chapterKeyFromRow, groupTopicRowsByChapter } from "@/lib/doubt/chapter-
 import type { DoubtChatTopicRow, DoubtChatConversationRow, DoubtChatEntitlement } from "@/lib/doubt/loaders";
 import { parseDoubtChatListLabel } from "@/lib/doubt/doubt-conversation-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 import { ConversationSidebar } from "./doubt-chat-view/conversation-sidebar";
@@ -60,10 +68,26 @@ export function DoubtChatView(props: {
 	const [conversations, setConversations] = useState(props.conversations);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+	const [chatsOpen, setChatsOpen] = useState(false);
 
 	useEffect(() => {
 		setConversations(props.conversations);
 	}, [props.conversations]);
+
+	useEffect(() => {
+		setChatsOpen(false);
+	}, [c]);
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+		const mq = window.matchMedia("(min-width: 48rem)");
+		const onChange = () => {
+			if (mq.matches) setChatsOpen(false);
+		};
+		mq.addEventListener("change", onChange);
+		onChange();
+		return () => mq.removeEventListener("change", onChange);
+	}, []);
 
 	const confirmDeleteRow = useMemo(() => {
 		if (!confirmDeleteId) return null;
@@ -201,16 +225,37 @@ export function DoubtChatView(props: {
 		setTopicId(null);
 	}, []);
 
+	const conversationSidebarProps = {
+		conversations,
+		activeConversationId: c,
+		deletingId,
+		showPicker,
+		onConfirmDelete: setConfirmDeleteId,
+	} as const;
+
+	const openChats = useCallback(() => setChatsOpen(true), []);
+
 	return (
 		<>
 			<div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden medium:flex-row">
-				<ConversationSidebar
-					conversations={conversations}
-					activeConversationId={c}
-					deletingId={deletingId}
-					showPicker={showPicker}
-					onConfirmDelete={setConfirmDeleteId}
-				/>
+				<div className="hidden h-full min-h-0 medium:flex">
+					<ConversationSidebar {...conversationSidebarProps} layout="rail" />
+				</div>
+
+				<Sheet open={chatsOpen} onOpenChange={setChatsOpen}>
+					<SheetContent
+						side="left"
+						className="medium:hidden flex h-full max-h-[100dvh] min-h-0 w-[min(100%,20rem)] flex-col gap-0 overflow-hidden p-0"
+					>
+						<SheetHeader className="border-border shrink-0 border-b px-4 py-3">
+							<SheetTitle>Past chats</SheetTitle>
+							<SheetDescription className="sr-only">
+								Open a previous conversation or start a new chat.
+							</SheetDescription>
+						</SheetHeader>
+						<ConversationSidebar {...conversationSidebarProps} layout="drawer" />
+					</SheetContent>
+				</Sheet>
 
 				<div
 					className={cn(
@@ -248,6 +293,17 @@ export function DoubtChatView(props: {
 								exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
 								transition={{ duration: panelDuration, ease: "easeOut" }}
 							>
+								<div className="w-full max-w-full shrink-0 pb-4 medium:hidden">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="w-full"
+										onClick={openChats}
+									>
+										Past chats
+									</Button>
+								</div>
 								<ScopePicker
 									sortedSubjects={sortedSubjects}
 									chapters={chapters}
@@ -285,6 +341,7 @@ export function DoubtChatView(props: {
 									initialUsage={props.initialFromUrl.usage}
 									initialTutorMode={props.initialFromUrl.initialTutorMode}
 									initialEntitlement={props.entitlement}
+									onOpenChats={openChats}
 								/>
 							</motion.div>
 						) : null}

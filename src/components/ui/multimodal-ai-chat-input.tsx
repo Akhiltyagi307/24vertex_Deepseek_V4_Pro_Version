@@ -95,8 +95,8 @@ export function TopicChatComposer({
 					"dark:focus-within:border-emerald-400/45 dark:focus-within:shadow-[0_0_0_3px_rgba(52,211,153,0.1)]",
 				)}
 			>
-				<div className="flex min-w-0 items-end gap-2 px-3 py-2 medium:gap-2.5 medium:px-3.5 medium:py-2.5">
-					<div className="relative min-w-0 flex-1">
+				<div className="flex min-w-0 flex-col gap-0 px-3 py-2 medium:flex-row medium:items-end medium:gap-2.5 medium:px-3.5 medium:py-2.5">
+					<div className="relative min-w-0 w-full medium:flex-1">
 						<label htmlFor={textareaId} className="sr-only">
 							Message to tutor
 						</label>
@@ -127,8 +127,15 @@ export function TopicChatComposer({
 						/>
 					</div>
 
-					<div className="flex shrink-0 items-center gap-2 pb-px">
-						{toolbar}
+					<div
+						className={cn(
+							"flex min-w-0 w-full items-center justify-between gap-2 pb-px",
+							"medium:w-auto medium:shrink-0 medium:justify-end",
+						)}
+					>
+						<div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden medium:flex-initial medium:overflow-visible">
+							{toolbar}
+						</div>
 						{busy ? (
 							<Tooltip>
 								<TooltipTrigger

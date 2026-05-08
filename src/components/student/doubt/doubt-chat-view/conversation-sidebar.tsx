@@ -17,12 +17,20 @@ import {
 import type { DoubtChatConversationRow } from "@/lib/doubt/loaders";
 import { cn } from "@/lib/utils";
 
+export type ConversationSidebarLayout = "stacked" | "rail" | "drawer";
+
 export type ConversationSidebarProps = {
 	conversations: DoubtChatConversationRow[];
 	activeConversationId: string | null;
 	deletingId: string | null;
 	showPicker: boolean;
 	onConfirmDelete: (id: string) => void;
+	/**
+	 * `stacked`: legacy capped-height strip (tests / rare use).
+	 * `rail`: fixed left column for `medium+` only (parent should `hidden medium:flex`).
+	 * `drawer`: full-height body inside a `Sheet` on small screens.
+	 */
+	layout?: ConversationSidebarLayout;
 };
 
 export function ConversationSidebar({
@@ -31,18 +39,32 @@ export function ConversationSidebar({
 	deletingId,
 	showPicker,
 	onConfirmDelete,
+	layout = "stacked",
 }: ConversationSidebarProps) {
 	const groupedConversations = groupConversationsByRecency(conversations);
 
+	const shellClass =
+		layout === "rail"
+			? cn(
+					"flex h-full min-h-0 w-72 shrink-0 flex-col overflow-hidden self-stretch border-r",
+					"border-zinc-200/90 bg-emerald-50/35 text-sidebar-foreground",
+					"dark:border-sidebar-border dark:bg-sidebar",
+				)
+			: layout === "drawer"
+				? cn(
+						"flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden",
+						"border-0 bg-emerald-50/35 text-sidebar-foreground",
+						"dark:bg-sidebar",
+					)
+				: cn(
+						"flex max-h-[min(40vh,240px)] w-full shrink-0 flex-col overflow-hidden border-b",
+						"border-zinc-200/90 bg-emerald-50/35 text-sidebar-foreground",
+						"dark:border-sidebar-border dark:bg-sidebar dark:border-b",
+						"medium:h-full medium:max-h-none medium:min-h-0 medium:w-72 medium:self-stretch medium:border-r medium:border-b-0",
+					);
+
 	return (
-		<aside
-			className={cn(
-				"flex max-h-[min(40vh,240px)] w-full shrink-0 flex-col overflow-hidden border-b",
-				"border-zinc-200/90 bg-emerald-50/35 text-sidebar-foreground",
-				"dark:border-sidebar-border dark:bg-sidebar dark:border-b",
-				"medium:max-h-none medium:min-h-0 medium:w-72 medium:self-stretch medium:border-r medium:border-b-0",
-			)}
-		>
+		<aside className={shellClass}>
 			<div
 				className={cn(
 					"shrink-0 border-b px-3 py-3",
@@ -111,8 +133,8 @@ export function ConversationSidebar({
 											"hover:border-zinc-300/80 hover:bg-white/80",
 											"dark:border-sidebar-border/60 dark:hover:border-border/50 dark:hover:bg-sidebar-accent/80",
 											active && [
-												"border-emerald-400/70 bg-white shadow-sm shadow-emerald-600/5 ring-1 ring-emerald-500/20",
-												"dark:border-primary/30 dark:bg-primary/10 dark:shadow-none dark:ring-0",
+												"border-emerald-500/35 bg-white/90",
+												"dark:border-primary/25 dark:bg-primary/[0.08]",
 											],
 											!active && "border-transparent",
 											isDeleting && "pointer-events-none opacity-50",
@@ -126,15 +148,6 @@ export function ConversationSidebar({
 												"dark:focus-visible:ring-sidebar-ring/45",
 											)}
 										>
-											{active ? (
-												<span
-													aria-hidden
-													className={cn(
-														"absolute inset-y-2 left-0 w-0.5 rounded-full bg-emerald-500",
-														"dark:bg-primary",
-													)}
-												/>
-											) : null}
 											<div className="line-clamp-2 text-[13px] font-semibold leading-snug tracking-tight text-foreground">
 												{headline}
 											</div>

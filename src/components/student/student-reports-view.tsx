@@ -16,6 +16,7 @@ import {
 	ListFilter,
 	ListOrdered,
 	Search,
+	type LucideIcon,
 } from "lucide-react";
 import * as React from "react";
 import { format } from "date-fns";
@@ -67,6 +68,111 @@ function formatReportSummaryDate(raw: number): string {
 	const d = new Date(raw);
 	if (!Number.isFinite(d.getTime())) return "—";
 	return format(d, "MMM d, yyyy");
+}
+
+/** Below `medium` (768px): dense row + 2-column grid so the table surfaces sooner. */
+function ReportStatTileCompact({
+	Icon,
+	iconClassName,
+	label,
+	value,
+	hint,
+}: {
+	Icon: LucideIcon;
+	iconClassName: string;
+	label: string;
+	value: React.ReactNode;
+	hint: string;
+}) {
+	return (
+		<Card size="sm" className="shadow-none gap-0 py-0">
+			<CardContent className="space-y-1 p-3">
+				<div className="flex items-start justify-between gap-2">
+					<div className="flex min-w-0 flex-1 items-center gap-1.5">
+						<Icon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={2} aria-hidden />
+						<span className="min-w-0 truncate text-xs font-medium leading-tight text-foreground">{label}</span>
+					</div>
+					<div className="min-w-0 max-w-[52%] shrink-0 text-right font-semibold leading-tight text-foreground">
+						{value}
+					</div>
+				</div>
+				<p className="text-pretty text-muted-foreground text-[0.625rem] leading-snug">{hint}</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+/** medium+: original spacious stat cards. */
+function ReportStatTileFull({
+	Icon,
+	iconClassName,
+	label,
+	hint,
+	value,
+	valueClassName,
+}: {
+	Icon: LucideIcon;
+	iconClassName: string;
+	label: string;
+	hint: string;
+	value: React.ReactNode;
+	/** e.g. last-test date: no tabular-nums */
+	valueClassName?: string;
+}) {
+	return (
+		<Card className="shadow-none">
+			<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+				<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">{label}</CardTitle>
+				<Icon className={cn("size-8 shrink-0", iconClassName)} strokeWidth={2} aria-hidden />
+			</CardHeader>
+			<CardContent>
+				<p className={cn("font-semibold text-2xl tabular-nums", valueClassName)}>{value}</p>
+				<p className="text-muted-foreground text-xs">{hint}</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+function ReportStatResponsive({
+	Icon,
+	iconClassName,
+	label,
+	hint,
+	compactValue,
+	fullValue,
+	fullValueClassName,
+}: {
+	Icon: LucideIcon;
+	iconClassName: string;
+	label: string;
+	hint: string;
+	compactValue: React.ReactNode;
+	fullValue: React.ReactNode;
+	fullValueClassName?: string;
+}) {
+	return (
+		<>
+			<div className="medium:hidden">
+				<ReportStatTileCompact
+					Icon={Icon}
+					iconClassName={iconClassName}
+					label={label}
+					value={compactValue}
+					hint={hint}
+				/>
+			</div>
+			<div className="hidden medium:block">
+				<ReportStatTileFull
+					Icon={Icon}
+					iconClassName={iconClassName}
+					label={label}
+					hint={hint}
+					value={fullValue}
+					valueClassName={fullValueClassName}
+				/>
+			</div>
+		</>
+	);
 }
 
 function scoreForAverage(r: StudentReportTestRowSerialized): number | null {
@@ -265,7 +371,7 @@ export function StudentReportsView({
 	const { container, item } = useReportsStaggerVariants();
 
 	return (
-		<div className="flex w-full min-w-0 flex-col gap-8 py-6 pb-28 medium:py-8">
+		<div className="flex w-full min-w-0 flex-col gap-4 py-6 pb-28 medium:gap-8 medium:py-8">
 			<motion.header
 				className="flex shrink-0 flex-col gap-1.5"
 				initial="hidden"
@@ -298,7 +404,7 @@ export function StudentReportsView({
 
 			<motion.section
 				aria-labelledby="report-stats-heading"
-				className="grid gap-4 medium:grid-cols-2 xl:grid-cols-5"
+				className="grid grid-cols-2 gap-2 medium:grid-cols-2 medium:gap-4 xl:grid-cols-5"
 				initial="hidden"
 				animate="show"
 				variants={container}
@@ -307,90 +413,63 @@ export function StudentReportsView({
 					Reports summary
 				</h2>
 				<motion.div variants={item}>
-					<Card className="shadow-none">
-						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Total reports</CardTitle>
-							<Library
-								className="size-8 shrink-0 text-cyan-600 dark:text-cyan-400"
-								strokeWidth={2}
-								aria-hidden
-							/>
-						</CardHeader>
-						<CardContent>
-							<p className="font-semibold text-2xl tabular-nums">{overviewStats.total}</p>
-							<p className="text-muted-foreground text-xs">{parentViewer ? "On this list" : "On your list"}</p>
-						</CardContent>
-					</Card>
+					<ReportStatResponsive
+						Icon={Library}
+						iconClassName="text-cyan-600 dark:text-cyan-400"
+						label="Total reports"
+						hint={parentViewer ? "On this list" : "On your list"}
+						compactValue={<span className="text-lg tabular-nums tracking-tight">{overviewStats.total}</span>}
+						fullValue={overviewStats.total}
+					/>
 				</motion.div>
 				<motion.div variants={item}>
-					<Card className="shadow-none">
-						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Submitted</CardTitle>
-							<Clock
-								className="size-8 shrink-0 text-amber-600 dark:text-amber-400"
-								strokeWidth={2}
-								aria-hidden
-							/>
-						</CardHeader>
-						<CardContent>
-							<p className="font-semibold text-2xl tabular-nums">{overviewStats.submitted}</p>
-							<p className="text-muted-foreground text-xs">Waiting on a final score</p>
-						</CardContent>
-					</Card>
+					<ReportStatResponsive
+						Icon={Clock}
+						iconClassName="text-amber-600 dark:text-amber-400"
+						label="Submitted"
+						hint="Waiting on a final score"
+						compactValue={<span className="text-lg tabular-nums tracking-tight">{overviewStats.submitted}</span>}
+						fullValue={overviewStats.submitted}
+					/>
 				</motion.div>
 				<motion.div variants={item}>
-					<Card className="shadow-none">
-						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Graded</CardTitle>
-							<BadgeCheck
-								className="size-8 shrink-0 text-emerald-600 dark:text-emerald-400"
-								strokeWidth={2}
-								aria-hidden
-							/>
-						</CardHeader>
-						<CardContent>
-							<p className="font-semibold text-2xl tabular-nums">{overviewStats.graded}</p>
-							<p className="text-muted-foreground text-xs">Fully graded</p>
-						</CardContent>
-					</Card>
+					<ReportStatResponsive
+						Icon={BadgeCheck}
+						iconClassName="text-emerald-600 dark:text-emerald-400"
+						label="Graded"
+						hint="Fully graded"
+						compactValue={<span className="text-lg tabular-nums tracking-tight">{overviewStats.graded}</span>}
+						fullValue={overviewStats.graded}
+					/>
 				</motion.div>
 				<motion.div variants={item}>
-					<Card className="shadow-none">
-						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Average score</CardTitle>
-							<LineChart
-								className="size-8 shrink-0 text-violet-600 dark:text-violet-400"
-								strokeWidth={2}
-								aria-hidden
-							/>
-						</CardHeader>
-						<CardContent>
-							<p className="font-semibold text-2xl tabular-nums">
+					<ReportStatResponsive
+						Icon={LineChart}
+						iconClassName="text-violet-600 dark:text-violet-400"
+						label="Average score"
+						hint="Across tests in the table"
+						compactValue={
+							<span className="text-lg tabular-nums tracking-tight">
 								{overviewStats.avgScore != null ? `${overviewStats.avgScore}%` : "—"}
-							</p>
-							<p className="text-muted-foreground text-xs">Across tests in the table</p>
-						</CardContent>
-					</Card>
+							</span>
+						}
+						fullValue={overviewStats.avgScore != null ? `${overviewStats.avgScore}%` : "—"}
+					/>
 				</motion.div>
-				<motion.div variants={item}>
-					<Card className="shadow-none">
-						<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-							<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">Last test</CardTitle>
-							<CalendarClock
-								className="size-8 shrink-0 text-sky-600 dark:text-sky-400"
-								strokeWidth={2}
-								aria-hidden
-							/>
-						</CardHeader>
-						<CardContent>
-							<p className="font-semibold text-2xl leading-snug">
+				<motion.div variants={item} className="col-span-2 medium:col-span-1">
+					<ReportStatResponsive
+						Icon={CalendarClock}
+						iconClassName="text-sky-600 dark:text-sky-400"
+						label="Last test"
+						hint={parentViewer ? "Their last submitted test" : "When you last submitted"}
+						compactValue={
+							<span className="break-words text-xs font-semibold leading-snug">
 								{overviewStats.lastTestMs ? formatReportSummaryDate(overviewStats.lastTestMs) : "—"}
-							</p>
-							<p className="text-muted-foreground text-xs">
-								{parentViewer ? "Their last submitted test" : "When you last submitted"}
-							</p>
-						</CardContent>
-					</Card>
+							</span>
+						}
+						fullValue={overviewStats.lastTestMs ? formatReportSummaryDate(overviewStats.lastTestMs) : "—"}
+						fullValueClassName="leading-snug"
+					/>
 				</motion.div>
 			</motion.section>
 

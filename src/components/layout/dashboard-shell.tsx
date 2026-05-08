@@ -83,7 +83,9 @@ export function DashboardShell({
 						tabIndex={-1}
 						className={cn(
 							"min-w-0 outline-none",
-							doubtChat && "flex min-h-0 flex-1 flex-col",
+							/* Doubt chat + other immersive routes need a flex column that fills the pane
+							 * so `h-full` children (composer, session chrome) pin correctly. */
+							(doubtChat || immersive) && "flex min-h-0 flex-1 flex-col",
 						)}
 					>
 						{children}

@@ -32,6 +32,8 @@ export type DoubtChatThreadProps = {
 	initialUsage: UsageSummary;
 	initialTutorMode: import("@/lib/doubt/doubt-tutor-mode").DoubtTutorMode;
 	initialEntitlement: EntitlementSummary;
+	/** Mobile: opens past-chats sheet from thread header */
+	onOpenChats?: () => void;
 };
 
 export const SUGGESTED_PROMPTS = [

@@ -220,7 +220,7 @@ export function ChatComposer({
 										: "Attach image or PDF"}
 								</TooltipContent>
 							</Tooltip>
-							<span className="text-muted-foreground shrink-0 text-[12px] font-medium">
+							<span className="text-muted-foreground hidden shrink-0 text-[12px] font-medium medium:inline">
 								Mode
 							</span>
 							<Select
@@ -266,7 +266,7 @@ export function ChatComposer({
 										display={`${formatTokens(entitlement.tokensUsed)}/${formatTokens(entitlement.tokensQuota)}`}
 										pct={usagePct}
 										reduceMotion={Boolean(reduceMotion)}
-										className="w-[12rem] medium:w-[14rem]"
+										className="w-full max-w-full medium:w-[14rem]"
 									/>
 								</TooltipTrigger>
 								<TooltipContent>

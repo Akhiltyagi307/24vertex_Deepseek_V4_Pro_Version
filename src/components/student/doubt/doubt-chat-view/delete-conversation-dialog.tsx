@@ -40,7 +40,7 @@ export function DeleteConversationDialog({
 			<Dialog.Portal>
 				<Dialog.Backdrop
 					className={cn(
-						"fixed inset-0 z-50 bg-black/60 transition-opacity duration-150",
+						"fixed inset-0 z-50 bg-zinc-950/55 transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs dark:bg-zinc-950/65",
 						"data-ending-style:opacity-0 data-starting-style:opacity-0",
 					)}
 				/>
