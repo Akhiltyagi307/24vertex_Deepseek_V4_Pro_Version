@@ -99,7 +99,6 @@ const groups: SidebarGroup[] = [
 		icon: Sparkles,
 		items: [
 			{ href: "/admin/ai/prompts", label: "Prompts" },
-			{ href: "/admin/ai/evals", label: "Evals" },
 			{ href: "/admin/ai/usage", label: "Usage" },
 		],
 	},
