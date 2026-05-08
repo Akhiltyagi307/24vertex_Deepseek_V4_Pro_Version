@@ -1331,9 +1331,9 @@ Schema (TypeScript-style; follow field names exactly):
   }
 
   MCQItem = Base & { options: { A,B,C,D: string }, answer_key.correct_answer ∈ {"A","B","C","D"} }
-  FIBItem = Base    // correct_answer is short word/phrase
-  SAItem  = Base    // correct_answer is brief working / 2–4 sentences
-  LAItem  = Base    // correct_answer is paragraph-level
+  FIBItem = Base & { options: null }   // correct_answer is short word/phrase
+  SAItem  = Base & { options: null }   // correct_answer is brief working / 2–4 sentences
+  LAItem  = Base & { options: null }   // correct_answer is paragraph-level
 
   Output = {
     questions_by_type: {
@@ -1346,6 +1346,56 @@ Schema (TypeScript-style; follow field names exactly):
       adaptation_rationale: string  // one sentence: why these items, given student.recent_errors and topics[]
     }
   }
+
+Concrete shape (illustrative — match field names, types, and \`options: null\` on non-MCQ items exactly; substitute your own subject-appropriate content):
+
+{
+  "questions_by_type": {
+    "multiple_choice": [
+      {
+        "topic_id": "<uuid copied verbatim from user message topics[]>",
+        "topic_name": "<topic name from user message>",
+        "question_text": "<stem in this subject's register>",
+        "difficulty_level": "medium",
+        "options": { "A": "<option A>", "B": "<option B>", "C": "<option C>", "D": "<option D>" },
+        "answer_key": {
+          "correct_answer": "B",
+          "explanation": "<one-paragraph reasoning>",
+          "common_mistakes": ["<misconception this distractor anchors on>"],
+          "related_concept": "<adjacent idea>"
+        },
+        "estimated_time_seconds": 60
+      }
+    ],
+    "fill_in_blank": [
+      {
+        "topic_id": "<uuid>",
+        "topic_name": "<topic name>",
+        "question_text": "<stem ending in a single blank>",
+        "difficulty_level": "easy",
+        "options": null,
+        "answer_key": {
+          "correct_answer": "<unique short answer>",
+          "explanation": "<one-paragraph reasoning>",
+          "common_mistakes": [],
+          "related_concept": "<adjacent idea>"
+        },
+        "estimated_time_seconds": 45
+      }
+    ],
+    "short_answer": [],
+    "long_answer": []
+  },
+  "generation_metadata": {
+    "adaptation_rationale": "<one sentence: why these items, given student.recent_errors and topics[]>"
+  }
+}
+
+Hard rules from this shape:
+- Every \`topic_id\` is a uuid string copied verbatim from the user message's \`topics[]\`.
+- Every non-MCQ item includes \`"options": null\` (literal null — not omitted, not {}, not "").
+- \`estimated_time_seconds\` is an integer (no decimals, no quotes).
+- For MCQ, \`answer_key.correct_answer\` is a single uppercase letter "A"/"B"/"C"/"D" matching one of the option keys.
 
 intent=${intent}, schema_version=${schemaVersion}.`;
 }

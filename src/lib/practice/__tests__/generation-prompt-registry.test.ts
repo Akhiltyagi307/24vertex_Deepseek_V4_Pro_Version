@@ -269,7 +269,7 @@ describe("buildCompactMathPreamble6_10", () => {
 		expect(fallback2).toContain("Grade 8");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 5,800 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 7,500 chars)", () => {
 		// The current compact 6–10 prompt is ~5,510 chars at typical interpolations.
 		// This bound is a drift tripwire — if it fires, double-check whether new
 		// content earned its keep before raising the limit.
@@ -279,7 +279,7 @@ describe("buildCompactMathPreamble6_10", () => {
 			studentGrade: 8,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(5800);
+		expect(text.length).toBeLessThanOrEqual(7500);
 	});
 });
 
@@ -319,7 +319,7 @@ describe("buildCompactMathPreamble11_12", () => {
 		expect(text).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 6,900 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 8,600 chars)", () => {
 		// The current compact 11–12 prompt is ~6,575 chars at typical interpolations.
 		// 11–12 carries a senior-secondary distractor list and the maxima/minima
 		// worked example, hence the larger bound vs 6–10.
@@ -329,7 +329,7 @@ describe("buildCompactMathPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(6900);
+		expect(text.length).toBeLessThanOrEqual(8600);
 	});
 });
 
@@ -449,7 +449,7 @@ describe("buildCompactSciencePreamble6_10", () => {
 		expect(fallback2).toContain("Grade 8");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 8,200 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 9,900 chars)", () => {
 		// Science is larger than Math 6–10 by design: it carries a 6-row
 		// question-type taxonomy (concept-check / application / reasoning /
 		// numerical / diagram-linked / activity–assertion-reason) and a separate
@@ -461,7 +461,7 @@ describe("buildCompactSciencePreamble6_10", () => {
 			studentGrade: 8,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(8200);
+		expect(text.length).toBeLessThanOrEqual(9900);
 	});
 });
 
@@ -585,11 +585,11 @@ describe("buildCompactSocialSciencePreamble6_10", () => {
 		expect(fallback2).toContain("Grade 9");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 9,900 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 11,700 chars)", () => {
 		// Social Science is the largest compact prompt by design: it carries the
 		// 6-row taxonomy, the load-bearing "Never produce dates from memory"
 		// guard, an explicit sensitive-topics policy, distractor anchors, AND a
-		// place-name conventions paragraph. Current prompt is ~9,640 chars at
+		// place-name conventions paragraph. Current prompt is ~11,620 chars at
 		// typical interpolations.
 		const text = buildCompactSocialSciencePreamble6_10({
 			subjectName: "Social Science",
@@ -597,7 +597,7 @@ describe("buildCompactSocialSciencePreamble6_10", () => {
 			studentGrade: 10,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(9900);
+		expect(text.length).toBeLessThanOrEqual(11700);
 	});
 });
 
@@ -730,7 +730,7 @@ describe("buildCompactEnglishPreamble6_10", () => {
 		expect(fallback2).toContain("Grade 8");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 12,400 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 14,000 chars)", () => {
 		// English 6–10 carries: NCERT book-names list (Honeysuckle / Honeydew /
 		// It So Happened / Beehive / Moments / First Flight / Footprints), five
 		// curriculum strands with bucket mapping, the load-bearing literary-
@@ -746,7 +746,7 @@ describe("buildCompactEnglishPreamble6_10", () => {
 			studentGrade: 9,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(12400);
+		expect(text.length).toBeLessThanOrEqual(14000);
 	});
 });
 
@@ -885,7 +885,7 @@ describe("buildCompactEnglishPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 14,400 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 16,000 chars)", () => {
 		// English 11–12 carries the case-based framing section, technical-term-
 		// without-gloss clause, writing-skills word-count table, the *My Mother
 		// at Sixty-Six* literature exemplar, and the **article-task writing-
@@ -898,7 +898,7 @@ describe("buildCompactEnglishPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(14400);
+		expect(text.length).toBeLessThanOrEqual(16000);
 	});
 });
 
@@ -1076,7 +1076,7 @@ describe("buildCompactPhysicsPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 13,300 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 14,900 chars)", () => {
 		// Physics 11–12 carries the chapter-scope paragraph, inline SI
 		// constants, the load-bearing sign-convention section, the 6-row
 		// taxonomy, the senior-secondary distractor list, the lens-formula MCQ
@@ -1090,7 +1090,7 @@ describe("buildCompactPhysicsPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(13300);
+		expect(text.length).toBeLessThanOrEqual(14900);
 	});
 });
 
@@ -1279,7 +1279,7 @@ describe("buildCompactChemistryPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 13,700 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 15,300 chars)", () => {
 		// Chemistry 11–12 carries the chapter scope, inline constants and
 		// atomic masses, three-sub-disciplines section, verification rule,
 		// 6-row taxonomy, the senior-secondary distractor list (14 anchors),
@@ -1294,7 +1294,7 @@ describe("buildCompactChemistryPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(13700);
+		expect(text.length).toBeLessThanOrEqual(15300);
 	});
 });
 
@@ -1469,7 +1469,7 @@ describe("buildCompactBiologyPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 14,300 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 15,900 chars)", () => {
 		// Biology 11–12 carries the chapter scope, the load-bearing
 		// hallucination guard as a named section, the dense distractor list
 		// (16 anchors), the genetic-notation + scientific-name + Unicode-bio-
@@ -1484,7 +1484,7 @@ describe("buildCompactBiologyPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(14300);
+		expect(text.length).toBeLessThanOrEqual(15900);
 	});
 });
 
@@ -1657,7 +1657,7 @@ describe("buildCompactAccountancyPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 13,000 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 14,400 chars)", () => {
 		// Accountancy is the largest 11–12 compact prompt by design: it carries
 		// inline markdown-table exemplars for journal entries and T-accounts
 		// (these are load-bearing — the original verbose prompt scored 88/100
@@ -1671,7 +1671,7 @@ describe("buildCompactAccountancyPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(13000);
+		expect(text.length).toBeLessThanOrEqual(14400);
 	});
 });
 
@@ -1820,7 +1820,7 @@ describe("buildCompactBusinessStudiesPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 15,700 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 17,200 chars)", () => {
 		// Business Studies 11–12 carries the chapter scope, application-first
 		// rule + statutes guard as named sections, the 7-row taxonomy, the
 		// distractor list (15 anchors), the Fayol scenario MCQ exemplar, and
@@ -1835,7 +1835,7 @@ describe("buildCompactBusinessStudiesPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(15700);
+		expect(text.length).toBeLessThanOrEqual(17200);
 	});
 });
 
@@ -2043,7 +2043,7 @@ describe("buildCompactEconomicsPreamble11_12", () => {
 		expect(fallback2).toContain("Grade 12");
 	});
 
-	it("stays within the token-efficiency floor (drift tripwire: ≤ 16,600 chars)", () => {
+	it("stays within the token-efficiency floor (drift tripwire: ≤ 18,100 chars)", () => {
 		// Economics 11–12 is the largest compact prompt. Carries four sub-
 		// discipline chapter scopes (Statistics + Indian Econ Dev + Micro +
 		// Macro), the load-bearing policy-year/data hallucination guard, the
@@ -2060,6 +2060,6 @@ describe("buildCompactEconomicsPreamble11_12", () => {
 			studentGrade: 12,
 			userMessageSummary: makeSummary(),
 		});
-		expect(text.length).toBeLessThanOrEqual(16600);
+		expect(text.length).toBeLessThanOrEqual(18100);
 	});
 });

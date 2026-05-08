@@ -80,6 +80,34 @@ function formatGenerationError(e: unknown): string {
 }
 
 /**
+ * Pull the diagnostic fields off `NoObjectGeneratedError` (the zod cause and
+ * the raw model text) so logs say *why* the model output failed validation
+ * instead of just "did not match the test format". Returns LogMetadata-shaped
+ * values (string/null) so the result can be passed straight to logServerError.
+ */
+function extractNoObjectGeneratedDiagnostics(
+	e: unknown,
+): Record<string, string | null> | undefined {
+	if (!NoObjectGeneratedError.isInstance(e)) return undefined;
+	const withFields = e as { cause?: unknown; text?: unknown };
+	const cause = withFields.cause;
+	const text = withFields.text;
+	const causeMessage =
+		cause instanceof Error
+			? cause.message
+			: cause == null
+				? null
+				: typeof cause === "string"
+					? cause
+					: JSON.stringify(cause);
+	const rawText = typeof text === "string" ? text.slice(0, 2048) : null;
+	return {
+		noObjectCause: causeMessage != null ? causeMessage.slice(0, 1024) : null,
+		noObjectRawText: rawText,
+	};
+}
+
+/**
  * Gated preflight: rate limit, optional billing, resolve config. Does **not** record `practice_generate_clicked`.
  * Shared by the server action and the generate-stream API route.
  */
@@ -216,7 +244,11 @@ async function runModelOnce(
 			});
 			return { ok: true, object: object as PracticeGenerationGroupedOutput };
 		} catch (e) {
-			logServerError("runPracticeGeneration.streamObject", e);
+			logServerError(
+				"runPracticeGeneration.streamObject",
+				e,
+				extractNoObjectGeneratedDiagnostics(e),
+			);
 			return {
 				ok: false,
 				message: `Could not generate the test. ${formatGenerationError(e)}`,
@@ -239,7 +271,11 @@ async function runModelOnce(
 		});
 		return { ok: true, object: object as PracticeGenerationGroupedOutput };
 	} catch (e) {
-		logServerError("generatePracticeTest.generateObject", e);
+		logServerError(
+			"generatePracticeTest.generateObject",
+			e,
+			extractNoObjectGeneratedDiagnostics(e),
+		);
 		return {
 			ok: false,
 			message: `Could not generate the test. ${formatGenerationError(e)}`,

@@ -133,12 +133,12 @@ describe("createPracticeGenerationOutputSchema", () => {
 		expect(summarizeGroupedQuestionTypeCounts(raw)).toEqual(plan.counts);
 	});
 
-	it("rejects grouped output when a bucket length is wrong", () => {
+	it("accepts grouped output with mismatched bucket counts (count enforcement is downstream in validateAndStripGeneration)", () => {
 		const plan = getPracticeQuestionPlan(3600);
 		const raw = makeGroupedGeneration(plan.counts);
 		raw.questions_by_type.multiple_choice.pop();
 		const parsed = createPracticeGenerationOutputSchema(plan.counts).safeParse(raw);
-		expect(parsed.success).toBe(false);
+		expect(parsed.success).toBe(true);
 	});
 });
 
@@ -214,6 +214,35 @@ describe("validateAndStripGeneration - MCQ validation", () => {
 		]);
 		const out = validateAndStripGeneration(raw, 2, new Set([TOPIC_A]));
 		expect(out.ok).toBe(false);
+	});
+});
+
+describe("validateAndStripGeneration - single-type plans (e.g. Math = MCQ-only)", () => {
+	it("accepts a 15-question MCQ-only plan when expectedTypeCounts says so", () => {
+		const raw = makeGeneration(
+			Array.from({ length: 15 }, (_, i) => makeQuestion({ question_number: i + 1 })),
+		);
+		const out = validateAndStripGeneration(raw, 15, new Set([TOPIC_A]), {
+			expectedTypeCounts: {
+				multiple_choice: 15,
+				fill_in_blank: 0,
+				short_answer: 0,
+				long_answer: 0,
+			},
+			expectedDurationSeconds: 3600,
+		});
+		expect(out.ok).toBe(true);
+	});
+
+	it("still rejects single-type output when no plan is provided (heuristic fallback)", () => {
+		const raw = makeGeneration([
+			makeQuestion({ question_number: 1 }),
+			makeQuestion({ question_number: 2 }),
+		]);
+		const out = validateAndStripGeneration(raw, 2, new Set([TOPIC_A]));
+		expect(out.ok).toBe(false);
+		if (out.ok) return;
+		expect(out.message).toMatch(/at least two question types/);
 	});
 });
 
