@@ -1,8 +1,20 @@
 import {
+	buildCompactAccountancyPreamble11_12,
+	buildCompactBiologyPreamble11_12,
+	buildCompactBusinessStudiesPreamble11_12,
+	buildCompactChemistryPreamble11_12,
+	buildCompactEconomicsPreamble11_12,
+	buildCompactEnglishPreamble11_12,
+	buildCompactEnglishPreamble6_10,
+	buildCompactMathPreamble11_12,
+	buildCompactMathPreamble6_10,
+	buildCompactPhysicsPreamble11_12,
+	buildCompactSciencePreamble6_10,
+	buildCompactSocialSciencePreamble6_10,
 	getPracticeGenerationSubjectPreamble,
 	resolvePracticeGenerationSubjectRouting,
 } from "./generation-prompt-registry";
-import type { PracticeUserMessagePayload } from "./user-message";
+import type { PracticeUserMessageSummary } from "./user-message";
 
 export type PracticeGenerationSubjectContext = {
 	subjectName: string;
@@ -12,10 +24,7 @@ export type PracticeGenerationSubjectContext = {
 	studentGrade: number | null;
 };
 
-type UserMessageSummary = Pick<
-	PracticeUserMessagePayload,
-	"schema_version" | "intent" | "test_parameters" | "constraints"
->;
+type UserMessageSummary = PracticeUserMessageSummary;
 
 /**
  * Shared rules and JSON contract for the assessment generator (server-side).
@@ -130,6 +139,11 @@ Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessage
 /**
  * System prompt for the assessment generator (server-side).
  * Output is written to DB; students never receive raw answer keys from this channel.
+ *
+ * Migrated subjects (currently: Mathematics) use a self-contained compact prompt
+ * that replaces both the verbose preamble and the shared JSON-contract
+ * instructions. Other subjects continue to use the verbose preamble + shared
+ * path until each is migrated.
  */
 export function buildPracticeSystemPrompt(context: {
 	userMessageSummary: UserMessageSummary;
@@ -141,6 +155,108 @@ export function buildPracticeSystemPrompt(context: {
 		context.generationSubject.subjectGroup,
 		context.generationSubject.subjectName,
 	);
+
+	if (routing.category === "mathematics") {
+		const compactBuilder =
+			routing.band === "11_12" ? buildCompactMathPreamble11_12 : buildCompactMathPreamble6_10;
+		return compactBuilder({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "6_10" && routing.category === "science") {
+		return buildCompactSciencePreamble6_10({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "6_10" && routing.category === "social_science") {
+		return buildCompactSocialSciencePreamble6_10({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "6_10" && routing.category === "english") {
+		return buildCompactEnglishPreamble6_10({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "english") {
+		return buildCompactEnglishPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "physics") {
+		return buildCompactPhysicsPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "chemistry") {
+		return buildCompactChemistryPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "biology") {
+		return buildCompactBiologyPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "accountancy") {
+		return buildCompactAccountancyPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "business_studies") {
+		return buildCompactBusinessStudiesPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
+	if (routing.band === "11_12" && routing.category === "economics_statistics") {
+		return buildCompactEconomicsPreamble11_12({
+			subjectName: context.generationSubject.subjectName,
+			subjectGrade: context.generationSubject.subjectGrade,
+			studentGrade: context.generationSubject.studentGrade,
+			userMessageSummary: context.userMessageSummary,
+		});
+	}
+
 	const preamble = getPracticeGenerationSubjectPreamble(routing, {
 		subjectName: context.generationSubject.subjectName,
 		subjectGrade: context.generationSubject.subjectGrade,
