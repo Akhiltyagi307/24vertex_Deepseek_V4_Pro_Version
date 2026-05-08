@@ -23,6 +23,7 @@ import {
 	createPracticeGenerationOutputSchema,
 	fetchTopicContextChunksByTopicIds,
 	flattenPracticeGenerationOutput,
+	normalizeGroupedEstimatedTimesToPlan,
 	resolvePracticeConfigForStudent,
 	summarizeGroupedQuestionTypeCounts,
 	stringifyPracticeUserMessageForModel,
@@ -34,7 +35,12 @@ import {
 	getPracticeQuestionPlan,
 	getPracticeQuestionPlanForSubject,
 	practiceTypeCountsToQuestionMixJson,
+	type PracticeQuestionTypeCounts,
 } from "@/lib/practice/constants";
+import {
+	buildPracticeGenerationRepairSystemPrompt,
+	buildPracticeGenerationRepairUserPrompt,
+} from "@/lib/practice/practice-generation-repair";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
 import { repeatPracticeAiResultUntilSuccessOrExhausted } from "@/lib/practice/ai-retry";
@@ -295,6 +301,72 @@ async function runModelOnceWithFallback(
 	return { ok: false, message: second.message };
 }
 
+function isPracticeGenerationRepairEnabled(): boolean {
+	return process.env.PRACTICE_GENERATION_REPAIR?.trim().toLowerCase() !== "false";
+}
+
+async function runPracticeGenerationRepairGrouped(params: {
+	failedGrouped: PracticeGenerationGroupedOutput;
+	validationMessage: string;
+	durationSeconds: number;
+	expectedTypeCounts: PracticeQuestionTypeCounts;
+	allowedTopicIds: string[];
+	generationOutputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>;
+	estimatedQuestionCount: number;
+	studentUserId: string;
+	abortSignal?: AbortSignal;
+}): Promise<
+	{ ok: true; object: PracticeGenerationGroupedOutput; modelMs: number } | { ok: false; message: string; modelMs: number }
+> {
+	const repairUser = buildPracticeGenerationRepairUserPrompt({
+		validationMessage: params.validationMessage,
+		timeLimitSeconds: params.durationSeconds,
+		timeSumMin: Math.round(params.durationSeconds * 0.6),
+		timeSumMax: Math.round(params.durationSeconds * 1.2),
+		allowedTopicIds: params.allowedTopicIds,
+		questionTypeCounts: params.expectedTypeCounts,
+		failedGroupedJson: JSON.stringify(params.failedGrouped),
+	});
+	const t0 = Date.now();
+	try {
+		const { object, usage } = await generateObject({
+			model: getOpenAIProvider()(getOpenAIChatModel()),
+			schema: params.generationOutputSchema,
+			system: buildPracticeGenerationRepairSystemPrompt(),
+			prompt: repairUser,
+			maxOutputTokens: Math.min(12_000, Math.max(6_000, params.estimatedQuestionCount * 900)),
+			maxRetries: 2,
+			abortSignal: params.abortSignal,
+			providerOptions: {
+				openai: { strictJsonSchema: isStrictJsonSchemaForGenerationEnabled() },
+			},
+		});
+		void recordAiCall({
+			feature: "practice.generation.repair",
+			model: getOpenAIChatModel(),
+			userId: params.studentUserId,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
+		});
+		return { ok: true, object: object as PracticeGenerationGroupedOutput, modelMs: Date.now() - t0 };
+	} catch (e) {
+		logServerError("runPracticeGenerationRepairGrouped", e);
+		void recordAiCall({
+			feature: "practice.generation.repair",
+			model: getOpenAIChatModel(),
+			userId: params.studentUserId,
+			inputTokens: 0,
+			outputTokens: 0,
+			latencyMs: Date.now() - t0,
+			status: "error",
+			error: formatGenerationError(e),
+		});
+		return { ok: false, message: formatGenerationError(e), modelMs: Date.now() - t0 };
+	}
+}
+
 /**
  * One shared path for persisting a generated test after validation (topic context, model, dedup, RPC, billing, embeddings).
  * Used by the server action and the streaming API route.
@@ -451,15 +523,45 @@ async function runPracticeGenerationAfterResolveCore(
 		);
 		cumulativeModelMs += Date.now() - m0;
 		if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
+
+		let grouped: PracticeGenerationGroupedOutput = normalizeGroupedEstimatedTimesToPlan(
+			r.object,
+			durationSeconds,
+		);
+
 		const v0 = Date.now();
-		const flattened = flattenPracticeGenerationOutput(r.object);
-		const out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
+		let flattened = flattenPracticeGenerationOutput(grouped);
+		let out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
 			expectedDurationSeconds: durationSeconds,
 			expectedTypeCounts,
 		});
+
+		if (!out.ok && isPracticeGenerationRepairEnabled()) {
+			const repaired = await runPracticeGenerationRepairGrouped({
+				failedGrouped: grouped,
+				validationMessage: out.message,
+				durationSeconds,
+				expectedTypeCounts,
+				allowedTopicIds: [...topicIdSet],
+				generationOutputSchema,
+				estimatedQuestionCount: expectedCount,
+				studentUserId: resolved.userId,
+				abortSignal: opts.abortSignal,
+			});
+			cumulativeModelMs += repaired.modelMs;
+			if (repaired.ok) {
+				grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
+				flattened = flattenPracticeGenerationOutput(grouped);
+				out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
+					expectedDurationSeconds: durationSeconds,
+					expectedTypeCounts,
+				});
+			}
+		}
+
 		cumulativeValidationMs += Date.now() - v0;
 		if (!out.ok) {
-			const actualTypeCounts = summarizeGroupedQuestionTypeCounts(r.object);
+			const actualTypeCounts = summarizeGroupedQuestionTypeCounts(grouped);
 			logServerError("generatePracticeTest.validation", out.message, {
 				subjectId,
 				durationSeconds,

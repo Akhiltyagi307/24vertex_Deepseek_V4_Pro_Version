@@ -55,6 +55,7 @@ describe("buildPracticeUserMessage", () => {
 			topics: TOPICS,
 		});
 		expect(msg.test_parameters.estimated_question_count).toBe(15);
+		expect(msg.test_parameters.allowed_topic_ids).toEqual([TOPICS[0]!.topicId, TOPICS[1]!.topicId]);
 		expect(msg.test_parameters.question_type_counts).toEqual({
 			multiple_choice: 5,
 			fill_in_blank: 5,

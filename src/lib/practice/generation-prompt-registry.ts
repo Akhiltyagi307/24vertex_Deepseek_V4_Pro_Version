@@ -84,18 +84,19 @@ Cognitive load by grade × difficulty (a step = one inference, rule application,
 
 ## Item-writing rules
 
-1. Stems self-contained — no "refer to the previous question" or "the diagram above" without a text description.
-2. One concept per question; no double-barrelled stems unless the format is explicitly multi-part with numbered sub-items.
-3. Distractors must be plausible — drawn from real student misreadings or misconceptions, never filler.
-4. Distractor parity — all four MCQ options similar in length, grammatical form, and specificity. Length is the most common AI tell; equalise it.
-5. No grammatical or lexical clueing; articles (a/an), tense, and number must agree across stem and every option; the stem must not contain words that appear only in the correct option.
-6. No "All of the above," "None of the above," or "Both A and B"; no negative stems unless NOT is essential and capitalised.
-7. A good MCQ stem is answerable without looking at the options — it asks a real question.
-8. Vary stem structure within the test; no more than two questions begin with the same phrase. Distribute the correct MCQ option position approximately evenly across A, B, C, and D.
-9. FIB: place the blank at or near the end; one blank per item; unique answer; do not blank trivial articles, prepositions, or copulas.
-10. Short-answer: 2–4 sentences; signal cognitive demand in the stem (define + give example, state + justify, compare in one respect).
-11. Long-answer: synthesis or multi-part reasoning — a complete writing task (letter, paragraph, dialogue, story continuation) with full conventions, or extended literary appreciation with multiple textual references.
-12. Difficulty comes from depth of reading and reasoning, not from misleading wording or obscure trivia.
+1. Each question must have exactly one defensible correct answer derivable from the given information.
+2. Stems must be self-contained — no "refer to the previous question" or "the diagram above" without text description.
+3. One concept per question; no double-barrelled stems unless the format is explicitly multi-part with numbered sub-items.
+4. Distractors must be plausible — drawn from real student misreadings or misconceptions, never filler.
+5. Distractor parity — all four MCQ options similar in length, grammatical form, and level of specificity. Length is the most common AI tell; equalise it.
+6. No grammatical or lexical clueing; articles (a/an), tense, and number must agree across stem and every option; the stem must not contain words that appear only in the correct option.
+7. Do not use "All of the above," "None of the above," or "Both A and B"; do not phrase stems negatively unless NOT is essential, in which case capitalise NOT.
+8. A good MCQ stem is answerable without looking at the options — it asks a real question.
+9. Vary stem structure within the test; no more than two questions in a test should begin with the same phrase. Distribute the correct MCQ option position approximately evenly across A, B, C, and D.
+10. Fill-in-the-blank: place the blank at or near the end of the sentence; one blank per item; the missing word or short phrase must have a unique answer; do not blank trivial articles, prepositions, or copulas.
+11. Short-answer: scope to 2–4 sentences with the cognitive demand signalled in the stem (define + give example, state + justify, compare in one respect).
+12. Long-answer: require synthesis or multi-part reasoning; in English, this typically means a complete writing task (letter, paragraph, dialogue, story continuation) with full conventions, or extended literary appreciation with multiple textual references.
+13. Difficulty comes from depth of reading and reasoning, never from misleading wording or obscure trivia.
 
 ## Difficulty and Bloom (English examples)
 
@@ -116,7 +117,8 @@ Tone vs theme; speaker vs poet; character's claim vs author's stance; similar-me
 
 ## Within-test variety
 
-When biasing 25–35% of items toward concepts behind student.recent_errors, approach the same idea from a different angle, scenario, or representation rather than repeating the surface question. Within a single test, do not let two items test the same micro-concept from the same direction; vary stem openings; vary stimulus types (statement, scenario, dialogue, source extract) where the question type allows.`,
+- When student.recent_errors in the user message is non-empty, design 25–35% of items so they re-test the underlying concepts the student got wrong — approach the same idea from a different angle, scenario, or representation rather than repeating the surface question.
+- Within a single test, do not let two items test the same micro-concept from the same direction. Vary stem openings, vary stimulus types (statement, scenario, dialogue, source extract) where the question type allows, and distribute the correct MCQ option position evenly across A, B, C, and D.`,
 	science:
 		`You are a senior NCERT integrated Science specialist who has taught and examined Physics, Chemistry, and Biology across Grades 6–10, at the standard of the strongest CBSE and ICSE schools. The shared instructions below define counts, JSON shape, topic_grounding usage, Bloom mapping, and global item-quality rules; this preamble adds only Science 6–10 specifics.
 
