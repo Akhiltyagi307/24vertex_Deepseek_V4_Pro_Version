@@ -43,7 +43,10 @@ import {
 } from "@/lib/practice/practice-generation-repair";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
-import { repeatPracticeAiResultUntilSuccessOrExhausted } from "@/lib/practice/ai-retry";
+import {
+	PRACTICE_REPAIR_MAX_CALLS,
+	repeatPracticeAiResultUntilSuccessOrExhausted,
+} from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import {
 	embedQuestionTexts,
@@ -65,6 +68,15 @@ export type RunGenerationPipelineOptions = {
 	/** Cancel the OpenAI HTTP call (and downstream model retries) when fired. */
 	abortSignal?: AbortSignal;
 };
+
+/**
+ * Tag attached to `ai_calls.prompt_id` and to `practice_generation_attempts`
+ * analytics events so we can A/B prompt rewrites against historical baselines.
+ * Bump when shipping a behavior-affecting prompt change. Current revision:
+ * v4 — strict-schema-on, hard-gates + final-compliance recap, compact user
+ * message, moderate preamble trim (release v3.2.1).
+ */
+export const PRACTICE_PROMPT_REVISION = "v4" as const;
 
 function formatGenerationError(e: unknown): string {
 	if (APICallError.isInstance(e)) {
@@ -140,14 +152,24 @@ export async function preflightPracticeGeneration(
 }
 
 /**
- * Strict JSON-schema mode for generation. Off by default because the practice
- * generation schema uses `z.array().length(N)` and `z.null().optional()`,
- * patterns that don't reliably satisfy OpenAI's strict-mode contract — turning
- * it on globally has historically caused 100% generation failure on some model
- * versions. Set `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=true` in non-prod to test.
+ * Strict JSON-schema mode for generation. ON by default since release v3.2.1 —
+ * GPT-5.4-mini and newer reliably satisfy `z.array().length(N)` /
+ * `z.null().optional()` under structured outputs, and turning it on doubled
+ * one-shot success in dev. Set `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=false`
+ * to roll back if a future model regresses.
  */
 function isStrictJsonSchemaForGenerationEnabled(): boolean {
-	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GENERATE === "true";
+	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GENERATE !== "false";
+}
+
+/**
+ * Strict JSON-schema mode for the repair pass. OFF by default — the repair
+ * call already validates against the same Zod schema after the fact, and
+ * structured outputs sometimes regenerate aggressively where we wanted a
+ * minimal patch. Override with `PRACTICE_STRICT_JSON_SCHEMA_REPAIR=true`.
+ */
+function isStrictJsonSchemaForRepairEnabled(): boolean {
+	return process.env.PRACTICE_STRICT_JSON_SCHEMA_REPAIR === "true";
 }
 
 /**
@@ -188,7 +210,10 @@ async function runModelOnce(
 		system: systemPrompt,
 		prompt: userPrompt,
 		maxOutputTokens,
-		maxRetries: 2,
+		// Lowered from 2 → 1 in v3.2.1: HTTP-layer retries silently doubled
+		// per-attempt cost on slow failures. Transient 429/503 are still
+		// recovered by the runModelOnceWithFallback() fallback-model path.
+		maxRetries: 1,
 		abortSignal: opts.abortSignal,
 		providerOptions: {
 			openai: {
@@ -215,6 +240,7 @@ async function runModelOnce(
 				feature: "practice.generation",
 				model: chatModelId,
 				userId: studentUserId,
+				promptId: PRACTICE_PROMPT_REVISION,
 				inputTokens: usage?.inputTokens ?? 0,
 				outputTokens: usage?.outputTokens ?? 0,
 				latencyMs: Date.now() - t0,
@@ -238,6 +264,7 @@ async function runModelOnce(
 			feature: "practice.generation",
 			model: chatModelId,
 			userId: studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
 			latencyMs: Date.now() - t0,
@@ -335,16 +362,17 @@ async function runPracticeGenerationRepairGrouped(params: {
 			system: buildPracticeGenerationRepairSystemPrompt(),
 			prompt: repairUser,
 			maxOutputTokens: Math.min(12_000, Math.max(6_000, params.estimatedQuestionCount * 900)),
-			maxRetries: 2,
+			maxRetries: 1,
 			abortSignal: params.abortSignal,
 			providerOptions: {
-				openai: { strictJsonSchema: isStrictJsonSchemaForGenerationEnabled() },
+				openai: { strictJsonSchema: isStrictJsonSchemaForRepairEnabled() },
 			},
 		});
 		void recordAiCall({
 			feature: "practice.generation.repair",
 			model: getOpenAIChatModel(),
 			userId: params.studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
 			latencyMs: Date.now() - t0,
@@ -357,6 +385,7 @@ async function runPracticeGenerationRepairGrouped(params: {
 			feature: "practice.generation.repair",
 			model: getOpenAIChatModel(),
 			userId: params.studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: 0,
 			outputTokens: 0,
 			latencyMs: Date.now() - t0,
@@ -409,6 +438,12 @@ async function runPracticeGenerationAfterResolveCore(
 	let cumulativeModelMs = 0;
 	let cumulativeValidationMs = 0;
 	const timingsMs: Record<string, number> = {};
+	// Pipeline-scoped counters so repair budget is enforced across all
+	// generation attempts (not per-attempt). Lets us emit
+	// `practice_generation_attempts` once at the end with accurate spend.
+	let generationCallCount = 0;
+	let repairCallCount = 0;
+	let succeededOnCall: number | null = null;
 
 	void recordPracticeEvent(
 		supabase,
@@ -513,6 +548,7 @@ async function runPracticeGenerationAfterResolveCore(
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
 		const m0 = Date.now();
+		generationCallCount++;
 		const r = await runModelOnceWithFallback(
 			systemPrompt,
 			userPrompt,
@@ -536,7 +572,15 @@ async function runPracticeGenerationAfterResolveCore(
 			expectedTypeCounts,
 		});
 
-		if (!out.ok && isPracticeGenerationRepairEnabled()) {
+		// Pipeline-scoped repair budget (max PRACTICE_REPAIR_MAX_CALLS across
+		// the entire pipeline, NOT per attempt). Earlier code allowed one
+		// repair per attempt, which silently doubled spend on slow days.
+		if (
+			!out.ok &&
+			isPracticeGenerationRepairEnabled() &&
+			repairCallCount < PRACTICE_REPAIR_MAX_CALLS
+		) {
+			repairCallCount++;
 			const repaired = await runPracticeGenerationRepairGrouped({
 				failedGrouped: grouped,
 				validationMessage: out.message,
@@ -638,6 +682,7 @@ async function runPracticeGenerationAfterResolveCore(
 			const r = await generateAndStrip();
 			if (!r.ok) return { ok: false, message: r.message };
 			stripped = r.public;
+			succeededOnCall = generationCallCount + repairCallCount;
 			return { ok: true, value: r.object };
 		},
 		{
@@ -653,6 +698,18 @@ async function runPracticeGenerationAfterResolveCore(
 		},
 	);
 	if (!attempt.ok) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_generation_attempts",
+			{
+				generation_calls: generationCallCount,
+				repair_calls: repairCallCount,
+				succeeded_on_call: null,
+				prompt_revision: PRACTICE_PROMPT_REVISION,
+				outcome: "generation_failed",
+			},
+			{ studentId: resolved.userId },
+		);
 		logPracticeObs({
 			phase: "practice_generation",
 			correlationId,
@@ -668,6 +725,18 @@ async function runPracticeGenerationAfterResolveCore(
 		return { ok: false, code: "generation_failed", message: attempt.message };
 	}
 	if (!stripped || !stripped.ok) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_generation_attempts",
+			{
+				generation_calls: generationCallCount,
+				repair_calls: repairCallCount,
+				succeeded_on_call: null,
+				prompt_revision: PRACTICE_PROMPT_REVISION,
+				outcome: "generation_invalid",
+			},
+			{ studentId: resolved.userId },
+		);
 		logPracticeObs({
 			phase: "practice_generation",
 			correlationId,
@@ -686,6 +755,19 @@ async function runPracticeGenerationAfterResolveCore(
 			message: "The generator output could not be validated.",
 		};
 	}
+
+	void recordPracticeEvent(
+		supabase,
+		"practice_generation_attempts",
+		{
+			generation_calls: generationCallCount,
+			repair_calls: repairCallCount,
+			succeeded_on_call: succeededOnCall,
+			prompt_revision: PRACTICE_PROMPT_REVISION,
+			outcome: "ok",
+		},
+		{ studentId: resolved.userId },
+	);
 
 	const fullOutput = attempt.value;
 	const totalQ = fullOutput.questions.length;

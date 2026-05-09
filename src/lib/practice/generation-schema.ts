@@ -56,8 +56,9 @@ const practiceGeneratedMultipleChoiceDraftSchema = practiceQuestionDraftBaseSche
 	}),
 });
 
+/** `options` must be explicit `null` (not omitted). OpenAI strict structured outputs require every object `property` to appear in `required`; optional keys break generation with invalid_json_schema. */
 const practiceGeneratedWrittenDraftSchema = practiceQuestionDraftBaseSchema.extend({
-	options: z.null().optional(),
+	options: z.null(),
 });
 
 const PRACTICE_BUCKET_KEYS = ["multiple_choice", "fill_in_blank", "short_answer", "long_answer"] as const;
