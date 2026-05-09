@@ -1,4 +1,4 @@
-import { getPracticeQuestionPlanForSubject } from "./constants";
+import { getPracticeQuestionPlanForSubject, isMathematicsSubject } from "./constants";
 import type { PracticeFocusArea } from "./schemas";
 import type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
 
@@ -79,12 +79,34 @@ export type PracticeTopicGrounding = {
 	exercise_chunks: PracticeTopicChunkLine[];
 };
 
-const GENERATION_DIRECTIVE_INSTRUCTION =
-	"Generate original practice questions aligned to the supplied curriculum and exercise-style references in topic_grounding; do not copy exercise chunk wording verbatim.";
+/**
+ * Compact "anchor" header serialized FIRST in the JSON payload. Models reliably
+ * latch onto the first clear summary in a long input; mirroring the hard-gate
+ * facts here halves the cognitive cost of locating counts, time band, and the
+ * topic-id allowlist while the model is composing items.
+ */
+export type PracticeGenerationSummary = {
+	total: number;
+	counts: {
+		multiple_choice: number;
+		fill_in_blank: number;
+		short_answer: number;
+		long_answer: number;
+	};
+	duration_seconds: number;
+	time_sum_min: number;
+	time_sum_max: number;
+	allowed_topic_ids: string[];
+	coverage_mode: PracticeCoverageMode;
+	difficulty: PracticeDifficulty;
+	subject_is_math: boolean;
+};
 
 export type PracticeUserMessagePayload = {
 	schema_version: 3;
 	intent: "generate_practice_test";
+	/** Anchor header — see {@link PracticeGenerationSummary}. */
+	generation_summary: PracticeGenerationSummary;
 	student: {
 		grade: number | null;
 		/**
@@ -121,9 +143,6 @@ export type PracticeUserMessagePayload = {
 			short_answer: number;
 			long_answer: number;
 		};
-		note: string;
-		/** Instruction for the model; replaces the old parallel `generation_directives` block. */
-		generation_instruction: string;
 		/** Derived from `grounding_meta.context_quality`; tells the model when to stay conservative. */
 		context_quality_instruction: string;
 		/** Exact UUID allowlist for topic_id on every question (same as topics[].topic_id). */
@@ -217,9 +236,28 @@ export function buildPracticeUserMessage(input: {
 	const focusArea = input.focusArea ?? "all";
 	const focusAreaInstruction = FOCUS_AREA_INSTRUCTION[focusArea];
 
+	const allowed_topic_ids = input.topics.map((t) => t.topicId);
+	const subject_is_math = isMathematicsSubject(input.subject.name);
+
+	const generation_summary: PracticeGenerationSummary = {
+		total: estimated_question_count,
+		counts: question_type_counts,
+		duration_seconds: input.timeLimitSeconds,
+		time_sum_min: Math.round(input.timeLimitSeconds * 0.6),
+		time_sum_max: Math.round(input.timeLimitSeconds * 1.2),
+		allowed_topic_ids,
+		coverage_mode,
+		difficulty: input.difficulty,
+		subject_is_math,
+	};
+
 	return {
 		schema_version: 3,
 		intent: "generate_practice_test",
+		// Anchor header at the top so the model latches onto counts/time band
+		// before parsing the rest of the payload. Duplicates a few fields
+		// from `test_parameters` on purpose; signal density beats DRY here.
+		generation_summary,
 		student: {
 			grade: input.studentGrade,
 			recent_errors: input.recentErrors && input.recentErrors.length > 0 ? input.recentErrors : undefined,
@@ -240,10 +278,8 @@ export function buildPracticeUserMessage(input: {
 			coverage_mode,
 			coverage_instruction,
 			question_type_counts,
-			note: "Question count and per-type counts are fixed by duration. Fill the required questions_by_type buckets exactly before any final ordering.",
-			generation_instruction: GENERATION_DIRECTIVE_INSTRUCTION,
 			context_quality_instruction: contextQualityInstruction,
-			allowed_topic_ids: input.topics.map((t) => t.topicId),
+			allowed_topic_ids,
 		},
 		topics: input.topics.map((t) => ({
 			topic_id: t.topicId,
@@ -257,8 +293,11 @@ export function buildPracticeUserMessage(input: {
 		})),
 		constraints: {
 			question_types: ["multiple_choice", "fill_in_blank", "short_answer", "long_answer"],
+			// Trimmed in v3.2.1: the system prompt now owns pedagogy. Keep
+			// only a one-line orientation here so the JSON payload still
+			// flags the constraint surface for the model.
 			pedagogy:
-				"Align to NCERT-style outcomes for the given grade. Apply Bloom-style cognitive progression and obey test_parameters.coverage_mode and coverage_instruction. Fill each questions_by_type bucket with exactly the requested number of questions before any final ordering. For fill_in_blank: one word or a very short phrase; no options. For short_answer: brief sentences. For long_answer: multi-sentence or short paragraph. Prefer clarity over trick questions; avoid ambiguous wording. When student.recent_errors is present, bias items toward those concepts where pedagogically appropriate. Use topic_grounding for curriculum and exercise-style context; per-topic performance is under topics keyed by topic_id.",
+				"Follow the system prompt's HARD GATES and final compliance checklist; obey test_parameters.coverage_mode and coverage_instruction; bias toward student.recent_errors where pedagogically appropriate.",
 		},
 	};
 }
@@ -270,10 +309,61 @@ export function toPracticeUserMessageForModel(payload: PracticeUserMessagePayloa
 	return { ...rest, grounding_meta: metaForModel };
 }
 
+/**
+ * Strip empty arrays inside `topic_grounding[].content_chunks`/`exercise_chunks`
+ * and any per-topic null fields before sending to the model. This keeps the
+ * server-stored payload identical (DB still gets the full shape via
+ * `stringifyPracticeUserMessage`) but trims tokens on the model-bound copy.
+ *
+ * Returns a deep clone — callers may mutate freely.
+ */
+export function compactPayloadForModel(payload: PracticeUserMessageForModel): PracticeUserMessageForModel {
+	const clone = structuredClone(payload) as PracticeUserMessageForModel;
+	clone.topic_grounding = clone.topic_grounding.map((topic) => {
+		const out: Record<string, unknown> = {
+			topic_id: topic.topic_id,
+			topic_name: topic.topic_name,
+			curriculum_hint: topic.curriculum_hint,
+		};
+		if (topic.content_chunks.length > 0) out.content_chunks = topic.content_chunks;
+		if (topic.exercise_chunks.length > 0) out.exercise_chunks = topic.exercise_chunks;
+		return out as PracticeTopicGrounding;
+	});
+	clone.topics = clone.topics.map((t) => {
+		const perf: Record<string, unknown> = { status: t.performance.status };
+		if (t.performance.average_score_percent != null) {
+			perf.average_score_percent = t.performance.average_score_percent;
+		}
+		if (t.performance.tests_taken !== 0) perf.tests_taken = t.performance.tests_taken;
+		if (t.performance.trend && t.performance.trend !== "unknown") {
+			perf.trend = t.performance.trend;
+		}
+		if (t.performance.last_test_date != null) perf.last_test_date = t.performance.last_test_date;
+		return { topic_id: t.topic_id, performance: perf as typeof t.performance };
+	});
+	if (clone.student.recent_errors && clone.student.recent_errors.length === 0) {
+		delete clone.student.recent_errors;
+	}
+	return clone;
+}
+
+/**
+ * Pretty-printed serialization. Used for storage / logs / unit tests.
+ * Do NOT call this for the model-bound prompt — use
+ * {@link stringifyPracticeUserMessageForModel} instead, which is compact
+ * (no indent) and applies {@link compactPayloadForModel}.
+ */
 export function stringifyPracticeUserMessage(payload: PracticeUserMessagePayload | PracticeUserMessageForModel): string {
 	return `${JSON.stringify(payload, null, 2)}\n`;
 }
 
+/**
+ * Compact serialization for the model: no whitespace, empty arrays / null
+ * performance fields stripped. The model parses JSON, not pretty-printed
+ * JSON, so we save tokens with zero loss of meaning.
+ */
 export function stringifyPracticeUserMessageForModel(payload: PracticeUserMessagePayload): string {
-	return stringifyPracticeUserMessage(toPracticeUserMessageForModel(payload));
+	const forModel = toPracticeUserMessageForModel(payload);
+	const compact = compactPayloadForModel(forModel);
+	return JSON.stringify(compact);
 }

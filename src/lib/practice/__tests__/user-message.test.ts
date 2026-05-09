@@ -62,14 +62,28 @@ describe("buildPracticeUserMessage", () => {
 			short_answer: 3,
 			long_answer: 2,
 		});
-		expect(msg.test_parameters.note).toContain("questions_by_type");
 		expect(msg.topics.length).toBe(2);
 		expect(msg.schema_version).toBe(3);
 		expect(msg.topic_grounding).toHaveLength(2);
 		expect(msg.topic_grounding[0]!.content_chunks).toEqual([]);
 		expect(msg.test_parameters.estimated_question_count).toBe(15);
-		expect(msg.test_parameters.generation_instruction.length).toBeGreaterThan(20);
 		expect(msg.grounding_meta.topic_count).toBe(2);
+		expect(msg.generation_summary).toEqual({
+			total: 15,
+			counts: {
+				multiple_choice: 5,
+				fill_in_blank: 5,
+				short_answer: 3,
+				long_answer: 2,
+			},
+			duration_seconds: 3600,
+			time_sum_min: 2160,
+			time_sum_max: 4320,
+			allowed_topic_ids: [TOPICS[0]!.topicId, TOPICS[1]!.topicId],
+			coverage_mode: "few_topics",
+			difficulty: "medium",
+			subject_is_math: false,
+		});
 		expect(msg.topics[0]).toEqual({
 			topic_id: TOPICS[0]!.topicId,
 			performance: {
@@ -156,7 +170,7 @@ describe("buildPracticeUserMessage", () => {
 		expect(msg.student.recent_errors?.length).toBe(1);
 	});
 
-	it("produces stable JSON output shape", () => {
+	it("produces stable JSON output shape (pretty)", () => {
 		const msg = buildPracticeUserMessage({
 			studentGrade: 9,
 			subject: { id: "x", name: "S" },
@@ -167,6 +181,26 @@ describe("buildPracticeUserMessage", () => {
 		const json = stringifyPracticeUserMessage(msg);
 		expect(json).toContain("\"intent\": \"generate_practice_test\"");
 		expect(json).toContain("\"schema_version\": 3");
+	});
+
+	it("model-facing serialization is compact and starts with generation_summary", () => {
+		const msg = buildPracticeUserMessage({
+			studentGrade: 9,
+			subject: { id: "x", name: "S" },
+			difficulty: "medium",
+			timeLimitSeconds: 3600,
+			topics: TOPICS,
+		});
+		const compact = stringifyPracticeUserMessageForModel(msg);
+		// No newlines / no two-space indent in the model-facing copy.
+		expect(compact).not.toContain("\n");
+		expect(compact).not.toContain("  ");
+		// generation_summary must be the first key after schema_version+intent.
+		expect(compact.indexOf("generation_summary")).toBeGreaterThan(0);
+		expect(compact.indexOf("generation_summary")).toBeLessThan(compact.indexOf("test_parameters"));
+		// Empty content_chunks / exercise_chunks arrays are stripped to save tokens.
+		expect(compact).not.toContain("\"content_chunks\":[]");
+		expect(compact).not.toContain("\"exercise_chunks\":[]");
 	});
 
 	it("strips fetch_error from model-facing JSON", () => {

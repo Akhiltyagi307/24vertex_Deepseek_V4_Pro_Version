@@ -43,7 +43,10 @@ import {
 } from "@/lib/practice/practice-generation-repair";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
-import { repeatPracticeAiResultUntilSuccessOrExhausted } from "@/lib/practice/ai-retry";
+import {
+	PRACTICE_REPAIR_MAX_CALLS,
+	repeatPracticeAiResultUntilSuccessOrExhausted,
+} from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import {
 	embedQuestionTexts,
@@ -66,18 +69,14 @@ export type RunGenerationPipelineOptions = {
 	abortSignal?: AbortSignal;
 };
 
-type PracticeQuestion = PracticeGenerationOutput["questions"][number];
-type PracticeQuestionType = PracticeQuestion["question_type"];
-
-const DEFAULT_GENERATION_BUDGET_MS = 300_000;
-const MIN_BUDGET_FOR_MODEL_ATTEMPT_MS = 22_000;
-const MIN_BUDGET_FOR_REPAIR_MS = 16_000;
-
-function getGenerationBudgetMs(): number {
-	const raw = Number.parseInt(process.env.PRACTICE_GENERATION_BUDGET_MS ?? "", 10);
-	if (!Number.isFinite(raw) || raw < 30_000) return DEFAULT_GENERATION_BUDGET_MS;
-	return raw;
-}
+/**
+ * Tag attached to `ai_calls.prompt_id` and to `practice_generation_attempts`
+ * analytics events so we can A/B prompt rewrites against historical baselines.
+ * Bump when shipping a behavior-affecting prompt change. Current revision:
+ * v4 — strict-schema-on, hard-gates + final-compliance recap, compact user
+ * message, moderate preamble trim (release v3.2.1).
+ */
+export const PRACTICE_PROMPT_REVISION = "v4" as const;
 
 function formatGenerationError(e: unknown): string {
 	if (APICallError.isInstance(e)) {
@@ -153,11 +152,24 @@ export async function preflightPracticeGeneration(
 }
 
 /**
- * Strict JSON-schema mode for generation. ON by default. Disable via
- * `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=false` if a future model regresses.
+ * Strict JSON-schema mode for generation. ON by default since release v3.2.1 —
+ * GPT-5.4-mini and newer reliably satisfy `z.array().length(N)` /
+ * `z.null().optional()` under structured outputs, and turning it on doubled
+ * one-shot success in dev. Set `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=false`
+ * to roll back if a future model regresses.
  */
 function isStrictJsonSchemaForGenerationEnabled(): boolean {
 	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GENERATE !== "false";
+}
+
+/**
+ * Strict JSON-schema mode for the repair pass. OFF by default — the repair
+ * call already validates against the same Zod schema after the fact, and
+ * structured outputs sometimes regenerate aggressively where we wanted a
+ * minimal patch. Override with `PRACTICE_STRICT_JSON_SCHEMA_REPAIR=true`.
+ */
+function isStrictJsonSchemaForRepairEnabled(): boolean {
+	return process.env.PRACTICE_STRICT_JSON_SCHEMA_REPAIR === "true";
 }
 
 /**
@@ -198,7 +210,10 @@ async function runModelOnce(
 		system: systemPrompt,
 		prompt: userPrompt,
 		maxOutputTokens,
-		maxRetries: 2,
+		// Lowered from 2 → 1 in v3.2.1: HTTP-layer retries silently doubled
+		// per-attempt cost on slow failures. Transient 429/503 are still
+		// recovered by the runModelOnceWithFallback() fallback-model path.
+		maxRetries: 1,
 		abortSignal: opts.abortSignal,
 		providerOptions: {
 			openai: {
@@ -225,6 +240,7 @@ async function runModelOnce(
 				feature: "practice.generation",
 				model: chatModelId,
 				userId: studentUserId,
+				promptId: PRACTICE_PROMPT_REVISION,
 				inputTokens: usage?.inputTokens ?? 0,
 				outputTokens: usage?.outputTokens ?? 0,
 				latencyMs: Date.now() - t0,
@@ -248,6 +264,7 @@ async function runModelOnce(
 			feature: "practice.generation",
 			model: chatModelId,
 			userId: studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
 			latencyMs: Date.now() - t0,
@@ -345,16 +362,17 @@ async function runPracticeGenerationRepairGrouped(params: {
 			system: buildPracticeGenerationRepairSystemPrompt(),
 			prompt: repairUser,
 			maxOutputTokens: Math.min(12_000, Math.max(6_000, params.estimatedQuestionCount * 900)),
-			maxRetries: 2,
+			maxRetries: 1,
 			abortSignal: params.abortSignal,
 			providerOptions: {
-				openai: { strictJsonSchema: isStrictJsonSchemaForGenerationEnabled() },
+				openai: { strictJsonSchema: isStrictJsonSchemaForRepairEnabled() },
 			},
 		});
 		void recordAiCall({
 			feature: "practice.generation.repair",
 			model: getOpenAIChatModel(),
 			userId: params.studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
 			latencyMs: Date.now() - t0,
@@ -367,6 +385,7 @@ async function runPracticeGenerationRepairGrouped(params: {
 			feature: "practice.generation.repair",
 			model: getOpenAIChatModel(),
 			userId: params.studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: 0,
 			outputTokens: 0,
 			latencyMs: Date.now() - t0,
@@ -419,23 +438,12 @@ async function runPracticeGenerationAfterResolveCore(
 	let cumulativeModelMs = 0;
 	let cumulativeValidationMs = 0;
 	const timingsMs: Record<string, number> = {};
-	let generationAttemptCount = 0;
-	let repairAttemptCount = 0;
-	let moderationReplacementCount = 0;
-	const generationBudgetMs = getGenerationBudgetMs();
-	const remainingBudgetMs = () => Math.max(0, generationBudgetMs - (Date.now() - pipelineT0));
-	const hasRemainingBudget = (minimumMs: number) => remainingBudgetMs() >= minimumMs;
-	const generationTimedOutMessage =
-		"Generation timed out before a safe retry could start. Please try again.";
-	const withCorrelationFailure = (
-		code: GeneratePracticeFailure["code"],
-		message: string,
-	): Extract<GeneratePracticeResult, { ok: false }> => ({
-		ok: false,
-		code,
-		message,
-		correlationId,
-	});
+	// Pipeline-scoped counters so repair budget is enforced across all
+	// generation attempts (not per-attempt). Lets us emit
+	// `practice_generation_attempts` once at the end with accurate spend.
+	let generationCallCount = 0;
+	let repairCallCount = 0;
+	let succeededOnCall: number | null = null;
 
 	void recordPracticeEvent(
 		supabase,
@@ -534,161 +542,13 @@ async function runPracticeGenerationAfterResolveCore(
 		["multiple_choice", "fill_in_blank", "short_answer", "long_answer"]
 			.map((key) => `${key}=${counts[key] ?? 0}`)
 			.join(", ");
-	const emptyTypeCounts = (): PracticeQuestionTypeCounts => ({
-		multiple_choice: 0,
-		fill_in_blank: 0,
-		short_answer: 0,
-		long_answer: 0,
-	});
-
-	function buildModerationReplacementPrompt(args: {
-		baseUserPrompt: string;
-		replacementCounts: PracticeQuestionTypeCounts;
-		allowedTopicIds: string[];
-		preferredTopicIds: string[];
-		blockedQuestionTexts: string[];
-	}): string {
-		return [
-			args.baseUserPrompt,
-			"",
-			"MODERATION_REPLACEMENT_MODE:",
-			"- Generate ONLY replacement questions to fill moderation-filtered slots.",
-			"- Preserve pedagogy and exam style; do not include policy/safety commentary.",
-			"- Use only topic_id values from ALLOWED_TOPIC_IDS.",
-			"- Prefer topic_id values from PREFERRED_TOPIC_IDS where feasible.",
-			"- Avoid repeating blocked question stems listed in BLOCKED_QUESTION_TEXTS.",
-			"REQUIRED_BUCKET_LENGTHS (questions_by_type.*.length):",
-			JSON.stringify(args.replacementCounts),
-			"ALLOWED_TOPIC_IDS:",
-			JSON.stringify(args.allowedTopicIds),
-			"PREFERRED_TOPIC_IDS:",
-			JSON.stringify(args.preferredTopicIds),
-			"BLOCKED_QUESTION_TEXTS:",
-			JSON.stringify(args.blockedQuestionTexts.slice(0, 12)),
-		].join("\n");
-	}
-
-	async function replaceModeratedQuestions(args: {
-		flattened: PracticeGenerationOutput;
-		flaggedIndices: number[];
-	}): Promise<
-		| { ok: true; mergedOutput: PracticeGenerationOutput; public: ReturnType<typeof validateAndStripGeneration> }
-		| { ok: false; message: string }
-	> {
-		const flaggedIndexSet = new Set(args.flaggedIndices);
-		const replacementCounts = emptyTypeCounts();
-		const preferredTopicIds = new Set<string>();
-		const blockedQuestionTexts: string[] = [];
-		for (const idx of flaggedIndexSet) {
-			const q = args.flattened.questions[idx];
-			if (!q) continue;
-			replacementCounts[q.question_type]++;
-			preferredTopicIds.add(q.topic_id);
-			blockedQuestionTexts.push(q.question_text);
-		}
-		const replacementTotal = Object.values(replacementCounts).reduce((sum, n) => sum + n, 0);
-		if (replacementTotal <= 0) {
-			return { ok: false, message: "Moderation replacement failed: no flagged questions to replace." };
-		}
-		if (!hasRemainingBudget(MIN_BUDGET_FOR_MODEL_ATTEMPT_MS)) {
-			return { ok: false, message: generationTimedOutMessage };
-		}
-
-		const replacementSchema = createPracticeGenerationOutputSchema(replacementCounts);
-		const replacementPrompt = buildModerationReplacementPrompt({
-			baseUserPrompt: userPrompt,
-			replacementCounts,
-			allowedTopicIds: [...topicIdSet],
-			preferredTopicIds: [...preferredTopicIds],
-			blockedQuestionTexts,
-		});
-		const replacementT0 = Date.now();
-		const replacementRun = await runModelOnceWithFallback(
-			systemPrompt,
-			replacementPrompt,
-			replacementTotal,
-			replacementSchema,
-			opts,
-			resolved.userId,
-		);
-		cumulativeModelMs += Date.now() - replacementT0;
-		if (!replacementRun.ok) {
-			return { ok: false, message: replacementRun.message };
-		}
-		const replacementFlat = flattenPracticeGenerationOutput(replacementRun.object);
-		const replacementOut = validateAndStripGeneration(replacementFlat, replacementTotal, topicIdSet, {
-			expectedTypeCounts: replacementCounts,
-		});
-		if (!replacementOut.ok) {
-			return { ok: false, message: replacementOut.message };
-		}
-
-		const replacementPerItem = await moderatePracticeQuestionsPerItem(
-			replacementFlat.questions.map((q) => q.question_text),
-		);
-		if (!replacementPerItem.ok) {
-			return { ok: false, message: "Replacement questions failed moderation checks." };
-		}
-		const replacementBlob = await moderatePracticeGenerationText(JSON.stringify(replacementFlat.questions));
-		if (!replacementBlob.ok) {
-			return { ok: false, message: "Replacement questions failed moderation checks." };
-		}
-
-		const byType: Record<PracticeQuestionType, PracticeQuestion[]> = {
-			multiple_choice: [],
-			fill_in_blank: [],
-			short_answer: [],
-			long_answer: [],
-		};
-		for (const q of replacementFlat.questions) {
-			byType[q.question_type].push(q);
-		}
-		let missingByType = false;
-		const mergedQuestions: PracticeQuestion[] = args.flattened.questions.map((q, idx) => {
-			if (!flaggedIndexSet.has(idx)) return q;
-			const next = byType[q.question_type].shift();
-			if (!next) {
-				missingByType = true;
-				return q;
-			}
-			return next;
-		});
-		if (missingByType) {
-			return { ok: false, message: "Replacement generation returned too few questions for at least one type." };
-		}
-		for (const type of Object.keys(byType) as PracticeQuestionType[]) {
-			if (byType[type].length > 0) {
-				return { ok: false, message: "Replacement generation returned an unexpected question mix." };
-			}
-		}
-
-		const mergedOutput: PracticeGenerationOutput = {
-			questions: mergedQuestions.map((q, idx) => ({ ...q, question_number: idx + 1 })),
-			generation_metadata: args.flattened.generation_metadata,
-		};
-		const mergedOut = validateAndStripGeneration(mergedOutput, expectedCount, topicIdSet, {
-			expectedDurationSeconds: durationSeconds,
-			expectedTypeCounts,
-		});
-		if (!mergedOut.ok) {
-			return { ok: false, message: mergedOut.message };
-		}
-		const mergedBlob = await moderatePracticeGenerationText(JSON.stringify(mergedOutput.questions));
-		if (!mergedBlob.ok) {
-			return { ok: false, message: "Output blocked by moderation filters." };
-		}
-		return { ok: true, mergedOutput, public: mergedOut };
-	}
 
 	async function generateAndStrip(): Promise<
 		| { ok: true; object: PracticeGenerationOutput; public: ReturnType<typeof validateAndStripGeneration> }
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
-		generationAttemptCount++;
-		if (!hasRemainingBudget(MIN_BUDGET_FOR_MODEL_ATTEMPT_MS)) {
-			return { ok: false, message: generationTimedOutMessage, code: "generation_failed" };
-		}
 		const m0 = Date.now();
+		generationCallCount++;
 		const r = await runModelOnceWithFallback(
 			systemPrompt,
 			userPrompt,
@@ -712,36 +572,33 @@ async function runPracticeGenerationAfterResolveCore(
 			expectedTypeCounts,
 		});
 
-		if (!out.ok && isPracticeGenerationRepairEnabled()) {
-			if (hasRemainingBudget(MIN_BUDGET_FOR_REPAIR_MS)) {
-				repairAttemptCount++;
-				const repaired = await runPracticeGenerationRepairGrouped({
-					failedGrouped: grouped,
-					validationMessage: out.message,
-					durationSeconds,
+		// Pipeline-scoped repair budget (max PRACTICE_REPAIR_MAX_CALLS across
+		// the entire pipeline, NOT per attempt). Earlier code allowed one
+		// repair per attempt, which silently doubled spend on slow days.
+		if (
+			!out.ok &&
+			isPracticeGenerationRepairEnabled() &&
+			repairCallCount < PRACTICE_REPAIR_MAX_CALLS
+		) {
+			repairCallCount++;
+			const repaired = await runPracticeGenerationRepairGrouped({
+				failedGrouped: grouped,
+				validationMessage: out.message,
+				durationSeconds,
+				expectedTypeCounts,
+				allowedTopicIds: [...topicIdSet],
+				generationOutputSchema,
+				estimatedQuestionCount: expectedCount,
+				studentUserId: resolved.userId,
+				abortSignal: opts.abortSignal,
+			});
+			cumulativeModelMs += repaired.modelMs;
+			if (repaired.ok) {
+				grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
+				flattened = flattenPracticeGenerationOutput(grouped);
+				out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
+					expectedDurationSeconds: durationSeconds,
 					expectedTypeCounts,
-					allowedTopicIds: [...topicIdSet],
-					generationOutputSchema,
-					estimatedQuestionCount: expectedCount,
-					studentUserId: resolved.userId,
-					abortSignal: opts.abortSignal,
-				});
-				cumulativeModelMs += repaired.modelMs;
-				if (repaired.ok) {
-					grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
-					flattened = flattenPracticeGenerationOutput(grouped);
-					out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
-						expectedDurationSeconds: durationSeconds,
-						expectedTypeCounts,
-					});
-				}
-			} else {
-				logServerError("generatePracticeTest.repair.skipped_budget", out.message, {
-					subjectId,
-					durationSeconds,
-					correlationId,
-					generationAttemptCount,
-					remainingBudgetMs: remainingBudgetMs(),
 				});
 			}
 		}
@@ -756,9 +613,6 @@ async function runPracticeGenerationAfterResolveCore(
 				expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
 				actualTypeCounts: formatTypeCounts(actualTypeCounts),
 				correlationId,
-				generationAttemptCount,
-				repairAttemptCount,
-				remainingBudgetMs: remainingBudgetMs(),
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
 		}
@@ -772,6 +626,10 @@ async function runPracticeGenerationAfterResolveCore(
 			flattened.questions.map((q) => q.question_text),
 		);
 		if (!perItem.ok) {
+			// If too many items are flagged, regenerate the whole test rather
+			// than ship a too-short test. Otherwise we accept losing a few.
+			const retainedCount = flattened.questions.length - perItem.flagged.length;
+			const flaggedTooMany = retainedCount < expectedCount;
 			for (const flag of perItem.flagged) {
 				try {
 					await insertHeuristicModerationFlag({
@@ -785,20 +643,16 @@ async function runPracticeGenerationAfterResolveCore(
 					logServerError("generatePracticeTest.moderation_flag.per_item", e, { correlationId });
 				}
 			}
-			const replacement = await replaceModeratedQuestions({
-				flattened,
-				flaggedIndices: perItem.flagged.map((f) => f.index),
-			});
-			if (!replacement.ok) {
+			if (flaggedTooMany) {
 				return {
 					ok: false,
-					message: replacement.message,
+					message: "Output blocked by moderation filters.",
 					code: "generation_invalid",
 				};
 			}
-			moderationReplacementCount += perItem.flagged.length;
-			flattened = replacement.mergedOutput;
-			out = replacement.public;
+			// Drop flagged questions so the rest of the test is preserved.
+			const dropSet = new Set(perItem.flagged.map((f) => f.index));
+			flattened.questions = flattened.questions.filter((_, i) => !dropSet.has(i));
 		}
 
 		const modBlob = JSON.stringify(flattened.questions);
@@ -828,6 +682,7 @@ async function runPracticeGenerationAfterResolveCore(
 			const r = await generateAndStrip();
 			if (!r.ok) return { ok: false, message: r.message };
 			stripped = r.public;
+			succeededOnCall = generationCallCount + repairCallCount;
 			return { ok: true, value: r.object };
 		},
 		{
@@ -838,32 +693,23 @@ async function runPracticeGenerationAfterResolveCore(
 					attemptNumber,
 					totalAttempts,
 					correlationId,
-					repairAttemptCount,
-					remainingBudgetMs: remainingBudgetMs(),
 				});
-			},
-			shouldRetry: (_failure, attemptNumber, totalAttempts) => {
-				if (attemptNumber >= totalAttempts) return false;
-				const canRetry = hasRemainingBudget(MIN_BUDGET_FOR_MODEL_ATTEMPT_MS);
-				if (!canRetry) {
-					logServerError(
-						"generatePracticeTest.retry.skipped_budget",
-						"Skipping retry because the remaining generation budget is too low.",
-						{
-							subjectId,
-							durationSeconds,
-							correlationId,
-							attemptNumber,
-							totalAttempts,
-							remainingBudgetMs: remainingBudgetMs(),
-						},
-					);
-				}
-				return canRetry;
 			},
 		},
 	);
 	if (!attempt.ok) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_generation_attempts",
+			{
+				generation_calls: generationCallCount,
+				repair_calls: repairCallCount,
+				succeeded_on_call: null,
+				prompt_revision: PRACTICE_PROMPT_REVISION,
+				outcome: "generation_failed",
+			},
+			{ studentId: resolved.userId },
+		);
 		logPracticeObs({
 			phase: "practice_generation",
 			correlationId,
@@ -874,15 +720,23 @@ async function runPracticeGenerationAfterResolveCore(
 				...timingsMs,
 				modelMs: cumulativeModelMs,
 				validationMs: cumulativeValidationMs,
-				generationAttemptCount,
-				repairAttemptCount,
-				moderationReplacementCount,
-				remainingBudgetMs: remainingBudgetMs(),
 			},
 		});
-		return withCorrelationFailure("generation_failed", attempt.message);
+		return { ok: false, code: "generation_failed", message: attempt.message };
 	}
 	if (!stripped || !stripped.ok) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_generation_attempts",
+			{
+				generation_calls: generationCallCount,
+				repair_calls: repairCallCount,
+				succeeded_on_call: null,
+				prompt_revision: PRACTICE_PROMPT_REVISION,
+				outcome: "generation_invalid",
+			},
+			{ studentId: resolved.userId },
+		);
 		logPracticeObs({
 			phase: "practice_generation",
 			correlationId,
@@ -893,14 +747,27 @@ async function runPracticeGenerationAfterResolveCore(
 				...timingsMs,
 				modelMs: cumulativeModelMs,
 				validationMs: cumulativeValidationMs,
-				generationAttemptCount,
-				repairAttemptCount,
-				moderationReplacementCount,
-				remainingBudgetMs: remainingBudgetMs(),
 			},
 		});
-		return withCorrelationFailure("generation_invalid", "The generator output could not be validated.");
+		return {
+			ok: false,
+			code: "generation_invalid",
+			message: "The generator output could not be validated.",
+		};
 	}
+
+	void recordPracticeEvent(
+		supabase,
+		"practice_generation_attempts",
+		{
+			generation_calls: generationCallCount,
+			repair_calls: repairCallCount,
+			succeeded_on_call: succeededOnCall,
+			prompt_revision: PRACTICE_PROMPT_REVISION,
+			outcome: "ok",
+		},
+		{ studentId: resolved.userId },
+	);
 
 	const fullOutput = attempt.value;
 	const totalQ = fullOutput.questions.length;
@@ -982,13 +849,13 @@ async function runPracticeGenerationAfterResolveCore(
 				...timingsMs,
 				modelMs: cumulativeModelMs,
 				validationMs: cumulativeValidationMs,
-				generationAttemptCount,
-				repairAttemptCount,
-				moderationReplacementCount,
-				remainingBudgetMs: remainingBudgetMs(),
 			},
 		});
-		return withCorrelationFailure("database_error", "Could not create the test session.");
+		return {
+			ok: false,
+			code: "database_error",
+			message: "Could not create the test session.",
+		};
 	}
 
 	const testId = newTestId as string;
@@ -1047,9 +914,6 @@ async function runPracticeGenerationAfterResolveCore(
 			...timingsMs,
 			modelMs: cumulativeModelMs,
 			validationMs: cumulativeValidationMs,
-			generationAttemptCount,
-			repairAttemptCount,
-			moderationReplacementCount,
 		},
 		questionCount: totalQ,
 		topicCount: resolved.canonicalTopics.length,

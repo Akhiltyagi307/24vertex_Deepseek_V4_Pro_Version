@@ -1,6 +1,15 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
+import { config as loadEnv } from "dotenv";
+
+// Mirrors `vitest.config.ts` — Playwright doesn't auto-load .env files, so
+// without this `auth.setup.ts` (and any spec that depends on credentials)
+// silently skip when run with a bare `playwright test`.
+const envLocal = path.resolve(__dirname, ".env.local");
+const envFallback = path.resolve(__dirname, ".env");
+loadEnv({ path: fs.existsSync(envLocal) ? envLocal : envFallback });
 
 /**
  * Playwright config.

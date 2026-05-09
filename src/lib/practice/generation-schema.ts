@@ -56,9 +56,8 @@ const practiceGeneratedMultipleChoiceDraftSchema = practiceQuestionDraftBaseSche
 	}),
 });
 
+/** `options` must be explicit `null` (not omitted). OpenAI strict structured outputs require every object `property` to appear in `required`; optional keys break generation with invalid_json_schema. */
 const practiceGeneratedWrittenDraftSchema = practiceQuestionDraftBaseSchema.extend({
-	// OpenAI strict JSON-schema requires every declared property in a nested
-	// object to be present in `required`; keep written-question options explicit.
 	options: z.null(),
 });
 

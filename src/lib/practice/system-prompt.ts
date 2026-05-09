@@ -1,3 +1,5 @@
+import type { PracticeQuestionTypeCounts } from "./constants";
+import { isMathematicsSubject } from "./constants";
 import {
 	getPracticeGenerationSubjectPreamble,
 	resolvePracticeGenerationSubjectRouting,
@@ -15,7 +17,85 @@ export type PracticeGenerationSubjectContext = {
 type UserMessageSummary = Pick<
 	PracticeUserMessagePayload,
 	"schema_version" | "intent" | "test_parameters" | "constraints"
->;
+> & {
+	/** Subject name passed in so the Math-only banner is reinforced contextually. */
+	subjectName?: string | null;
+};
+
+/**
+ * Per-bucket weights used to derive concrete time targets for the model.
+ * MCQ is the baseline; written items take longer per question. The targets
+ * are advisory — the validator only enforces the total time band — but a
+ * concrete number per bucket is far easier for the model to land in one shot
+ * than mental arithmetic across 15–30 items.
+ */
+const BUCKET_TIME_WEIGHTS: Record<keyof PracticeQuestionTypeCounts, number> = {
+	multiple_choice: 1,
+	fill_in_blank: 0.7,
+	short_answer: 2.5,
+	long_answer: 4,
+};
+
+function computePerBucketTimeTargets(
+	timeLimitSeconds: number,
+	counts: PracticeQuestionTypeCounts,
+): { mcq: number; fib: number; sa: number; la: number } {
+	const totalWeight =
+		counts.multiple_choice * BUCKET_TIME_WEIGHTS.multiple_choice +
+		counts.fill_in_blank * BUCKET_TIME_WEIGHTS.fill_in_blank +
+		counts.short_answer * BUCKET_TIME_WEIGHTS.short_answer +
+		counts.long_answer * BUCKET_TIME_WEIGHTS.long_answer;
+	if (totalWeight <= 0) return { mcq: 60, fib: 45, sa: 180, la: 360 };
+	const perWeight = timeLimitSeconds / totalWeight;
+	return {
+		mcq: Math.max(20, Math.round(perWeight * BUCKET_TIME_WEIGHTS.multiple_choice)),
+		fib: Math.max(20, Math.round(perWeight * BUCKET_TIME_WEIGHTS.fill_in_blank)),
+		sa: Math.max(60, Math.round(perWeight * BUCKET_TIME_WEIGHTS.short_answer)),
+		la: Math.max(120, Math.round(perWeight * BUCKET_TIME_WEIGHTS.long_answer)),
+	};
+}
+
+/**
+ * Build the HARD GATES block — the non-negotiable machine constraints.
+ * Reused at the very top AND at the very end of the system prompt so
+ * recency on long inputs reinforces the same rules the validator enforces.
+ */
+function buildHardGatesBlock(args: {
+	heading: string;
+	estimatedQuestionCount: number;
+	counts: PracticeQuestionTypeCounts;
+	timeLimitSeconds: number;
+	timeSumMin: number;
+	timeSumMax: number;
+	bucketTimes: { mcq: number; fib: number; sa: number; la: number };
+	subjectIsMath: boolean;
+}): string {
+	const c = args.counts;
+	const mathBanner =
+		args.subjectIsMath ?
+			"- Subject is Mathematics: EVERY question must be in `multiple_choice`. The `fill_in_blank`, `short_answer`, and `long_answer` arrays MUST be empty arrays."
+		:	"- If the subject is Mathematics, every question is `multiple_choice` and the other three buckets are empty. (For this test the counts below already encode that.)";
+
+	const perBucketTimes =
+		[
+			c.multiple_choice > 0 ? `MCQ ~${args.bucketTimes.mcq}s each` : null,
+			c.fill_in_blank > 0 ? `FIB ~${args.bucketTimes.fib}s each` : null,
+			c.short_answer > 0 ? `short_answer ~${args.bucketTimes.sa}s each` : null,
+			c.long_answer > 0 ? `long_answer ~${args.bucketTimes.la}s each` : null,
+		]
+			.filter(Boolean)
+			.join(", ");
+
+	return `${args.heading}
+- Output JSON only — no markdown fences, no commentary, no leading or trailing prose.
+- Emit EXACTLY ${args.estimatedQuestionCount} questions across the four buckets: ${c.multiple_choice} multiple_choice, ${c.fill_in_blank} fill_in_blank, ${c.short_answer} short_answer, ${c.long_answer} long_answer. Buckets MUST contain exactly that many items — not one more, not one fewer. If a bucket is 0, emit an empty array \`[]\`.
+${mathBanner}
+- topic_id COPY PROTOCOL: every \`topic_id\` MUST be copied character-for-character from \`test_parameters.allowed_topic_ids\` (or the same values under \`topic_grounding[].topic_id\`). Do NOT type a UUID from memory, do NOT splice segments from two different ids, do NOT lowercase/uppercase or trim. Set each question's \`topic_name\` to the \`topic_grounding[].topic_name\` matching that exact \`topic_id\`.
+- multiple_choice questions MUST include \`options\` with exactly the four keys A, B, C, D (string values). \`answer_key.correct_answer\` MUST be exactly one of "A", "B", "C", or "D" matching one of those keys. Do NOT emit \`options: null\` inside multiple_choice; if the stem is a single blank or short completion, place it in \`fill_in_blank\` instead.
+- fill_in_blank, short_answer, long_answer questions MUST omit \`options\` entirely (or set it to null). Their \`answer_key.correct_answer\` is a short string for FIB, sentences for short_answer, paragraph-style for long_answer.
+- MCQ self-consistency: for each MCQ, mentally re-solve the stem and confirm \`answer_key.correct_answer\` is the letter of the option that solves it. The explanation must justify THAT letter only. For numerically-keyed MCQs, recompute every option's value before locking the letter.
+- Time budget: SUM of every question's \`estimated_time_seconds\` across ALL buckets MUST be between ${args.timeSumMin} and ${args.timeSumMax} inclusive (target ~${args.timeLimitSeconds}). Per-bucket starting points: ${perBucketTimes || "n/a"}. Adjust ±20% within the band based on item complexity.`;
+}
 
 /**
  * Shared rules and JSON contract for the assessment generator (server-side).
@@ -32,113 +112,63 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 		question_type_counts,
 	} = userMessageSummary.test_parameters;
 
-	const c = question_type_counts;
-	const typeCountsLine = `Fill questions_by_type with exactly ${c.multiple_choice} multiple_choice, ${c.fill_in_blank} fill_in_blank, ${c.short_answer} short_answer, and ${c.long_answer} long_answer questions (total ${estimated_question_count}).`;
+	const subjectIsMath = isMathematicsSubject(userMessageSummary.subjectName);
+	const timeSumMin = Math.round(time_limit_seconds * 0.6);
+	const timeSumMax = Math.round(time_limit_seconds * 1.2);
+	const bucketTimes = computePerBucketTimeTargets(time_limit_seconds, question_type_counts);
 
-	return `Rules:
-- Use \`topic_grounding\` (content_chunks and exercise_chunks per topic) as the primary factual basis for scope and terminology; do not invent curriculum outside those chunks except where needed for coherent, well-formed questions.
-- Generate exactly ${estimated_question_count} questions — this count MUST be respected.
-- ${typeCountsLine}
-- Output questions grouped under the matching questions_by_type bucket. Do not move a question into the wrong bucket and do not invent extra buckets.
-- Target difficulty: ${difficulty}. Calibrate reading length, computation steps, and distractor quality accordingly.
-- Respect the time limit: ${time_limit_seconds} seconds total. The SUM of all questions' estimated_time_seconds MUST be between ${Math.round(time_limit_seconds * 0.6)} and ${Math.round(time_limit_seconds * 1.2)} seconds inclusive (same rule the server enforces). Aim near ${time_limit_seconds} when possible.
-- Bloom-inspired cognitive demand: map each item to a primary level from Remember, Understand, Apply, Analyze, Evaluate, and Create as appropriate to the subject and grade. Prefer progression within the test (earlier items may lean toward lower levels; later items increase demand where the global difficulty allows). Keep difficulty_level consistent with that cognitive demand.
-- Topic coverage: selected topic_count=${topic_count}; coverage_mode=${coverage_mode}. Follow this instruction exactly: ${coverage_instruction} Every question's topic_id MUST be copied character-for-character from test_parameters.allowed_topic_ids (or the same values under topics[] / topic_grounding[].topic_id). Never invent, merge, or partially reuse UUID segments from different topics.
-- When coverage_mode is balanced or many_topics and performance data exists, still favor weaker areas (lower average_score_percent, worse status, fewer tests_taken, declining trend) in how you allocate questions.
-- When the user message includes student.recent_errors, bias questions toward those concepts where the pedagogy allows, without repeating exact prior wording. Those entries are only for concept hints: every question's topic_id must still be copied from topic_grounding (or the topics list), never from a UUID that is not listed there.
-- Pedagogical quality: unambiguous prompts, correct mathematics, physically sensible science, one clearly best answer for MCQs. MCQ options MUST be labeled A, B, C, D (exactly those four keys). answer_key.correct_answer MUST be a single letter A, B, C, or D that maps to one of the options.
-- Bucket discipline: anything in multiple_choice MUST have options {A,B,C,D}. If the stem is a single blank or short completion, put it in fill_in_blank instead — never put options: null inside multiple_choice.
-- fill_in_blank: use a clear blank or a single missing term; answer_key.correct_answer is the expected word or very short phrase.
-- short_answer: brief written response (sentences).
-- long_answer: longer written response (paragraph-level where appropriate).
-- Explanations in answer_key must teach: step-by-step reasoning, common mistakes, related concept.
+	const hardGatesTop = buildHardGatesBlock({
+		heading: "## HARD GATES (non-negotiable machine constraints)",
+		estimatedQuestionCount: estimated_question_count,
+		counts: question_type_counts,
+		timeLimitSeconds: time_limit_seconds,
+		timeSumMin,
+		timeSumMax,
+		bucketTimes,
+		subjectIsMath,
+	});
+
+	const finalChecklist = buildHardGatesBlock({
+		heading: "## FINAL COMPLIANCE CHECKLIST — verify before you emit",
+		estimatedQuestionCount: estimated_question_count,
+		counts: question_type_counts,
+		timeLimitSeconds: time_limit_seconds,
+		timeSumMin,
+		timeSumMax,
+		bucketTimes,
+		subjectIsMath,
+	});
+
+	return `${hardGatesTop}
+
+## Pedagogy
+
+- Difficulty target: ${difficulty}. Calibrate reading length, computation steps, and distractor quality accordingly.
+- Bloom-inspired cognitive demand: map each item to one of Remember, Understand, Apply, Analyze, Evaluate, Create as appropriate to the subject and grade. Earlier items may lean lower; later items may climb where the global difficulty allows. Keep \`difficulty_level\` consistent with that cognitive demand.
+- Topic coverage: selected ${topic_count} topic(s); coverage_mode=${coverage_mode}. Follow this instruction exactly: ${coverage_instruction}
+- When performance data exists in \`topics[].performance\`, favor weaker areas (lower \`average_score_percent\`, worse status, fewer tests_taken, declining trend) when allocating questions.
+- When \`student.recent_errors\` is present, bias roughly 25–35% of items toward those concepts where the pedagogy allows. Use a different scenario or representation; never repeat the prior wording.
+- Pedagogical quality: unambiguous prompts, correct mathematics, physically sensible science, exactly one defensible best answer for MCQs. Distractors must be plausible misconceptions, not filler.
+- Explanations in \`answer_key\` must teach: step-by-step reasoning, common mistakes, and a related concept.
 - Do not include profanity, stereotypes, or personally identifiable information.
-- Output JSON only — no markdown fences, no commentary before or after.
 
-## How to use the topic_grounding chunks
-For each topic in \`topic_grounding[]\`, treat the two chunk arrays as a pair with distinct jobs:
-- \`content_chunks\` — NCERT-style explanatory passages. Use them to decide **what** to ask: which concept, definition, process, formula, or named entity each item targets. The "answerable from grounding" rule still applies; this specifies which array carries the concepts.
-- \`exercise_chunks\` — NCERT-style end-of-chapter or in-text questions. Use them to decide **how** to ask: language register, sentence cadence, command verbs, scaffolding pattern, length, and any visible format conventions (assertion-reason, blank-at-end, sub-parts).
-### Generation rules
-1. Style imitation. Match \`exercise_chunks\` on register, cadence, command-verb family ("State and explain", "Distinguish between", "Find the value of", "Why does…", "Identify the…"), scaffolding density, and format conventions. The generated test should sound like it came from the same chapter as the chunks. When you bias an item toward a concept in \`student.recent_errors\`, draw the language from \`exercise_chunks\` for that item's \`topic_id\`.
-2. Calibrate within the grade envelope. The grade-level cognitive-load table in the subject preamble is the global guard. Within that envelope, treat the complexity visible in \`exercise_chunks\` as the local style benchmark for "medium" at this chapter — scale up by adding a step or layering a sub-concept for "hard," scale down for "easy."
-3. Per-topic stylistic loyalty. In multi-topic tests, take stylistic cues for each item from that item's own topic chunks, not from a dominant topic. A history item and a geography item in the same test should each sound like their own chapter's exercises.
-4. Do not import chunk noise. If a chunk contains a typo, OCR artefact, stray figure caption, or factually questionable phrasing, silently correct it in your item. Imitate the chunk's intent and register, not its accidents.
-### Self-check before emitting each item
-- Sum estimated_time_seconds across ALL questions; confirm it lies between ${Math.round(time_limit_seconds * 0.6)} and ${Math.round(time_limit_seconds * 1.2)}.
-- The concept tested is traceable to a sentence in \`content_chunks\` for this \`topic_id\`.
-- The phrasing could pass for an item from \`exercise_chunks\` for this \`topic_id\` — same register, same command-verb family, same scaffolding density — without being a copy.
-- A teacher who wrote those exercise chunks would recognise the item as theirs in voice, but not as one they had already written.
+## Using \`topic_grounding\` chunks
 
-Response JSON shape (types are illustrative; follow field names exactly):
-{
-  "questions_by_type": {
-    "multiple_choice": [
-      {
-        "topic_id": "<uuid from user message>",
-        "topic_name": "<string>",
-        "question_text": "<string, LaTeX inline allowed where needed>",
-        "difficulty_level": "easy" | "medium" | "hard",
-        "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
-        "answer_key": {
-          "correct_answer": "A" | "B" | "C" | "D",
-          "explanation": "<string>",
-          "common_mistakes": ["<string>", "..."],
-          "related_concept": "<string>"
-        },
-        "estimated_time_seconds": <integer>
-      }
-    ],
-    "fill_in_blank": [
-      {
-        "topic_id": "<uuid from user message>",
-        "topic_name": "<string>",
-        "question_text": "<string>",
-        "difficulty_level": "easy" | "medium" | "hard",
-        "answer_key": {
-          "correct_answer": "<short text answer>",
-          "explanation": "<string>",
-          "common_mistakes": ["<string>", "..."],
-          "related_concept": "<string>"
-        },
-        "estimated_time_seconds": <integer>
-      }
-    ],
-    "short_answer": [
-      {
-        "topic_id": "<uuid from user message>",
-        "topic_name": "<string>",
-        "question_text": "<string>",
-        "difficulty_level": "easy" | "medium" | "hard",
-        "answer_key": {
-          "correct_answer": "<short text answer>",
-          "explanation": "<string>",
-          "common_mistakes": ["<string>", "..."],
-          "related_concept": "<string>"
-        },
-        "estimated_time_seconds": <integer>
-      }
-    ],
-    "long_answer": [
-      {
-        "topic_id": "<uuid from user message>",
-        "topic_name": "<string>",
-        "question_text": "<string>",
-        "difficulty_level": "easy" | "medium" | "hard",
-        "answer_key": {
-          "correct_answer": "<paragraph-style answer>",
-          "explanation": "<string>",
-          "common_mistakes": ["<string>", "..."],
-          "related_concept": "<string>"
-        },
-        "estimated_time_seconds": <integer>
-      }
-    ]
-  },
-  "generation_metadata": {
-    "adaptation_rationale": "<short string>"
-  }
-}
+For each topic, treat the two chunk arrays as a pair with distinct jobs:
+- \`content_chunks\` — NCERT-style explanatory passages. Use them to decide WHAT to ask (concepts, definitions, processes, formulae, named entities).
+- \`exercise_chunks\` — NCERT-style end-of-chapter questions. Use them to decide HOW to ask (register, cadence, command verbs, scaffolding, format conventions).
+
+Rules:
+1. Style imitation. Match the register, cadence, and command-verb family of \`exercise_chunks\` for that topic. The test should sound like it came from the same chapter — without copying any chunk verbatim.
+2. Per-topic stylistic loyalty. In multi-topic tests, take stylistic cues for each item from THAT item's own topic chunks, not from a dominant topic.
+3. Do not import chunk noise. Silently correct typos, OCR artefacts, and stray captions. Imitate intent and register, not accidents.
+4. When \`grounding_meta.context_quality\` is \`low_context\` or \`no_context\`, stay at the conceptual / definition level for affected topics; do not invent specific named examples, dates, formulae, or numeric constants you cannot verify from the chunks.
+
+## Output shape
+
+Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`estimated_time_seconds\` (positive integer), and \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept }). Multiple-choice items also include \`options\` ({A,B,C,D}). \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
+
+${finalChecklist}
 
 Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessageSummary.schema_version}.`;
 }
@@ -161,6 +191,10 @@ export function buildPracticeSystemPrompt(context: {
 		subjectName: context.generationSubject.subjectName,
 		subjectGrade: context.generationSubject.subjectGrade,
 	});
-	const shared = buildPracticeGenerationSharedSystemInstructions(context.userMessageSummary);
+	const summaryWithSubject: UserMessageSummary = {
+		...context.userMessageSummary,
+		subjectName: context.generationSubject.subjectName,
+	};
+	const shared = buildPracticeGenerationSharedSystemInstructions(summaryWithSubject);
 	return `${preamble}\n\n${shared}`;
 }

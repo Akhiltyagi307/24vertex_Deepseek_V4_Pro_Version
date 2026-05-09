@@ -11,6 +11,18 @@ export type PracticeEvent =
 	| "practice_generate_clicked"
 	| "practice_generation_succeeded"
 	| "practice_generation_failed"
+	/**
+	 * Emitted once per pipeline run with the call counts so we can chart
+	 * "% one-shot" over time and watch repair-pass spend. Props:
+	 *   {
+	 *     generation_calls: number,           // 1 = best case
+	 *     repair_calls: number,                // 0 = best case
+	 *     succeeded_on_call: number | null,    // 1 = one-shot, null = failed
+	 *     prompt_revision: string,             // e.g. "v4"
+	 *     outcome: "ok" | "generation_failed" | "generation_invalid",
+	 *   }
+	 */
+	| "practice_generation_attempts"
 	| "practice_session_started"
 	| "practice_answer_saved"
 	| "practice_submit_clicked"

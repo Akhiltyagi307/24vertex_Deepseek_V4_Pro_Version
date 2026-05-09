@@ -3,11 +3,23 @@
  * empty responses, schema mismatch) should retry before the user sees an error.
  *
  * `PRACTICE_AI_USER_FACING_RETRIES` is how many *additional* attempts after the first.
+ *
+ * Lowered from 5 → 2 (release v3.2.1) once the prompt rework, strict JSON schema, and
+ * pipeline-scoped repair counter made one-shot the dominant path. Five retries cost
+ * 6× model calls per pipeline in the worst case; the new budget is 3 generation calls
+ * + at most {@link PRACTICE_REPAIR_MAX_CALLS} repair calls = 5 model calls worst case.
  */
-export const PRACTICE_AI_USER_FACING_RETRIES = 5;
+export const PRACTICE_AI_USER_FACING_RETRIES = 2;
 
 /** Total model calls per logical operation: one try plus {@link PRACTICE_AI_USER_FACING_RETRIES} retries. */
 export const PRACTICE_AI_MAX_ATTEMPTS = 1 + PRACTICE_AI_USER_FACING_RETRIES;
+
+/**
+ * Maximum number of repair-pass model calls allowed across the entire generation
+ * pipeline (NOT per-attempt). Two repairs is a cap on pure validator-fixup spend
+ * that is independent of how many full generation attempts we make.
+ */
+export const PRACTICE_REPAIR_MAX_CALLS = 2;
 
 function sleepMs(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
