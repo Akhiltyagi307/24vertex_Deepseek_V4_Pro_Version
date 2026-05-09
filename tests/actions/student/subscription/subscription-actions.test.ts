@@ -465,6 +465,57 @@ describe("redeemCoupon — RPC outcomes", () => {
 		}
 		expect(revalidatePathMock.current).toHaveBeenCalledWith("/student/subscription");
 	});
+
+	it("does not reject multi-seat campaigns when `single_use_globally` arrives as string \"false\" and another redemption row exists", async () => {
+		mockUser.current = { id: STUDENT_ID };
+		mockAdmin.current = makeMockSupabase({
+			user: { id: STUDENT_ID },
+			tables: {
+				profiles: { data: { role: "student", grade: 9 } },
+				coupons: {
+					data: {
+						...VALID_COUPON,
+						single_use_globally: "false",
+					},
+				},
+				coupon_redemptions: { data: [{ id: "prior-redeem" }] },
+				subscriptions: { data: null },
+			},
+			rpcs: {
+				billing_redeem_coupon_atomic: { data: [{ ok: true }] },
+			},
+		});
+		const out = await redeemCoupon("WELCOME");
+		expect(out.ok).toBe(true);
+	});
+
+	it("accepts string integers for counters and duration from PostgREST", async () => {
+		mockUser.current = { id: STUDENT_ID };
+		mockAdmin.current = makeMockSupabase({
+			user: { id: STUDENT_ID },
+			tables: {
+				profiles: { data: { role: "student", grade: 9 } },
+				coupons: {
+					data: {
+						...VALID_COUPON,
+						max_redemptions: "100",
+						redemptions_count: "0",
+						duration_days: "14",
+					},
+				},
+				coupon_redemptions: { data: null },
+				subscriptions: { data: null },
+			},
+			rpcs: {
+				billing_redeem_coupon_atomic: { data: [{ ok: true }] },
+			},
+		});
+		const out = await redeemCoupon("WELCOME");
+		expect(out.ok).toBe(true);
+		if (out.ok && out.kind === "entitlement") {
+			expect(out.message).toMatch(/14 days/);
+		}
+	});
 });
 
 /* -------------------------------------------------------------------------- */

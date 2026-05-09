@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { cancelSubscription } from "@/lib/billing/razorpay";
 import { quoteCheckoutCouponForPlan } from "@/lib/billing/checkout-coupon";
+import { coercePgBool, coercePgNonNegInt, coercePgPositiveInt } from "@/lib/billing/coupon-field-coercion";
 import { isCouponSingleUseGlobalExhausted } from "@/lib/billing/coupon-policy";
 import {
 	PAID_CHECKOUT_PLAN_CODES,
@@ -120,7 +121,11 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 	if (cErr || !coupon) {
 		return { ok: false, code: "invalid_code", message: INVALID };
 	}
-	if (coupon.kind === "checkout_discount") {
+	const couponKind = String(coupon.kind ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/\s+/g, "_");
+	if (couponKind === "checkout_discount") {
 		// Pick a plan that satisfies `eligible_plan_codes` *and* has a Razorpay offer
 		// attached so `quoteCheckoutCouponForPlan` can validate end-to-end (active,
 		// not expired, not exhausted, offer synced, plan eligible). We don't know
@@ -161,26 +166,48 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 			eligiblePlanCodes: eligiblePlanCodes && eligiblePlanCodes.length > 0 ? eligiblePlanCodes : null,
 		};
 	}
-	if (!coupon.is_active) {
+	if (coercePgBool(coupon.is_active) !== true) {
 		return { ok: false, code: "inactive", message: "This coupon is no longer active." };
 	}
 	if (coupon.expires_at && new Date(coupon.expires_at).getTime() < Date.now()) {
 		return { ok: false, code: "expired", message: "This coupon has expired." };
 	}
-	if (coupon.redemptions_count >= coupon.max_redemptions) {
+	const redemptionsCount = coercePgNonNegInt(coupon.redemptions_count);
+	const maxRedemptions = coercePgNonNegInt(coupon.max_redemptions);
+	if (redemptionsCount == null || maxRedemptions == null) {
+		logServerError("billing.redeem_coupon.invalid_numeric_coupon_columns", new Error("invalid coupon counters"), {
+			couponId: coupon.id,
+			redemptionsCountRaw: String(coupon.redemptions_count),
+			maxRedemptionsRaw: String(coupon.max_redemptions),
+		});
+		return {
+			ok: false,
+			code: "invalid_code",
+			message: "This promotion is not set up correctly. Please contact support.",
+		};
+	}
+	if (redemptionsCount >= maxRedemptions) {
 		return { ok: false, code: "exhausted", message: "This coupon has been fully redeemed." };
 	}
 
-	const { data: alreadyAny } = await admin
+	const singleUseGlobally = coercePgBool(coupon.single_use_globally) ?? false;
+	const { data: redemptionRows, error: redemptionSampleErr } = await admin
 		.from("coupon_redemptions")
-		.select("id, profile_id")
+		.select("id")
 		.eq("coupon_id", coupon.id)
-		.maybeSingle();
+		.limit(1);
+	if (redemptionSampleErr) {
+		logSupabaseError("billing.redeem_coupon.coupon_redemptions_sample", redemptionSampleErr, {
+			couponId: coupon.id,
+		});
+		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
+	}
+	const anyRedemptionExists = Array.isArray(redemptionRows) && redemptionRows.length > 0;
 	if (
 		isCouponSingleUseGlobalExhausted({
-			singleUseGlobally: Boolean(coupon.single_use_globally),
-			redemptionsCount: coupon.redemptions_count,
-			anyRedemptionExists: Boolean(alreadyAny),
+			singleUseGlobally,
+			redemptionsCount,
+			anyRedemptionExists,
 		})
 	) {
 		return { ok: false, code: "exhausted", message: "This coupon has already been redeemed." };
@@ -202,7 +229,8 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		};
 	}
 
-	const grantRaw = coupon.grants_plan_code;
+	const grantRaw =
+		typeof coupon.grants_plan_code === "string" ? coupon.grants_plan_code.trim() : coupon.grants_plan_code;
 	if (!grantRaw || !isPlanCode(grantRaw) || grantRaw === "free") {
 		return {
 			ok: false,
@@ -214,12 +242,7 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 	const grant = grantRaw;
 	const plan = PLAN_CATALOG[grant];
 
-	const durationDays =
-		typeof coupon.duration_days === "number" &&
-		Number.isFinite(coupon.duration_days) &&
-		Number.isInteger(coupon.duration_days)
-			? coupon.duration_days
-			: null;
+	const durationDays = coercePgPositiveInt(coupon.duration_days);
 	if (!durationDays || durationDays <= 0) {
 		return {
 			ok: false,
@@ -254,7 +277,19 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		}
 		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
 	}
-	const redeemRow = Array.isArray(redeemRows) ? redeemRows[0] : redeemRows;
+	const redeemRow = ((): { ok?: boolean; error_code?: string | null; subscription_id?: string | null } | null => {
+		if (redeemRows == null) return null;
+		if (Array.isArray(redeemRows)) return redeemRows[0] ?? null;
+		if (typeof redeemRows === "object") return redeemRows as { ok?: boolean; error_code?: string | null };
+		return null;
+	})();
+	if (redeemRow == null) {
+		logServerError("billing.redeem_coupon.atomic_rpc_empty", new Error("RPC returned no row"), {
+			profileId: targetProfileId,
+			couponId: coupon.id,
+		});
+		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
+	}
 	if (!redeemRow?.ok) {
 		const errorCode = String(redeemRow?.error_code ?? "database_error");
 		if (errorCode === "invalid_code") return { ok: false, code: "invalid_code", message: INVALID };
