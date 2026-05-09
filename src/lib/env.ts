@@ -164,6 +164,26 @@ export function getOpenAIChatModelFallback(): string | null {
 	return null;
 }
 
+/**
+ * Practice-generation primary model. When unset, falls back to OPENAI_CHAT_MODEL
+ * so existing deployments keep current behavior.
+ */
+export function getOpenAIPracticeChatModel(): string {
+	const model = readTrimmedEnv("OPENAI_PRACTICE_CHAT_MODEL");
+	if (model) return model;
+	return getOpenAIChatModel();
+}
+
+/**
+ * Practice-generation fallback model. When unset, falls back to
+ * OPENAI_CHAT_MODEL_FALLBACK.
+ */
+export function getOpenAIPracticeChatModelFallback(): string | null {
+	const model = readTrimmedEnv("OPENAI_PRACTICE_CHAT_MODEL_FALLBACK");
+	if (model) return model;
+	return getOpenAIChatModelFallback();
+}
+
 // ============================================================
 // Billing / SaaS
 // ============================================================

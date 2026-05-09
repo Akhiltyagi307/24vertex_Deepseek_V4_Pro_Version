@@ -168,6 +168,19 @@ const devArgs = ["dev", "-H", "127.0.0.1", "-p", String(port)];
 const useWebpack =
 	process.env.NEXT_DEV_WEBPACK === "1" || process.env.NEXT_DEV_WEBPACK === "true";
 if (useWebpack) {
+	const clearWebpackDev =
+		process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "1" ||
+		process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "true";
+	if (clearWebpackDev) {
+		const devOut = resolve(process.cwd(), ".next/dev");
+		try {
+			if (fs.existsSync(devOut)) {
+				fs.rmSync(devOut, { recursive: true, force: true });
+			}
+		} catch (e) {
+			console.warn("Could not remove .next/dev (continuing):", e?.message ?? e);
+		}
+	}
 	devArgs.push("--webpack");
 	console.warn("NEXT_DEV_WEBPACK: using webpack dev (slower but avoids Turbopack chunk glitches).");
 } else {
@@ -207,6 +220,61 @@ function spawnNextDev() {
 }
 
 const child = spawnNextDev();
+
+/** When true, exit if `routes-manifest.json` vanishes after we know a good compile (PM2 can restart clean). */
+const routesManifestWatchdog =
+	process.env.NEXT_DEV_ROUTES_WATCHDOG === "1" ||
+	process.env.NEXT_DEV_ROUTES_WATCHDOG === "true" ||
+	process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "1" ||
+	process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "true";
+
+if (routesManifestWatchdog) {
+	const routesManifestPath = resolve(process.cwd(), ".next/dev/routes-manifest.json");
+	const tickMs = Number(process.env.NEXT_DEV_ROUTES_WATCHDOG_MS) || 5000;
+	const missingThreshold = Number(process.env.NEXT_DEV_ROUTES_WATCHDOG_MISSING_TICKS) || 5;
+	const bootGraceMs = Number(process.env.NEXT_DEV_ROUTES_WATCHDOG_BOOT_GRACE_MS) || 60_000;
+	let sawRoutesManifest = false;
+	let consecutiveMissing = 0;
+	let childBootTime = Date.now();
+
+	child.on("spawn", () => {
+		childBootTime = Date.now();
+	});
+
+	let watchdogExiting = false;
+	function exitForCorruptDevOutput(reason) {
+		if (watchdogExiting) return;
+		watchdogExiting = true;
+		console.error(`next-dev watchdog: ${reason} Exiting so the process supervisor can restart with a clean .next/dev.`);
+		try {
+			child.kill("SIGTERM");
+		} catch {
+			/* ignore */
+		}
+		setTimeout(() => process.exit(1), 1500);
+	}
+
+	const watchdog = setInterval(() => {
+		if (watchdogExiting) return;
+		const manifestOk = fs.existsSync(routesManifestPath);
+		if (manifestOk) {
+			sawRoutesManifest = true;
+			consecutiveMissing = 0;
+			return;
+		}
+		if (!sawRoutesManifest) return;
+		if (Date.now() - childBootTime < bootGraceMs) return;
+		consecutiveMissing++;
+		if (consecutiveMissing >= missingThreshold) {
+			clearInterval(watchdog);
+			exitForCorruptDevOutput(
+				`.next/dev/routes-manifest.json missing for ${consecutiveMissing} consecutive checks (~${(consecutiveMissing * tickMs) / 1000}s).`,
+			);
+		}
+	}, tickMs);
+
+	process.on("exit", () => clearInterval(watchdog));
+}
 
 child.on("exit", (code, signal) => {
 	if (signal) process.kill(process.pid, signal);

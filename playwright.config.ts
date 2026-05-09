@@ -91,7 +91,7 @@ export default defineConfig({
 		},
 		{
 			name: "student",
-			testMatch: /(post-login|notifications|practice-generate)\.spec\.ts$/,
+			testMatch: /(post-login|notifications|practice-generate|practice-full-subjects)\.spec\.ts$/,
 			dependencies: ["auth-setup"],
 			use: { storageState: STUDENT_STORAGE_STATE },
 		},

@@ -1,6 +1,9 @@
 const path = require("node:path");
 
-/** Next.js dev server managed by PM2 (survives closing the terminal; optional `pm2 startup` for reboot). */
+/** Next.js dev server managed by PM2 (survives closing the terminal; optional `pm2 startup` for reboot).
+ *  Webpack + `NEXT_DEV_WEBPACK_CLEAR_DEV` clears `.next/dev` on each start; `scripts/next-dev.mjs` also
+ *  watchdogs `routes-manifest.json` when that env is set so PM2 can auto-restart after rare dev corruption.
+ */
 module.exports = {
 	apps: [
 		{
@@ -20,6 +23,9 @@ module.exports = {
 				// Turbopack dev cache can corrupt across restarts (missing manifests / `[turbopack]_runtime.js`).
 				// Webpack is slower but stable for a long-lived PM2 process; see `scripts/next-dev.mjs`.
 				NEXT_DEV_WEBPACK: "1",
+				// Clear `.next/dev` whenever PM2 starts the wrapper so stale/partial dev output
+				// (e.g. missing `routes-manifest.json` after internal Next restarts) cannot linger.
+				NEXT_DEV_WEBPACK_CLEAR_DEV: "1",
 			},
 		},
 	],

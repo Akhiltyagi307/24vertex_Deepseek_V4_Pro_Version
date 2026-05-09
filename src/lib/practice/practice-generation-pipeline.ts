@@ -10,7 +10,7 @@ import {
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
-import { getOpenAIChatModel, getOpenAIChatModelFallback } from "@/lib/env";
+import { getOpenAIPracticeChatModel, getOpenAIPracticeChatModelFallback } from "@/lib/env";
 import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
 import {
 	mapResolveToGenerateFailure,
@@ -196,7 +196,7 @@ async function runModelOnce(
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
 	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
 	studentUserId: string,
-	chatModelId: string = getOpenAIChatModel(),
+	chatModelId: string = getOpenAIPracticeChatModel(),
 ): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string; error: unknown }> {
 	// Hard-cap output tokens at 12k regardless of question count. The previous
 	// scaling could request up to 32k for high-question tests, which exceeds
@@ -294,7 +294,7 @@ async function runModelOnceWithFallback(
 	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
 	studentUserId: string,
 ): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
-	const primary = getOpenAIChatModel();
+	const primary = getOpenAIPracticeChatModel();
 	const first = await runModelOnce(
 		systemPrompt,
 		userPrompt,
@@ -306,7 +306,7 @@ async function runModelOnceWithFallback(
 	);
 	if (first.ok) return first;
 
-	const fallback = getOpenAIChatModelFallback();
+	const fallback = getOpenAIPracticeChatModelFallback();
 	if (!fallback || !isRetryableForFallback(first.error)) {
 		return { ok: false, message: first.message };
 	}
@@ -357,7 +357,7 @@ async function runPracticeGenerationRepairGrouped(params: {
 	const t0 = Date.now();
 	try {
 		const { object, usage } = await generateObject({
-			model: getOpenAIProvider()(getOpenAIChatModel()),
+			model: getOpenAIProvider()(getOpenAIPracticeChatModel()),
 			schema: params.generationOutputSchema,
 			system: buildPracticeGenerationRepairSystemPrompt(),
 			prompt: repairUser,
@@ -370,7 +370,7 @@ async function runPracticeGenerationRepairGrouped(params: {
 		});
 		void recordAiCall({
 			feature: "practice.generation.repair",
-			model: getOpenAIChatModel(),
+			model: getOpenAIPracticeChatModel(),
 			userId: params.studentUserId,
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
@@ -383,7 +383,7 @@ async function runPracticeGenerationRepairGrouped(params: {
 		logServerError("runPracticeGenerationRepairGrouped", e);
 		void recordAiCall({
 			feature: "practice.generation.repair",
-			model: getOpenAIChatModel(),
+			model: getOpenAIPracticeChatModel(),
 			userId: params.studentUserId,
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: 0,

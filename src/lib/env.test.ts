@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getAppUrl, getOpenAIDoubtChatModel, getOpenAIChatModel } from "@/lib/env";
+import {
+	getAppUrl,
+	getOpenAIDoubtChatModel,
+	getOpenAIChatModel,
+	getOpenAIPracticeChatModel,
+	getOpenAIPracticeChatModelFallback,
+} from "@/lib/env";
 
 afterEach(() => {
 	vi.unstubAllEnvs();
@@ -81,5 +87,29 @@ describe("getOpenAIDoubtChatModel", () => {
 		vi.stubEnv("OPENAI_CHAT_MODEL", undefined);
 
 		expect(getOpenAIDoubtChatModel()).toBe("gpt-5.4-mini");
+	});
+});
+
+describe("practice-specific model envs", () => {
+	it("uses OPENAI_PRACTICE_CHAT_MODEL when set", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("OPENAI_CHAT_MODEL", "gpt-5.5");
+		vi.stubEnv("OPENAI_PRACTICE_CHAT_MODEL", "gpt-5.4-mini");
+		expect(getOpenAIPracticeChatModel()).toBe("gpt-5.4-mini");
+	});
+
+	it("falls back to OPENAI_CHAT_MODEL when OPENAI_PRACTICE_CHAT_MODEL is unset", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("OPENAI_CHAT_MODEL", "gpt-5.5");
+		vi.stubEnv("OPENAI_PRACTICE_CHAT_MODEL", undefined);
+		expect(getOpenAIPracticeChatModel()).toBe("gpt-5.5");
+	});
+
+	it("uses practice fallback env first, then generic fallback", () => {
+		vi.stubEnv("OPENAI_PRACTICE_CHAT_MODEL_FALLBACK", "gpt-5.5");
+		vi.stubEnv("OPENAI_CHAT_MODEL_FALLBACK", "gpt-5.4-mini");
+		expect(getOpenAIPracticeChatModelFallback()).toBe("gpt-5.5");
+		vi.stubEnv("OPENAI_PRACTICE_CHAT_MODEL_FALLBACK", undefined);
+		expect(getOpenAIPracticeChatModelFallback()).toBe("gpt-5.4-mini");
 	});
 });
