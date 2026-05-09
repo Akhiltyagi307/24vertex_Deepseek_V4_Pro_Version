@@ -5,7 +5,7 @@ import { z } from "zod";
 import { loadDoubtTopicRows, type DoubtChatEntitlement, type DoubtChatTopicRow } from "@/lib/doubt/loaders";
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
 import { getEntitlements } from "@/lib/billing/entitlements";
-import { getOpenAIChatModel } from "@/lib/env";
+import { getOpenAIDoubtChatModel } from "@/lib/env";
 import {
 	consumeDoubtChatRateLimit,
 	consumeDoubtChatReadRateLimit,
@@ -46,7 +46,7 @@ export async function createDoubtConversation(input: unknown): Promise<CreateDou
 	}
 
 	const title = `${scope.topic.topicName} — ${scope.subjectName}`;
-	const model = getOpenAIChatModel();
+	const model = getOpenAIDoubtChatModel();
 
 	const { data: created, error } = await supabase
 		.from("doubt_conversations")

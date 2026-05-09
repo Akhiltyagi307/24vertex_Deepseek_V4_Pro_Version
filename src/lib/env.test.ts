@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getAppUrl, getOpenAIChatModel } from "@/lib/env";
+import { getAppUrl, getOpenAIDoubtChatModel, getOpenAIChatModel } from "@/lib/env";
 
 afterEach(() => {
 	vi.unstubAllEnvs();
@@ -54,5 +54,32 @@ describe("getOpenAIChatModel", () => {
 		vi.stubEnv("OPENAI_CHAT_MODEL", undefined);
 
 		expect(() => getOpenAIChatModel()).toThrow("Missing OPENAI_CHAT_MODEL");
+	});
+});
+
+describe("getOpenAIDoubtChatModel", () => {
+	it("uses OPENAI_DOUBT_CHAT_MODEL when set", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("OPENAI_DOUBT_CHAT_MODEL", "gpt-4o");
+		vi.stubEnv("OPENAI_CHAT_MODEL", "gpt-5.4-mini");
+
+		expect(getOpenAIDoubtChatModel()).toBe("gpt-4o");
+	});
+
+	it("falls back to getOpenAIChatModel when OPENAI_DOUBT_CHAT_MODEL is unset", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("OPENAI_DOUBT_CHAT_MODEL", undefined);
+		vi.stubEnv("OPENAI_CHAT_MODEL", "gpt-custom");
+
+		expect(getOpenAIDoubtChatModel()).toBe("gpt-custom");
+	});
+
+	it("falls back to the dev default chat model when neither doubt nor chat model env is set", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("VERCEL_ENV", undefined);
+		vi.stubEnv("OPENAI_DOUBT_CHAT_MODEL", undefined);
+		vi.stubEnv("OPENAI_CHAT_MODEL", undefined);
+
+		expect(getOpenAIDoubtChatModel()).toBe("gpt-5.4-mini");
 	});
 });

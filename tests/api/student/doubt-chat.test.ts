@@ -74,7 +74,7 @@ vi.mock("@/lib/server/log-supabase-error", () => ({
 	isPostgresUndefinedColumnError: () => false,
 }));
 vi.mock("@/lib/env", () => ({
-	getOpenAIChatModel: () => "gpt-test",
+	getOpenAIDoubtChatModel: () => "gpt-test",
 	getSupabaseUrl: () => "http://localhost:54321",
 	getSupabasePublishableKey: () => "test",
 	getComplianceExportsBucket: () => "compliance-exports",

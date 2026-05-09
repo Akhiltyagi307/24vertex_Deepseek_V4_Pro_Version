@@ -20,7 +20,7 @@ vi.mock("@/lib/server/log-supabase-error", () => ({
 }));
 
 vi.mock("@/lib/env", () => ({
-	getOpenAIChatModel: () => "gpt-test",
+	getOpenAIDoubtChatModel: () => "gpt-test",
 }));
 
 vi.mock("@/lib/doubt/validate-doubt-scope", () => ({

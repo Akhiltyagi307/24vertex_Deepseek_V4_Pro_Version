@@ -143,6 +143,17 @@ export function getOpenAIChatModel(): string {
 }
 
 /**
+ * Chat model for student doubt chat only (`OPENAI_DOUBT_CHAT_MODEL`).
+ * When unset, uses {@link getOpenAIChatModel} so practice generation and doubt
+ * can share one config until you explicitly split models.
+ */
+export function getOpenAIDoubtChatModel(): string {
+	const model = readTrimmedEnv("OPENAI_DOUBT_CHAT_MODEL");
+	if (model) return model;
+	return getOpenAIChatModel();
+}
+
+/**
  * Optional fallback chat model used when the primary returns 429 / overload
  * / timeout. Useful so a single model deprecation or capacity blip doesn't
  * fail every generation. Returns `null` when no fallback is configured.

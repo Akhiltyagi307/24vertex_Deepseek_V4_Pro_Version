@@ -12,7 +12,7 @@ import {
 import { doubtChatBodySchema } from "@/lib/doubt/request-schema";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
 import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
-import { getOpenAIChatModel } from "@/lib/env";
+import { getOpenAIDoubtChatModel } from "@/lib/env";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeDoubtChatRateLimit } from "@/lib/practice/practice-rate-limit";
 import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
@@ -131,7 +131,7 @@ export async function POST(req: Request) {
 		});
 	}
 
-	const modelId = getOpenAIChatModel();
+	const modelId = getOpenAIDoubtChatModel();
 	const doubtFeature = tutorMode === "explain" ? "doubt.explain" : "doubt.solve_with_me";
 	const dbPrompt = await getActiveAiPrompt(doubtFeature);
 	const templateSrc = dbPrompt?.template?.trim()
