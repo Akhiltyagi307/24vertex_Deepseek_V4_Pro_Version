@@ -202,11 +202,32 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		};
 	}
 
-	const grant = coupon.grants_plan_code as keyof typeof PLAN_CATALOG | null;
-	if (!grant) {
-		return { ok: false, code: "invalid_code", message: INVALID };
+	const grantRaw = coupon.grants_plan_code;
+	if (!grantRaw || !isPlanCode(grantRaw) || grantRaw === "free") {
+		return {
+			ok: false,
+			code: "invalid_code",
+			message:
+				"This promotion is not set up correctly (plan). Please contact support so the team can fix the coupon.",
+		};
 	}
-	const plan = PLAN_CATALOG[grant] ?? PLAN_CATALOG.pro_monthly;
+	const grant = grantRaw;
+	const plan = PLAN_CATALOG[grant];
+
+	const durationDays =
+		typeof coupon.duration_days === "number" &&
+		Number.isFinite(coupon.duration_days) &&
+		Number.isInteger(coupon.duration_days)
+			? coupon.duration_days
+			: null;
+	if (!durationDays || durationDays <= 0) {
+		return {
+			ok: false,
+			code: "invalid_code",
+			message:
+				"This promotion is not set up correctly (missing number of days). Please contact support so the team can fix the coupon.",
+		};
+	}
 
 	const { data: profile } = await admin
 		.from("profiles")
@@ -218,7 +239,7 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		p_coupon_id: coupon.id,
 		p_profile_id: targetProfileId,
 		p_plan_code: grant,
-		p_duration_days: coupon.duration_days,
+		p_duration_days: durationDays,
 		p_tests_quota: plan.testsPerPeriod,
 		p_tokens_quota: tokenQuotaForGrade(plan, profile?.grade ?? null),
 	});
@@ -227,6 +248,10 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 			profileId: targetProfileId,
 			couponId: coupon.id,
 		});
+		const msg = String(redeemErr.message ?? "");
+		if (/Coupon has already been redeemed|duplicate key|unique constraint/i.test(msg)) {
+			return { ok: false, code: "exhausted", message: "This coupon has already been redeemed." };
+		}
 		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
 	}
 	const redeemRow = Array.isArray(redeemRows) ? redeemRows[0] : redeemRows;
@@ -264,6 +289,22 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 					"This code is for checkout only. Enter it when you subscribe with Razorpay on the subscription page.",
 			};
 		}
+		if (errorCode === "invalid_plan") {
+			return {
+				ok: false,
+				code: "invalid_code",
+				message:
+					"This promotion is not set up correctly (plan). Please contact support so the team can fix the coupon.",
+			};
+		}
+		if (errorCode === "invalid_input") {
+			return {
+				ok: false,
+				code: "invalid_code",
+				message:
+					"This promotion could not be applied. It may be misconfigured — please contact support.",
+			};
+		}
 		return { ok: false, code: "database_error", message: "Could not apply coupon. Try again later." };
 	}
 
@@ -273,7 +314,7 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		{
 			code,
 			plan_code: grant,
-			duration_days: coupon.duration_days,
+			duration_days: durationDays,
 			billed_by_parent: callerProfile?.role === "parent" && targetProfileId !== user.id,
 		},
 		{ studentId: targetProfileId },
@@ -290,8 +331,8 @@ export async function redeemCoupon(rawCode: string, billingProfileId?: string): 
 		ok: true,
 		kind: "entitlement",
 		message: forParent
-			? `Coupon applied! This student now has ${coupon.duration_days} days of ${plan.name} access.`
-			: `Coupon applied! You have ${coupon.duration_days} days of ${plan.name} access.`,
+			? `Coupon applied! This student now has ${durationDays} days of ${plan.name} access.`
+			: `Coupon applied! You have ${durationDays} days of ${plan.name} access.`,
 	};
 }
 
