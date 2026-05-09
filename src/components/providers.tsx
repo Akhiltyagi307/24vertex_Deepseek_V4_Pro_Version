@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-
+import { AppToaster } from "@/components/app-toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -16,7 +15,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 export function Providers({ children }: { children: React.ReactNode }) {
 	return (
 		<ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-			<TooltipProvider delay={0}>{children}</TooltipProvider>
+			<TooltipProvider delay={0}>
+				{children}
+				<AppToaster />
+			</TooltipProvider>
 		</ThemeProvider>
 	);
 }

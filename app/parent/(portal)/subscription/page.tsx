@@ -1,28 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { TicketIcon } from "lucide-react";
 
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
-import { BillingTrustRow } from "@/components/student/subscription/billing-trust-row";
 import { CancelSubscriptionButton } from "@/components/student/subscription/cancel-subscription-button";
 import { DevEnforcementBanner } from "@/components/student/subscription/dev-enforcement-banner";
 import {
 	PaymentHistorySection,
 	type PaymentHistoryRow,
 } from "@/components/student/subscription/payment-history-section";
-import { PlanComparison } from "@/components/student/subscription/plan-comparison";
-import { PlanComparisonTable } from "@/components/student/subscription/plan-comparison-table";
+import { PlansWithCouponSection } from "@/components/student/subscription/plans-with-coupon-section";
 import { TrialStateBand } from "@/components/student/subscription/trial-state-band";
-import { CouponRedeemForm } from "@/components/student/subscription/coupon-redeem-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPlanCatalog } from "@/lib/cache/deterministic-lookups";
@@ -169,61 +158,22 @@ export default async function ParentSubscriptionPage() {
 						{
 							key: "plans",
 							content: (
-								<section id="plans" className="flex flex-col gap-4">
-									<div>
-										<h2 className="font-heading text-lg font-medium tracking-tight">Choose a plan</h2>
-										<p className="text-pretty text-sm text-muted-foreground">
-											Upgrade when your family wants more practice tests or tutor-chat allowance for this child.
-										</p>
-									</div>
-									<PlanComparison
-										currentPlanCode={entitlement?.planCode ?? "free"}
-										isTrialing={!!isTrialing}
-										trialEndsAt={entitlement?.trialEndsAt ?? null}
-										trialDaysLeft={entitlement?.trialDaysLeft ?? null}
-										grade={studentProfile.grade ?? null}
-										prefill={prefill}
-										planCatalog={planCatalog}
-										billingProfileId={activeId}
-									/>
-									<PlanComparisonTable
-										currentPlanCode={entitlement?.planCode ?? "free"}
-										grade={studentProfile.grade ?? null}
-										planCatalog={planCatalog}
-									/>
-									<BillingTrustRow />
-								</section>
+								<PlansWithCouponSection
+									currentPlanCode={entitlement?.planCode ?? "free"}
+									isTrialing={!!isTrialing}
+									trialEndsAt={entitlement?.trialEndsAt ?? null}
+									trialDaysLeft={entitlement?.trialDaysLeft ?? null}
+									grade={studentProfile.grade ?? null}
+									prefill={prefill}
+									planCatalog={planCatalog}
+									billingProfileId={activeId}
+									isPaid={isPaid}
+								/>
 							),
 						},
 						{
 							key: "payments",
 							content: <PaymentHistorySection payments={payments} />,
-						},
-						{
-							key: "coupon",
-							content: (
-								<Card>
-									<CardHeader>
-										<div className="flex items-center gap-2">
-											<TicketIcon className="size-4 text-muted-foreground" aria-hidden />
-											<CardTitle className="text-base">Have a coupon?</CardTitle>
-										</div>
-										<CardDescription className="text-pretty">
-											If you have a code from school or a campaign, apply it here for a complimentary Pro window
-											on this child&apos;s account, with no card needed.
-										</CardDescription>
-									</CardHeader>
-									<CardContent className="flex flex-col gap-3">
-										<CouponRedeemForm billingProfileId={activeId} />
-										{isPaid ? (
-											<p className="text-xs text-muted-foreground">
-												This student is already on a paid Razorpay plan, so a coupon can&apos;t be stacked on top
-												right now.
-											</p>
-										) : null}
-									</CardContent>
-								</Card>
-							),
 						},
 						{
 							key: "footer",
