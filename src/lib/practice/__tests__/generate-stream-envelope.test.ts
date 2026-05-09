@@ -66,6 +66,17 @@ describe("envelopeForResult", () => {
 		expect(env).toMatchObject({ type: "error", code: "generation_invalid" });
 	});
 
+	it("forwards correlationId from pipeline failures", () => {
+		const failure: GeneratePracticeResult = {
+			ok: false,
+			code: "generation_failed",
+			message: "timeout",
+			correlationId: "corr_123",
+		};
+		const env = envelopeForResult(failure);
+		expect(env).toMatchObject({ type: "error", correlationId: "corr_123" });
+	});
+
 	it("truncates failure messages over 400 chars with an ellipsis", () => {
 		const huge = "x".repeat(900);
 		const failure: GeneratePracticeResult = {

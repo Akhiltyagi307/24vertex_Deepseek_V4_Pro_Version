@@ -50,6 +50,8 @@ export type GeneratePracticeFailure = {
 		| "subscription_expired";
 	message: string;
 	fieldErrors?: Record<string, string[]>;
+	/** Support/debug reference for logs tied to this generation attempt. */
+	correlationId?: string;
 	/** When true the client should surface the paywall dialog instead of an inline error. */
 	paywall?: boolean;
 };

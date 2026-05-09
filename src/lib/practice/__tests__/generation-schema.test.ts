@@ -135,6 +135,16 @@ describe("createPracticeGenerationOutputSchema", () => {
 		expect(summarizeGroupedQuestionTypeCounts(raw)).toEqual(plan.counts);
 	});
 
+	it("requires explicit options: null for written buckets", () => {
+		const plan = getPracticeQuestionPlan(3600);
+		const raw = makeGroupedGeneration(plan.counts);
+		if (raw.questions_by_type.fill_in_blank[0]) {
+			delete (raw.questions_by_type.fill_in_blank[0] as { options?: null }).options;
+		}
+		const parsed = createPracticeGenerationOutputSchema(plan.counts).safeParse(raw);
+		expect(parsed.success).toBe(false);
+	});
+
 	it("rejects grouped output when a bucket length is wrong", () => {
 		const plan = getPracticeQuestionPlan(3600);
 		const raw = makeGroupedGeneration(plan.counts);

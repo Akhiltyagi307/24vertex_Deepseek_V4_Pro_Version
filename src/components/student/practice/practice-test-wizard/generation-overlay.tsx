@@ -12,6 +12,7 @@ import { GENERATING_STATUS_MESSAGES, practiceSolidCtaClassName } from "./types";
 export type GenerationOverlayProps = {
 	generating: boolean;
 	generatingStatusIndex: number;
+	streamProgressMessage: string | null;
 	generatedPreview: { testId: string; subjectName: string } | null;
 	pending: boolean;
 	onCancelGenerate: () => void;
@@ -22,6 +23,7 @@ export type GenerationOverlayProps = {
 export function GenerationOverlay({
 	generating,
 	generatingStatusIndex,
+	streamProgressMessage,
 	generatedPreview,
 	pending,
 	onCancelGenerate,
@@ -42,7 +44,7 @@ export function GenerationOverlay({
 						key={generatingStatusIndex}
 						className="text-muted-foreground max-w-sm px-4 text-center text-base leading-relaxed motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 motion-reduce:animate-none"
 					>
-						{GENERATING_STATUS_MESSAGES[generatingStatusIndex]}
+						{streamProgressMessage ?? GENERATING_STATUS_MESSAGES[generatingStatusIndex]}
 					</p>
 					<p className="text-muted-foreground px-4 text-center text-sm">
 						This might take a minute or two.

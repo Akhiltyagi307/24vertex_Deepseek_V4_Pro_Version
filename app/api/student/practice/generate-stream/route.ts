@@ -14,6 +14,7 @@ import { getApiRequestUser } from "@/lib/auth/api-request-user";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
+const PARTIAL_EMIT_MIN_INTERVAL_MS = 250;
 
 function isPracticeStreamingEnabled(): boolean {
 	const raw = process.env.PRACTICE_STREAM?.trim().toLowerCase();
@@ -59,7 +60,13 @@ export async function POST(request: Request) {
 		// HTTP status mapping centralized in `httpStatusForGenerateFailure` so the
 		// server-action and streaming-route paths can't drift apart silently.
 		return Response.json(
-			{ ok: false, message: r.message, code: r.code, ...(r.paywall ? { paywall: true } : {}) },
+			{
+				ok: false,
+				message: r.message,
+				code: r.code,
+				...(r.paywall ? { paywall: true } : {}),
+				...(r.correlationId ? { correlationId: r.correlationId } : {}),
+			},
 			{ status: httpStatusForGenerateFailure(r) },
 		);
 	}
@@ -70,6 +77,14 @@ export async function POST(request: Request) {
 			const send = (line: object) => {
 				controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
 			};
+			let latestPendingPartial: unknown = null;
+			let lastPartialSentAt = 0;
+			const flushPendingPartial = () => {
+				if (latestPendingPartial === null) return;
+				send(envelopeForPartial(latestPendingPartial));
+				latestPendingPartial = null;
+				lastPartialSentAt = Date.now();
+			};
 			try {
 				const result = await runPracticeGenerationAfterResolve(
 					supabase,
@@ -78,7 +93,11 @@ export async function POST(request: Request) {
 					{
 						useStreamObject: true,
 						onPartialObject: (partial) => {
-							send(envelopeForPartial(partial));
+							latestPendingPartial = partial;
+							const now = Date.now();
+							if (now - lastPartialSentAt >= PARTIAL_EMIT_MIN_INTERVAL_MS) {
+								flushPendingPartial();
+							}
 						},
 						// When the client closes the connection, request.signal fires
 						// and the in-flight OpenAI HTTP call is cancelled — no more
@@ -86,6 +105,7 @@ export async function POST(request: Request) {
 						abortSignal: request.signal,
 					},
 				);
+				flushPendingPartial();
 				// envelopeForResult guarantees success → `done`, failure → `error`.
 				// Wrapping a failure inside `done` would look like success to a
 				// naive client.

@@ -66,6 +66,19 @@ export type RunGenerationPipelineOptions = {
 	abortSignal?: AbortSignal;
 };
 
+type PracticeQuestion = PracticeGenerationOutput["questions"][number];
+type PracticeQuestionType = PracticeQuestion["question_type"];
+
+const DEFAULT_GENERATION_BUDGET_MS = 300_000;
+const MIN_BUDGET_FOR_MODEL_ATTEMPT_MS = 22_000;
+const MIN_BUDGET_FOR_REPAIR_MS = 16_000;
+
+function getGenerationBudgetMs(): number {
+	const raw = Number.parseInt(process.env.PRACTICE_GENERATION_BUDGET_MS ?? "", 10);
+	if (!Number.isFinite(raw) || raw < 30_000) return DEFAULT_GENERATION_BUDGET_MS;
+	return raw;
+}
+
 function formatGenerationError(e: unknown): string {
 	if (APICallError.isInstance(e)) {
 		const code = e.statusCode;
@@ -140,14 +153,11 @@ export async function preflightPracticeGeneration(
 }
 
 /**
- * Strict JSON-schema mode for generation. Off by default because the practice
- * generation schema uses `z.array().length(N)` and `z.null().optional()`,
- * patterns that don't reliably satisfy OpenAI's strict-mode contract — turning
- * it on globally has historically caused 100% generation failure on some model
- * versions. Set `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=true` in non-prod to test.
+ * Strict JSON-schema mode for generation. ON by default. Disable via
+ * `PRACTICE_STRICT_JSON_SCHEMA_GENERATE=false` if a future model regresses.
  */
 function isStrictJsonSchemaForGenerationEnabled(): boolean {
-	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GENERATE === "true";
+	return process.env.PRACTICE_STRICT_JSON_SCHEMA_GENERATE !== "false";
 }
 
 /**
@@ -409,6 +419,23 @@ async function runPracticeGenerationAfterResolveCore(
 	let cumulativeModelMs = 0;
 	let cumulativeValidationMs = 0;
 	const timingsMs: Record<string, number> = {};
+	let generationAttemptCount = 0;
+	let repairAttemptCount = 0;
+	let moderationReplacementCount = 0;
+	const generationBudgetMs = getGenerationBudgetMs();
+	const remainingBudgetMs = () => Math.max(0, generationBudgetMs - (Date.now() - pipelineT0));
+	const hasRemainingBudget = (minimumMs: number) => remainingBudgetMs() >= minimumMs;
+	const generationTimedOutMessage =
+		"Generation timed out before a safe retry could start. Please try again.";
+	const withCorrelationFailure = (
+		code: GeneratePracticeFailure["code"],
+		message: string,
+	): Extract<GeneratePracticeResult, { ok: false }> => ({
+		ok: false,
+		code,
+		message,
+		correlationId,
+	});
 
 	void recordPracticeEvent(
 		supabase,
@@ -507,11 +534,160 @@ async function runPracticeGenerationAfterResolveCore(
 		["multiple_choice", "fill_in_blank", "short_answer", "long_answer"]
 			.map((key) => `${key}=${counts[key] ?? 0}`)
 			.join(", ");
+	const emptyTypeCounts = (): PracticeQuestionTypeCounts => ({
+		multiple_choice: 0,
+		fill_in_blank: 0,
+		short_answer: 0,
+		long_answer: 0,
+	});
+
+	function buildModerationReplacementPrompt(args: {
+		baseUserPrompt: string;
+		replacementCounts: PracticeQuestionTypeCounts;
+		allowedTopicIds: string[];
+		preferredTopicIds: string[];
+		blockedQuestionTexts: string[];
+	}): string {
+		return [
+			args.baseUserPrompt,
+			"",
+			"MODERATION_REPLACEMENT_MODE:",
+			"- Generate ONLY replacement questions to fill moderation-filtered slots.",
+			"- Preserve pedagogy and exam style; do not include policy/safety commentary.",
+			"- Use only topic_id values from ALLOWED_TOPIC_IDS.",
+			"- Prefer topic_id values from PREFERRED_TOPIC_IDS where feasible.",
+			"- Avoid repeating blocked question stems listed in BLOCKED_QUESTION_TEXTS.",
+			"REQUIRED_BUCKET_LENGTHS (questions_by_type.*.length):",
+			JSON.stringify(args.replacementCounts),
+			"ALLOWED_TOPIC_IDS:",
+			JSON.stringify(args.allowedTopicIds),
+			"PREFERRED_TOPIC_IDS:",
+			JSON.stringify(args.preferredTopicIds),
+			"BLOCKED_QUESTION_TEXTS:",
+			JSON.stringify(args.blockedQuestionTexts.slice(0, 12)),
+		].join("\n");
+	}
+
+	async function replaceModeratedQuestions(args: {
+		flattened: PracticeGenerationOutput;
+		flaggedIndices: number[];
+	}): Promise<
+		| { ok: true; mergedOutput: PracticeGenerationOutput; public: ReturnType<typeof validateAndStripGeneration> }
+		| { ok: false; message: string }
+	> {
+		const flaggedIndexSet = new Set(args.flaggedIndices);
+		const replacementCounts = emptyTypeCounts();
+		const preferredTopicIds = new Set<string>();
+		const blockedQuestionTexts: string[] = [];
+		for (const idx of flaggedIndexSet) {
+			const q = args.flattened.questions[idx];
+			if (!q) continue;
+			replacementCounts[q.question_type]++;
+			preferredTopicIds.add(q.topic_id);
+			blockedQuestionTexts.push(q.question_text);
+		}
+		const replacementTotal = Object.values(replacementCounts).reduce((sum, n) => sum + n, 0);
+		if (replacementTotal <= 0) {
+			return { ok: false, message: "Moderation replacement failed: no flagged questions to replace." };
+		}
+		if (!hasRemainingBudget(MIN_BUDGET_FOR_MODEL_ATTEMPT_MS)) {
+			return { ok: false, message: generationTimedOutMessage };
+		}
+
+		const replacementSchema = createPracticeGenerationOutputSchema(replacementCounts);
+		const replacementPrompt = buildModerationReplacementPrompt({
+			baseUserPrompt: userPrompt,
+			replacementCounts,
+			allowedTopicIds: [...topicIdSet],
+			preferredTopicIds: [...preferredTopicIds],
+			blockedQuestionTexts,
+		});
+		const replacementT0 = Date.now();
+		const replacementRun = await runModelOnceWithFallback(
+			systemPrompt,
+			replacementPrompt,
+			replacementTotal,
+			replacementSchema,
+			opts,
+			resolved.userId,
+		);
+		cumulativeModelMs += Date.now() - replacementT0;
+		if (!replacementRun.ok) {
+			return { ok: false, message: replacementRun.message };
+		}
+		const replacementFlat = flattenPracticeGenerationOutput(replacementRun.object);
+		const replacementOut = validateAndStripGeneration(replacementFlat, replacementTotal, topicIdSet, {
+			expectedTypeCounts: replacementCounts,
+		});
+		if (!replacementOut.ok) {
+			return { ok: false, message: replacementOut.message };
+		}
+
+		const replacementPerItem = await moderatePracticeQuestionsPerItem(
+			replacementFlat.questions.map((q) => q.question_text),
+		);
+		if (!replacementPerItem.ok) {
+			return { ok: false, message: "Replacement questions failed moderation checks." };
+		}
+		const replacementBlob = await moderatePracticeGenerationText(JSON.stringify(replacementFlat.questions));
+		if (!replacementBlob.ok) {
+			return { ok: false, message: "Replacement questions failed moderation checks." };
+		}
+
+		const byType: Record<PracticeQuestionType, PracticeQuestion[]> = {
+			multiple_choice: [],
+			fill_in_blank: [],
+			short_answer: [],
+			long_answer: [],
+		};
+		for (const q of replacementFlat.questions) {
+			byType[q.question_type].push(q);
+		}
+		let missingByType = false;
+		const mergedQuestions: PracticeQuestion[] = args.flattened.questions.map((q, idx) => {
+			if (!flaggedIndexSet.has(idx)) return q;
+			const next = byType[q.question_type].shift();
+			if (!next) {
+				missingByType = true;
+				return q;
+			}
+			return next;
+		});
+		if (missingByType) {
+			return { ok: false, message: "Replacement generation returned too few questions for at least one type." };
+		}
+		for (const type of Object.keys(byType) as PracticeQuestionType[]) {
+			if (byType[type].length > 0) {
+				return { ok: false, message: "Replacement generation returned an unexpected question mix." };
+			}
+		}
+
+		const mergedOutput: PracticeGenerationOutput = {
+			questions: mergedQuestions.map((q, idx) => ({ ...q, question_number: idx + 1 })),
+			generation_metadata: args.flattened.generation_metadata,
+		};
+		const mergedOut = validateAndStripGeneration(mergedOutput, expectedCount, topicIdSet, {
+			expectedDurationSeconds: durationSeconds,
+			expectedTypeCounts,
+		});
+		if (!mergedOut.ok) {
+			return { ok: false, message: mergedOut.message };
+		}
+		const mergedBlob = await moderatePracticeGenerationText(JSON.stringify(mergedOutput.questions));
+		if (!mergedBlob.ok) {
+			return { ok: false, message: "Output blocked by moderation filters." };
+		}
+		return { ok: true, mergedOutput, public: mergedOut };
+	}
 
 	async function generateAndStrip(): Promise<
 		| { ok: true; object: PracticeGenerationOutput; public: ReturnType<typeof validateAndStripGeneration> }
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
+		generationAttemptCount++;
+		if (!hasRemainingBudget(MIN_BUDGET_FOR_MODEL_ATTEMPT_MS)) {
+			return { ok: false, message: generationTimedOutMessage, code: "generation_failed" };
+		}
 		const m0 = Date.now();
 		const r = await runModelOnceWithFallback(
 			systemPrompt,
@@ -537,24 +713,35 @@ async function runPracticeGenerationAfterResolveCore(
 		});
 
 		if (!out.ok && isPracticeGenerationRepairEnabled()) {
-			const repaired = await runPracticeGenerationRepairGrouped({
-				failedGrouped: grouped,
-				validationMessage: out.message,
-				durationSeconds,
-				expectedTypeCounts,
-				allowedTopicIds: [...topicIdSet],
-				generationOutputSchema,
-				estimatedQuestionCount: expectedCount,
-				studentUserId: resolved.userId,
-				abortSignal: opts.abortSignal,
-			});
-			cumulativeModelMs += repaired.modelMs;
-			if (repaired.ok) {
-				grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
-				flattened = flattenPracticeGenerationOutput(grouped);
-				out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
-					expectedDurationSeconds: durationSeconds,
+			if (hasRemainingBudget(MIN_BUDGET_FOR_REPAIR_MS)) {
+				repairAttemptCount++;
+				const repaired = await runPracticeGenerationRepairGrouped({
+					failedGrouped: grouped,
+					validationMessage: out.message,
+					durationSeconds,
 					expectedTypeCounts,
+					allowedTopicIds: [...topicIdSet],
+					generationOutputSchema,
+					estimatedQuestionCount: expectedCount,
+					studentUserId: resolved.userId,
+					abortSignal: opts.abortSignal,
+				});
+				cumulativeModelMs += repaired.modelMs;
+				if (repaired.ok) {
+					grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
+					flattened = flattenPracticeGenerationOutput(grouped);
+					out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
+						expectedDurationSeconds: durationSeconds,
+						expectedTypeCounts,
+					});
+				}
+			} else {
+				logServerError("generatePracticeTest.repair.skipped_budget", out.message, {
+					subjectId,
+					durationSeconds,
+					correlationId,
+					generationAttemptCount,
+					remainingBudgetMs: remainingBudgetMs(),
 				});
 			}
 		}
@@ -569,6 +756,9 @@ async function runPracticeGenerationAfterResolveCore(
 				expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
 				actualTypeCounts: formatTypeCounts(actualTypeCounts),
 				correlationId,
+				generationAttemptCount,
+				repairAttemptCount,
+				remainingBudgetMs: remainingBudgetMs(),
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
 		}
@@ -582,10 +772,6 @@ async function runPracticeGenerationAfterResolveCore(
 			flattened.questions.map((q) => q.question_text),
 		);
 		if (!perItem.ok) {
-			// If too many items are flagged, regenerate the whole test rather
-			// than ship a too-short test. Otherwise we accept losing a few.
-			const retainedCount = flattened.questions.length - perItem.flagged.length;
-			const flaggedTooMany = retainedCount < expectedCount;
 			for (const flag of perItem.flagged) {
 				try {
 					await insertHeuristicModerationFlag({
@@ -599,16 +785,20 @@ async function runPracticeGenerationAfterResolveCore(
 					logServerError("generatePracticeTest.moderation_flag.per_item", e, { correlationId });
 				}
 			}
-			if (flaggedTooMany) {
+			const replacement = await replaceModeratedQuestions({
+				flattened,
+				flaggedIndices: perItem.flagged.map((f) => f.index),
+			});
+			if (!replacement.ok) {
 				return {
 					ok: false,
-					message: "Output blocked by moderation filters.",
+					message: replacement.message,
 					code: "generation_invalid",
 				};
 			}
-			// Drop flagged questions so the rest of the test is preserved.
-			const dropSet = new Set(perItem.flagged.map((f) => f.index));
-			flattened.questions = flattened.questions.filter((_, i) => !dropSet.has(i));
+			moderationReplacementCount += perItem.flagged.length;
+			flattened = replacement.mergedOutput;
+			out = replacement.public;
 		}
 
 		const modBlob = JSON.stringify(flattened.questions);
@@ -648,7 +838,28 @@ async function runPracticeGenerationAfterResolveCore(
 					attemptNumber,
 					totalAttempts,
 					correlationId,
+					repairAttemptCount,
+					remainingBudgetMs: remainingBudgetMs(),
 				});
+			},
+			shouldRetry: (_failure, attemptNumber, totalAttempts) => {
+				if (attemptNumber >= totalAttempts) return false;
+				const canRetry = hasRemainingBudget(MIN_BUDGET_FOR_MODEL_ATTEMPT_MS);
+				if (!canRetry) {
+					logServerError(
+						"generatePracticeTest.retry.skipped_budget",
+						"Skipping retry because the remaining generation budget is too low.",
+						{
+							subjectId,
+							durationSeconds,
+							correlationId,
+							attemptNumber,
+							totalAttempts,
+							remainingBudgetMs: remainingBudgetMs(),
+						},
+					);
+				}
+				return canRetry;
 			},
 		},
 	);
@@ -663,9 +874,13 @@ async function runPracticeGenerationAfterResolveCore(
 				...timingsMs,
 				modelMs: cumulativeModelMs,
 				validationMs: cumulativeValidationMs,
+				generationAttemptCount,
+				repairAttemptCount,
+				moderationReplacementCount,
+				remainingBudgetMs: remainingBudgetMs(),
 			},
 		});
-		return { ok: false, code: "generation_failed", message: attempt.message };
+		return withCorrelationFailure("generation_failed", attempt.message);
 	}
 	if (!stripped || !stripped.ok) {
 		logPracticeObs({
@@ -678,13 +893,13 @@ async function runPracticeGenerationAfterResolveCore(
 				...timingsMs,
 				modelMs: cumulativeModelMs,
 				validationMs: cumulativeValidationMs,
+				generationAttemptCount,
+				repairAttemptCount,
+				moderationReplacementCount,
+				remainingBudgetMs: remainingBudgetMs(),
 			},
 		});
-		return {
-			ok: false,
-			code: "generation_invalid",
-			message: "The generator output could not be validated.",
-		};
+		return withCorrelationFailure("generation_invalid", "The generator output could not be validated.");
 	}
 
 	const fullOutput = attempt.value;
@@ -767,13 +982,13 @@ async function runPracticeGenerationAfterResolveCore(
 				...timingsMs,
 				modelMs: cumulativeModelMs,
 				validationMs: cumulativeValidationMs,
+				generationAttemptCount,
+				repairAttemptCount,
+				moderationReplacementCount,
+				remainingBudgetMs: remainingBudgetMs(),
 			},
 		});
-		return {
-			ok: false,
-			code: "database_error",
-			message: "Could not create the test session.",
-		};
+		return withCorrelationFailure("database_error", "Could not create the test session.");
 	}
 
 	const testId = newTestId as string;
@@ -832,6 +1047,9 @@ async function runPracticeGenerationAfterResolveCore(
 			...timingsMs,
 			modelMs: cumulativeModelMs,
 			validationMs: cumulativeValidationMs,
+			generationAttemptCount,
+			repairAttemptCount,
+			moderationReplacementCount,
 		},
 		questionCount: totalQ,
 		topicCount: resolved.canonicalTopics.length,

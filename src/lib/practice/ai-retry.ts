@@ -26,6 +26,7 @@ export async function repeatPracticeAiResultUntilSuccessOrExhausted<T>(
 	attempt: () => Promise<{ ok: true; value: T } | { ok: false; message: string }>,
 	options: {
 		onFailedAttempt?: (failure: { ok: false; message: string }, attemptNumber: number, totalAttempts: number) => void;
+		shouldRetry?: (failure: { ok: false; message: string }, attemptNumber: number, totalAttempts: number) => boolean;
 	} = {},
 ): Promise<{ ok: true; value: T } | { ok: false; message: string }> {
 	let last: { ok: false; message: string } = { ok: false, message: "Unknown error" };
@@ -40,8 +41,11 @@ export async function repeatPracticeAiResultUntilSuccessOrExhausted<T>(
 		if (process.env.NODE_ENV === "development") {
 			console.error(`[${label}] attempt ${i + 1}/${PRACTICE_AI_MAX_ATTEMPTS} failed:`, r.message);
 		}
-		if (i < PRACTICE_AI_MAX_ATTEMPTS - 1) {
+		const shouldRetry = options.shouldRetry?.(r, i + 1, PRACTICE_AI_MAX_ATTEMPTS) ?? true;
+		if (i < PRACTICE_AI_MAX_ATTEMPTS - 1 && shouldRetry) {
 			await sleepMs(backoffMs(i));
+		} else if (!shouldRetry) {
+			break;
 		}
 	}
 

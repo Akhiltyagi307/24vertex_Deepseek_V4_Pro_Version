@@ -29,6 +29,8 @@ export type GenerateStreamErrorEnvelope = {
 	type: "error";
 	/** Stable code from the pipeline ("generation_failed", etc.) — null when the error came from a thrown exception. */
 	code?: string;
+	/** Correlates user-visible errors to server logs, when available. */
+	correlationId?: string;
 	message: string;
 };
 
@@ -52,7 +54,12 @@ export function envelopeForResult(result: GeneratePracticeResult): GenerateStrea
 	if (result.ok) {
 		return { type: "done", result };
 	}
-	return { type: "error", code: result.code, message: truncateMessage(result.message) };
+	return {
+		type: "error",
+		code: result.code,
+		correlationId: result.correlationId,
+		message: truncateMessage(result.message),
+	};
 }
 
 /**

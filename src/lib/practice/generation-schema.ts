@@ -57,7 +57,9 @@ const practiceGeneratedMultipleChoiceDraftSchema = practiceQuestionDraftBaseSche
 });
 
 const practiceGeneratedWrittenDraftSchema = practiceQuestionDraftBaseSchema.extend({
-	options: z.null().optional(),
+	// OpenAI strict JSON-schema requires every declared property in a nested
+	// object to be present in `required`; keep written-question options explicit.
+	options: z.null(),
 });
 
 const PRACTICE_BUCKET_KEYS = ["multiple_choice", "fill_in_blank", "short_answer", "long_answer"] as const;

@@ -42,7 +42,10 @@ import {
 } from "@/lib/student/performance-matrix";
 import { cn } from "@/lib/utils";
 
-import { readPracticeGenerateNdjsonResponse } from "./practice-test-wizard/generate-stream";
+import {
+	PracticeStreamError,
+	readPracticeGenerateNdjsonResponse,
+} from "./practice-test-wizard/generate-stream";
 import { GenerationOverlay } from "./practice-test-wizard/generation-overlay";
 import {
 	formatStepErrors,
@@ -114,6 +117,7 @@ export function PracticeTestWizard({
 	const [chapterVersion, setChapterVersion] = React.useState(0);
 	const [stepError, setStepError] = React.useState<string | null>(null);
 	const [actionError, setActionError] = React.useState<string | null>(null);
+	const [actionErrorCorrelationId, setActionErrorCorrelationId] = React.useState<string | null>(null);
 	const [pending, setPending] = React.useState(false);
 	const [nonPreviewSuccess, setNonPreviewSuccess] = React.useState(false);
 	const [previewPayload, setPreviewPayload] = React.useState<{
@@ -123,6 +127,7 @@ export function PracticeTestWizard({
 	} | null>(null);
 	const [generating, setGenerating] = React.useState(false);
 	const [generatingStatusIndex, setGeneratingStatusIndex] = React.useState(0);
+	const [streamProgressMessage, setStreamProgressMessage] = React.useState<string | null>(null);
 	const generateAbortRef = React.useRef<AbortController | null>(null);
 	/** Prevents overlapping `runGenerate` calls (e.g. rapid double activation before `generating` re-renders). */
 	const generateInFlightRef = React.useRef(false);
@@ -275,6 +280,7 @@ export function PracticeTestWizard({
 		setSelectedTrackerIds(trackerIds);
 		setStepError(null);
 		setActionError(null);
+		setActionErrorCorrelationId(null);
 
 		const n = trackerIds.size;
 		const skipToDifficulty = n >= PRACTICE_MIN_TOPICS;
@@ -359,6 +365,7 @@ export function PracticeTestWizard({
 	React.useEffect(() => {
 		if (!generating) {
 			setGeneratingStatusIndex(0);
+			setStreamProgressMessage(null);
 			return;
 		}
 		const id = window.setInterval(() => {
@@ -470,6 +477,7 @@ export function PracticeTestWizard({
 	const goBack = () => {
 		setStepError(null);
 		setActionError(null);
+		setActionErrorCorrelationId(null);
 		setAttemptedContinueStep1(false);
 		if (step === 3) {
 			setNonPreviewSuccess(false);
@@ -484,10 +492,12 @@ export function PracticeTestWizard({
 
 	const runGenerate = async (): Promise<void> => {
 		setActionError(null);
+		setActionErrorCorrelationId(null);
 		const parsedDifficulty = practiceDifficultySchema.safeParse(difficulty);
 		const parsedDuration = practiceDurationSecondsInputSchema.safeParse(durationSeconds);
 		if (!subjectId || !parsedDifficulty.success || !parsedDuration.success) {
 			setActionError("Invalid configuration. Go back and check your choices.");
+			setActionErrorCorrelationId(null);
 			return;
 		}
 		if (generateInFlightRef.current) {
@@ -497,6 +507,7 @@ export function PracticeTestWizard({
 		const abort = new AbortController();
 		generateAbortRef.current = abort;
 		setGenerating(true);
+		setStreamProgressMessage("Generating questions...");
 		try {
 			const payload = {
 				subjectId,
@@ -546,7 +557,12 @@ export function PracticeTestWizard({
 							message: j.message ?? "Could not generate the test.",
 						} as GeneratePracticeResult;
 					}
-					return readPracticeGenerateNdjsonResponse(res);
+					return readPracticeGenerateNdjsonResponse(res, {
+						onPartialProgress: ({ draftedQuestions }) => {
+							if (draftedQuestions <= 0) return;
+							setStreamProgressMessage(`Drafting question ${draftedQuestions}...`);
+						},
+					});
 				}
 				return generatePracticeTest(payload);
 			})();
@@ -570,6 +586,7 @@ export function PracticeTestWizard({
 					return;
 				}
 				setActionError(result.message);
+				setActionErrorCorrelationId(result.correlationId ?? null);
 				return;
 			}
 			const topicDistribution: Record<string, number> = {};
@@ -595,10 +612,17 @@ export function PracticeTestWizard({
 			router.refresh();
 		} catch (e) {
 			if ((e as Error).message !== "cancelled") {
+				if (e instanceof PracticeStreamError) {
+					setActionError(e.message);
+					setActionErrorCorrelationId(e.correlationId ?? null);
+					return;
+				}
 				setActionError(e instanceof Error ? e.message : "Generation failed.");
+				setActionErrorCorrelationId(null);
 			}
 		} finally {
 			setGenerating(false);
+			setStreamProgressMessage(null);
 			generateAbortRef.current = null;
 			generateInFlightRef.current = false;
 		}
@@ -610,11 +634,13 @@ export function PracticeTestWizard({
 
 	const runFinalize = async (): Promise<boolean> => {
 		setActionError(null);
+		setActionErrorCorrelationId(null);
 		setNonPreviewSuccess(false);
 		const parsedDifficulty = practiceDifficultySchema.safeParse(difficulty);
 		const parsedDuration = practiceDurationSecondsInputSchema.safeParse(durationSeconds);
 		if (!subjectId || !parsedDifficulty.success || !parsedDuration.success) {
 			setActionError("Invalid configuration. Go back and check your choices.");
+			setActionErrorCorrelationId(null);
 			return false;
 		}
 		const cacheKey = JSON.stringify({
@@ -644,6 +670,7 @@ export function PracticeTestWizard({
 			});
 			if (!result.ok) {
 				setActionError(result.message);
+				setActionErrorCorrelationId(null);
 				return false;
 			}
 			if (showPromptPreview && result.userMessageJson && result.systemPrompt) {
@@ -669,6 +696,7 @@ export function PracticeTestWizard({
 	function goNext() {
 		setStepError(null);
 		setActionError(null);
+		setActionErrorCorrelationId(null);
 
 		if (step === 0) {
 			const parsed = practiceStep0Schema.safeParse({ subjectId });
@@ -715,6 +743,7 @@ export function PracticeTestWizard({
 
 		setStepError(null);
 		setActionError(null);
+		setActionErrorCorrelationId(null);
 
 		const fields = practiceStep2FieldsSchema.safeParse({ difficulty, durationSeconds });
 		if (!fields.success) {
@@ -730,6 +759,7 @@ export function PracticeTestWizard({
 			await navigator.clipboard.writeText(text);
 		} catch {
 			setActionError(`Could not copy ${label} to the clipboard.`);
+			setActionErrorCorrelationId(null);
 		}
 	};
 
@@ -848,6 +878,11 @@ export function PracticeTestWizard({
 								<AlertTitle>Something went wrong</AlertTitle>
 								<AlertDescription className="flex flex-col gap-2">
 									<span>{actionError}</span>
+									{actionErrorCorrelationId ? (
+										<span className="text-xs text-muted-foreground">
+											Reference: {actionErrorCorrelationId}
+										</span>
+									) : null}
 									{(actionError?.includes("Refresh") || actionError?.includes("no longer")) && (
 										<Link
 											href="/student/practice"
@@ -879,6 +914,7 @@ export function PracticeTestWizard({
 					<GenerationOverlay
 						generating={generating}
 						generatingStatusIndex={generatingStatusIndex}
+						streamProgressMessage={streamProgressMessage}
 						generatedPreview={generatedPreview}
 						pending={pending}
 						onCancelGenerate={cancelGenerate}

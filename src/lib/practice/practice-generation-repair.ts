@@ -14,7 +14,7 @@ Hard rules:
 - Return the SAME top-level shape: questions_by_type (four arrays) + generation_metadata.
 - Preserve the SAME array length in each bucket as in the input (do not add or remove questions).
 - multiple_choice: every item MUST include options with exactly keys A, B, C, D (strings). Never use options: null there. If a stem reads like a fill-in, rewrite it as a proper MCQ with four plausible choices while keeping the same bucket.
-- fill_in_blank, short_answer, long_answer: do not include an options field except null/omit as in the schema; never put MCQ options in those buckets.
+- fill_in_blank, short_answer, long_answer: every item MUST include "options": null. Never put MCQ options in those buckets.
 - topic_id on every question MUST be an exact string copy from ALLOWED_TOPIC_IDS — no invented UUIDs, no splicing segments from two different ids.
 - estimated_time_seconds: positive integers; the SUM across all questions must be between TIME_SUM_MIN and TIME_SUM_MAX inclusive (given in the user message).
 - answer_key.correct_answer for MCQ must be exactly one letter A, B, C, or D matching the options.

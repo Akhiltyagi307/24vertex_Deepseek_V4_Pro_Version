@@ -1,7 +1,43 @@
 import type { GeneratePracticeResult } from "../../../../../app/student/practice/actions/types";
 
 /** NDJSON from `/api/student/practice/generate-stream` when `PRACTICE_STREAM` + `NEXT_PUBLIC_PRACTICE_STREAM` are enabled. */
-export async function readPracticeGenerateNdjsonResponse(res: Response): Promise<GeneratePracticeResult> {
+export type PracticeGenerateStreamProgress = {
+	draftedQuestions: number;
+};
+
+export class PracticeStreamError extends Error {
+	readonly correlationId?: string;
+
+	constructor(message: string, correlationId?: string) {
+		super(message);
+		this.name = "PracticeStreamError";
+		this.correlationId = correlationId;
+	}
+}
+
+function inferDraftedQuestionsFromPartial(partial: unknown): number | null {
+	if (!partial || typeof partial !== "object") return null;
+	const buckets = (partial as { questions_by_type?: unknown }).questions_by_type;
+	if (!buckets || typeof buckets !== "object") return null;
+	const typed = buckets as Record<string, unknown>;
+	const keys = ["multiple_choice", "fill_in_blank", "short_answer", "long_answer"] as const;
+	let total = 0;
+	let sawAnyArray = false;
+	for (const key of keys) {
+		const arr = typed[key];
+		if (!Array.isArray(arr)) continue;
+		sawAnyArray = true;
+		total += arr.length;
+	}
+	return sawAnyArray ? total : null;
+}
+
+export async function readPracticeGenerateNdjsonResponse(
+	res: Response,
+	options: {
+		onPartialProgress?: (progress: PracticeGenerateStreamProgress) => void;
+	} = {},
+): Promise<GeneratePracticeResult> {
 	const reader = res.body?.getReader();
 	if (!reader) {
 		throw new Error("No response body from generation stream.");
@@ -22,9 +58,16 @@ export async function readPracticeGenerateNdjsonResponse(res: Response): Promise
 			const msg = JSON.parse(trimmed) as
 				| { type: "partial"; partial: unknown }
 				| { type: "done"; result: GeneratePracticeResult }
-				| { type: "error"; message: string };
+				| { type: "error"; message: string; correlationId?: string };
+			if (msg.type === "partial") {
+				const draftedQuestions = inferDraftedQuestionsFromPartial(msg.partial);
+				if (draftedQuestions !== null) {
+					options.onPartialProgress?.({ draftedQuestions });
+				}
+				continue;
+			}
 			if (msg.type === "error") {
-				throw new Error(msg.message);
+				throw new PracticeStreamError(msg.message, msg.correlationId);
 			}
 			if (msg.type === "done") {
 				final = msg.result;
@@ -33,7 +76,15 @@ export async function readPracticeGenerateNdjsonResponse(res: Response): Promise
 		if (done) break;
 	}
 	if (buffer.trim()) {
-		const msg = JSON.parse(buffer.trim()) as { type: string; result?: GeneratePracticeResult };
+		const msg = JSON.parse(buffer.trim()) as {
+			type: string;
+			result?: GeneratePracticeResult;
+			message?: string;
+			correlationId?: string;
+		};
+		if (msg.type === "error") {
+			throw new PracticeStreamError(msg.message ?? "Generation failed.", msg.correlationId);
+		}
 		if (msg.type === "done" && msg.result) {
 			final = msg.result;
 		}
