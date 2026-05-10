@@ -43,6 +43,8 @@ import {
 } from "@/lib/practice/practice-generation-repair";
 import { applyDeterministicPracticeAutofix } from "@/lib/practice/practice-generation-autofix";
 import { evaluatePracticeGenerationQuality } from "@/lib/practice/practice-generation-quality-gates";
+import { applyVisualPatches } from "@/lib/practice/visuals/apply-visual-patches";
+import { runValidatorPass } from "@/lib/practice/visuals/run-validator-pass";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
 import {
@@ -828,6 +830,26 @@ async function runPracticeGenerationAfterResolveCore(
 		} finally {
 			timingsMs.dedup = Date.now() - dedupT0;
 		}
+	}
+
+	// Pass 2 — best-effort visual validator. Disabled by default
+	// (PRACTICE_VISUAL_VALIDATOR=false). Even when enabled the pass is
+	// best-effort: any error short-circuits to "no patches", Pass 1's
+	// output still ships. See src/lib/practice/visuals/run-validator-pass.ts
+	// for the full contract.
+	const validatorResult = await runValidatorPass(fullOutput, {
+		correlationId,
+		userId: resolved.userId,
+	});
+	if (validatorResult.ok && validatorResult.patches.length > 0) {
+		const patched = applyVisualPatches(fullOutput, validatorResult.patches);
+		fullOutput.questions = patched.output.questions;
+		logPracticeObs({
+			phase: "practice_generation_visual_patches_applied",
+			correlation_id: correlationId,
+			applied: patched.applied,
+			candidates: validatorResult.patches.length,
+		});
 	}
 
 	const questionsPayload = fullOutput.questions.map((q) => ({
