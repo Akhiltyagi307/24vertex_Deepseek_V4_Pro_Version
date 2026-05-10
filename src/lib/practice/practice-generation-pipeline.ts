@@ -41,6 +41,8 @@ import {
 	buildPracticeGenerationRepairSystemPrompt,
 	buildPracticeGenerationRepairUserPrompt,
 } from "@/lib/practice/practice-generation-repair";
+import { applyDeterministicPracticeAutofix } from "@/lib/practice/practice-generation-autofix";
+import { evaluatePracticeGenerationQuality } from "@/lib/practice/practice-generation-quality-gates";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
 import {
@@ -566,7 +568,7 @@ async function runPracticeGenerationAfterResolveCore(
 		);
 
 		const v0 = Date.now();
-		let flattened = flattenPracticeGenerationOutput(grouped);
+		let flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
 		let out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
 			expectedDurationSeconds: durationSeconds,
 			expectedTypeCounts,
@@ -595,7 +597,7 @@ async function runPracticeGenerationAfterResolveCore(
 			cumulativeModelMs += repaired.modelMs;
 			if (repaired.ok) {
 				grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
-				flattened = flattenPracticeGenerationOutput(grouped);
+				flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
 				out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
 					expectedDurationSeconds: durationSeconds,
 					expectedTypeCounts,
@@ -615,6 +617,20 @@ async function runPracticeGenerationAfterResolveCore(
 				correlationId,
 			});
 			return { ok: false, message: out.message, code: "generation_invalid" };
+		}
+
+		// Quality gates: near-duplicate stems, topic concentration. These were
+		// previously dormant — the framework existed but was never invoked.
+		// Failure bounces to the retry policy; the existing retry loop handles
+		// the next attempt with a fresh model call.
+		const qualityGate = evaluatePracticeGenerationQuality({ questions: flattened.questions });
+		if (!qualityGate.ok) {
+			logServerError("generatePracticeTest.qualityGate", qualityGate.message, {
+				subjectId,
+				gateCode: qualityGate.code,
+				correlationId,
+			});
+			return { ok: false, message: qualityGate.message, code: "generation_invalid" };
 		}
 
 		// Hybrid moderation:
