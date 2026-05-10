@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import type { AttachmentRow } from "@/lib/doubt/attachments/types";
 
 export type Enrolled = { id: string; name: string; subject_group: string | null; sort_order: number };
 
@@ -21,14 +22,17 @@ export type EntitlementSummary = {
 	tokensLeft: number;
 };
 
+export type MessageAttachmentsByMessageId = Record<string, AttachmentRow[]>;
+
 export type DoubtChatThreadProps = {
 	conversationId: string;
 	subjectId: string;
-	topicId: string;
+	topicId: string | null;
 	subjectName: string | null;
 	topicName: string | null;
 	chapterName: string | null;
 	initialMessages: UIMessage[];
+	initialMessageAttachments: MessageAttachmentsByMessageId;
 	initialUsage: UsageSummary;
 	initialTutorMode: import("@/lib/doubt/doubt-tutor-mode").DoubtTutorMode;
 	initialEntitlement: EntitlementSummary;

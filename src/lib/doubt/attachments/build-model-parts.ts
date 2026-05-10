@@ -67,9 +67,14 @@ export async function decorateUserMessageWithAttachments(
 	}
 
 	const transcripts = pdfRows
-		.map((p) => (p.ocrText ?? "").trim())
-		.filter((t) => t.length > 0)
-		.map((t, i) => `[Attached PDF ${i + 1} transcript]\n${t}`)
+		.map((p, i) => {
+			const label = p.storagePath.split("/").at(-1) ?? `attachment-${i + 1}.pdf`;
+			const text = (p.ocrText ?? "").trim();
+			if (text.length > 0) {
+				return `[Attached PDF ${i + 1}: ${label}]\n${text}`;
+			}
+			return `[Attached PDF ${i + 1}: ${label}]\n(Text extraction returned empty content. The file is attached, but its text could not be read reliably.)`;
+		})
 		.join("\n\n");
 
 	// Reconstruct parts. We only mutate the text part (prepend transcripts) and
@@ -103,6 +108,104 @@ export async function decorateUserMessageWithAttachments(
 	return { ...userMessage, parts: newParts };
 }
 
+function toAttachmentRow(row: {
+	id: string;
+	conversation_id: string;
+	message_id: string | null;
+	kind: "image" | "pdf";
+	storage_path: string;
+	mime: string;
+	size_bytes: number;
+	ocr_text: string | null;
+	created_at: string;
+}): AttachmentRow {
+	return {
+		id: row.id,
+		conversationId: row.conversation_id,
+		messageId: row.message_id,
+		kind: row.kind,
+		storagePath: row.storage_path,
+		mime: row.mime,
+		sizeBytes: row.size_bytes,
+		ocrText: row.ocr_text,
+		createdAt: row.created_at,
+	};
+}
+
+async function loadBoundAttachmentsForMessages(
+	supabase: SupabaseClient,
+	conversationId: string,
+	messageIds: string[],
+): Promise<Map<string, AttachmentRow[]>> {
+	if (messageIds.length === 0) {
+		return new Map();
+	}
+	const { data, error } = await supabase
+		.from("doubt_message_attachments")
+		.select("id, conversation_id, message_id, kind, storage_path, mime, size_bytes, ocr_text, created_at")
+		.eq("conversation_id", conversationId)
+		.in("message_id", messageIds)
+		.order("created_at", { ascending: true });
+	if (error || !data) {
+		return new Map();
+	}
+	const byMessageId = new Map<string, AttachmentRow[]>();
+	for (const row of data) {
+		const messageId = (row.message_id ?? null) as string | null;
+		if (!messageId) continue;
+		const attachment = toAttachmentRow({
+			id: row.id as string,
+			conversation_id: row.conversation_id as string,
+			message_id: messageId,
+			kind: row.kind as "image" | "pdf",
+			storage_path: row.storage_path as string,
+			mime: row.mime as string,
+			size_bytes: row.size_bytes as number,
+			ocr_text: (row.ocr_text ?? null) as string | null,
+			created_at: row.created_at as string,
+		});
+		const existing = byMessageId.get(messageId);
+		if (existing) {
+			existing.push(attachment);
+		} else {
+			byMessageId.set(messageId, [attachment]);
+		}
+	}
+	return byMessageId;
+}
+
+/**
+ * Decorates each user message in the thread with attachments that are already
+ * bound via `doubt_message_attachments.message_id`.
+ *
+ * This keeps follow-up turns grounded in earlier uploaded documents/images
+ * without requiring the student to re-attach files every message.
+ */
+export async function decorateThreadMessagesWithBoundAttachments(
+	supabase: SupabaseClient,
+	conversationId: string,
+	messages: UIMessage[],
+): Promise<UIMessage[]> {
+	if (messages.length === 0) return messages;
+	const userMessageIds = messages
+		.filter((m): m is UIMessage & { id: string } => m.role === "user" && typeof m.id === "string")
+		.map((m) => m.id);
+	if (userMessageIds.length === 0) return messages;
+
+	const byMessageId = await loadBoundAttachmentsForMessages(supabase, conversationId, userMessageIds);
+	if (byMessageId.size === 0) return messages;
+
+	const decorated: UIMessage[] = [...messages];
+	for (let i = 0; i < decorated.length; i++) {
+		const message = decorated[i];
+		if (!message || message.role !== "user" || typeof message.id !== "string") continue;
+		const attachments = byMessageId.get(message.id);
+		if (!attachments || attachments.length === 0) continue;
+		decorated[i] = await decorateUserMessageWithAttachments(supabase, message, attachments);
+	}
+	return decorated;
+}
+
 export async function loadAttachmentsForRequest(
 	supabase: SupabaseClient,
 	conversationId: string,
@@ -115,17 +218,19 @@ export async function loadAttachmentsForRequest(
 		.eq("conversation_id", conversationId)
 		.in("id", attachmentIds);
 	if (error || !data) return [];
-	const found = data.map((r) => ({
-		id: r.id as string,
-		conversationId: r.conversation_id as string,
-		messageId: (r.message_id ?? null) as string | null,
-		kind: r.kind as "image" | "pdf",
-		storagePath: r.storage_path as string,
-		mime: r.mime as string,
-		sizeBytes: r.size_bytes as number,
-		ocrText: (r.ocr_text ?? null) as string | null,
-		createdAt: r.created_at as string,
-	}));
+	const found = data.map((r) =>
+		toAttachmentRow({
+			id: r.id as string,
+			conversation_id: r.conversation_id as string,
+			message_id: (r.message_id ?? null) as string | null,
+			kind: r.kind as "image" | "pdf",
+			storage_path: r.storage_path as string,
+			mime: r.mime as string,
+			size_bytes: r.size_bytes as number,
+			ocr_text: (r.ocr_text ?? null) as string | null,
+			created_at: r.created_at as string,
+		}),
+	);
 	// Preserve caller-specified ordering so the model sees attachments in the
 	// order the student attached them.
 	const byId = new Map(found.map((a) => [a.id, a]));

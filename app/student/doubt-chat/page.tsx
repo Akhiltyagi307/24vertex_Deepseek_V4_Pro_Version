@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { DoubtChatView } from "@/components/student/doubt/doubt-chat-view";
 import {
 	loadDoubtConversationForStudent,
+	loadDoubtMessageAttachmentsByMessageId,
 	loadDoubtMessagesForConversation,
 	loadDoubtPageBundle,
 	loadDoubtTokenSummaryForConversation,
@@ -36,10 +37,11 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 	if (cParam) {
 		const conv = await loadDoubtConversationForStudent(cParam, user.id);
 		if (conv) {
-			const [messages, usage, lastTutorMode] = await Promise.all([
+			const [messages, usage, lastTutorMode, messageAttachmentsByMessageId] = await Promise.all([
 				loadDoubtMessagesForConversation(conv.id),
 				loadDoubtTokenSummaryForConversation(conv.id),
 				loadLastDoubtTutorModeForConversation(conv.id),
+				loadDoubtMessageAttachmentsByMessageId(conv.id),
 			]);
 			initialFromUrl = {
 				conversation: {
@@ -52,6 +54,7 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 					chapterName: conv.chapterName,
 				},
 				messages,
+				messageAttachmentsByMessageId,
 				usage,
 				initialTutorMode: lastTutorMode ?? "explain",
 			};
@@ -73,6 +76,8 @@ export default async function StudentDoubtChatPage({ searchParams }: PageProps) 
 				conversations={bundle.conversations}
 				initialFromUrl={initialFromUrl}
 				entitlement={bundle.entitlement}
+				doubtPickerPerformance={bundle.doubtPickerPerformance}
+				performanceLoadError={bundle.performanceLoadError}
 			/>
 		</div>
 	);

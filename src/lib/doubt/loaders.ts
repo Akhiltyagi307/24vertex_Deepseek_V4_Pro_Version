@@ -7,7 +7,18 @@ import { isDoubtTutorMode, type DoubtTutorMode } from "@/lib/doubt/doubt-tutor-m
 import { getEntitlements, type EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { createClient } from "@/lib/supabase/server";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
+import {
+	averageTestScorePercentForSubject,
+	buildSubjectCardTrackerStats,
+	dominantStatusFromTrackerStats,
+	emptySubjectCardTrackerStats,
+	type PerformanceRowSerialized,
+	type TrackerStatus,
+} from "@/lib/student/performance-matrix";
+import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
 import { loadStudentSubjects, type StudentSubjectsProfileRow } from "@/lib/student/load-student-subjects";
+import { parseStoredChapterMeta } from "@/lib/doubt/validate-doubt-scope";
+import type { AttachmentRow } from "@/lib/doubt/attachments/types";
 
 /**
  * Slimmed entitlement view used by the doubt-chat composer's quota meter — we
@@ -47,6 +58,59 @@ export type DoubtChatConversationRow = {
 	updatedAt: string;
 	subjectName: string;
 };
+
+/**
+ * Performance slices for doubt scope picker (subject avg + status, chapter weak counts, topic status).
+ */
+export type DoubtPickerPerformance = {
+	bySubjectId: Record<
+		string,
+		{
+			avgScorePercent: number | null;
+			dominantStatus: ReturnType<typeof dominantStatusFromTrackerStats>;
+			weakTopicCount: number;
+		}
+	>;
+	topicStatusById: Record<string, TrackerStatus>;
+	/**
+	 * Key `${subjectId}:${unitNumber}:${chapterNumber}` → count of topics that need improvement
+	 * (practice status is developing or below target). Untested topics are not counted.
+	 */
+	needsImprovementCountByChapterKey: Record<string, number>;
+};
+
+function buildDoubtPickerPerformance(
+	rows: PerformanceRowSerialized[],
+	enrolledSubjectIds: string[],
+): DoubtPickerPerformance {
+	const topicStatusById: Record<string, TrackerStatus> = {};
+	const needsImprovementCountByChapterKey: Record<string, number> = {};
+	for (const r of rows) {
+		topicStatusById[r.topicId] = r.status;
+		if (r.status === "satisfactory" || r.status === "bad") {
+			const ck = `${r.subjectId}:${r.unitNumber}:${r.chapterNumber}`;
+			needsImprovementCountByChapterKey[ck] =
+				(needsImprovementCountByChapterKey[ck] ?? 0) + 1;
+		}
+	}
+	const trackerMap = buildSubjectCardTrackerStats(rows);
+	const bySubjectId: DoubtPickerPerformance["bySubjectId"] = {};
+	for (const sid of enrolledSubjectIds) {
+		const st = trackerMap.get(sid) ?? emptySubjectCardTrackerStats;
+		let weakTopicCount = 0;
+		for (const r of rows) {
+			if (r.subjectId === sid && r.status !== "good") {
+				weakTopicCount += 1;
+			}
+		}
+		bySubjectId[sid] = {
+			avgScorePercent: averageTestScorePercentForSubject(rows, sid),
+			dominantStatus: dominantStatusFromTrackerStats(st),
+			weakTopicCount,
+		};
+	}
+	return { bySubjectId, topicStatusById, needsImprovementCountByChapterKey };
+}
 
 /**
  * All active topics for a subject and the student's profile grade.
@@ -126,6 +190,16 @@ export async function loadDoubtPageBundle(userId: string) {
 	const conversations = await loadDoubtConversationsList(userId);
 	const entitlement = toDoubtChatEntitlement(await getEntitlements(supabase, userId));
 
+	const perfBundle = await loadStudentPerformanceBundle(supabase, userId, {
+		grade: profileRow.grade,
+		stream: profileRow.stream,
+		elective_subject_id: profileRow.elective_subject_id,
+		role: profileRow.role,
+	});
+
+	const enrolledIdsForPerf = perfBundle.enrolledSubjects.map((s) => s.id);
+	const doubtPickerPerformance = buildDoubtPickerPerformance(perfBundle.rows, enrolledIdsForPerf);
+
 	return {
 		ok: true as const,
 		profile: profileRow,
@@ -133,6 +207,8 @@ export async function loadDoubtPageBundle(userId: string) {
 		subjectsLoadError: subj.loadError,
 		conversations,
 		entitlement,
+		doubtPickerPerformance,
+		performanceLoadError: perfBundle.loadError,
 	};
 }
 
@@ -165,7 +241,7 @@ export type LoadedDoubtConversation = {
 	id: string;
 	studentId: string;
 	subjectId: string;
-	topicId: string;
+	topicId: string | null;
 	title: string | null;
 	subjectName: string | null;
 	topicName: string | null;
@@ -180,7 +256,7 @@ export async function loadDoubtConversationForStudent(
 	const { data, error } = await supabase
 		.from("doubt_conversations")
 		.select(
-			"id, student_id, subject_id, topic_id, title, subjects(name), topics(topic_name, chapter_name)",
+			"id, student_id, subject_id, topic_id, title, metadata, subjects(name), topics(topic_name, chapter_name)",
 		)
 		.eq("id", conversationId)
 		.maybeSingle();
@@ -198,15 +274,24 @@ export async function loadDoubtConversationForStudent(
 		| { topic_name: string; chapter_name: string | null }[]
 		| null;
 	const topicRow = Array.isArray(top) ? top[0] : top;
+
+	let topicName = topicRow?.topic_name?.trim() || null;
+	let chapterName = topicRow?.chapter_name?.trim() || null;
+	if (!data.topic_id) {
+		topicName = null;
+		const meta = parseStoredChapterMeta(data.metadata);
+		chapterName = meta?.chapter.chapter_name ?? chapterName;
+	}
+
 	return {
 		id: data.id,
 		studentId: data.student_id,
 		subjectId: data.subject_id,
-		topicId: data.topic_id,
+		topicId: data.topic_id ?? null,
 		title: data.title,
 		subjectName,
-		topicName: topicRow?.topic_name?.trim() || null,
-		chapterName: topicRow?.chapter_name?.trim() || null,
+		topicName,
+		chapterName,
 	};
 }
 
@@ -261,6 +346,7 @@ export async function loadLastDoubtTutorModeForConversation(
 		.select("tutor_mode")
 		.eq("conversation_id", conversationId)
 		.eq("role", "user")
+		.or("is_hidden.is.null,is_hidden.eq.false")
 		.not("tutor_mode", "is", null)
 		.order("created_at", { ascending: false })
 		.limit(1)
@@ -286,22 +372,26 @@ export async function loadLastDoubtTutorModeForConversation(
  * `opts.limit` (turns) — when set, returns at most `limit * 2` of the most
  * recent messages, in chronological order. Used by the route handler to cap
  * the context sent to OpenAI; full history is still returned when `limit` is
- * omitted (compliance export, page bundle, parent view all need the full
- * thread).
+ * `opts.includeHiddenForModel` — when true (API route model history), include rows with
+ * `is_hidden = true` (bootstrap scope). Default false for UI / parents / exports that use full history.
  */
 export async function loadDoubtMessagesForConversationWithClient(
 	supabase: SupabaseClient,
 	conversationId: string,
-	opts?: { limit?: number },
+	opts?: { limit?: number; includeHiddenForModel?: boolean },
 ): Promise<UIMessage[]> {
 	const turnLimit = opts?.limit;
 	const messageCap = typeof turnLimit === "number" && turnLimit > 0 ? turnLimit * 2 : null;
 
-	const baseQuery = supabase
+	let baseQuery = supabase
 		.from("doubt_messages")
 		.select("id, role, content, created_at")
 		.eq("conversation_id", conversationId)
 		.in("role", ["user", "assistant"]);
+
+	if (!opts?.includeHiddenForModel) {
+		baseQuery = baseQuery.or("is_hidden.is.null,is_hidden.eq.false");
+	}
 
 	const { data, error } =
 		messageCap == null
@@ -333,4 +423,46 @@ export async function loadDoubtMessagesForConversationWithClient(
 export async function loadDoubtMessagesForConversation(conversationId: string): Promise<UIMessage[]> {
 	const supabase = await createClient();
 	return loadDoubtMessagesForConversationWithClient(supabase, conversationId);
+}
+
+export type DoubtMessageAttachmentsByMessageId = Record<string, AttachmentRow[]>;
+
+/**
+ * Attachment chips rendered above each user message in the chat window.
+ */
+export async function loadDoubtMessageAttachmentsByMessageId(
+	conversationId: string,
+): Promise<DoubtMessageAttachmentsByMessageId> {
+	const supabase = await createClient();
+	const { data, error } = await supabase
+		.from("doubt_message_attachments")
+		.select("id, conversation_id, message_id, kind, storage_path, mime, size_bytes, ocr_text, created_at")
+		.eq("conversation_id", conversationId)
+		.order("created_at", { ascending: true });
+
+	if (error || !data) {
+		if (error) {
+			logSupabaseError("loadDoubtMessageAttachmentsByMessageId", error, { conversationId });
+		}
+		return {};
+	}
+
+	const out: DoubtMessageAttachmentsByMessageId = {};
+	for (const row of data) {
+		const messageId = (row.message_id ?? null) as string | null;
+		if (!messageId) continue;
+		const attachment: AttachmentRow = {
+			id: row.id as string,
+			conversationId: row.conversation_id as string,
+			messageId,
+			kind: row.kind as "image" | "pdf",
+			storagePath: row.storage_path as string,
+			mime: row.mime as string,
+			sizeBytes: row.size_bytes as number,
+			ocrText: (row.ocr_text ?? null) as string | null,
+			createdAt: row.created_at as string,
+		};
+		out[messageId] = [...(out[messageId] ?? []), attachment];
+	}
+	return out;
 }

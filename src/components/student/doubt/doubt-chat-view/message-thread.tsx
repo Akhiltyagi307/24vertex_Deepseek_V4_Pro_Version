@@ -5,7 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowDown, PanelLeft, Sparkles } from "lucide-react";
+import { ArrowDown, FileText, Image as ImageIcon, PanelLeft, Sparkles } from "lucide-react";
 
 import { usePaywall } from "@/components/student/subscription/paywall-dialog";
 import {
@@ -29,6 +29,12 @@ import {
 	type UsageSummary,
 } from "./types";
 
+function formatAttachmentSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function MessageThread({
 	conversationId,
 	subjectId,
@@ -37,6 +43,7 @@ export function MessageThread({
 	topicName,
 	chapterName,
 	initialMessages,
+	initialMessageAttachments,
 	initialUsage,
 	initialTutorMode,
 	initialEntitlement,
@@ -49,11 +56,16 @@ export function MessageThread({
 	const [entitlement, setEntitlement] = useState<EntitlementSummary>(initialEntitlement);
 	const [regenPending, setRegenPending] = useState(false);
 	const [pendingAttachments, setPendingAttachments] = useState<AttachmentRow[]>([]);
+	const [messageAttachmentsById, setMessageAttachmentsById] = useState(initialMessageAttachments);
+	const [optimisticLatestUserAttachments, setOptimisticLatestUserAttachments] = useState<
+		AttachmentRow[] | null
+	>(null);
 	const [showScrollDown, setShowScrollDown] = useState(false);
 	const paywall = usePaywall();
 
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+	const nextRequestAttachmentIdsRef = useRef<string[] | null>(null);
 
 	// Latest pending attachments are read via a ref so the transport closure
 	// doesn't re-create on every chip add/remove (which would tear down useChat).
@@ -62,18 +74,26 @@ export function MessageThread({
 		pendingAttachmentsRef.current = pendingAttachments;
 	}, [pendingAttachments]);
 
+	useEffect(() => {
+		setMessageAttachmentsById(initialMessageAttachments);
+	}, [initialMessageAttachments]);
+
 	const transport = useMemo(
 		() =>
 			new DefaultChatTransport({
 				api: "/api/student/doubt-chat",
 				credentials: "same-origin",
-				body: () => ({
-					subjectId,
-					topicId,
-					conversationId,
-					tutorMode,
-					attachmentIds: pendingAttachmentsRef.current.map((a) => a.id),
-				}),
+				body: () => {
+					const attachmentIds = nextRequestAttachmentIdsRef.current ?? [];
+					nextRequestAttachmentIdsRef.current = null;
+					return {
+						subjectId,
+						topicId,
+						conversationId,
+						tutorMode,
+						attachmentIds,
+					};
+				},
 			}),
 		[subjectId, topicId, conversationId, tutorMode],
 	);
@@ -83,6 +103,7 @@ export function MessageThread({
 		messages: initialMessages,
 		transport,
 		onError: (err) => {
+			nextRequestAttachmentIdsRef.current = null;
 			const raw = err instanceof Error ? err.message : "";
 			try {
 				const parsed = JSON.parse(raw) as { paywall?: boolean; code?: string; error?: string };
@@ -159,6 +180,9 @@ export function MessageThread({
 		(text: string) => {
 			const t = text.trim();
 			if (!t || busy) return;
+			const attachmentSnapshot = [...pendingAttachmentsRef.current];
+			nextRequestAttachmentIdsRef.current = attachmentSnapshot.map((a) => a.id);
+			setOptimisticLatestUserAttachments(attachmentSnapshot.length > 0 ? attachmentSnapshot : null);
 			setInput("");
 			void sendMessage({ text: t });
 			// Clear chips after the message goes — they're now bound to the row.
@@ -211,16 +235,26 @@ export function MessageThread({
 		tutorMode === "solve_with_me"
 			? topicName
 				? `Work through a problem on ${topicName}…`
-				: "Describe a problem to solve together…"
+				: chapterName
+					? `Work through a problem from ${chapterName}…`
+					: "Describe a problem to solve together…"
 			: topicName
 				? `Ask anything about ${topicName}…`
-				: "Ask a question about this topic…";
+				: chapterName
+					? `Ask anything about ${chapterName}…`
+					: "Ask a question about this chapter…";
 
 	const empty = messages.length === 0;
 	const lastAssistantIsStreaming =
 		streaming &&
 		messages.length > 0 &&
 		messages[messages.length - 1]?.role === "assistant";
+	const latestUserMessageIndex = useMemo(() => {
+		for (let i = messages.length - 1; i >= 0; i--) {
+			if (messages[i]?.role === "user") return i;
+		}
+		return -1;
+	}, [messages]);
 
 	return (
 		<div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -246,11 +280,11 @@ export function MessageThread({
 					</div>
 					<div className="min-w-0 flex-1">
 						<h2 className="text-foreground truncate text-sm font-semibold tracking-tight">
-							{topicName ?? "Topic tutor"}
+							{topicName ?? chapterName ?? "Doubt tutor"}
 						</h2>
 						<p className="text-muted-foreground truncate text-[11.5px] leading-tight">
-							{[subjectName, chapterName].filter(Boolean).join(" · ") ||
-								"Topic-scoped tutor"}
+							{[subjectName, topicName ? chapterName : null].filter(Boolean).join(" · ") ||
+								(subjectName ?? "Syllabus-scoped tutor")}
 						</p>
 					</div>
 					<span
@@ -260,7 +294,7 @@ export function MessageThread({
 						)}
 					>
 						<span className="inline-block size-1.5 rounded-full bg-emerald-500" />
-						Topic-scoped
+						{topicName ? "Topic-scoped" : "Chapter-scoped"}
 					</span>
 				</div>
 			</header>
@@ -278,6 +312,7 @@ export function MessageThread({
 						{empty ? (
 							<EmptyState
 								topicName={topicName}
+								chapterName={chapterName}
 								onPick={(text) => {
 									setInput(text);
 									textareaRef.current?.focus();
@@ -288,6 +323,14 @@ export function MessageThread({
 						{messages.map((m, idx) => {
 							const text = extractText(m);
 							if (m.role === "user") {
+								const persistedAttachments =
+									typeof m.id === "string" ? (messageAttachmentsById[m.id] ?? []) : [];
+								const userAttachments =
+									persistedAttachments.length > 0
+										? persistedAttachments
+										: optimisticLatestUserAttachments && idx === latestUserMessageIndex
+											? optimisticLatestUserAttachments
+											: [];
 								return (
 									<div
 										key={m.id}
@@ -300,6 +343,31 @@ export function MessageThread({
 												"dark:border-zinc-700/60 dark:bg-zinc-800/70",
 											)}
 										>
+											{userAttachments.length > 0 ? (
+												<div
+													className="mb-2 flex flex-wrap gap-1.5"
+													aria-label="Message attachments"
+												>
+													{userAttachments.map((attachment) => (
+														<div
+															key={attachment.id}
+															className="inline-flex items-center gap-1.5 rounded-full border border-border/65 bg-background/55 px-2 py-1 text-[11.5px] text-foreground/85"
+														>
+															{attachment.kind === "image" ? (
+																<ImageIcon className="size-3.5 text-emerald-600" aria-hidden />
+															) : (
+																<FileText className="size-3.5 text-emerald-600" aria-hidden />
+															)}
+															<span className="max-w-[11rem] truncate">
+																{attachment.storagePath.split("/").at(-1) ?? "attachment"}
+															</span>
+															<span className="text-muted-foreground tabular-nums text-[10.5px]">
+																{formatAttachmentSize(attachment.sizeBytes)}
+															</span>
+														</div>
+													))}
+												</div>
+											) : null}
 											<p className="whitespace-pre-wrap [text-wrap:pretty]">{text}</p>
 										</div>
 									</div>

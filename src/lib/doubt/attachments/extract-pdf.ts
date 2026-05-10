@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const BUCKET = "doubt-attachments";
 const EXTRACTION_TIMEOUT_MS = 20_000;
 const NATIVE_TEXT_THRESHOLD = 200; // chars; below this we try OCR.
+const MAX_PDFJS_TEXT_PAGES = 20;
 const MAX_OCR_PAGES = 5;
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
@@ -40,6 +41,40 @@ async function nativeText(buf: Buffer): Promise<string> {
 	return (result.text ?? "").trim();
 }
 
+async function pdfjsLayerText(buf: Buffer): Promise<string> {
+	type TextItem = { str?: string };
+	type TextContent = { items: TextItem[] };
+	type PageInfo = { getTextContent: () => Promise<TextContent> };
+	type PdfDoc = { numPages: number; getPage: (n: number) => Promise<PageInfo> };
+	type PdfModule = {
+		getDocument: (data: { data: Uint8Array }) => { promise: Promise<PdfDoc> };
+	};
+	const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfModule;
+	const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+	const pageCount = Math.min(doc.numPages, MAX_PDFJS_TEXT_PAGES);
+	const pieces: string[] = [];
+	for (let i = 1; i <= pageCount; i++) {
+		try {
+			const page = await doc.getPage(i);
+			const content = await page.getTextContent();
+			const line = (content.items ?? [])
+				.map((item) => item.str ?? "")
+				.join(" ")
+				.replace(/\s+/g, " ")
+				.trim();
+			if (line.length > 0) {
+				pieces.push(line);
+			}
+		} catch (e) {
+			Sentry.captureException(e, {
+				tags: { component: "doubt.extract_pdf", phase: "pdfjs_page_text" },
+				extra: { page: i },
+			});
+		}
+	}
+	return pieces.join("\n\n").trim();
+}
+
 async function ocrText(buf: Buffer): Promise<string> {
 	type PageInfo = { num: number; render: (opts: { canvasContext: unknown; viewport: unknown }) => { promise: Promise<void> }; getViewport: (o: { scale: number }) => unknown };
 	type PdfDoc = { numPages: number; getPage: (n: number) => Promise<PageInfo> };
@@ -71,7 +106,12 @@ async function ocrText(buf: Buffer): Promise<string> {
 			// optional. Production deploys will need a canvas implementation.
 			let nodeCanvas: { createCanvas: (w: number, h: number) => unknown } | null = null;
 			try {
-				const mod = (await import("@napi-rs/canvas").catch(() => null)) as
+				// Use a runtime-only require so webpack does not attempt to bundle
+				// the optional native `.node` binary from @napi-rs/canvas.
+				const runtimeRequire = new Function("m", "return require(m)") as (
+					moduleName: string,
+				) => unknown;
+				const mod = runtimeRequire("@napi-rs/canvas") as
 					| { createCanvas: (w: number, h: number) => unknown }
 					| null;
 				if (mod) nodeCanvas = mod;
@@ -109,10 +149,12 @@ async function ocrText(buf: Buffer): Promise<string> {
  * Strategy:
  *   1. Try native text extraction via `pdf-parse`. Most CBSE NCERT-style PDFs
  *      have a real text layer; this path is fast and free.
- *   2. If the native layer is missing (scanned worksheet), fall back to
- *      `pdfjs-dist` rasterization + `tesseract.js`. Capped at 5 pages and
- *      gated by a 20-second total budget. If `@napi-rs/canvas` isn't present
- *      in the runtime, OCR is skipped and only the native text returns.
+ *   2. If that returns too little text, try `pdfjs-dist` text-layer extraction
+ *      (up to 20 pages). This catches PDFs where `pdf-parse` under-reads.
+ *   3. If still sparse (likely scanned worksheet), fall back to `pdfjs-dist`
+ *      rasterization + `tesseract.js`. Capped at 5 pages and gated by a
+ *      20-second total budget. If `@napi-rs/canvas` isn't present in the
+ *      runtime, OCR is skipped and we keep best effort text from steps 1-2.
  *
  * Errors are swallowed and reported to Sentry — extraction is best-effort and
  * the chat should still go through with whatever text we have (or empty).
@@ -132,6 +174,19 @@ export async function extractPdfText(
 					tags: { component: "doubt.extract_pdf", phase: "native_text" },
 					extra: { attachmentId: attachment.id },
 				});
+			}
+			if (text.length < NATIVE_TEXT_THRESHOLD) {
+				try {
+					const pdfjsText = await pdfjsLayerText(buf);
+					if (pdfjsText.length > text.length) {
+						text = pdfjsText;
+					}
+				} catch (e) {
+					Sentry.captureException(e, {
+						tags: { component: "doubt.extract_pdf", phase: "pdfjs_text" },
+						extra: { attachmentId: attachment.id },
+					});
+				}
 			}
 			if (text.length < NATIVE_TEXT_THRESHOLD) {
 				try {

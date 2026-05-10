@@ -14,7 +14,12 @@ import {
 } from "@/lib/doubt/doubt-actions";
 import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { chapterKeyFromRow, groupTopicRowsByChapter } from "@/lib/doubt/chapter-group";
-import type { DoubtChatTopicRow, DoubtChatConversationRow, DoubtChatEntitlement } from "@/lib/doubt/loaders";
+import type {
+	DoubtChatTopicRow,
+	DoubtChatConversationRow,
+	DoubtChatEntitlement,
+	DoubtPickerPerformance,
+} from "@/lib/doubt/loaders";
 import { parseDoubtChatListLabel } from "@/lib/doubt/doubt-conversation-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -31,7 +36,7 @@ import { ConversationSidebar } from "./doubt-chat-view/conversation-sidebar";
 import { DeleteConversationDialog } from "./doubt-chat-view/delete-conversation-dialog";
 import { MessageThread } from "./doubt-chat-view/message-thread";
 import { ScopePicker } from "./doubt-chat-view/scope-picker";
-import type { Enrolled, UsageSummary } from "./doubt-chat-view/types";
+import type { Enrolled, MessageAttachmentsByMessageId, UsageSummary } from "./doubt-chat-view/types";
 
 export function DoubtChatView(props: {
 	enrolledSubjects: Enrolled[];
@@ -41,17 +46,20 @@ export function DoubtChatView(props: {
 		conversation: {
 			id: string;
 			subjectId: string;
-			topicId: string;
+			topicId: string | null;
 			title: string | null;
 			subjectName: string | null;
 			topicName: string | null;
 			chapterName: string | null;
 		};
 		messages: UIMessage[];
+		messageAttachmentsByMessageId: MessageAttachmentsByMessageId;
 		usage: UsageSummary;
 		initialTutorMode: DoubtTutorMode;
 	};
 	entitlement: DoubtChatEntitlement;
+	doubtPickerPerformance: DoubtPickerPerformance;
+	performanceLoadError: string | null;
 }) {
 	const router = useRouter();
 	const sp = useSearchParams();
@@ -169,31 +177,33 @@ export function DoubtChatView(props: {
 		}
 		if (!chapterKey) {
 			const first = topicRows[0];
-			setChapterKey(chapterKeyFromRow(first));
+			setChapterKey(chapterKeyFromRow(first!));
 		}
 	}, [topicRows, chapterKey, showPicker]);
 
 	useEffect(() => {
-		if (!showPicker) return;
-		if (topicsInChapter.length === 0) {
+		if (!showPicker || !topicId || topicsInChapter.length === 0) return;
+		if (!topicsInChapter.some((t) => t.id === topicId)) {
 			setTopicId(null);
-			return;
-		}
-		const stillIn = topicId && topicsInChapter.some((t) => t.id === topicId);
-		if (!stillIn) {
-			setTopicId(topicsInChapter[0].id);
 		}
 	}, [topicsInChapter, topicId, showPicker]);
 
+	const onPickChapter = useCallback((key: string | null) => {
+		setChapterKey(key);
+		setTopicId(null);
+	}, []);
+
 	const onStartChat = useCallback(async () => {
-		if (!subjectId || !topicId) {
-			setCreateError("Select a subject, chapter, and topic first.");
+		if (!subjectId || !chapterKey) {
+			setCreateError("Pick a subject and chapter first.");
 			return;
 		}
 		setStartPending(true);
 		setCreateError(null);
 		try {
-			const res = await createDoubtConversation({ subjectId, topicId });
+			const res = topicId
+				? await createDoubtConversation({ subjectId, topicId })
+				: await createDoubtConversation({ subjectId, chapterKey });
 			if (!res.ok) {
 				setCreateError(res.message);
 				return;
@@ -202,7 +212,7 @@ export function DoubtChatView(props: {
 		} finally {
 			setStartPending(false);
 		}
-	}, [subjectId, topicId, router]);
+	}, [subjectId, chapterKey, topicId, router]);
 
 	const sortedSubjects = useMemo(() => {
 		return [...props.enrolledSubjects].sort((a, b) => {
@@ -234,6 +244,10 @@ export function DoubtChatView(props: {
 	} as const;
 
 	const openChats = useCallback(() => setChatsOpen(true), []);
+	const threadKey =
+		props.initialFromUrl == null
+			? "empty-thread"
+			: `${props.initialFromUrl.conversation.id}:${props.initialFromUrl.messages.length}:${props.initialFromUrl.messages.at(-1)?.id ?? "none"}`;
 
 	return (
 		<>
@@ -267,6 +281,13 @@ export function DoubtChatView(props: {
 						<Alert variant="destructive" className="m-4 shrink-0">
 							<AlertTitle>Subjects</AlertTitle>
 							<AlertDescription>{props.subjectsLoadError}</AlertDescription>
+						</Alert>
+					) : null}
+
+					{props.performanceLoadError ? (
+						<Alert variant="destructive" className="m-4 shrink-0">
+							<AlertTitle>Performance data</AlertTitle>
+							<AlertDescription>{props.performanceLoadError}</AlertDescription>
 						</Alert>
 					) : null}
 
@@ -314,8 +335,9 @@ export function DoubtChatView(props: {
 									loadTopicsPending={loadTopicsPending}
 									startPending={startPending}
 									createError={createError}
+									doubtPickerPerformance={props.doubtPickerPerformance}
 									onPickSubject={onPickSubject}
-									onPickChapter={setChapterKey}
+									onPickChapter={onPickChapter}
 									onPickTopic={setTopicId}
 									onStartChat={() => void onStartChat()}
 								/>
@@ -330,7 +352,7 @@ export function DoubtChatView(props: {
 								transition={{ duration: panelDuration, ease: "easeOut" }}
 							>
 								<MessageThread
-									key={props.initialFromUrl.conversation.id}
+									key={threadKey}
 									conversationId={props.initialFromUrl.conversation.id}
 									subjectId={props.initialFromUrl.conversation.subjectId}
 									topicId={props.initialFromUrl.conversation.topicId}
@@ -338,6 +360,7 @@ export function DoubtChatView(props: {
 									topicName={props.initialFromUrl.conversation.topicName}
 									chapterName={props.initialFromUrl.conversation.chapterName}
 									initialMessages={props.initialFromUrl.messages}
+									initialMessageAttachments={props.initialFromUrl.messageAttachmentsByMessageId}
 									initialUsage={props.initialFromUrl.usage}
 									initialTutorMode={props.initialFromUrl.initialTutorMode}
 									initialEntitlement={props.entitlement}

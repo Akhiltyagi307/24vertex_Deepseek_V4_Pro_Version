@@ -6,12 +6,13 @@ import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
 import {
 	bindAttachmentsToMessage,
-	decorateUserMessageWithAttachments,
+	decorateThreadMessagesWithBoundAttachments,
 	loadAttachmentsForRequest,
 } from "@/lib/doubt/attachments/build-model-parts";
+import { fetchDoubtTopicContextBlockByTopicIds } from "@/lib/doubt/topic-context-chunks";
 import { doubtChatBodySchema } from "@/lib/doubt/request-schema";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
-import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
+import { resolveDoubtScopeForConversation, type DoubtScopeSuccess } from "@/lib/doubt/validate-doubt-scope";
 import { getOpenAIDoubtChatModel } from "@/lib/env";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeDoubtChatRateLimit } from "@/lib/practice/practice-rate-limit";
@@ -36,11 +37,31 @@ const DOUBT_CHAT_HISTORY_TURN_CAP = 10;
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { loadDoubtMessagesForConversationWithClient } from "@/lib/doubt/loaders";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 120;
 
 function toUIMessageList(raw: unknown[]): UIMessage[] {
 	return raw as UIMessage[];
+}
+
+function attachTopicContextChunksToScope(scope: DoubtScopeSuccess, chunkBlock: string): DoubtScopeSuccess {
+	if (scope.kind === "topic") {
+		return {
+			...scope,
+			topic: {
+				...scope.topic,
+				contextChunksBlock: chunkBlock,
+			},
+		};
+	}
+	return {
+		...scope,
+		chapter: {
+			...scope.chapter,
+			contextChunksBlock: chunkBlock,
+		},
+	};
 }
 
 export async function POST(req: Request) {
@@ -107,13 +128,79 @@ export async function POST(req: Request) {
 		: DOUBT_CHAT_PRE_DEBIT_TOKENS;
 	await consumeTokens(supabase, user.id, preDebit);
 
-	const scope = await validateDoubtScope(supabase, { subjectId, topicId });
+	const { data: existing, error: findErr } = await supabase
+		.from("doubt_conversations")
+		.select("id, student_id, subject_id, topic_id, metadata")
+		.eq("id", rawConvId)
+		.maybeSingle();
+	if (findErr) {
+		logSupabaseError("doubt_chat.find_conversation", findErr, { conversationId: rawConvId });
+		return new Response(JSON.stringify({ error: "Could not open this conversation." }), {
+			status: 500,
+			headers: { "content-type": "application/json" },
+		});
+	}
+	if (!existing || existing.student_id !== user.id) {
+		return new Response(JSON.stringify({ error: "Conversation not found." }), {
+			status: 404,
+			headers: { "content-type": "application/json" },
+		});
+	}
+	if (existing.subject_id !== subjectId) {
+		return new Response(JSON.stringify({ error: "Subject no longer matches this chat." }), {
+			status: 400,
+			headers: { "content-type": "application/json" },
+		});
+	}
+	const storedTopicId = existing.topic_id ?? null;
+	const bodyTopicId = topicId ?? null;
+	if (storedTopicId !== bodyTopicId) {
+		return new Response(JSON.stringify({ error: "Topic scope no longer matches this chat." }), {
+			status: 400,
+			headers: { "content-type": "application/json" },
+		});
+	}
+
+	const scope = await resolveDoubtScopeForConversation(supabase, {
+		subjectId: existing.subject_id,
+		topicId: storedTopicId,
+		metadata: existing.metadata,
+	});
 	if (!scope.ok) {
 		const status = scope.code === "unauthorized" ? 401 : 400;
 		return new Response(JSON.stringify({ error: scope.message, code: scope.code }), {
 			status,
 			headers: { "content-type": "application/json" },
 		});
+	}
+
+	let groundedScope: DoubtScopeSuccess;
+	try {
+		const topicIds = scope.kind === "topic" ? [scope.topic.id] : scope.chapter.topicIds;
+		const chunksRes = await fetchDoubtTopicContextBlockByTopicIds(createServiceRoleClient(), topicIds);
+		if (!chunksRes.ok) {
+			return new Response(
+				JSON.stringify({
+					error: chunksRes.message,
+					code: chunksRes.code,
+				}),
+				{ status: 400, headers: { "content-type": "application/json" } },
+			);
+		}
+		groundedScope = attachTopicContextChunksToScope(scope, chunksRes.block);
+	} catch (e) {
+		logSupabaseError(
+			"doubt_chat.context_chunks",
+			{ message: e instanceof Error ? e.message : String(e) },
+			{ conversationId: existing.id },
+		);
+		return new Response(
+			JSON.stringify({
+				error: "Could not load chapter context right now. Please try again.",
+				code: "context_chunks_unavailable",
+			}),
+			{ status: 500, headers: { "content-type": "application/json" } },
+		);
 	}
 
 	const last = messages.filter((m) => m.role === "user").at(-1);
@@ -137,33 +224,9 @@ export async function POST(req: Request) {
 	const templateSrc = dbPrompt?.template?.trim()
 		? dbPrompt.template
 		: getDoubtModeTemplate(tutorMode);
-	const system = interpolateDoubtPromptTemplate(templateSrc, scope);
+	const system = interpolateDoubtPromptTemplate(templateSrc, groundedScope);
 
-	const { data: existing, error: findErr } = await supabase
-		.from("doubt_conversations")
-		.select("id, student_id, subject_id, topic_id")
-		.eq("id", rawConvId)
-		.maybeSingle();
-	if (findErr) {
-		logSupabaseError("doubt_chat.find_conversation", findErr, { conversationId: rawConvId });
-		return new Response(JSON.stringify({ error: "Could not open this conversation." }), {
-			status: 500,
-			headers: { "content-type": "application/json" },
-		});
-	}
-	if (!existing || existing.student_id !== user.id) {
-		return new Response(JSON.stringify({ error: "Conversation not found." }), {
-			status: 404,
-			headers: { "content-type": "application/json" },
-		});
-	}
-	if (existing.subject_id !== subjectId || existing.topic_id !== topicId) {
-		return new Response(JSON.stringify({ error: "Subject or topic no longer matches this chat." }), {
-			status: 400,
-			headers: { "content-type": "application/json" },
-		});
-	}
-	const conversationId = existing.id;
+	const conversationId = existing.id as string;
 
 	// Validate attachment ownership (must belong to this conversation, which
 	// we've already verified belongs to the user).
@@ -221,29 +284,20 @@ export async function POST(req: Request) {
 
 	const threadFromDb = await loadDoubtMessagesForConversationWithClient(supabase, conversationId, {
 		limit: DOUBT_CHAT_HISTORY_TURN_CAP,
+		includeHiddenForModel: false,
 	});
-	const forModel = threadFromDb.map((m) => {
-		const { id: _i, ...rest } = m;
-		return rest;
-	}) as UIMessage[];
 
-	// Decorate the most recent user message with PDF transcripts + image
-	// parts so the model can reason over the attachments.
-	if (attachments.length > 0 && forModel.length > 0) {
-		const lastIdx = forModel.length - 1;
-		const lastModelMsg = forModel[lastIdx];
-		if (lastModelMsg && lastModelMsg.role === "user") {
-			forModel[lastIdx] = await decorateUserMessageWithAttachments(
-				supabase,
-				lastModelMsg,
-				attachments,
-			);
-		}
-	}
+	// Include attachments bound to user messages across the recent history
+	// window so follow-up questions can still use previously uploaded files.
+	const forModelWithAttachments = await decorateThreadMessagesWithBoundAttachments(
+		supabase,
+		conversationId,
+		threadFromDb,
+	);
 
 	let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>>;
 	try {
-		modelMessages = await convertToModelMessages(forModel);
+		modelMessages = await convertToModelMessages(forModelWithAttachments);
 	} catch (e) {
 		const message = e instanceof Error ? e.message : "Invalid message format.";
 		return new Response(JSON.stringify({ error: message }), {
