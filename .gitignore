@@ -81,11 +81,15 @@ testsprite_tests/
 # src/lib/ai/doubt-prompt-templates.ts and must ship with the deploy.
 # Exception: billing/* operational runbooks are committed so on-call has
 # them when responding to billing incidents.
+# Exception: practice/* operational runbooks are committed for the same
+# on-call reason (visuals rollout / rollback).
 docs/*
 !docs/explain-mode-prompt.md
 !docs/solve-with-me-mode-prompt.md
 !docs/billing/
 !docs/billing/*.md
+!docs/practice/
+!docs/practice/*.md
 
 # One-off local notes at repo root (keep out of git)
 EduAI_PRD_v3_2_TestSprite_Backend.md
