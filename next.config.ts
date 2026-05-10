@@ -45,6 +45,16 @@ const nextConfig: NextConfig = {
 			"@tiptap/starter-kit",
 		],
 	},
+	// `smiles-drawer` 2.x ships its main entry as `app.js` but that file
+	// imports from `./src/Drawer`, `./src/SvgDrawer`, etc. — and one of
+	// those internal source files (`CIP.ts`) is TypeScript. Webpack's
+	// default config ignores node_modules for transpilation, so the
+	// build fails with "Module parse failed: Unexpected token" on the
+	// `type` keyword. Listing the package here runs it through Next's
+	// SWC transpiler. Same for any future visual-renderer dep that
+	// ships untranspiled TS — add to this list rather than ejecting
+	// from `next/dynamic({ ssr: false })`.
+	transpilePackages: ["smiles-drawer"],
 	serverExternalPackages: [
 		"@sentry/nextjs",
 		"drizzle-orm",

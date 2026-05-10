@@ -190,7 +190,7 @@ function PieSlices({
 						dataKey="value"
 						nameKey="label"
 						outerRadius={100}
-						label={(entry: { label: string; value: number }) => entry.label}
+						label={renderPieSliceLabel}
 					>
 						{spec.slices.map((_, i) => (
 							<Cell key={`p-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -257,6 +257,12 @@ function Ogive({
 			</ResponsiveContainer>
 		</div>
 	);
+}
+
+function renderPieSliceLabel(props: { name?: string | number; value?: number }): string {
+	if (typeof props.name === "string") return props.name;
+	if (typeof props.name === "number") return String(props.name);
+	return "";
 }
 
 function mergeLineSeries(series: { name: string; points: { x: number; y: number }[] }[]) {

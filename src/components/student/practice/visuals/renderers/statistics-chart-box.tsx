@@ -1,14 +1,30 @@
 "use client";
 
 import * as React from "react";
-import Plotly from "plotly.js-dist-min";
+// `plotly.js-dist-min` ships zero TS types — declared as a bare module in
+// `plotly.js-dist-min.d.ts`. We cast `Plotly` to a minimal local interface
+// for the two methods we use; the rest of the API is intentionally `any`
+// to avoid pulling the full plotly type pack into the bundle.
+import PlotlyImport from "plotly.js-dist-min";
 
 import type { StatisticsChartSpec } from "@/lib/practice/visuals/types";
+
+type PlotlyApi = {
+	newPlot: (
+		el: HTMLElement,
+		data: unknown[],
+		layout: Record<string, unknown>,
+		config: Record<string, unknown>,
+	) => Promise<unknown> | unknown;
+	purge: (el: HTMLElement) => void;
+};
+
+const Plotly = PlotlyImport as unknown as PlotlyApi;
 
 /**
  * Box-plot sub-component for `statistics_chart` (subKind: "box").
  *
- * Wraps Plotly imperatively. Plotly is lazy-imported via React.lazy in
+ * Wraps Plotly imperatively. Plotly is lazy-imported via next/dynamic in
  * statistics-chart.tsx so non-box stats charts pay no Plotly cost.
  */
 export function StatisticsChartBox({
@@ -38,7 +54,7 @@ export function StatisticsChartBox({
 			yaxis: { title: { text: spec.yLabel } },
 			showlegend: false,
 		};
-		void Plotly.newPlot(el, data as unknown as Plotly.Data[], layout, {
+		void Plotly.newPlot(el, data, layout, {
 			displayModeBar: false,
 			responsive: true,
 		});
