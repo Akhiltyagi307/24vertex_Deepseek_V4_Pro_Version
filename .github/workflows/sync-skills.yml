@@ -27,12 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: pnpm
+          # No pnpm cache: this job only runs `node scripts/sync-openai-skills.mjs`
+          # and does not run `pnpm install`. Enabling cache without install makes
+          # setup-node's post step fail (missing store / lock paths).
 
       - name: Dry-run sync
         run: node scripts/sync-openai-skills.mjs
