@@ -87,7 +87,7 @@ Concept-check — state, explain, distinguish ideas in the student's own words (
 Application — predict outcomes, interpret an experimental setup, identify the variable being tested, apply a principle to an everyday situation. MCQ + short-answer.
 Reasoning — cause-and-effect chains, justify a phenomenon, evaluate a claim from evidence. Short-answer + long-answer.
 Numerical — Physics-led items (speed, force, current, resistance, work, power) with realistic values and clean answers, plus stoichiometry/concentration where the topic permits. MCQ + FIB + short-answer with working.
-Diagram-linked — describe the labelled structure, circuit, or ray diagram in text precisely enough to mentally reconstruct.
+Diagram-linked — for physics topics (circuits, ray optics, force diagrams) emit a \`visual\` (kind: physics_diagram, subKind matching the topic). For chemistry topics (molecular structure, balanced equations) emit \`chemistry_molecule\` or \`chemistry_reaction\`. For biology topics (cells, life cycles, ecosystems, nutrition diagrams) v1 has no biology renderer — set \`visual: null\` and write a self-contained stem; do NOT describe an imagined diagram in prose.
 Activity-based or assertion–reason — frame around an NCERT-style activity ("In an activity, a student observes…") or use the standard CBSE assertion–reason four-option set: (a) Both A and R true and R is the correct explanation of A; (b) Both true but R is not; (c) A true, R false; (d) A false, R true.
 
 ## Subject-specific grounding
@@ -158,7 +158,14 @@ Three demands across all MCQs:
 - Procedural fluency — single computation, simplification, factorisation, equation solve, with one clean numeric answer.
 - Problem-solving — multi-step word problems with realistic Indian contexts (rupees, kilometres, kilograms, litres, plausible quantities and prices), where the student must choose the method, set up the equation, and check the answer; the four options surface the most common error paths.
 
-Verify the mathematics internally before emitting the item. Describe figures in text precisely enough that a student can sketch them — name the points, give the relations, specify what is parallel, equal, perpendicular, or marked.
+Verify the mathematics internally before emitting the item. For coordinate geometry, transformations, locus, congruence, similar triangles, polygons with given side lengths, and any item that says "in the figure" or "in the diagram", emit a \`visual\` (kind: math_geometry) instead of describing the figure in prose.
+
+## Visual routing
+
+- Coordinate geometry, transformations, locus, congruence, and triangles with given side lengths SHOULD use \`math_geometry\`.
+- "Sketch", "draw", "plot the graph of", and inflection/extrema items SHOULD use \`math_function_plot\`. Prefer integer-friendly coefficients for legibility.
+- Set / interval / inequality items use \`number_line\`.
+- Pure algebra, identities, simplification, equation-solving, and proofs use \`visual: null\`.
 
 ## Subject-specific grounding
 
@@ -174,7 +181,7 @@ Misconceptions students actually carry — sign errors (+ vs −), formula confu
 
 ## Output formatting
 
-- Notation: Unicode where possible — fractions ½, ¾, ⅓, ⅔, ¼; superscripts x², y³, x⁻¹; subscripts x₁, x₂; symbols √, π, θ, °, ∠, △, ∥, ⊥, ≤, ≥, ≠, ±, →. ASCII fallback for expressions without clean Unicode forms (5/8, x^4, sqrt(2)). Do not use LaTeX delimiters. Be consistent within a test.
+- Notation in \`question_text\`: Unicode where possible — fractions ½, ¾, ⅓, ⅔, ¼; superscripts x², y³, x⁻¹; subscripts x₁, x₂; symbols √, π, θ, °, ∠, △, ∥, ⊥, ≤, ≥, ≠, ±, →. ASCII fallback for expressions without clean Unicode forms (5/8, x^4, sqrt(2)). Do not use LaTeX delimiters in \`question_text\`. INSIDE \`visual.spec\` text labels (point names, axis labels) LaTeX IS supported — \`$x_0$\`, \`$\\theta$\` will render. Be consistent within a test.
 - Currency: ₹ followed by amount.
 - Units: SI — m, cm, km, kg, g, s, min, hr, m/s, m/s², °C. Do not mix CGS and SI within an item.
 - Names in word problems: Indian (Rohan, Aisha, Meera, Arjun, Priya, Kabir, Fatima, Ishaan, Vikram, Anjali, Karthik, Sneha).
@@ -245,7 +252,7 @@ Reading load — Grade 11: stems 14–20 words, max 4 sentences, problem stimuli
 ## Physics-specific item-writing
 
 - Verify the physics and the arithmetic internally before emitting the item.
-- Describe any figure, circuit, or experimental setup in text precisely (label points, identify components, give relations and orientations).
+- For figures, circuits, ray-optics layouts, and experimental setups: emit a \`visual\` (subKind: free_body | ray_optics | circuit) instead of describing the geometry in prose. The stem should reference the visual ("in the circuit shown", "based on the ray diagram below") rather than restate component positions or orientations.
 - Long-answer that can be solved cleanly in three lines is mis-bucketed; move it to short-answer.
 
 ## Physics-specific distractors
@@ -254,7 +261,7 @@ Vector vs scalar treatment of velocity, momentum, force; sign conventions in opt
 
 ## Output formatting
 
-- Notation: Unicode where possible — superscripts (m², m³, m⁻¹, x², 10⁻¹⁹), subscripts (v₀, x₁, R_B, ε₀, μ₀), Greek letters (α, β, γ, δ, θ, λ, μ, ν, π, ρ, σ, τ, φ, ω, Ω, Ψ, Φ), symbols (√, ∫, ∑, ∞, →, ⇌, ≈, ≤, ≥, ±, ·). ASCII for complex expressions (sqrt(2gh), integral from 0 to T of f(t) dt, dy/dx, d²y/dx²). Do not use LaTeX delimiters.
+- Notation in \`question_text\`: Unicode where possible — superscripts (m², m³, m⁻¹, x², 10⁻¹⁹), subscripts (v₀, x₁, R_B, ε₀, μ₀), Greek letters (α, β, γ, δ, θ, λ, μ, ν, π, ρ, σ, τ, φ, ω, Ω, Ψ, Φ), symbols (√, ∫, ∑, ∞, →, ⇌, ≈, ≤, ≥, ±, ·). ASCII for complex expressions (sqrt(2gh), integral from 0 to T of f(t) dt, dy/dx, d²y/dx²). Do not use LaTeX delimiters in \`question_text\`. INSIDE \`visual.spec\` text labels (force names, axis labels, etc.) LaTeX IS supported and preferred for subscripts and Greek letters: write \`$v_0$\`, \`$\\theta$\`.
 - Vectors: arrow notation (F⃗, v⃗, B⃗) or "magnitude of F" / "unit vector along x." Be consistent within an item.
 - Units: SI throughout — m, kg, s, A, K, mol, cd; derived (m/s, m/s², N, J, W, C, V, Ω, F, H, T, Wb, Hz). Do not mix CGS and SI; do not use Imperial.
 - Significant figures: 2–3 sig figs in numerical answers unless the problem demands more.
@@ -285,7 +292,9 @@ Use named reactions, mechanisms, and definitions from the chunks. Standard const
 ## Chemistry-specific item-writing
 
 - Verify the chemistry (balance equations, check oxidation states, confirm IUPAC names) before emitting the item.
-- Describe any structure, mechanism, or experimental setup in text precisely.
+- For structure / IUPAC / mechanism / stereochemistry questions, prefer \`visual: { caption, altText, spec: { kind: "chemistry_molecule", smiles: "...", display: "2d", label } }\` over describing structures in words.
+- For balanced-equation, mechanism-arrow, and stoichiometry questions, prefer \`visual: { caption, altText, spec: { kind: "chemistry_reaction", ce: "<mhchem>", label } }\` over plain-text equations.
+- Never write a structure in prose ("a six-carbon ring with...") if a SMILES string captures it. Never write a balanced equation in plain text if mhchem captures it. Inside \`visual.spec\` text labels (compound names, conditions over the arrow), LaTeX is supported: \`$\\Delta$\`, \`$\\xrightarrow{cat.}$\`.
 
 ## Chemistry-specific distractors
 
@@ -315,7 +324,7 @@ Do not introduce material outside the student's current grade level or chapters 
 
 MCQ — identification of structures and processes, naming of organisms, recognition of life-cycle stages, distinguishing between similar terms, single-fact recall, assertion–reason in standard CBSE four-option format. FIB — scientific name completion, term recall, labelled-structure identification described in text. Short-answer (50–80 words) — explanation of a process, structure-with-function description, justification of a biological observation, single-step inheritance problems. Long-answer — multi-step processes (Calvin cycle, glycolysis, Krebs cycle, urea cycle, gametogenesis), complete inheritance problems with Punnett-square reasoning, biotechnology process descriptions (PCR, restriction digestion, recombinant DNA workflow), case-based items (100–200 word stimulus + 2–3 sub-parts).
 
-Diagram-based items are central — describe the figure (organ, organelle, life-cycle stage, cross-section, ecosystem flow) entirely in text with sufficient detail (relative positions, named parts present, distinguishing features) so a student can mentally reconstruct it.
+Diagram-based items: v1 has no biology_diagram renderer in the visual set, so set \`visual: null\` and write a self-contained stem. Do NOT describe an imagined figure in prose; rephrase the item so it can be answered from the names, properties, and processes alone (e.g., "Identify the organelle responsible for ATP synthesis" rather than "In the figure shown, label the organelle that…"). Curated biology illustrations are planned for a later release.
 
 ## Subject-specific grounding
 
@@ -362,20 +371,27 @@ Use formulas, theorems, identities, and named results from the chunks. Standard 
 ## Mathematics-specific item-writing
 
 - Verify the mathematics internally before emitting the item.
-- Describe any figure, region, or graph in text precisely; for matrices, write them out explicitly with a markdown table or by stating the entries.
+- For figures, regions, conics, vectors, 3D-geometry diagrams, and graphs, emit a \`visual\` (math_geometry / math_function_plot / number_line) instead of describing the figure in prose. For matrices and other tabular data the structured \`data_table\` visual or a markdown table inside \`question_text\` is acceptable.
 - Choose numbers so intermediate steps are clean. Difficulty comes from depth of reasoning and step count, not heavy arithmetic, ugly numbers, or trick wording.
 
 ## Mathematics-specific distractors
 
 Sign errors in trigonometry (especially angles in the second/third/fourth quadrants); confusion between sin⁻¹ and (sin x)⁻¹ = csc x; derivative vs antiderivative reversed; chain rule applied incorrectly; product/quotient rule sign errors; matrix multiplication non-commutativity ignored; det(AB) vs det(A)+det(B) confusion; definite vs indefinite integration (forgetting limits, forgetting +C); permutation vs combination; P(A∩B) vs P(A∪B); P(A|B) vs P(B|A) in Bayes; conic equation sign confusion; vector dot vs cross product (scalar vs vector result); equation of a line in vector form vs equation of a plane; AP common difference vs GP common ratio applied to the wrong sequence; interval notation mistakes (open vs closed); domain vs range in inverse-trig functions; one-one vs onto.
 
+## Visual routing
+
+- Coordinate geometry, conic sections, vector + 3D-geometry diagrams SHOULD use \`math_geometry\`.
+- "Sketch", "plot", inflection / extrema / increasing-decreasing / continuity items SHOULD use \`math_function_plot\`.
+- Set / interval / inequality items use \`number_line\`.
+- Pure algebra, identities, integration techniques, matrix arithmetic, and proofs use \`visual: null\`.
+
 ## Output formatting
 
-- Notation: Unicode where possible — superscripts (x², x³, x⁻¹, eˣ), subscripts (x₀, x₁, aₙ), Greek letters (α, β, γ, δ, θ, λ, μ, π, σ, ω, Δ, Σ), symbols (√, ∫, ∑, ∏, ∞, ∈, ∉, ⊆, ⊂, ∪, ∩, ∅, →, ⇒, ⇔, ≤, ≥, ≠, ±, ·, ×, ÷). ASCII fallback (sqrt(2x+1), integral from 0 to π of sin(x) dx, dy/dx, d²y/dx², lim(x→0), Σ(n=1 to ∞), C(n,r), P(n,r)).
+- Notation in \`question_text\`: Unicode where possible — superscripts (x², x³, x⁻¹, eˣ), subscripts (x₀, x₁, aₙ), Greek letters (α, β, γ, δ, θ, λ, μ, π, σ, ω, Δ, Σ), symbols (√, ∫, ∑, ∏, ∞, ∈, ∉, ⊆, ⊂, ∪, ∩, ∅, →, ⇒, ⇔, ≤, ≥, ≠, ±, ·, ×, ÷). ASCII fallback (sqrt(2x+1), integral from 0 to π of sin(x) dx, dy/dx, d²y/dx², lim(x→0), Σ(n=1 to ∞), C(n,r), P(n,r)). Inside \`visual.spec\` text labels LaTeX IS supported — \`$x_0$\`, \`$\\theta$\` will render.
 - Matrices: markdown table for display, e.g. \`| 1 | 2 | / | 3 | 4 |\`; or "Let A be the 2×2 matrix with entries a₁₁=1, a₁₂=2, a₂₁=3, a₂₂=4." Be consistent within a test.
 - Vectors: arrow notation (a⃗, b⃗) or unit-vector notation (î, ĵ, k̂); magnitudes as |a⃗|.
 - Sets and intervals: ∈, ∉, ⊆, ⊂, ∪, ∩, ∅; intervals as (a, b), [a, b], [a, b), (a, b].
-- Probability: P(A), P(A|B), P(A ∩ B), P(A ∪ B); E(X), Var(X). No LaTeX delimiters.
+- Probability: P(A), P(A|B), P(A ∩ B), P(A ∪ B); E(X), Var(X). No LaTeX delimiters in \`question_text\`.
 - Currency: ₹. Names in word problems: Indian. Word-problem contexts: Indian everyday life.`,
 
 	accountancy:
@@ -422,7 +438,9 @@ Use accounting standards, definitions, formulas, and named conventions from the 
 ## Accountancy-specific item-writing
 
 - Verify figures balance and entries reconcile before emitting the item.
-- Present transaction lists, trial balances, and adjustments completely in the question.
+- Journalising, posting, trial balance, balance sheet, P&L, cash book, and rectification items MUST emit an \`accountancy_table\` visual showing either the GIVEN stimulus (data the student must work from) OR the BLANK skeleton the student must fill — never both. Theory items use \`visual: null\`.
+- The \`accountancy_table\` spec carries a \`subKind\` (journal_entry, ledger, trial_balance, balance_sheet, p_and_l, cash_book, rectification) which selects the column shape; pick whichever matches the question. Amounts are plain numbers (15000), no commas, no symbol — the renderer formats as ₹15,000 with Indian-numbering grouping.
+- Present transaction lists, trial balances, and adjustments completely in the visual when one is emitted; if no visual, present them in the stem.
 
 ## Accountancy-specific distractors
 
@@ -497,7 +515,9 @@ Use formulas, definitions, named policies, and historical references from the ch
 
 - Verify Statistics computations internally before emitting the item.
 - Choose numbers in Statistics problems so that intermediate steps are clean.
-- Describe data tables, scenarios, and curve descriptions completely in text.
+- Demand–supply, AS–AD, IS–LM, PPF, indifference, and Phillips-curve items MUST emit an \`economics_curve\` visual whose \`curves[].expr\` are functions of \`p\` (price on the x-axis). Mark equilibria, intercepts, or inflection points using the spec's \`marks\` array. The renderer substitutes \`p\` → \`x\` before plotting; do NOT pre-substitute.
+- Statistics items that require inference from grouped data, distribution shape, or regression direction MUST emit a \`statistics_chart\` (subKind: histogram | bar | line | scatter | pie | frequency_polygon | ogive | box) showing the data the question refers to. For ogive include \`cumulative\` ("less_than" or "more_than"). Computation-only items ("calculate elasticity from Q1, Q2, P1, P2") use \`visual: null\` and present the values inline.
+- Generic stimulus tables (e.g., a 6-row class-frequency table feeding a mean / median question) can use \`data_table\` if neither \`accountancy_table\` nor \`statistics_chart\` fits.
 
 ## Economics-specific distractors
 
