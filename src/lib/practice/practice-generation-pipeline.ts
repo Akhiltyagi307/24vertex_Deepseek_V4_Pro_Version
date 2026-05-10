@@ -76,11 +76,18 @@ export type RunGenerationPipelineOptions = {
 /**
  * Tag attached to `ai_calls.prompt_id` and to `practice_generation_attempts`
  * analytics events so we can A/B prompt rewrites against historical baselines.
- * Bump when shipping a behavior-affecting prompt change. Current revision:
+ * Bump when shipping a behavior-affecting prompt change.
+ *
  * v4 — strict-schema-on, hard-gates + final-compliance recap, compact user
- * message, moderate preamble trim (release v3.2.1).
+ *      message, moderate preamble trim (release v3.2.1).
+ * v5 — student-friendly language block (Goal B), Visuals discipline block +
+ *      per-subject reconciliations + visual quality gates (Goal A), the
+ *      QuestionVisualEnvelope schema field, dormant autofix + quality gates
+ *      wired into the pipeline. Pass-2 validator (PRACTICE_VISUAL_VALIDATOR)
+ *      is wired but a no-op until the OpenAI Skills + shell-tool integration
+ *      goes live.
  */
-export const PRACTICE_PROMPT_REVISION = "v4" as const;
+export const PRACTICE_PROMPT_REVISION = "v5" as const;
 
 function formatGenerationError(e: unknown): string {
 	if (APICallError.isInstance(e)) {
