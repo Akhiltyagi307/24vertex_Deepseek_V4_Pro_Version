@@ -1,4 +1,5 @@
 import {
+	boolean,
 	check,
 	index,
 	integer,
@@ -14,7 +15,7 @@ import { sql } from "drizzle-orm";
 import { subjects, topics } from "./academic";
 import { profiles } from "./profiles";
 
-/** Student "doubt chat" threads: one row per topic-scoped conversation. */
+/** Student "doubt chat" threads: topic-scoped (`topicId` set) or chapter-scoped (`topicId` null + metadata.chapter). */
 export const doubtConversations = pgTable(
 	"doubt_conversations",
 	{
@@ -25,9 +26,7 @@ export const doubtConversations = pgTable(
 		subjectId: uuid("subject_id")
 			.notNull()
 			.references(() => subjects.id, { onDelete: "restrict" }),
-		topicId: uuid("topic_id")
-			.notNull()
-			.references(() => topics.id, { onDelete: "restrict" }),
+		topicId: uuid("topic_id").references(() => topics.id, { onDelete: "restrict" }),
 		title: text("title"),
 		model: varchar("model", { length: 120 }),
 		metadata: jsonb("metadata").default({}),
@@ -50,6 +49,8 @@ export const doubtMessages = pgTable(
 		role: varchar("role", { length: 20 }).notNull(),
 		/** User messages: tutor mode when sent. Assistant rows leave null. */
 		tutorMode: varchar("tutor_mode", { length: 20 }),
+		/** Scope bootstrap / system context — excluded from UI when true. */
+		isHidden: boolean("is_hidden").notNull().default(false),
 		content: text("content").notNull(),
 		promptTokens: integer("prompt_tokens"),
 		completionTokens: integer("completion_tokens"),

@@ -47,7 +47,24 @@ describe("doubtChatBodySchema", () => {
 		expect(r.success).toBe(false);
 	});
 
-	it("rejects non-UUID topicId", () => {
+	it("accepts null topicId for chapter-scoped chats", () => {
+		const r = doubtChatBodySchema.safeParse({ ...validBody, topicId: null });
+		expect(r.success, JSON.stringify(r.success ? "" : r.error.flatten())).toBe(true);
+		if (r.success) expect(r.data.topicId).toBeNull();
+	});
+
+	it("defaults omitted topicId to null", () => {
+		const omitTopic = (b: typeof validBody) => {
+			const copy: Record<string, unknown> = { ...b };
+			delete copy.topicId;
+			return copy;
+		};
+		const r = doubtChatBodySchema.safeParse(omitTopic(validBody));
+		expect(r.success).toBe(true);
+		if (r.success) expect(r.data.topicId).toBeNull();
+	});
+
+	it("rejects invalid topicId string", () => {
 		const r = doubtChatBodySchema.safeParse({ ...validBody, topicId: "still-not-a-uuid" });
 		expect(r.success).toBe(false);
 	});

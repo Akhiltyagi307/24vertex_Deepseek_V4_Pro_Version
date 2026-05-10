@@ -24,7 +24,9 @@ vi.mock("@/lib/env", () => ({
 }));
 
 vi.mock("@/lib/doubt/validate-doubt-scope", () => ({
-	validateDoubtScope: vi.fn(),
+	validateDoubtTopicScope: vi.fn(),
+	validateDoubtChapterScope: vi.fn(),
+	buildChapterMetadataPayload: vi.fn(),
 }));
 
 vi.mock("@/lib/doubt/loaders", () => ({

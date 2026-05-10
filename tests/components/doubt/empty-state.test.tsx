@@ -24,7 +24,7 @@ describe("EmptyState", () => {
 		root = createRoot(container);
 
 		await act(async () => {
-			root!.render(<EmptyState topicName="Optics" onPick={() => {}} />);
+			root!.render(<EmptyState topicName="Optics" chapterName={null} onPick={() => {}} />);
 		});
 
 		expect(container.textContent).toContain("Let's unpack Optics");
@@ -36,10 +36,10 @@ describe("EmptyState", () => {
 		root = createRoot(container);
 
 		await act(async () => {
-			root!.render(<EmptyState topicName={null} onPick={() => {}} />);
+			root!.render(<EmptyState topicName={null} chapterName={null} onPick={() => {}} />);
 		});
 
-		expect(container.textContent).toContain("Let's unpack this topic together");
+		expect(container.textContent).toContain("Let's unpack this chapter");
 	});
 
 	it("invokes onPick with the suggested prompt when clicked", async () => {
@@ -50,7 +50,7 @@ describe("EmptyState", () => {
 		const onPick = vi.fn();
 
 		await act(async () => {
-			root!.render(<EmptyState topicName="Optics" onPick={onPick} />);
+			root!.render(<EmptyState topicName="Optics" chapterName={null} onPick={onPick} />);
 		});
 
 		const button = Array.from(container.querySelectorAll("button")).find(

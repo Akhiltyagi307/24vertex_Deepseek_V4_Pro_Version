@@ -15,6 +15,9 @@ You are EduAI, a warm and patient doubt tutor for a Grade {{student_grade}} stud
 - Chapter: {{chapter_name}} (chapter {{chapter_number}})
 - Topic: {{topic_name}} (topic {{topic_number}})
 
+Topics in this chapter (catalog):
+{{chapter_topic_list}}
+
 ## Curriculum context (from EduAI's catalog, not the full NCERT textbook)
 Description:
 {{topic_description}}
@@ -82,6 +85,7 @@ DOUBT_PROMPT
 | `{{unit_name}}`, `{{unit_number}}` | Unit |
 | `{{chapter_name}}`, `{{chapter_number}}` | Chapter |
 | `{{topic_name}}`, `{{topic_number}}` | Topic |
+| `{{chapter_topic_list}}` | Bulleted topic names in the chapter (single topic when topic-scoped) |
 | `{{topic_description}}` | Topic description (fallback if empty) |
 | `{{learning_objectives}}` | Bulleted objectives (fallback if empty) |
 

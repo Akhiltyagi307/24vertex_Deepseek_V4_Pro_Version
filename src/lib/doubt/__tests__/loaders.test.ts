@@ -40,6 +40,7 @@ type Builder = {
 	select: () => Builder;
 	eq: () => Builder;
 	in: () => Builder;
+	or: () => Builder;
 	order: (col: string, opts?: { ascending?: boolean }) => Builder;
 	limit: (n: number) => Promise<{ data: Row[]; error: null }>;
 	then: (
@@ -65,6 +66,7 @@ function buildSupabase(allRows: Row[]): Supabase {
 		select: () => builder,
 		eq: () => builder,
 		in: () => builder,
+		or: () => builder,
 		order: (_col, opts) => {
 			state.ascending = opts?.ascending ?? true;
 			return builder;

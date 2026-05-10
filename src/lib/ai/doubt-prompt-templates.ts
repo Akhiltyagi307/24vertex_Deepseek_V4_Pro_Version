@@ -62,23 +62,53 @@ export function interpolateDoubtPromptTemplate(
 	template: string,
 	scope: DoubtScopeSuccess,
 ): string {
-	const t = scope.topic;
-	const desc = t.description?.trim() || EMPTY_DESC_FALLBACK;
-	const goalsLines =
-		t.learningObjectives?.filter((s) => s.trim().length > 0).map((s) => `- ${s}`).join("\n") || EMPTY_GOALS_FALLBACK;
-
-	const vars: Record<string, string> = {
-		student_grade: String(scope.studentGrade),
-		subject_name: scope.subjectName,
-		unit_name: t.unitName,
-		unit_number: String(t.unitNumber),
-		chapter_name: t.chapterName,
-		chapter_number: String(t.chapterNumber),
-		topic_name: t.topicName,
-		topic_number: String(t.topicNumber),
-		topic_description: desc,
-		learning_objectives: goalsLines,
-	};
+	let vars: Record<string, string>;
+	if (scope.kind === "topic") {
+		const t = scope.topic;
+		const descFromChunks = t.contextChunksBlock?.trim() ?? "";
+		const chunksOnly = descFromChunks.length > 0;
+		const desc = descFromChunks || t.description?.trim() || EMPTY_DESC_FALLBACK;
+		const goalsLines = chunksOnly
+			? "Use ONLY the topic_context_chunks content above as grounding. If a detail is missing there, state that clearly."
+			: t.learningObjectives?.filter((s) => s.trim().length > 0).map((s) => `- ${s}`).join("\n") ||
+				EMPTY_GOALS_FALLBACK;
+		vars = {
+			student_grade: chunksOnly ? "not provided" : String(scope.studentGrade),
+			subject_name: chunksOnly ? "not provided" : scope.subjectName,
+			unit_name: chunksOnly ? "not provided" : t.unitName,
+			unit_number: chunksOnly ? "not provided" : String(t.unitNumber),
+			chapter_name: chunksOnly ? "not provided" : t.chapterName,
+			chapter_number: chunksOnly ? "not provided" : String(t.chapterNumber),
+			topic_name: chunksOnly ? "selected topic (metadata omitted)" : t.topicName,
+			topic_number: chunksOnly ? "not provided" : String(t.topicNumber),
+			topic_description: desc,
+			learning_objectives: goalsLines,
+			chapter_topic_list: chunksOnly
+				? "(omitted intentionally — rely only on topic_context_chunks text)"
+				: `- ${t.topicName}`,
+		};
+	} else {
+		const ch = scope.chapter;
+		const descFromChunks = ch.contextChunksBlock?.trim() ?? "";
+		const chunksOnly = descFromChunks.length > 0;
+		vars = {
+			student_grade: chunksOnly ? "not provided" : String(scope.studentGrade),
+			subject_name: chunksOnly ? "not provided" : scope.subjectName,
+			unit_name: chunksOnly ? "not provided" : ch.unitName,
+			unit_number: chunksOnly ? "not provided" : String(ch.unitNumber),
+			chapter_name: chunksOnly ? "not provided" : ch.chapterName,
+			chapter_number: chunksOnly ? "not provided" : String(ch.chapterNumber),
+			topic_name: chunksOnly ? "selected chapter (metadata omitted)" : "Whole chapter (all syllabus topics listed below)",
+			topic_number: chunksOnly ? "not provided" : "—",
+			topic_description: descFromChunks || ch.topicDescription,
+			learning_objectives: chunksOnly
+				? "Use ONLY the topic_context_chunks content above as grounding. If a detail is missing there, state that clearly."
+				: ch.learningObjectivesBlock,
+			chapter_topic_list: chunksOnly
+				? "(omitted intentionally — rely only on topic_context_chunks text)"
+				: ch.topicNamesBlock,
+		};
+	}
 
 	let out = template;
 	for (const [key, value] of Object.entries(vars)) {

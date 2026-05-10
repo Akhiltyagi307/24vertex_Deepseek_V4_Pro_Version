@@ -2,6 +2,15 @@ import type { DoubtChatTopicRow } from "@/lib/doubt/loaders";
 
 export const chapterKeyFromRow = (t: DoubtChatTopicRow) => `${t.unitNumber}:${t.chapterNumber}`;
 
+export function parseChapterKey(key: string): { unitNumber: number; chapterNumber: number } | null {
+	const parts = key.split(":");
+	if (parts.length !== 2) return null;
+	const unitNumber = Number.parseInt(parts[0]!, 10);
+	const chapterNumber = Number.parseInt(parts[1]!, 10);
+	if (!Number.isFinite(unitNumber) || !Number.isFinite(chapterNumber)) return null;
+	return { unitNumber, chapterNumber };
+}
+
 /**
  * Group flat topic rows into chapter groups for select UI.
  */

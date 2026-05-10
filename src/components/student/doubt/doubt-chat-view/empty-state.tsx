@@ -5,17 +5,20 @@ import { SUGGESTED_PROMPTS } from "./types";
 
 export function EmptyState({
 	topicName,
+	chapterName,
 	onPick,
 }: {
 	topicName: string | null;
+	chapterName: string | null;
 	onPick: (text: string) => void;
 }) {
+	const scopeLabel = topicName ?? chapterName ?? "this chapter";
 	return (
 		<div className="flex w-full flex-col items-center gap-4 pt-4 medium:pt-8">
 			<div className="flex w-full min-w-0 flex-col items-center gap-4 text-center medium:w-1/2">
 				<div className="min-w-0 w-full space-y-1.5">
 					<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
-						{topicName ? `Let's unpack ${topicName}` : "Let's unpack this topic together"}
+						{`Let's unpack ${scopeLabel}`}
 					</h3>
 					<PageHeaderSubtext variant="wrap" className="text-center">
 						Ask about concepts, worked examples, or practice questions. Answers stay scoped to your

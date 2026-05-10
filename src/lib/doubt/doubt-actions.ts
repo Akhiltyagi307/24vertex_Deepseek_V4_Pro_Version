@@ -2,8 +2,14 @@
 
 import { z } from "zod";
 
+import { buildDoubtHiddenBootstrapUserContent } from "@/lib/doubt/doubt-hidden-bootstrap";
 import { loadDoubtTopicRows, type DoubtChatEntitlement, type DoubtChatTopicRow } from "@/lib/doubt/loaders";
-import { validateDoubtScope } from "@/lib/doubt/validate-doubt-scope";
+import { parseChapterKey } from "@/lib/doubt/chapter-group";
+import {
+	buildChapterMetadataPayload,
+	validateDoubtChapterScope,
+	validateDoubtTopicScope,
+} from "@/lib/doubt/validate-doubt-scope";
 import { getEntitlements } from "@/lib/billing/entitlements";
 import { getOpenAIDoubtChatModel } from "@/lib/env";
 import {
@@ -14,22 +20,35 @@ import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { getStudentSubjectsRpc } from "@/lib/student/get-student-subjects-rpc";
 import { createClient } from "@/lib/supabase/server";
 
-const createSchema = z.object({
-	subjectId: z.string().uuid(),
-	topicId: z.string().uuid(),
-});
+const createSchema = z
+	.object({
+		subjectId: z.string().uuid(),
+		topicId: z.string().uuid().optional(),
+		chapterKey: z.string().regex(/^\d+:\d+$/, "Invalid chapter key.").optional(),
+	})
+	.superRefine((val, ctx) => {
+		const hasTopic = val.topicId != null && val.topicId.length > 0;
+		const hasChapter = val.chapterKey != null && val.chapterKey.length > 0;
+		if (hasTopic === hasChapter) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "Provide exactly one of topicId or chapterKey.",
+				path: hasTopic ? ["chapterKey"] : ["topicId"],
+			});
+		}
+	});
 
 export type CreateDoubtConversationResult =
 	| { ok: true; conversationId: string; title: string }
 	| { ok: false; code: string; message: string };
 
 /**
- * Inserts a doubt_conversations row (topic-scoped) before the first streamed message.
+ * Inserts a doubt_conversations row (topic- or chapter-scoped) and a hidden bootstrap user message.
  */
 export async function createDoubtConversation(input: unknown): Promise<CreateDoubtConversationResult> {
 	const parsed = createSchema.safeParse(input);
 	if (!parsed.success) {
-		return { ok: false, code: "validation_error", message: "Check your subject and topic selection." };
+		return { ok: false, code: "validation_error", message: "Check your subject, chapter, and topic selection." };
 	}
 
 	const supabase = await createClient();
@@ -37,26 +56,48 @@ export async function createDoubtConversation(input: unknown): Promise<CreateDou
 	if (!rate.ok) {
 		return { ok: false, code: "rate_limited", message: rate.message };
 	}
-	const scope = await validateDoubtScope(supabase, {
-		subjectId: parsed.data.subjectId,
-		topicId: parsed.data.topicId,
-	});
+
+	const { subjectId } = parsed.data;
+	const scope = await (async () => {
+		if (parsed.data.topicId) {
+			return validateDoubtTopicScope(supabase, { subjectId, topicId: parsed.data.topicId });
+		}
+		const coords = parseChapterKey(parsed.data.chapterKey!);
+		if (!coords) {
+			return {
+				ok: false as const,
+				code: "validation_error" as const,
+				message: "Invalid chapter selection.",
+			};
+		}
+		return validateDoubtChapterScope(supabase, {
+			subjectId,
+			unitNumber: coords.unitNumber,
+			chapterNumber: coords.chapterNumber,
+		});
+	})();
+
 	if (!scope.ok) {
 		return { ok: false, code: scope.code, message: scope.message };
 	}
 
-	const title = `${scope.topic.topicName} — ${scope.subjectName}`;
+	const title =
+		scope.kind === "topic"
+			? `${scope.topic.topicName} — ${scope.subjectName}`
+			: `Ch ${scope.chapter.chapterNumber}: ${scope.chapter.chapterName} — ${scope.subjectName}`;
 	const model = getOpenAIDoubtChatModel();
+	const metadata =
+		scope.kind === "chapter" ? (buildChapterMetadataPayload(scope) as unknown as Record<string, unknown>) : {};
 
 	const { data: created, error } = await supabase
 		.from("doubt_conversations")
 		.insert({
 			student_id: scope.userId,
 			subject_id: scope.subjectId,
-			topic_id: scope.topic.id,
+			topic_id: scope.kind === "topic" ? scope.topic.id : null,
 			title,
 			model,
-			metadata: {},
+			metadata,
 		})
 		.select("id")
 		.single();
@@ -68,7 +109,25 @@ export async function createDoubtConversation(input: unknown): Promise<CreateDou
 		return { ok: false, code: "database_error", message: "Could not start a new chat. Try again." };
 	}
 
-	return { ok: true, conversationId: created.id, title };
+	const conversationId = created.id as string;
+	const bootstrap = buildDoubtHiddenBootstrapUserContent(scope);
+	const hiddenInsert = await supabase.from("doubt_messages").insert({
+		conversation_id: conversationId,
+		role: "user",
+		content: bootstrap,
+		is_hidden: true,
+	});
+
+	if (hiddenInsert.error) {
+		logSupabaseError("createDoubtConversation.hidden_bootstrap", hiddenInsert.error, {
+			userId: scope.userId,
+			conversationId,
+		});
+		await supabase.from("doubt_conversations").delete().eq("id", conversationId);
+		return { ok: false, code: "database_error", message: "Could not start a new chat. Try again." };
+	}
+
+	return { ok: true, conversationId, title };
 }
 
 const topicListSchema = z.object({
