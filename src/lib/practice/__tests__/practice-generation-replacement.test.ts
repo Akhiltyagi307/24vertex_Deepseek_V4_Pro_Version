@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildCompactModerationReplacementPrompt,
 	buildLegacyModerationReplacementPrompt,
+	buildVisualFixReplacementPrompt,
 } from "../practice-generation-replacement";
 
 const ARGS = {
@@ -32,5 +33,20 @@ describe("replacement prompt builders", () => {
 		expect(text).toContain("Generate replacement practice questions as strict JSON");
 		expect(text).toContain("REQUIRED_BUCKET_LENGTHS");
 		expect(text).toContain("BLOCKED_QUESTION_TEXTS");
+	});
+
+	it("visual fix prompt scopes regeneration to FAILED_INDEXES", () => {
+		const text = buildVisualFixReplacementPrompt({
+			baseUserPrompt: "BASE_PROMPT_TEXT",
+			failedQuestionIndexes: [3, 7],
+			failureCode: "stem_references_missing_visual",
+			failureDetails: "2 question(s) reference a visual that wasn't emitted.",
+		});
+		expect(text).toContain("BASE_PROMPT_TEXT");
+		expect(text).toContain("VISUAL_FIX_MODE");
+		expect(text).toContain("Failure code: stem_references_missing_visual");
+		expect(text).toContain('"FAILED_INDEXES"'.replace(/"/g, "")); // tolerate either JSON layout
+		expect(text).toContain("[3,7]");
+		expect(text).toContain("(b) set visual to null and rewrite the stem");
 	});
 });
