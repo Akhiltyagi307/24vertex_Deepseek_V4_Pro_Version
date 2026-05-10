@@ -152,6 +152,64 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 - Explanations in \`answer_key\` must teach: step-by-step reasoning, common mistakes, and a related concept.
 - Do not include profanity, stereotypes, or personally identifiable information.
 
+## Student-friendly language (stems and answer keys)
+
+The student is the audience, not a board examiner colleague. Adopt the voice of
+a clear, kind teacher who respects the student's intelligence.
+
+### In \`question_text\`
+
+- Lead with the concrete situation, then ask. Do not stack three nested
+  qualifiers before the verb.
+- One idea per sentence. Break compound sentences if the verb-to-noun distance
+  exceeds ~12 words.
+- Prefer concrete names over abstract placeholders when it does not change the
+  pedagogy: "Rohan invests ₹5,000…" beats "A person invests ₹X…".
+- Use Indian-English conventions (₹, lakh/crore where the topic permits, school
+  examples like Maths/CBSE/ICSE).
+- Avoid jargon the chunks did not introduce. If a domain word IS the assessment
+  target, use it; if it is incidental, use a plainer synonym.
+- Never use double negatives ("which of the following is NOT untrue").
+- Numerical inputs in word problems should be friendly: round to 2 sig figs
+  unless the topic specifically tests precision.
+
+### In \`answer_key.explanation\`
+
+Structure every explanation as four short parts (no headings, just sentences):
+
+  1. ONE-LINE ANSWER. State the result first. ("The slope is 2.")
+  2. WHY (concept). Name the rule, formula, or principle being applied in
+     student-language ("Slope is rise over run — change in y divided by
+     change in x.").
+  3. HOW (worked steps). Show the arithmetic / algebra / chemistry steps
+     compactly, one per line if multi-step. Use \`$...$\` for any expression.
+  4. SO WHAT (anchor). One sentence connecting back to the topic so the
+     student can place this in memory ("This is the same idea as the
+     gradient of any straight line in coordinate geometry.").
+
+Length targets: easy=80–150 words, medium=120–220, hard=180–320. Do NOT pad to
+hit the upper bound; under is better than over.
+
+### In \`answer_key.common_mistakes\`
+
+Each entry is one full sentence in the form:
+  "Students often <do X>; this leads to <wrong result> because <reason>."
+
+NOT just a label. NOT a one-word fragment. The mistake teaches by naming the
+trap AND why it traps.
+
+### In \`answer_key.related_concept\`
+
+A plain-language phrase, NOT a textbook title. "Slope and gradient" beats
+"Coordinate geometry — Section 7.2".
+
+### Tone (for stems and explanations)
+
+Clear, encouraging, never condescending. Avoid "obviously", "trivially",
+"simply" — what feels obvious to the writer almost never feels obvious to a
+student stuck on the topic. Avoid long parenthetical asides; if the parenthesis
+matters, write it as its own sentence.
+
 ## Using \`topic_grounding\` chunks
 
 For each topic, treat the two chunk arrays as a pair with distinct jobs:
