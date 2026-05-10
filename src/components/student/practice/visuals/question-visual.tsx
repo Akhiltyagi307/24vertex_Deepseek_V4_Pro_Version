@@ -70,6 +70,14 @@ const EconomicsCurve = dynamic(
 	() => import("./renderers/economics-curve").then((m) => ({ default: m.EconomicsCurve })),
 	{ ssr: false, loading: () => <RendererLoading /> },
 );
+const DataTable = dynamic(
+	() => import("./renderers/data-table").then((m) => ({ default: m.DataTable })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const EnglishPassage = dynamic(
+	() => import("./renderers/english-passage").then((m) => ({ default: m.EnglishPassage })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
 export function QuestionVisual({
 	visual,
 	className,
@@ -124,14 +132,9 @@ function RendererDispatch({
 			return <StatisticsChart spec={spec} />;
 		case "economics_curve":
 			return <EconomicsCurve spec={spec} />;
-		default:
-			// Fallback for kinds whose renderer hasn't shipped yet. Visible to
-			// internal QA only; PRACTICE_VISUALS=false in production keeps the
-			// model from emitting any visual until renderers land.
-			return (
-				<span className="text-muted-foreground text-sm" aria-hidden="true">
-					Visual ({spec.kind}) not yet supported on this client.
-				</span>
-			);
+		case "data_table":
+			return <DataTable spec={spec} />;
+		case "english_passage":
+			return <EnglishPassage spec={spec} />;
 	}
 }

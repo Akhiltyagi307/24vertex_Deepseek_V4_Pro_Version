@@ -49,20 +49,27 @@ describe("QuestionVisual dispatcher", () => {
 		);
 	});
 
-	it("renders a fallback message when the spec's kind has no renderer registered", () => {
-		// Pick an exemplar whose kind hasn't been wired yet in this commit.
-		// Update or drop this case as renderers ship in subsequent commits.
-		const unsupportedExemplar = VISUAL_EXEMPLARS.find(
-			(ex) => ex.visual?.spec.kind === "english_passage",
-		);
-		expect(unsupportedExemplar?.visual).toBeTruthy();
-		container = document.createElement("div");
-		document.body.appendChild(container);
-		root = createRoot(container);
-		act(() => {
-			root!.render(<QuestionVisual visual={unsupportedExemplar!.visual} />);
-		});
-		const figure = container.querySelector("[data-question-visual]");
-		expect(figure?.textContent ?? "").toContain("not yet supported");
+	it("dispatches every exemplar without throwing", () => {
+		// All eleven kinds have renderers wired. Every exemplar should mount
+		// (renderers are dynamic-imported so we may see a loading placeholder
+		// rather than the final visual; we just assert the figure shell appears).
+		for (const exemplar of VISUAL_EXEMPLARS) {
+			if (!exemplar.visual) continue;
+			container = document.createElement("div");
+			document.body.appendChild(container);
+			root = createRoot(container);
+			act(() => {
+				root!.render(<QuestionVisual visual={exemplar.visual} />);
+			});
+			const figure = container.querySelector("[data-question-visual]");
+			expect(figure).not.toBeNull();
+			expect(figure?.getAttribute("data-question-visual-kind")).toBe(
+				exemplar.visual!.spec.kind,
+			);
+			act(() => {
+				root!.unmount();
+			});
+			document.body.replaceChildren();
+		}
 	});
 });

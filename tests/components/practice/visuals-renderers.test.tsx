@@ -10,11 +10,15 @@ import { ChemistryReaction } from "@/components/student/practice/visuals/rendere
 import { AccountancyTable } from "@/components/student/practice/visuals/renderers/accountancy-table";
 import { __test as accountancyTest } from "@/components/student/practice/visuals/renderers/accountancy-table";
 import { __test as economicsTest } from "@/components/student/practice/visuals/renderers/economics-curve";
+import { DataTable } from "@/components/student/practice/visuals/renderers/data-table";
+import { EnglishPassage } from "@/components/student/practice/visuals/renderers/english-passage";
 import type {
 	NumberLineSpec,
 	PhysicsDiagramSpec,
 	ChemistryReactionSpec,
 	AccountancyTableSpec,
+	DataTableSpec,
+	EnglishPassageSpec,
 } from "@/lib/practice/visuals/types";
 
 describe("<NumberLine />", () => {
@@ -313,5 +317,82 @@ describe("economics curve p→x substitution", () => {
 	});
 	it("handles p at the very start", () => {
 		expect(economicsTest.substitutePForX("p^2 + 1")).toBe("x^2 + 1");
+	});
+});
+
+describe("<DataTable />", () => {
+	let root: Root | null = null;
+	let container: HTMLDivElement;
+
+	afterEach(() => {
+		act(() => {
+			root?.unmount();
+		});
+		root = null;
+		document.body.replaceChildren();
+	});
+
+	it("renders headers and rows with cell alignment", () => {
+		const spec: DataTableSpec = {
+			kind: "data_table",
+			caption: "Plants per house",
+			headers: ["Number of plants", "Frequency"],
+			rows: [
+				[
+					{ value: "0", bold: false, align: "left" },
+					{ value: "1", bold: false, align: "right" },
+				],
+				[
+					{ value: "1", bold: false, align: "left" },
+					{ value: "5", bold: false, align: "right" },
+				],
+			],
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<DataTable spec={spec} />);
+		});
+		expect(container.querySelectorAll("th").length).toBe(2);
+		expect(container.querySelectorAll("tbody tr").length).toBe(2);
+		expect(container.textContent).toContain("Plants per house");
+	});
+});
+
+describe("<EnglishPassage />", () => {
+	let root: Root | null = null;
+	let container: HTMLDivElement;
+
+	afterEach(() => {
+		act(() => {
+			root?.unmount();
+		});
+		root = null;
+		document.body.replaceChildren();
+	});
+
+	it("renders one row per line with the line number", () => {
+		const spec: EnglishPassageSpec = {
+			kind: "english_passage",
+			title: "Excerpt",
+			source: "Anonymous",
+			lines: [
+				{ number: 1, text: "Line one of the poem." },
+				{ number: 2, text: "Line two of the poem." },
+				{ number: 3, text: "Line three of the poem." },
+			],
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<EnglishPassage spec={spec} />);
+		});
+		expect(container.textContent).toContain("Excerpt");
+		expect(container.textContent).toContain("Anonymous");
+		expect(container.textContent).toContain("1");
+		expect(container.textContent).toContain("Line one of the poem.");
+		expect(container.textContent).toContain("3");
 	});
 });
