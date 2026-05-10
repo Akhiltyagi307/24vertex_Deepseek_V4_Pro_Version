@@ -5,7 +5,13 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { NumberLine } from "@/components/student/practice/visuals/renderers/number-line";
-import type { NumberLineSpec } from "@/lib/practice/visuals/types";
+import { PhysicsDiagram } from "@/components/student/practice/visuals/renderers/physics-diagram";
+import { ChemistryReaction } from "@/components/student/practice/visuals/renderers/chemistry-reaction";
+import type {
+	NumberLineSpec,
+	PhysicsDiagramSpec,
+	ChemistryReactionSpec,
+} from "@/lib/practice/visuals/types";
 
 describe("<NumberLine />", () => {
 	let root: Root | null = null;
@@ -81,5 +87,133 @@ describe("<NumberLine />", () => {
 		});
 		const ticks = container.querySelectorAll("text");
 		expect(ticks.length).toBeLessThanOrEqual(220);
+	});
+});
+
+describe("<PhysicsDiagram /> — free body", () => {
+	let root: Root | null = null;
+	let container: HTMLDivElement;
+
+	afterEach(() => {
+		act(() => {
+			root?.unmount();
+		});
+		root = null;
+		document.body.replaceChildren();
+	});
+
+	it("renders one arrow per force", () => {
+		const spec: PhysicsDiagramSpec = {
+			kind: "physics_diagram",
+			subKind: "free_body",
+			bodyLabel: "Block",
+			forces: [
+				{ name: "W", magnitude: 49, angleDeg: 270 },
+				{ name: "N", magnitude: 42, angleDeg: 60 },
+			],
+			inclineDeg: 30,
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<PhysicsDiagram spec={spec} />);
+		});
+		const lines = container.querySelectorAll("line");
+		// 1 incline line + 2 force arrows = 3 lines minimum.
+		expect(lines.length).toBeGreaterThanOrEqual(3);
+		expect(container.textContent).toContain("Block");
+		expect(container.textContent).toContain("W");
+		expect(container.textContent).toContain("N");
+	});
+});
+
+describe("<PhysicsDiagram /> — circuit", () => {
+	let root: Root | null = null;
+	let container: HTMLDivElement;
+
+	afterEach(() => {
+		act(() => {
+			root?.unmount();
+		});
+		root = null;
+		document.body.replaceChildren();
+	});
+
+	it("renders nodes and components", () => {
+		const spec: PhysicsDiagramSpec = {
+			kind: "physics_diagram",
+			subKind: "circuit",
+			nodes: [
+				{ id: "a", x: 0, y: 0 },
+				{ id: "b", x: 4, y: 0 },
+				{ id: "c", x: 4, y: 3 },
+				{ id: "d", x: 0, y: 3 },
+			],
+			components: [
+				{
+					type: "battery",
+					from: "a",
+					to: "b",
+					emfVolts: 9,
+					label: "9V",
+				},
+				{ type: "resistor", from: "b", to: "c", resistanceOhms: 100, label: "R" },
+				{ type: "wire", from: "c", to: "d" },
+				{ type: "wire", from: "d", to: "a" },
+			],
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<PhysicsDiagram spec={spec} />);
+		});
+		expect(container.querySelectorAll("circle").length).toBeGreaterThanOrEqual(4);
+		expect(container.querySelectorAll("line").length).toBeGreaterThanOrEqual(4);
+	});
+});
+
+describe("<ChemistryReaction />", () => {
+	let root: Root | null = null;
+	let container: HTMLDivElement;
+
+	afterEach(() => {
+		act(() => {
+			root?.unmount();
+		});
+		root = null;
+		document.body.replaceChildren();
+	});
+
+	it("renders KaTeX HTML for a valid mhchem string", () => {
+		const spec: ChemistryReactionSpec = {
+			kind: "chemistry_reaction",
+			ce: "H2O + CO2 -> H2CO3",
+			label: "Carbonic acid formation",
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<ChemistryReaction spec={spec} />);
+		});
+		expect(container.querySelector(".katex")).not.toBeNull();
+		expect(container.textContent).toContain("Carbonic acid formation");
+	});
+
+	it("falls back gracefully on a syntactically broken mhchem string", () => {
+		const spec: ChemistryReactionSpec = {
+			kind: "chemistry_reaction",
+			ce: "\\garbage{",
+			label: null,
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<ChemistryReaction spec={spec} />);
+		});
+		expect(container.textContent ?? "").toContain("Could not render reaction");
 	});
 });

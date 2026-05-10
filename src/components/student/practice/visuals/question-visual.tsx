@@ -46,6 +46,18 @@ const NumberLine = dynamic(
 	() => import("./renderers/number-line").then((m) => ({ default: m.NumberLine })),
 	{ ssr: false, loading: () => <RendererLoading /> },
 );
+const PhysicsDiagram = dynamic(
+	() => import("./renderers/physics-diagram").then((m) => ({ default: m.PhysicsDiagram })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const ChemistryMolecule = dynamic(
+	() => import("./renderers/chemistry-molecule").then((m) => ({ default: m.ChemistryMolecule })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const ChemistryReaction = dynamic(
+	() => import("./renderers/chemistry-reaction").then((m) => ({ default: m.ChemistryReaction })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
 export function QuestionVisual({
 	visual,
 	className,
@@ -88,6 +100,12 @@ function RendererDispatch({
 			return <MathFunctionPlot spec={spec} />;
 		case "number_line":
 			return <NumberLine spec={spec} />;
+		case "physics_diagram":
+			return <PhysicsDiagram spec={spec} />;
+		case "chemistry_molecule":
+			return <ChemistryMolecule spec={spec} />;
+		case "chemistry_reaction":
+			return <ChemistryReaction spec={spec} />;
 		default:
 			// Fallback for kinds whose renderer hasn't shipped yet. Visible to
 			// internal QA only; PRACTICE_VISUALS=false in production keeps the
