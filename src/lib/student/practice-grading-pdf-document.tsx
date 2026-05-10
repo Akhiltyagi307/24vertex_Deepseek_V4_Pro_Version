@@ -4,6 +4,8 @@ import type { ReactElement, ReactNode } from "react";
 import { formatDuration } from "@/lib/student/subject-test-report";
 import { clampGenerationBlockForPdf, splitFeedbackForTwoQuestionPages } from "@/lib/student/practice-grading-pdf-chunks";
 import type { GradedQuestionItem, PracticeGradingSummary } from "@/lib/practice/grading-schema";
+import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
+import { QuestionVisualPdf } from "@/lib/student/practice-grading-pdf-visual";
 
 /**
  * Print theme: refined editorial PDF design — strong typographic hierarchy,
@@ -525,6 +527,12 @@ export type PracticeGradingPdfQuestion = GradedQuestionItem & {
 	question_difficulty: string | null;
 	/** Preformatted from questions.answer_key + options (generation pipeline). */
 	generation_answer_display: string;
+	/**
+	 * Stored visual envelope (parsed from `questions.metadata.visual`).
+	 * Null when the question has no visual or the envelope failed to parse —
+	 * in either case the PDF skips the visual section entirely.
+	 */
+	visual: QuestionVisualEnvelope | null;
 };
 
 export type PracticeGradingPdfCoverProps = {
@@ -877,6 +885,7 @@ function renderQuestionPageSequence(
 						<Text style={styles.sectionBody} wrap>
 							{q.question_text}
 						</Text>
+						<QuestionVisualPdf visual={q.visual} />
 					</View>
 				</Section>
 				<Section label="Your answer">

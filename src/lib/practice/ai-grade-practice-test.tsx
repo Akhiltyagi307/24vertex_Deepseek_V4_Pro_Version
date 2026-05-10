@@ -33,6 +33,7 @@ import {
 } from "@/lib/practice/student-answer-write";
 import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { PracticeGradingPdfDocument } from "@/lib/student/practice-grading-pdf-document";
+import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 import { createPhaseTimer, logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { withPracticeSpan } from "@/lib/practice/sentry-tags";
@@ -754,7 +755,9 @@ export async function buildPracticeGradingReportPdfBuffer(
 		admin.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
 		admin
 			.from("questions")
-			.select("id, topic_id, question_text, question_type, question_number, difficulty_level, options, answer_key")
+			.select(
+				"id, topic_id, question_text, question_type, question_number, difficulty_level, options, answer_key, metadata",
+			)
 			.eq("test_id", testId)
 			.order("question_number", { ascending: true }),
 	]);
@@ -893,6 +896,15 @@ export async function buildPracticeGradingReportPdfBuffer(
 			options: optionsRaw ?? null,
 			answerKeyJson: q.answer_key,
 		});
+		// Parse the stored visual envelope. Bad data degrades to no visual
+		// so the PDF render never fails on a corrupt blob.
+		const visualParse = parseStoredQuestionVisualFromMetadata((q as { metadata?: unknown }).metadata);
+		if (!visualParse.ok) {
+			logServerError("buildPracticeGradingReportPdfBuffer.parseStoredVisual", visualParse.reason, {
+				questionId: q.id as string,
+				testId,
+			});
+		}
 		return {
 			question_id: q.id as string,
 			topic_id: q.topic_id as string,
@@ -912,6 +924,7 @@ export async function buildPracticeGradingReportPdfBuffer(
 			question_type: q.question_type as string,
 			question_difficulty: (q.difficulty_level as string | null | undefined) ?? null,
 			generation_answer_display: generationDisplay,
+			visual: visualParse.ok ? visualParse.envelope : null,
 		};
 	});
 
