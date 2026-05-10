@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { LatexText } from "../latex-text";
+import { QuestionVisual } from "../visuals/question-visual";
 import type { PracticeSessionQuestion } from "@/components/student/practice/practice-session-types";
 import { difficultyClass } from "./shared";
 
@@ -199,6 +200,7 @@ export function QuestionCard({
 						<CardTitle className="text-foreground max-w-prose text-balance text-base font-semibold leading-relaxed tracking-tight medium:text-lg">
 							<LatexText text={active.question_text} />
 						</CardTitle>
+						<QuestionVisual visual={active.visual} />
 					</CardHeader>
 					<Separator className="shrink-0" />
 					<CardContent

@@ -4,6 +4,10 @@ import * as React from "react";
 import katex from "katex";
 
 import "katex/dist/katex.min.css";
+// Enables mhchem (\\ce{...}, \\pu{...}) for chemistry equations rendered
+// inside answer keys, explanations, and any future chemistry_reaction
+// visual that uses KaTeX. No new dependency — ships with `katex`.
+import "katex/dist/contrib/mhchem.mjs";
 
 import { cn } from "@/lib/utils";
 
