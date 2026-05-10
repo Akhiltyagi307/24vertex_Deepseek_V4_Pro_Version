@@ -7,10 +7,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { NumberLine } from "@/components/student/practice/visuals/renderers/number-line";
 import { PhysicsDiagram } from "@/components/student/practice/visuals/renderers/physics-diagram";
 import { ChemistryReaction } from "@/components/student/practice/visuals/renderers/chemistry-reaction";
+import { AccountancyTable } from "@/components/student/practice/visuals/renderers/accountancy-table";
+import { __test as accountancyTest } from "@/components/student/practice/visuals/renderers/accountancy-table";
+import { __test as economicsTest } from "@/components/student/practice/visuals/renderers/economics-curve";
 import type {
 	NumberLineSpec,
 	PhysicsDiagramSpec,
 	ChemistryReactionSpec,
+	AccountancyTableSpec,
 } from "@/lib/practice/visuals/types";
 
 describe("<NumberLine />", () => {
@@ -215,5 +219,99 @@ describe("<ChemistryReaction />", () => {
 			root!.render(<ChemistryReaction spec={spec} />);
 		});
 		expect(container.textContent ?? "").toContain("Could not render reaction");
+	});
+});
+
+describe("<AccountancyTable />", () => {
+	let root: Root | null = null;
+	let container: HTMLDivElement;
+
+	afterEach(() => {
+		act(() => {
+			root?.unmount();
+		});
+		root = null;
+		document.body.replaceChildren();
+	});
+
+	it("renders journal entry rows with formatted Indian rupees", () => {
+		const spec: AccountancyTableSpec = {
+			kind: "accountancy_table",
+			subKind: "journal_entry",
+			rows: [
+				{
+					date: "2026-04-01",
+					particulars: "Furniture A/c           Dr.",
+					debit: 100000,
+					credit: null,
+					narration: null,
+				},
+				{
+					date: "",
+					particulars: "    To Cash A/c",
+					debit: null,
+					credit: 100000,
+					narration: "(Being furniture purchased for cash)",
+				},
+			],
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<AccountancyTable spec={spec} />);
+		});
+		expect(container.textContent).toContain("Furniture A/c");
+		expect(container.textContent).toContain("₹1,00,000"); // one lakh in Indian numbering
+	});
+
+	it("computes trial balance totals", () => {
+		const spec: AccountancyTableSpec = {
+			kind: "accountancy_table",
+			subKind: "trial_balance",
+			rows: [
+				{ particulars: "Cash", debit: 50000, credit: null },
+				{ particulars: "Capital", debit: null, credit: 50000 },
+			],
+		};
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		act(() => {
+			root!.render(<AccountancyTable spec={spec} />);
+		});
+		const txt = container.textContent ?? "";
+		expect(txt).toContain("Total");
+		expect(txt).toContain("₹50,000");
+	});
+});
+
+describe("Indian-numbering rupee formatter", () => {
+	it("groups one lakh as 1,00,000", () => {
+		expect(accountancyTest.formatIndianNumber(100000)).toBe("1,00,000");
+	});
+	it("groups ten lakh as 10,00,000", () => {
+		expect(accountancyTest.formatIndianNumber(1000000)).toBe("10,00,000");
+	});
+	it("groups one crore as 1,00,00,000", () => {
+		expect(accountancyTest.formatIndianNumber(10000000)).toBe("1,00,00,000");
+	});
+	it("renders null as empty string", () => {
+		expect(accountancyTest.formatRupee(null)).toBe("");
+	});
+	it("brackets negative amounts per accounting convention", () => {
+		expect(accountancyTest.formatRupee(-15000)).toBe("(₹15,000)");
+	});
+});
+
+describe("economics curve p→x substitution", () => {
+	it("replaces standalone p with x", () => {
+		expect(economicsTest.substitutePForX("80 - 0.4 * p")).toBe("80 - 0.4 * x");
+	});
+	it("does not touch identifiers that contain p", () => {
+		expect(economicsTest.substitutePForX("exp(p) + pi")).toBe("exp(x) + pi");
+	});
+	it("handles p at the very start", () => {
+		expect(economicsTest.substitutePForX("p^2 + 1")).toBe("x^2 + 1");
 	});
 });

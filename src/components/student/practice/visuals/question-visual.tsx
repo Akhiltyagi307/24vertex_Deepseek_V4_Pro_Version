@@ -58,6 +58,18 @@ const ChemistryReaction = dynamic(
 	() => import("./renderers/chemistry-reaction").then((m) => ({ default: m.ChemistryReaction })),
 	{ ssr: false, loading: () => <RendererLoading /> },
 );
+const AccountancyTable = dynamic(
+	() => import("./renderers/accountancy-table").then((m) => ({ default: m.AccountancyTable })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const StatisticsChart = dynamic(
+	() => import("./renderers/statistics-chart").then((m) => ({ default: m.StatisticsChart })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const EconomicsCurve = dynamic(
+	() => import("./renderers/economics-curve").then((m) => ({ default: m.EconomicsCurve })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
 export function QuestionVisual({
 	visual,
 	className,
@@ -106,6 +118,12 @@ function RendererDispatch({
 			return <ChemistryMolecule spec={spec} />;
 		case "chemistry_reaction":
 			return <ChemistryReaction spec={spec} />;
+		case "accountancy_table":
+			return <AccountancyTable spec={spec} />;
+		case "statistics_chart":
+			return <StatisticsChart spec={spec} />;
+		case "economics_curve":
+			return <EconomicsCurve spec={spec} />;
 		default:
 			// Fallback for kinds whose renderer hasn't shipped yet. Visible to
 			// internal QA only; PRACTICE_VISUALS=false in production keeps the
