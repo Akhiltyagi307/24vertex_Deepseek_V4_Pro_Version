@@ -5,6 +5,8 @@ import {
 	resolvePracticeGenerationSubjectRouting,
 } from "./generation-prompt-registry";
 import type { PracticeUserMessagePayload } from "./user-message";
+import { isPracticeVisualsEnabled } from "./visuals/env";
+import { pickExemplarsForSubject, type VisualExemplar } from "./visuals/exemplars";
 
 export type PracticeGenerationSubjectContext = {
 	subjectName: string;
@@ -69,6 +71,7 @@ function buildHardGatesBlock(args: {
 	timeSumMax: number;
 	bucketTimes: { mcq: number; fib: number; sa: number; la: number };
 	subjectIsMath: boolean;
+	visualsEnabled: boolean;
 }): string {
 	const c = args.counts;
 	const mathBanner =
@@ -86,6 +89,10 @@ function buildHardGatesBlock(args: {
 			.filter(Boolean)
 			.join(", ");
 
+	const visualLine = args.visualsEnabled
+		? "- `visual` field: emit `null` UNLESS a load-bearing trigger fires per the Visuals discipline section. If non-null, every label in the stem MUST match the spec. When in doubt, prefer null."
+		: "- `visual` field: ALWAYS emit `null` for every question in this generation.";
+
 	return `${args.heading}
 - Output JSON only — no markdown fences, no commentary, no leading or trailing prose.
 - Emit EXACTLY ${args.estimatedQuestionCount} questions across the four buckets: ${c.multiple_choice} multiple_choice, ${c.fill_in_blank} fill_in_blank, ${c.short_answer} short_answer, ${c.long_answer} long_answer. Buckets MUST contain exactly that many items — not one more, not one fewer. If a bucket is 0, emit an empty array \`[]\`.
@@ -94,7 +101,8 @@ ${mathBanner}
 - multiple_choice questions MUST include \`options\` with exactly the four keys A, B, C, D (string values). \`answer_key.correct_answer\` MUST be exactly one of "A", "B", "C", or "D" matching one of those keys. Do NOT emit \`options: null\` inside multiple_choice; if the stem is a single blank or short completion, place it in \`fill_in_blank\` instead.
 - fill_in_blank, short_answer, long_answer questions MUST omit \`options\` entirely (or set it to null). Their \`answer_key.correct_answer\` is a short string for FIB, sentences for short_answer, paragraph-style for long_answer.
 - MCQ self-consistency: for each MCQ, mentally re-solve the stem and confirm \`answer_key.correct_answer\` is the letter of the option that solves it. The explanation must justify THAT letter only. For numerically-keyed MCQs, recompute every option's value before locking the letter.
-- Time budget: SUM of every question's \`estimated_time_seconds\` across ALL buckets MUST be between ${args.timeSumMin} and ${args.timeSumMax} inclusive (target ~${args.timeLimitSeconds}). Per-bucket starting points: ${perBucketTimes || "n/a"}. Adjust ±20% within the band based on item complexity.`;
+- Time budget: SUM of every question's \`estimated_time_seconds\` across ALL buckets MUST be between ${args.timeSumMin} and ${args.timeSumMax} inclusive (target ~${args.timeLimitSeconds}). Per-bucket starting points: ${perBucketTimes || "n/a"}. Adjust ±20% within the band based on item complexity.
+${visualLine}`;
 }
 
 /**
@@ -116,6 +124,7 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 	const timeSumMin = Math.round(time_limit_seconds * 0.6);
 	const timeSumMax = Math.round(time_limit_seconds * 1.2);
 	const bucketTimes = computePerBucketTimeTargets(time_limit_seconds, question_type_counts);
+	const visualsEnabled = isPracticeVisualsEnabled();
 
 	const hardGatesTop = buildHardGatesBlock({
 		heading: "## HARD GATES (non-negotiable machine constraints)",
@@ -126,6 +135,7 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 		timeSumMax,
 		bucketTimes,
 		subjectIsMath,
+		visualsEnabled,
 	});
 
 	const finalChecklist = buildHardGatesBlock({
@@ -137,7 +147,14 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 		timeSumMax,
 		bucketTimes,
 		subjectIsMath,
+		visualsEnabled,
 	});
+
+	const visualsBlock = visualsEnabled
+		? buildVisualsDisciplineBlock()
+		: "## Visuals\n\nFor this generation set `visual: null` on every question. Do not emit a non-null visual envelope under any circumstance.";
+
+	const exemplarsBlock = visualsEnabled ? buildExemplarsBlock(userMessageSummary.subjectName) : "";
 
 	return `${hardGatesTop}
 
@@ -210,6 +227,8 @@ Clear, encouraging, never condescending. Avoid "obviously", "trivially",
 student stuck on the topic. Avoid long parenthetical asides; if the parenthesis
 matters, write it as its own sentence.
 
+${visualsBlock}
+
 ## Using \`topic_grounding\` chunks
 
 For each topic, treat the two chunk arrays as a pair with distinct jobs:
@@ -224,11 +243,156 @@ Rules:
 
 ## Output shape
 
-Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`estimated_time_seconds\` (positive integer), and \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept }). Multiple-choice items also include \`options\` ({A,B,C,D}). \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
-
+Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`estimated_time_seconds\` (positive integer), \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept }), and \`visual\` (envelope or null). Multiple-choice items also include \`options\` ({A,B,C,D}). \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
+${exemplarsBlock}
 ${finalChecklist}
 
 Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessageSummary.schema_version}.`;
+}
+
+/**
+ * Visuals discipline block — see `docs/EDU-AI-VISUALS-GUIDE-V2.md` §2.2.
+ *
+ * Only emitted when `PRACTICE_VISUALS=true`. Tells the model when to attach
+ * a non-null `visual` envelope and what each renderer expects. Intentionally
+ * verbose — exemplars at the bottom of the prompt do most of the lifting,
+ * but the rules here cap the failure modes (every-question-gets-a-visual,
+ * label drift between stem and spec, syntactically invalid expressions).
+ */
+function buildVisualsDisciplineBlock(): string {
+	return `## Visuals (\`visual\` field — required on every question)
+
+The default is \`visual: null\`. Emit a non-null visual ONLY when one of these
+load-bearing triggers fires:
+
+  T1 — The student CANNOT solve the question without seeing the figure.
+       Examples: "in the figure shown", "the circuit below", "the graph above",
+       "the structure of compound X", "given the table".
+  T2 — The expected answer or stimulus has a presentation-style format the
+       student must read OR fill in: journal entry, ledger account, trial
+       balance, balance sheet, P&L, cash book, partition table.
+  T3 — The question requires inference from binned/visualized data: histogram,
+       ogive, scatter, box plot, frequency polygon.
+
+If none of T1/T2/T3 fires, emit \`visual: null\`. Pure algebra, definitions,
+theory recall, and short numerical items NEVER carry a visual.
+
+### Stem ↔ visual single-source-of-truth
+
+If you emit a visual, the stem MUST NOT restate data the visual already carries.
+  BAD : "In the figure below, A=(1,2), B=(4,8). Find slope of AB." + a visual
+        that already places A and B.
+  GOOD: "Find the slope of segment AB shown below." + the visual.
+
+Every label, letter, number, or unit referenced in the stem MUST appear in the
+spec; every label, letter, number in the spec MUST appear in the stem or be
+clearly secondary (axis ticks, gridlines).
+
+### Renderer-specific syntax (HARD)
+
+- \`math_geometry\`: integer or single-decimal coordinates only. The view must
+  contain every primitive with at least 1 unit of margin. Every primitive's
+  \`type\` is one of: point, segment, polygon, vector, angle_marker, circle.
+- \`math_function_plot\`: mathjs syntax (\`x^2\`, \`sin(x)\`, \`exp(-x^2)\`,
+  \`abs(x)\`, \`sqrt(x)\`). Every function MUST be defined and finite over its
+  plotted range. Never plot \`ln(-x)\`, \`1/0\`, or \`sqrt(negative)\` over the
+  visible domain.
+- \`number_line\`: \`min < max\`, \`tickStep > 0\`. \`points\` and \`intervals\`
+  carry their own \`openCircle\` / \`leftOpen\` / \`rightOpen\` flags.
+- \`physics_diagram\` with \`subKind: "free_body"\`: forces from the body's
+  centre; \`magnitude\` positive, \`angleDeg\` in degrees (standard math angle
+  convention — 0 = +x, 90 = +y).
+- \`physics_diagram\` with \`subKind: "ray_optics"\`: principal axis is the
+  spec's domain \`[axisMin, axisMax]\`; objects/images expressed as upright
+  arrows of \`height\`; lenses identified by \`type\` and a positive
+  \`focalLength\`.
+- \`physics_diagram\` with \`subKind: "circuit"\`: every node \`id\` referenced
+  by a component must appear in the \`nodes\` array; component \`from\` / \`to\`
+  reference node ids.
+- \`chemistry_molecule.smiles\`: canonical, parseable SMILES. Walk the bonds
+  mentally before emitting. Use skeletal SMILES; avoid explicit Hs unless
+  stereochemistry depends on them.
+- \`chemistry_reaction.ce\`: mhchem syntax. Numbers are auto-subscripted; do
+  NOT write \`H_2O\` (write \`H2O\`). Use double-backslash for control sequences
+  (\`\\\\Delta\`, \`\\\\Phi\`).
+- \`accountancy_table\` amounts: plain numbers (15000), no commas, no symbol.
+  The renderer formats as ₹15,000.00. Each \`subKind\` consumes a different
+  shape (journal_entry/cash_book/rectification → \`rows[]\`; ledger →
+  \`ledger\`; trial_balance → \`rows[]\`; balance_sheet → \`assetsSide\` +
+  \`equityAndLiabilitiesSide\`; p_and_l → \`rows[]\`).
+- \`economics_curve\` expressions are functions of \`p\` (price on the x-axis).
+  The renderer substitutes \`p\` → \`x\` before passing to the plotter.
+- \`statistics_chart\`: pick the matching \`subKind\` (histogram, bar, line,
+  scatter, pie, frequency_polygon, ogive, box). Histogram + frequency_polygon
+  + ogive consume \`bins[]\`; ogive also requires \`cumulative\` =
+  "less_than" or "more_than".
+- \`data_table\`: rows are arrays of cells; each cell has \`value\`, \`bold\`,
+  \`align\` ("left" | "center" | "right"). Use this for short stimulus tables
+  that don't fit accountancy or statistics shapes.
+- \`english_passage\`: \`lines[]\` with \`number\` (positive int) and \`text\`.
+  Inline \`$...$\` LaTeX is supported in line text.
+- All text labels in any spec are LaTeX-aware — \`$x_0$\`, \`$\\\\theta$\` will
+  render. Do NOT escape the LaTeX delimiters.
+
+### Self-check before emit (apply per-question)
+
+1. Does the stem actually require this visual? If unsure → null.
+2. Does every label in the stem appear in the spec?
+3. Does the answer key reference the same labels and values as the spec?
+4. For function plots and curves: f(x) defined and finite over the plotted range?
+5. For chemistry: does the SMILES / mhchem string parse?
+
+If any check fails and you cannot fix the spec, set \`visual: null\` and rewrite
+the stem to be self-contained. A correct question without a visual is ALWAYS
+preferred to a wrong or noisy visual.`;
+}
+
+const SUBJECT_EXEMPLAR_KEY: Record<string, VisualExemplar["subjects"][number]> = {
+	mathematics: "mathematics",
+	physics: "physics",
+	chemistry: "chemistry",
+	accountancy: "accountancy",
+	economics: "economics_statistics",
+	statistics: "economics_statistics",
+	economics_statistics: "economics_statistics",
+	science: "science",
+	biology: "science",
+	english: "english",
+};
+
+function pickExemplarSubjectKey(
+	subjectName?: string | null,
+): VisualExemplar["subjects"][number] {
+	if (!subjectName) return "mathematics";
+	const lower = subjectName.toLowerCase();
+	for (const [key, value] of Object.entries(SUBJECT_EXEMPLAR_KEY)) {
+		if (lower.includes(key)) return value;
+	}
+	return "mathematics";
+}
+
+/**
+ * Few-shot exemplars block — appended to the bottom of the shared system
+ * instructions when visuals are enabled. Provides 4 worked stems with
+ * matched `visual` shapes so the model has concrete patterns to imitate.
+ */
+function buildExemplarsBlock(subjectName?: string | null): string {
+	const subjectKey = pickExemplarSubjectKey(subjectName);
+	const exemplars = pickExemplarsForSubject(subjectKey, 4);
+	if (exemplars.length === 0) return "";
+	const rendered = exemplars
+		.map((ex, i) => {
+			const stem = ex.stem.trim();
+			const visual = JSON.stringify(ex.visual);
+			return `Example ${i + 1}:
+  question_text: ${JSON.stringify(stem)}
+  visual: ${visual}`;
+		})
+		.join("\n\n");
+	return `\n\n## Examples (worked stems with matching visuals)\n\nThe following are concrete stem ↔ visual pairs. Imitate the SHAPE — not the
+content — when constructing your own questions.
+
+${rendered}\n`;
 }
 
 /**
