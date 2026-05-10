@@ -1,3 +1,4 @@
+import { formatTimeShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { createClient } from "@/lib/supabase/server";
 import { rlConsume } from "@/lib/ratelimit";
 
@@ -92,7 +93,7 @@ export async function consumeGenerationRateLimit(
 		limitN: PRACTICE_GENERATE_RATE_LIMIT_N,
 		windowSeconds: PRACTICE_GENERATE_RATE_LIMIT_WINDOW_SECONDS,
 		limitExceededMessage: (reset) => {
-			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
+			const resetHint = reset ? ` Try again after ${formatTimeShortInAppTimeZone(reset)}.` : "";
 			return `You have generated too many practice tests in the last hour.${resetHint}`;
 		},
 	});
@@ -106,7 +107,7 @@ export async function consumeStudyTipsRateLimit(
 		limitN: STUDY_TIPS_RATE_LIMIT_N,
 		windowSeconds: STUDY_TIPS_RATE_LIMIT_WINDOW_SECONDS,
 		limitExceededMessage: (reset) => {
-			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
+			const resetHint = reset ? ` Try again after ${formatTimeShortInAppTimeZone(reset)}.` : "";
 			return `You have requested too many study tips recently.${resetHint}`;
 		},
 	});
@@ -120,7 +121,7 @@ export async function consumeAdaptiveFollowupsRateLimit(
 		limitN: ADAPTIVE_FOLLOWUPS_RATE_LIMIT_N,
 		windowSeconds: ADAPTIVE_FOLLOWUPS_RATE_LIMIT_WINDOW_SECONDS,
 		limitExceededMessage: (reset) => {
-			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
+			const resetHint = reset ? ` Try again after ${formatTimeShortInAppTimeZone(reset)}.` : "";
 			return `You have requested too many follow-up questions recently.${resetHint}`;
 		},
 	});
@@ -134,7 +135,7 @@ export async function consumeDoubtChatRateLimit(
 		limitN: DOUBT_CHAT_RATE_LIMIT_N,
 		windowSeconds: DOUBT_CHAT_RATE_LIMIT_WINDOW_SECONDS,
 		limitExceededMessage: (reset) => {
-			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
+			const resetHint = reset ? ` Try again after ${formatTimeShortInAppTimeZone(reset)}.` : "";
 			return `You have used the doubt chat assistant too many times in the last hour.${resetHint}`;
 		},
 	});
@@ -148,7 +149,7 @@ export async function consumeDoubtChatReadRateLimit(
 		limitN: DOUBT_CHAT_READ_RATE_LIMIT_N,
 		windowSeconds: DOUBT_CHAT_READ_RATE_LIMIT_WINDOW_SECONDS,
 		limitExceededMessage: (reset) => {
-			const resetHint = reset ? ` Try again after ${new Date(reset).toLocaleTimeString()}.` : "";
+			const resetHint = reset ? ` Try again after ${formatTimeShortInAppTimeZone(reset)}.` : "";
 			return `Too many doubt chat status refreshes recently.${resetHint}`;
 		},
 	});

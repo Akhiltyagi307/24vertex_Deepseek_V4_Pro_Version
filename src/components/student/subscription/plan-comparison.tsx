@@ -14,6 +14,7 @@ import { RazorpayCheckoutButton } from "@/components/student/subscription/razorp
 import { PriceDisplay } from "@/components/student/subscription/price-display";
 import type { StagedCheckoutCoupon } from "@/app/student/subscription/actions";
 import { PLAN_CATALOG, type PlanCode } from "@/lib/billing/plans";
+import { formatDateShortDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -45,7 +46,8 @@ function formatBillingStart(iso: string | null): string | null {
 	if (!iso) return null;
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return null;
-	return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+	const s = formatDateShortDMYInAppTimeZone(iso);
+	return s === "—" ? null : s;
 }
 
 function isEligibleForStagedCoupon(

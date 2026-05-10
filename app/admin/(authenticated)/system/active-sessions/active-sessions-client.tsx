@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmDestructive } from "@/components/admin/confirm-destructive";
 import { Button } from "@/components/ui/button";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 type SessionRow = {
 	id: string;
@@ -111,7 +112,7 @@ export function AdminActiveSessionsClient() {
 							<tr key={r.id} className="border-b border-border/80">
 								<td className="px-3 py-2">{r.is_current ? "Yes" : "—"}</td>
 								<td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
-									{r.last_seen_at ? new Date(r.last_seen_at).toLocaleString() : "—"}
+									{r.last_seen_at ? formatDateTimeMediumShortInAppTimeZone(r.last_seen_at) : "—"}
 								</td>
 								<td className="px-3 py-2 font-mono text-xs">{r.ip_address ?? "—"}</td>
 								<td className="max-w-[220px] truncate px-3 py-2 text-xs" title={r.user_agent ?? ""}>

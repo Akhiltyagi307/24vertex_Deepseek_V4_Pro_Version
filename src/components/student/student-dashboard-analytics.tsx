@@ -12,7 +12,10 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
-import { format } from "date-fns";
+import {
+	dateKeyToNoonInAppTimeZone,
+	formatDateKeyWeekdayLongInAppTimeZone,
+} from "@/lib/datetime/app-timezone";
 import { motion, useReducedMotion } from "motion/react";
 import { LineChartIcon } from "lucide-react";
 
@@ -135,15 +138,14 @@ function SubjectScoreCompactList({ rows }: { rows: SubjectRow[] }) {
 
 type RangeDays = 7 | 30;
 
-function parseLocalDateKey(dateKey: string): Date {
-	const [ys, ms, ds] = dateKey.split("-");
+function calendarMonthAnchorFromDateKey(dateKey: string): Date {
+	const [ys, ms] = dateKey.split("-");
 	const y = Number(ys);
 	const m = Number(ms);
-	const d = Number(ds);
-	if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+	if (!Number.isFinite(y) || !Number.isFinite(m)) {
 		return new Date();
 	}
-	return new Date(y, m - 1, d, 12, 0, 0, 0);
+	return new Date(y, m - 1, 1);
 }
 
 function activityTier(count: number, max: number): 0 | 1 | 2 | 3 | 4 {
@@ -169,19 +171,17 @@ function AnalyticsActivityCalendar({
 	const lastKey = days.length ? days[days.length - 1]!.dateKey : null;
 	const firstKey = days.length ? days[0]!.dateKey : null;
 
-	const windowStart = firstKey ? parseLocalDateKey(firstKey) : new Date();
-	const windowEnd = lastKey ? parseLocalDateKey(lastKey) : new Date();
+	const windowStart = firstKey ? dateKeyToNoonInAppTimeZone(firstKey) : new Date();
+	const windowEnd = lastKey ? dateKeyToNoonInAppTimeZone(lastKey) : new Date();
 
 	const [month, setMonth] = React.useState(() => {
 		if (!days.length) return new Date();
-		const e = parseLocalDateKey(days[days.length - 1]!.dateKey);
-		return new Date(e.getFullYear(), e.getMonth(), 1);
+		return calendarMonthAnchorFromDateKey(days[days.length - 1]!.dateKey);
 	});
 
 	React.useEffect(() => {
 		if (!lastKey) return;
-		const e = parseLocalDateKey(lastKey);
-		setMonth(new Date(e.getFullYear(), e.getMonth(), 1));
+		setMonth(calendarMonthAnchorFromDateKey(lastKey));
 	}, [lastKey]);
 
 	const [pickedKey, setPickedKey] = React.useState<string | null>(null);
@@ -236,7 +236,7 @@ function AnalyticsActivityCalendar({
 					<p className="font-medium text-foreground text-xs">Selected day</p>
 					{pickedKey ? (
 						<>
-							<p className="text-foreground text-sm">{format(parseLocalDateKey(pickedKey), "EEEE, MMMM d, yyyy")}</p>
+							<p className="text-foreground text-sm">{formatDateKeyWeekdayLongInAppTimeZone(pickedKey)}</p>
 							{picked && picked.count > 0 ? (
 								<p className="text-muted-foreground text-xs">
 									{picked.count} test{picked.count === 1 ? "" : "s"}

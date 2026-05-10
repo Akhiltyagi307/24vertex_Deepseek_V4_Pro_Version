@@ -1,6 +1,7 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement, ReactNode } from "react";
 
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { formatDuration } from "@/lib/student/subject-test-report";
 import { clampGenerationBlockForPdf, splitFeedbackForTwoQuestionPages } from "@/lib/student/practice-grading-pdf-chunks";
 import type { GradedQuestionItem, PracticeGradingSummary } from "@/lib/practice/grading-schema";
@@ -477,7 +478,7 @@ function formatStatusForPdf(raw: string): string {
 function formatDate(iso: string | null | undefined): string {
 	if (!iso) return "—";
 	try {
-		return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+		return formatDateTimeMediumShortInAppTimeZone(iso);
 	} catch {
 		return "—";
 	}

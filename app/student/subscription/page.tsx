@@ -16,6 +16,7 @@ import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPlanCatalog } from "@/lib/cache/deterministic-lookups";
 import { getCachedEntitlements } from "@/lib/billing/entitlements";
+import { formatDateLongDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -56,13 +57,7 @@ export default async function StudentSubscriptionPage() {
 		contact: profile.phone ?? undefined,
 	};
 
-	const renewalDate = entitlement
-		? new Date(entitlement.currentPeriodEnd).toLocaleDateString("en-IN", {
-				day: "numeric",
-				month: "long",
-				year: "numeric",
-			})
-		: "";
+	const renewalDate = entitlement ? formatDateLongDMYInAppTimeZone(entitlement.currentPeriodEnd) : "";
 
 	return (
 		<div className={cn("min-w-0 py-6 medium:py-8", studentHubPageShellClassName)}>

@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
  * sync-openai-skills — package the local `skills/` tree, hash each
- * skill's contents, and (when the OpenAI Skills upload API is
- * documented) push pinned versions to OpenAI Platform. Updates
- * `skills.lock.json` with the resolved versions on success.
+ * skill's contents, and (when enabled) prepare pinned uploads for OpenAI.
+ * Updates `skills.lock.json` with resolved versions on success.
  *
- * v1 BEHAVIOUR: this script is a dry-run scaffold. It computes a
- * SHA-256 hash of each skill directory and prints the manifest it
- * WOULD upload. Production sync is enabled by setting
- * SYNC_OPENAI_SKILLS=true and providing OPENAI_API_KEY; until the
- * upload step lands, those flags are no-ops.
+ * Operational checklist (Pass 2 shell + skills):
+ * 1. Set OPENAI_API_KEY (and SYNC_OPENAI_SKILLS=true when the upload step is implemented).
+ * 2. Run: `node scripts/sync-openai-skills.mjs` (or the GitHub workflow that wraps it).
+ * 3. For each skill in `skills.lock.json`, set `openai_skill_id` to the Platform skill id,
+ *    and replace `v0.1.0-pending-upload` with the pinned version string returned by OpenAI.
+ *    Alternatively, set env `PRACTICE_OPENAI_SKILL_MAP` with a JSON map (see `.env.example`).
+ * 4. Redeploy the app — `buildValidatorShellSkillReferences()` only emits skillReference
+ *    entries for keys that have a real id and non-pending version (or env override).
  *
- * Why a scaffold? OpenAI Skills are accessed via the Responses API
- * shell tool with a `skill_reference` envelope (see v2 visuals guide
- * §3.4). The exact upload endpoint and skill-id schema are not yet
- * pinned in this repo's stack; once the integration is verified
- * against the live API, replace the placeholder block at the bottom
- * of this file with the real call.
+ * v1 BEHAVIOUR: this script may still be a dry-run scaffold depending on repo state;
+ * see the implementation below. Production sync is enabled by setting
+ * SYNC_OPENAI_SKILLS=true and providing OPENAI_API_KEY.
+ *
+ * OpenAI Skills are used with the Responses API shell tool + `skill_reference`
+ * envelopes (v2 visuals guide §3.4).
  */
 
 import { createHash } from "node:crypto";

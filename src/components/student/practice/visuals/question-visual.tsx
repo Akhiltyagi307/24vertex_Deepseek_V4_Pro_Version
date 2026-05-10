@@ -97,8 +97,10 @@ export function QuestionVisual({
 			data-question-visual
 			data-question-visual-kind={visual.spec.kind}
 		>
-			<div className="flex min-h-[120px] w-full items-center justify-center overflow-x-auto">
-				<RendererDispatch visual={visual} />
+			<div className="max-h-[min(52dvh,28rem)] w-full overflow-x-auto overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]">
+				<div className="flex min-h-[120px] w-full items-center justify-center">
+					<RendererDispatch visual={visual} />
+				</div>
 			</div>
 			<figcaption className="text-muted-foreground text-center text-xs">
 				{visual.caption}

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { AdminPlanEditForm } from "@/components/admin/billing/admin-plan-edit-form";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { db } from "@/db";
 import { plans } from "@/db/schema/billing";
 
@@ -44,7 +45,7 @@ export default async function AdminBillingPlanDetailPage({ params }: Props) {
 				<Detail label="Razorpay plan id" value={plan.razorpayPlanId ? <span className="font-mono text-xs">{plan.razorpayPlanId}</span> : "—"} />
 				<Detail label="Active" value={plan.isActive ? "yes" : "no"} />
 				<Detail label="Sort order" value={String(plan.sortOrder)} />
-				<Detail label="Updated" value={plan.updatedAt.toISOString()} />
+				<Detail label="Updated" value={formatDateTimeMediumShortInAppTimeZone(plan.updatedAt)} />
 			</div>
 
 			<AdminPlanEditForm

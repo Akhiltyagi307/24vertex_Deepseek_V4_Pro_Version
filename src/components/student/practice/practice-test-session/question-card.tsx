@@ -83,8 +83,8 @@ export function QuestionCard({
 
 	return (
 		<Card className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden shadow-sm">
-			<div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
-				<div className="flex min-h-full min-w-0 flex-1 flex-col">
+			<div className="flex min-h-0 flex-1 flex-col overflow-y-auto [-webkit-overflow-scrolling:touch] overscroll-y-contain">
+				<div className="flex min-w-0 flex-col">
 					<CardHeader className="shrink-0 space-y-3 pb-3">
 						<div className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
 							<div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
@@ -205,7 +205,7 @@ export function QuestionCard({
 					<Separator className="shrink-0" />
 					<CardContent
 						key={active.id}
-						className="motion-safe:animate-in motion-safe:fade-in-0 flex min-h-0 flex-1 flex-col gap-6 pb-6 pt-5 motion-safe:duration-200 motion-reduce:animate-none"
+						className="motion-safe:animate-in motion-safe:fade-in-0 flex shrink-0 flex-col gap-6 pb-6 pt-5 motion-safe:duration-200 motion-reduce:animate-none"
 					>
 						{active.question_type === "multiple_choice" && active.options ?
 							<FieldSet>
@@ -257,7 +257,7 @@ export function QuestionCard({
 						:	null}
 
 						{active.question_type === "short_answer" || active.question_type === "long_answer" ?
-							<FieldSet className="min-h-0 flex-1 gap-4">
+							<FieldSet className="gap-4">
 								<FieldLegend variant="label" className="text-foreground shrink-0 text-sm font-medium">
 									Your answer
 								</FieldLegend>

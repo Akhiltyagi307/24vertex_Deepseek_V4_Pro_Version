@@ -1,3 +1,7 @@
+import {
+	addCalendarDaysToAppTimeZoneDateKey,
+	APP_TIME_ZONE,
+} from "@/lib/datetime/app-timezone";
 import { localDateKey } from "@/lib/student/dashboard-performance-stats";
 import type { PerformanceRowSerialized } from "@/lib/student/performance-matrix";
 
@@ -72,9 +76,8 @@ export function serializeCompletedTestsForAnalytics(
 	const end = options?.end ?? new Date();
 	let startKey: string | null = null;
 	if (options?.maxDaysBack != null) {
-		const start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-		start.setDate(start.getDate() - (options.maxDaysBack - 1));
-		startKey = localDateKey(start);
+		const endKey = localDateKey(end);
+		startKey = addCalendarDaysToAppTimeZoneDateKey(endKey, -(options.maxDaysBack - 1));
 	}
 
 	const out: AnalyticsTestRow[] = [];
@@ -125,20 +128,24 @@ export function filterTestsThroughDate(tests: AnalyticsTestRow[], end: Date): An
 	return tests.filter((t) => t.dateKey <= endKey);
 }
 
-/** Last `rangeDays` calendar days ending today (inclusive). */
+/** Last `rangeDays` calendar days ending `end`'s IST calendar day (inclusive). */
 export function filterTestsByRangeDays(tests: AnalyticsTestRow[], rangeDays: 7 | 30, end: Date = new Date()): AnalyticsTestRow[] {
-	const start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-	start.setDate(start.getDate() - (rangeDays - 1));
-	const startKey = localDateKey(start);
 	const endKey = localDateKey(end);
+	const startKey = addCalendarDaysToAppTimeZoneDateKey(endKey, -(rangeDays - 1));
 	return tests.filter((t) => t.dateKey >= startKey && t.dateKey <= endKey);
 }
 
 function shortDateLabel(dateKey: string): string {
 	const [y, m, d] = dateKey.split("-").map(Number);
 	if (!y || !m || !d) return dateKey;
-	const dt = new Date(y, m - 1, d);
-	return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+	const inst = new Date(
+		`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T12:00:00+05:30`,
+	);
+	return new Intl.DateTimeFormat("en-IN", {
+		timeZone: APP_TIME_ZONE,
+		month: "short",
+		day: "numeric",
+	}).format(inst);
 }
 
 export function buildTrendSeries(tests: AnalyticsTestRow[], rangeDays: 7 | 30, end: Date = new Date()): TrendChartPoint[] {
@@ -151,14 +158,12 @@ export function buildTrendSeries(tests: AnalyticsTestRow[], rangeDays: 7 | 30, e
 		byDay.set(t.dateKey, e);
 	}
 
-	const start = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-	start.setDate(start.getDate() - (rangeDays - 1));
+	const endKeyTrend = localDateKey(end);
+	const startKeyTrend = addCalendarDaysToAppTimeZoneDateKey(endKeyTrend, -(rangeDays - 1));
 
 	const points: TrendChartPoint[] = [];
 	for (let i = 0; i < rangeDays; i++) {
-		const cur = new Date(start);
-		cur.setDate(start.getDate() + i);
-		const dateKey = localDateKey(cur);
+		const dateKey = addCalendarDaysToAppTimeZoneDateKey(startKeyTrend, i);
 		const agg = byDay.get(dateKey);
 		const testCount = agg?.count ?? 0;
 		const scores = agg?.scores ?? [];
@@ -219,11 +224,8 @@ export function buildKpi(
 /** Last `weeks` * 7 days ending today (inclusive), one bucket per day. */
 export function buildHeatmapDays(tests: AnalyticsTestRow[], weeks: number, end: Date = new Date()): HeatmapDay[] {
 	const totalDays = weeks * 7;
-	const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-	const startDay = new Date(endDay);
-	startDay.setDate(endDay.getDate() - (totalDays - 1));
-	const startKey = localDateKey(startDay);
-	const endKey = localDateKey(endDay);
+	const endKey = localDateKey(end);
+	const startKey = addCalendarDaysToAppTimeZoneDateKey(endKey, -(totalDays - 1));
 
 	const countByKey = new Map<string, number>();
 	const minutesByKey = new Map<string, number>();
@@ -238,9 +240,7 @@ export function buildHeatmapDays(tests: AnalyticsTestRow[], weeks: number, end: 
 
 	const out: HeatmapDay[] = [];
 	for (let i = 0; i < totalDays; i++) {
-		const cur = new Date(startDay);
-		cur.setDate(startDay.getDate() + i);
-		const dateKey = localDateKey(cur);
+		const dateKey = addCalendarDaysToAppTimeZoneDateKey(startKey, i);
 		out.push({
 			dateKey,
 			count: countByKey.get(dateKey) ?? 0,

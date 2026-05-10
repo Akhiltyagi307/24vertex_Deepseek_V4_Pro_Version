@@ -611,7 +611,13 @@ export function PracticeRichAnswerEditor({
 	}
 
 	return (
-		<div className="flex min-h-0 w-full flex-1 flex-col" data-rich-answer-editor>
+		<div
+			className={cn(
+				"flex w-full shrink-0 flex-col",
+				variant === "long" ? "min-h-[min(40dvh,18rem)]" : "min-h-[min(32dvh,12rem)]",
+			)}
+			data-rich-answer-editor
+		>
 			<Toolbar editor={editor} onLink={onLink} />
 			<EditorContent
 				editor={editor}

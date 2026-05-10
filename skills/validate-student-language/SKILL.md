@@ -26,6 +26,10 @@ suggestion the model can choose to act on.
   - easy   → 80–150 words
   - medium → 120–220 words
   - hard   → 180–320 words
+- **Visual envelope leaks** — in `visual.caption` / `visual.altText`:
+  phrases like "answer is B", "correct option is …", or repeating the
+  correct option string when it does not appear in the stem (Pass 1 gate
+  `visual_leaks_answer` mirrors this).
 
 ## Output
 

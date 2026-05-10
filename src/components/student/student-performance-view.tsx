@@ -20,6 +20,7 @@ import {
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
+import { formatDateMediumInAppTimeZone } from "@/lib/datetime/app-timezone";
 import {
 	PageHeaderSubtext,
 	pageHeaderSubtextScrollClass,
@@ -257,7 +258,7 @@ function trendLabel(t: PerformanceRowSerialized["trend"]): string {
 function formatLastTest(iso: string | null): string {
 	if (!iso) return "—";
 	try {
-		return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" });
+		return formatDateMediumInAppTimeZone(iso);
 	} catch {
 		return "—";
 	}

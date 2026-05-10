@@ -18,10 +18,10 @@ const PLOT_HEIGHT = 320;
 /**
  * `economics_curve` renderer.
  *
- * Wraps function-plot, like `<MathFunctionPlot />`. The schema's
- * convention is that curve expressions are functions of `p` (price on
- * the x-axis); we substitute `p` → `x` before passing to function-plot
- * because that library always evaluates `fn` against `x`.
+ * Wraps function-plot, like `<MathFunctionPlot />`. Each \`curves[].expr\` is
+ * written in terms of \`p\` (the horizontal-axis variable — see \`xLabel\`,
+ * often Quantity); the renderer substitutes \`p\` → \`x\` before passing to
+ * function-plot because that library always evaluates \`fn\` against \`x\`.
  *
  * `marks` are rendered as small annotations at (x, y) — useful for
  * "Equilibrium" / "Price ceiling" callouts. function-plot's annotation

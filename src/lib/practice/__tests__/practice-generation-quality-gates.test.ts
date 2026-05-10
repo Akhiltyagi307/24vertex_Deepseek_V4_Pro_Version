@@ -119,6 +119,7 @@ describe("evaluatePracticeGenerationQuality", () => {
 		expect(out.ok).toBe(false);
 		if (out.ok) return;
 		expect(out.code).toBe("stem_references_missing_visual");
+		expect(out.details?.failedIndexes).toEqual([0]);
 	});
 
 	it("flags label drift between stem and visual spec", () => {
@@ -176,6 +177,101 @@ describe("evaluatePracticeGenerationQuality", () => {
 			}),
 		];
 		const out = evaluatePracticeGenerationQuality({ questions });
+		expect(out.ok).toBe(true);
+	});
+});
+
+describe("visual leak and chunk alignment gates", () => {
+	const tid = "11111111-1111-4111-8111-111111111111";
+	const tidB = "22222222-2222-4222-8222-222222222222";
+
+	function fillerSecondTopic(): PracticeGenerationOutput["questions"][number] {
+		return makeQuestion({
+			question_number: 2,
+			topic_id: tidB,
+			question_text: "Find the value of 2 + 2 phrased differently for variety.",
+			visual: null,
+		});
+	}
+
+	it("fails visual_leaks_answer when caption uses banned answer phrasing", () => {
+		const q1 = makeQuestion({
+			question_number: 1,
+			question_text: "Refer to the coordinate sketch shown for this problem.",
+			visual: {
+				caption: "Note: answer is B.",
+				altText: "Supplementary coordinate sketch for the problem layout.",
+				spec: {
+					kind: "math_geometry",
+					view: { xMin: 0, xMax: 2, yMin: 0, yMax: 2, showGrid: true, showAxes: true },
+					primitives: [{ type: "point", at: { x: 1, y: 1 }, label: "P" }],
+				},
+			},
+		});
+		const out = evaluatePracticeGenerationQuality({ questions: [q1, fillerSecondTopic()] });
+		expect(out.ok).toBe(false);
+		if (out.ok) return;
+		expect(out.code).toBe("visual_leaks_answer");
+	});
+
+	it("fails chunk_alignment_weak when stem lacks overlap with topic corpus", () => {
+		const corpus = new Map([
+			[
+				tid,
+				"newtonian mechanics inertia force motion equilibrium laws first second third law applied systems",
+			],
+		]);
+		const q1 = makeQuestion({
+			question_number: 1,
+			topic_id: tid,
+			question_text:
+				"Describe quantization in nanoscale plasmonic metamaterials without referring to textbook labels.",
+		});
+		const out = evaluatePracticeGenerationQuality({
+			questions: [q1, fillerSecondTopic()],
+			chunkAlignment: { corpusByTopicId: corpus, contextQuality: "ok" },
+		});
+		expect(out.ok).toBe(false);
+		if (out.ok) return;
+		expect(out.code).toBe("chunk_alignment_weak");
+	});
+
+	it("passes chunk gate when stem aligns with corpus", () => {
+		const corpus = new Map([
+			[
+				tid,
+				"newtonian mechanics inertia force motion equilibrium laws first second third law applied systems",
+			],
+		]);
+		const q1 = makeQuestion({
+			question_number: 1,
+			topic_id: tid,
+			question_text: "What does inertia describe about motion and force in equilibrium?",
+		});
+		const out = evaluatePracticeGenerationQuality({
+			questions: [q1, fillerSecondTopic()],
+			chunkAlignment: { corpusByTopicId: corpus, contextQuality: "ok" },
+		});
+		expect(out.ok).toBe(true);
+	});
+
+	it("skips chunk gate for no_context", () => {
+		const corpus = new Map([
+			[
+				tid,
+				"newtonian mechanics inertia force motion equilibrium laws first second third law applied systems",
+			],
+		]);
+		const q1 = makeQuestion({
+			question_number: 1,
+			topic_id: tid,
+			question_text:
+				"Describe nanoscale plasmonic quantization unrelated to supplied mechanics text.",
+		});
+		const out = evaluatePracticeGenerationQuality({
+			questions: [q1, fillerSecondTopic()],
+			chunkAlignment: { corpusByTopicId: corpus, contextQuality: "no_context" },
+		});
 		expect(out.ok).toBe(true);
 	});
 });

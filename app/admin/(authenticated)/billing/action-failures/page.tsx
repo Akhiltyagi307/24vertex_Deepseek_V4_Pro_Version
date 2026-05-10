@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { ActionFailureRetryButton } from "@/components/admin/billing/action-failure-retry-button";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { db } from "@/db";
 import { billingActionFailures } from "@/db/schema/billing";
 import { BILLING_ACTION_FAILURE_KIND_NAMES } from "@/lib/billing/action-failures";
@@ -130,7 +131,9 @@ export default async function AdminBillingActionFailuresPage({ searchParams }: P
 					<tbody>
 						{rows.map((r) => (
 							<tr key={r.id} className="border-b border-border/80">
-								<td className="px-3 py-2 text-muted-foreground">{r.createdAt.toISOString().slice(0, 19)}</td>
+								<td className="px-3 py-2 text-muted-foreground">
+									{formatDateTimeMediumShortInAppTimeZone(r.createdAt)}
+								</td>
 								<td className="px-3 py-2">{r.kind}</td>
 								<td className="px-3 py-2">
 									{r.profileId ?

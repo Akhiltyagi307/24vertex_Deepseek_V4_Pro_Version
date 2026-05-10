@@ -106,6 +106,24 @@ describe("parseStoredQuestionVisual", () => {
 			envelope: null,
 		});
 	});
+
+	it("rejects math_function_plot with inverted horizontal range (superRefine)", () => {
+		const result = questionVisualEnvelopeSchema.safeParse({
+			caption: "Invalid plot window",
+			altText: "The horizontal axis bounds are reversed which breaks rendering.",
+			spec: {
+				kind: "math_function_plot",
+				xMin: 2,
+				xMax: 1,
+				yMin: -1,
+				yMax: 1,
+				xLabel: "x",
+				yLabel: "y",
+				items: [{ expr: "x", color: "primary", label: null }],
+			},
+		});
+		expect(result.success).toBe(false);
+	});
 });
 
 describe("pickExemplarsForSubject", () => {

@@ -17,6 +17,12 @@ export type DashboardShellProps = {
 	 */
 	isDoubtChatPath: (pathname: string) => boolean;
 	/**
+	 * Optional pathname predicate for other routes that need the same pinned
+	 * viewport + inset overflow lock as doubt chat (e.g. timed practice tests),
+	 * so nested panels can scroll reliably.
+	 */
+	isFixedViewportShellPath?: (pathname: string) => boolean;
+	/**
 	 * Pathname predicate that, when true, sets sidebar `open=false` on mount and
 	 * forces it closed on path change. Student closes during practice-test
 	 * sessions; parent closes during doubt chat.
@@ -37,6 +43,7 @@ export function DashboardShell({
 	topBar,
 	sidebar,
 	isDoubtChatPath,
+	isFixedViewportShellPath,
 	isSidebarHiddenPath,
 	isImmersiveShellPath = alwaysFalse,
 	children,
@@ -51,13 +58,14 @@ export function DashboardShell({
 	}, [pathname, isSidebarHiddenPath]);
 
 	const doubtChat = isDoubtChatPath(pathname);
+	const fixedViewportShell = doubtChat || (isFixedViewportShellPath?.(pathname) ?? false);
 	const immersive = isImmersiveShellPath(pathname);
 
 	return (
 		<SidebarProvider
 			className={cn(
 				"flex w-full flex-col",
-				doubtChat ? "h-dvh max-h-dvh min-h-0 overflow-hidden" : "min-h-svh",
+				fixedViewportShell ? "h-dvh max-h-dvh min-h-0 overflow-hidden" : "min-h-svh",
 			)}
 			open={sidebarOpen}
 			onOpenChange={setSidebarOpen}
@@ -66,13 +74,13 @@ export function DashboardShell({
 			<div
 				className={cn(
 					"flex min-h-0 w-full min-w-0 flex-1 items-stretch",
-					doubtChat && "overflow-hidden",
+					fixedViewportShell && "overflow-hidden",
 				)}
 			>
 				{sidebar}
 				<SidebarInset
 					className={cn(
-						doubtChat
+						fixedViewportShell
 							? "min-h-0 min-w-0 grow basis-0 overflow-hidden bg-background"
 							: "min-h-0 min-w-0 grow basis-0 overflow-auto bg-background",
 						!immersive && "px-4 medium:px-6 xl:px-8",

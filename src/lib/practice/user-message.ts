@@ -1,7 +1,7 @@
 import { getPracticeQuestionPlanForSubject, isMathematicsSubject } from "./constants";
 import type { PracticeFocusArea } from "./schemas";
 import type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
-import { isPracticeVisualsEnabled } from "./visuals/env";
+import { computeMaxNonNullVisuals, isPracticeVisualsEnabled, isPracticeVisualsEnabledForSubject } from "./visuals/env";
 import type { QuestionVisualKind } from "./visuals/types";
 
 const FOCUS_AREA_INSTRUCTION: Record<PracticeFocusArea, string> = {
@@ -158,6 +158,16 @@ export type PracticeUserMessagePayload = {
 		visuals_policy: {
 			enabled: boolean;
 			preferred_kinds: QuestionVisualKind[];
+			/** Soft cap: at most this many questions may use non-null `visual`. */
+			max_non_null_visuals: number;
+		};
+		/**
+		 * When chunks exist, `prefer_chunk_aligned_items` is true so the model
+		 * prioritises stems traceable to `topic_grounding` (see system prompt).
+		 */
+		grounding_policy: {
+			mode: "chunk_aligned" | "curriculum_hint_only";
+			prefer_chunk_aligned_items: boolean;
 		};
 	};
 	/** Per-topic performance only; curriculum names live under `topic_grounding`. */
@@ -288,12 +298,22 @@ export function buildPracticeUserMessage(input: {
 	const grounding_meta = pre?.meta ?? defaultGroundingMeta(topic_count);
 	const contextQualityKey = grounding_meta.context_quality ?? "ok";
 	const contextQualityInstruction = CONTEXT_QUALITY_INSTRUCTION[contextQualityKey];
+	const hasTopicChunks =
+		(grounding_meta.context_chunk_count ?? 0) + (grounding_meta.exercise_chunk_count ?? 0) > 0;
 
 	const focusArea = input.focusArea ?? "all";
 	const focusAreaInstruction = FOCUS_AREA_INSTRUCTION[focusArea];
 
 	const allowed_topic_ids = input.topics.map((t) => t.topicId);
 	const subject_is_math = isMathematicsSubject(input.subject.name);
+	const visualsMasterOn = isPracticeVisualsEnabled();
+	const visualsEffective = isPracticeVisualsEnabledForSubject(input.subject.name);
+	const preferredKinds =
+		visualsMasterOn ?
+			visualsEffective ?
+				preferredVisualKindsForSubject(input.subject.name)
+			:	[]
+		:	preferredVisualKindsForSubject(input.subject.name);
 
 	const generation_summary: PracticeGenerationSummary = {
 		total: estimated_question_count,
@@ -337,8 +357,13 @@ export function buildPracticeUserMessage(input: {
 			context_quality_instruction: contextQualityInstruction,
 			allowed_topic_ids,
 			visuals_policy: {
-				enabled: isPracticeVisualsEnabled(),
-				preferred_kinds: preferredVisualKindsForSubject(input.subject.name),
+				enabled: visualsEffective,
+				preferred_kinds: preferredKinds,
+				max_non_null_visuals: visualsEffective ? computeMaxNonNullVisuals(estimated_question_count) : 0,
+			},
+			grounding_policy: {
+				mode: hasTopicChunks ? "chunk_aligned" : "curriculum_hint_only",
+				prefer_chunk_aligned_items: hasTopicChunks,
 			},
 		},
 		topics: input.topics.map((t) => ({

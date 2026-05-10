@@ -62,6 +62,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatDateLongStyleInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 export type ResolvedSubjectForSettings = {
 	id: string;
@@ -334,9 +335,7 @@ export function StudentProfileSettingsForm({
 		}
 	}
 
-	const enrolled = new Date(profile.created_at).toLocaleDateString("en-US", {
-		dateStyle: "long",
-	});
+	const enrolled = formatDateLongStyleInAppTimeZone(profile.created_at);
 	const accountDetails = (
 		<div className={cn(settingsNestedWellClass, "text-base")}>
 			<div className="grid grid-cols-1 gap-4 medium:grid-cols-2">

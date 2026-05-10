@@ -7,6 +7,7 @@ import { AdminExportButton } from "@/components/admin/data-table/export-button";
 import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { Button } from "@/components/ui/button";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -128,7 +129,7 @@ export function AdminLiveTestsPanel() {
 										</div>
 									</td>
 									<td className="px-2 py-1.5 font-mono text-xs text-muted-foreground">
-										{r.updated_at ? new Date(r.updated_at).toISOString() : "—"}
+										{r.updated_at ? formatDateTimeMediumShortInAppTimeZone(r.updated_at) : "—"}
 									</td>
 									<td className="px-2 py-1.5">
 										<Link className="text-primary underline-offset-2 hover:underline" href={`/admin/assessments/tests/${r.id}`}>

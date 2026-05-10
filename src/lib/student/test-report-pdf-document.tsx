@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import {
 	formatDuration,
 	formatScorePercent,
@@ -31,7 +32,7 @@ const styles = StyleSheet.create({
 function formatDate(iso: string | null | undefined): string {
 	if (!iso) return "—";
 	try {
-		return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+		return formatDateTimeMediumShortInAppTimeZone(iso);
 	} catch {
 		return "—";
 	}

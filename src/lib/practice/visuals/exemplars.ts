@@ -8,9 +8,8 @@
  *   model needs to see that confirmed in worked examples.
  * - Keep stems short and self-contained; the visual is load-bearing OR the
  *   stem stands alone, never both repeating the same data.
- * - Cover one example per visual kind we ship in Phase 2. Per-subject
- *   filtering happens at prompt-build time in
- *   `buildPracticeGenerationSharedSystemInstructions`.
+ * - Cover visual kinds shipped for Phase 2. Selection uses stratified sampling
+ *   by `spec.kind` in `pickExemplarsForSubject`.
  */
 
 import type { QuestionVisualEnvelope } from "./schemas";
@@ -48,11 +47,11 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["mathematics"],
 	},
 	{
-		stem: "Sketch the graph of $y = x^2 - 4$ on the given range and identify the x-intercepts.",
+		stem: "For the graph of $y = x^2 - 4$ shown, state the y-coordinate of the vertex.",
 		visual: {
-			caption: "Parabola y = x² − 4.",
+			caption: "Graph of the quadratic function on the given window.",
 			altText:
-				"Upward parabola crossing the x-axis at x = -2 and x = 2 with vertex at (0, -4).",
+				"Upward-opening parabola on a grid with horizontal x-axis and vertical y-axis; vertex at the lowest point of the curve within the window.",
 			spec: {
 				kind: "math_function_plot",
 				xMin: -4,
@@ -67,12 +66,29 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["mathematics"],
 	},
 	{
-		stem:
-			"A 5 kg block on a frictionless incline of 30° is released. Identify the magnitude of the net force shown below.",
+		stem: "Which inequality matches the interval highlighted on the number line below?",
 		visual: {
-			caption: "Forces on the block.",
+			caption: "Number line from 0 to 6 with a ray starting at 2.",
 			altText:
-				"Block on a 30 degree incline with weight straight down and normal perpendicular to the surface.",
+				"Integer tick marks from 0 through 6; solid dot at 2 and a thick segment extending right with an open end at 6.",
+			spec: {
+				kind: "number_line",
+				min: 0,
+				max: 6,
+				tickStep: 1,
+				points: [{ value: 2, label: "2", openCircle: false }],
+				intervals: [{ from: 2, to: 6, leftOpen: false, rightOpen: true, label: null }],
+			},
+		},
+		subjects: ["mathematics"],
+	},
+	{
+		stem:
+			"The diagram shows a block on a frictionless 30° incline with weight W = 49 N and normal N. What is the magnitude of N?",
+		visual: {
+			caption: "Weight and normal on a block on an incline.",
+			altText:
+				"Block on a 30 degree slope; weight arrow pointing vertically down labelled W; normal arrow perpendicular to the surface labelled N.",
 			spec: {
 				kind: "physics_diagram",
 				subKind: "free_body",
@@ -87,10 +103,49 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["physics", "science"],
 	},
 	{
+		stem: "For the circuit shown, through which component does conventional current leave the positive terminal of the battery?",
+		visual: {
+			caption: "Single-loop circuit with a battery and resistor.",
+			altText:
+				"Two labelled nodes; a 12 volt battery and a 4 ohm resistor form one closed loop between them.",
+			spec: {
+				kind: "physics_diagram",
+				subKind: "circuit",
+				nodes: [
+					{ id: "n1", x: 0, y: 1 },
+					{ id: "n2", x: 4, y: 1 },
+				],
+				components: [
+					{ type: "battery", from: "n1", to: "n2", emfVolts: 12, label: "12 V" },
+					{ type: "resistor", from: "n2", to: "n1", resistanceOhms: 4, label: "R" },
+				],
+			},
+		},
+		subjects: ["physics", "science"],
+	},
+	{
+		stem: "In the ray diagram below, where is the convex lens located on the principal axis?",
+		visual: {
+			caption: "Object and convex lens on a principal axis.",
+			altText:
+				"Horizontal axis from negative to positive positions; small object arrow left of centre; convex lens marker at the origin.",
+			spec: {
+				kind: "physics_diagram",
+				subKind: "ray_optics",
+				axisMin: -20,
+				axisMax: 20,
+				objects: [{ kind: "object", x: -10, height: 2, dashed: false }],
+				lenses: [{ type: "convex_lens", x: 0, focalLength: 10 }],
+			},
+		},
+		subjects: ["physics", "science"],
+	},
+	{
 		stem: "Identify the functional group present in the molecule shown.",
 		visual: {
-			caption: "Acetic acid.",
-			altText: "Two-carbon carboxylic acid CH3COOH with a methyl and a carboxyl group.",
+			caption: "Skeletal structure of a small organic molecule.",
+			altText:
+				"Two-carbon backbone with a carbonyl carbon bonded to an OH group and a methyl group; layout shown for the assessment diagram.",
 			spec: {
 				kind: "chemistry_molecule",
 				smiles: "CC(=O)O",
@@ -101,11 +156,24 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["chemistry", "science"],
 	},
 	{
-		stem: "Pass the journal entry for purchase of furniture for ₹15,000 in cash on 1 April 2026.",
+		stem: "Classify the reaction shown: is it synthesis, decomposition, or displacement?",
 		visual: {
-			caption: "Skeleton journal entry.",
+			caption: "Formation of water from hydrogen and oxygen.",
+			altText: "Chemical equation with hydrogen and oxygen as reactants and water as product; no balancing hints in the caption.",
+			spec: {
+				kind: "chemistry_reaction",
+				ce: "2 H2 + O2 -> 2 H2O",
+				label: null,
+			},
+		},
+		subjects: ["chemistry", "science"],
+	},
+	{
+		stem: "Complete the journal entry for purchase of furniture for ₹15,000 cash on 1 April 2026 using the skeleton below.",
+		visual: {
+			caption: "Blank journal entry form.",
 			altText:
-				"Date column, particulars column, debit and credit columns with a partly filled debit row and a credit row blank.",
+				"Columns for date, particulars, debit, and credit; headings indicate furniture purchase on 1 April with blank amount cells for the student.",
 			spec: {
 				kind: "accountancy_table",
 				subKind: "journal_entry",
@@ -113,7 +181,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 					{
 						date: "2026-04-01",
 						particulars: "Furniture A/c           Dr.",
-						debit: 15000,
+						debit: null,
 						credit: null,
 						narration: null,
 					},
@@ -121,8 +189,8 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 						date: "",
 						particulars: "    To Cash A/c",
 						debit: null,
-						credit: 15000,
-						narration: "(Being furniture purchased for cash)",
+						credit: null,
+						narration: null,
 					},
 				],
 			},
@@ -130,10 +198,11 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["accountancy"],
 	},
 	{
-		stem: "Read the modal class from the histogram shown.",
+		stem: "Which class interval is the modal class in the histogram shown?",
 		visual: {
 			caption: "Frequency distribution of marks.",
-			altText: "Histogram with five class intervals; the 30-40 bar is the tallest at 12.",
+			altText:
+				"Histogram with five adjacent class intervals on the horizontal axis and frequency on the vertical axis; bar heights vary across intervals.",
 			spec: {
 				kind: "statistics_chart",
 				subKind: "histogram",
@@ -151,11 +220,11 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["economics_statistics"],
 	},
 	{
-		stem: "From the demand and supply curves shown, identify the equilibrium price and quantity.",
+		stem: "Use the demand and supply curves shown to read the equilibrium price and quantity at their intersection.",
 		visual: {
-			caption: "Market for apples.",
+			caption: "Market diagram with downward demand and upward supply.",
 			altText:
-				"Downward sloping demand curve and upward sloping supply curve intersecting at price 40 and quantity 100.",
+				"Quantity on the horizontal axis, price on the vertical; two curves meet at a point labelled equilibrium in the first quadrant.",
 			spec: {
 				kind: "economics_curve",
 				xLabel: "Quantity",
@@ -217,9 +286,9 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		stem:
 			"Read the passage and identify the figure of speech used in line 3.",
 		visual: {
-			caption: "Excerpt from a poem.",
+			caption: "Numbered poem excerpt (lines 1–3).",
 			altText:
-				"Three-line excerpt from a poem; line 3 contains a personification of the wind.",
+				"Three short lines of verse, each prefixed by its line number; no interpretation of the literary device is stated.",
 			spec: {
 				kind: "english_passage",
 				title: null,
@@ -235,15 +304,51 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	},
 ];
 
-/** Subset selection: returns up to N exemplars relevant to a subject family. */
+function exemplarKindKey(ex: VisualExemplar): string {
+	if (ex.visual === null) return "__null__";
+	const s = ex.visual.spec;
+	if (s.kind === "physics_diagram") return `physics_diagram:${s.subKind}`;
+	return s.kind;
+}
+
+/**
+ * Subset selection: anchor with a null-visual example, then add exemplars
+ * maximizing distinct `spec.kind` (and physics `subKind`) for the subject.
+ */
 export function pickExemplarsForSubject(
 	subjectKey: VisualExemplar["subjects"][number],
-	limit = 4,
+	limit = 6,
 ): ReadonlyArray<VisualExemplar> {
 	const matching = VISUAL_EXEMPLARS.filter((ex) => ex.subjects.includes(subjectKey));
-	if (matching.length >= limit) return matching.slice(0, limit);
-	// Always anchor with the null-visual algebra example so the default sticks.
-	const anchor = VISUAL_EXEMPLARS[0];
-	const remainder = VISUAL_EXEMPLARS.filter((ex) => ex !== anchor && !matching.includes(ex));
-	return [anchor, ...matching, ...remainder].slice(0, limit);
+	const anchor =
+		matching.find((ex) => ex.visual === null) ??
+		VISUAL_EXEMPLARS.find((ex) => ex.visual === null) ??
+		matching[0];
+	if (!anchor) return [];
+
+	const matchingRest = matching.filter((ex) => ex !== anchor);
+	const otherRest = VISUAL_EXEMPLARS.filter((ex) => ex !== anchor && !matching.includes(ex));
+	const orderedPool = [...matchingRest, ...otherRest];
+
+	const picked: VisualExemplar[] = [anchor];
+	const seenKinds = new Set<string>([exemplarKindKey(anchor)]);
+
+	while (picked.length < limit && orderedPool.length > 0) {
+		let bestIdx = 0;
+		let bestScore = -1;
+		for (let i = 0; i < orderedPool.length; i++) {
+			const ex = orderedPool[i]!;
+			const k = exemplarKindKey(ex);
+			const score = seenKinds.has(k) ? 0 : 1;
+			if (score > bestScore) {
+				bestScore = score;
+				bestIdx = i;
+			}
+		}
+		const next = orderedPool.splice(bestIdx, 1)[0]!;
+		picked.push(next);
+		seenKinds.add(exemplarKindKey(next));
+	}
+
+	return picked.slice(0, limit);
 }

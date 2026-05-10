@@ -3,6 +3,7 @@ import { FileTextIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRupees } from "@/lib/billing/plans";
+import { formatDateShortDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 export type PaymentHistoryRow = {
 	id: string;
@@ -144,11 +145,7 @@ export function PaymentHistorySection({ payments }: { payments: PaymentHistoryRo
 										return (
 											<tr key={payment.id} className="border-t border-border/80 hover:bg-muted/30">
 												<td className="px-3 py-2.5">
-													{new Date(payment.created_at).toLocaleDateString("en-IN", {
-														day: "numeric",
-														month: "short",
-														year: "numeric",
-													})}
+													{formatDateShortDMYInAppTimeZone(payment.created_at)}
 												</td>
 												<td className="px-3 py-2.5 font-medium tabular-nums">
 													{payment.currency === "INR"

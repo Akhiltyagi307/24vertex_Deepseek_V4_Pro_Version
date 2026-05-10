@@ -1,4 +1,5 @@
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
+import { formatDateLongDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
 import { cn } from "@/lib/utils";
 
@@ -18,13 +19,8 @@ function formatTokens(n: number): string {
 }
 
 function formatEndDate(iso: string): string {
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return "";
-	return d.toLocaleDateString("en-IN", {
-		day: "numeric",
-		month: "long",
-		year: "numeric",
-	});
+	const s = formatDateLongDMYInAppTimeZone(iso);
+	return s === "—" ? "" : s;
 }
 
 function MiniMeter({

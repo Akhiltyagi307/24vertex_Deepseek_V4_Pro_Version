@@ -7,6 +7,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { formatRelativeTime } from "@/components/student/notifications/relative-time";
 import { getContextChunkStats, listRecentContextChunks } from "@/lib/admin/context-chunk-coverage";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 export const metadata = {
 	title: "Context chunks · EduAI Admin",
@@ -55,7 +56,11 @@ export default async function AdminContextChunksPage() {
 				<AdminKpiCard
 					label="Last ingested"
 					value={lastIngestedLabel}
-					hint={stats.lastIngestedAt ? new Date(stats.lastIngestedAt).toISOString().slice(0, 16).replace("T", " ") : "no data"}
+					hint={
+						stats.lastIngestedAt ?
+							formatDateTimeMediumShortInAppTimeZone(stats.lastIngestedAt)
+						:	"no data"
+					}
 				/>
 			</div>
 

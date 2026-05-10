@@ -1,9 +1,12 @@
 # Visuals eval fixtures
 
 Drop JSON files of the shape `PracticeGenerationOutput["questions"][number]`
-into `<subject>/` directories here. The eval script
-(`pnpm eval:visuals`) scores every fixture against the four-criterion
-gate from §6 of the v2 visuals guide:
+into `<subject>/` directories here. The eval script (`pnpm eval:visuals`, runs
+`tsx scripts/eval-visuals.ts`) scores every fixture using `stemNeedsVisualHint`
+from `src/lib/practice/visuals/stem-visual-hints.ts` — **keep that module aligned
+with** `practice-generation-quality-gates.ts` when changing deictic rules.
+
+Criteria:
 
 1. **visual_when_needed** — stem mentions a figure/diagram/etc. ⇔ visual is non-null.
 2. **spec_valid** — visual envelope (when present) parses against the schema.
@@ -11,6 +14,11 @@ gate from §6 of the v2 visuals guide:
    least one primitive, valid SMILES/mhchem etc.).
 4. **stem_self_contained** — when visual is null, the stem doesn't
    reference "above/below/shown" without a figure.
+5. **caption_alt_substantial** — when visual is non-null, `caption` and
+   `altText` each have at least three words.
+6. **visual_anti_spoiler** — `caption`/`altText` must not use banned answer
+   phrases or repeat the keyed answer / correct option text unless it also
+   appears in the stem.
 
 ## Folder layout
 

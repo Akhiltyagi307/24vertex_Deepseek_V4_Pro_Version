@@ -1,4 +1,5 @@
 import { getAppUrl } from "@/lib/env";
+import { formatDateLongDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { escapeHtml, renderEmailShell } from "@/lib/email/render-email-shell";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 
@@ -99,11 +100,7 @@ export async function sendPaymentReceiptEmail(params: PaymentReceiptParams): Pro
 export type SubscriptionActiveParams = CommonParams & { planName: string; nextRenewalIso: string };
 export async function sendSubscriptionActiveEmail(params: SubscriptionActiveParams): Promise<{ error: string | null }> {
 	const subject = `Welcome to ${params.planName}!`;
-	const renewal = new Date(params.nextRenewalIso).toLocaleDateString("en-IN", {
-		day: "numeric",
-		month: "long",
-		year: "numeric",
-	});
+	const renewal = formatDateLongDMYInAppTimeZone(params.nextRenewalIso);
 	const studentName = escapeHtml(params.studentName ?? "there");
 	const planName = escapeHtml(params.planName);
 

@@ -1,11 +1,12 @@
 import type { PracticeQuestionTypeCounts } from "./constants";
 import { isMathematicsSubject } from "./constants";
+import type { PracticeDifficulty } from "./types";
 import {
 	getPracticeGenerationSubjectPreamble,
 	resolvePracticeGenerationSubjectRouting,
 } from "./generation-prompt-registry";
 import type { PracticeUserMessagePayload } from "./user-message";
-import { isPracticeVisualsEnabled } from "./visuals/env";
+import { getPracticeVisualExemplarCount, isPracticeVisualsEnabledForSubject } from "./visuals/env";
 import { pickExemplarsForSubject, type VisualExemplar } from "./visuals/exemplars";
 
 export type PracticeGenerationSubjectContext = {
@@ -22,6 +23,10 @@ type UserMessageSummary = Pick<
 > & {
 	/** Subject name passed in so the Math-only banner is reinforced contextually. */
 	subjectName?: string | null;
+	/** Student grade (from payload.student.grade) for concise band rules. */
+	student_grade?: number | null;
+	/** Curriculum subject grade when known (from routing / subject row). */
+	subject_grade?: number | null;
 };
 
 /**
@@ -49,12 +54,23 @@ function computePerBucketTimeTargets(
 		counts.long_answer * BUCKET_TIME_WEIGHTS.long_answer;
 	if (totalWeight <= 0) return { mcq: 60, fib: 45, sa: 180, la: 360 };
 	const perWeight = timeLimitSeconds / totalWeight;
-	return {
-		mcq: Math.max(20, Math.round(perWeight * BUCKET_TIME_WEIGHTS.multiple_choice)),
-		fib: Math.max(20, Math.round(perWeight * BUCKET_TIME_WEIGHTS.fill_in_blank)),
-		sa: Math.max(60, Math.round(perWeight * BUCKET_TIME_WEIGHTS.short_answer)),
-		la: Math.max(120, Math.round(perWeight * BUCKET_TIME_WEIGHTS.long_answer)),
-	};
+		return {
+			mcq: Math.max(20, Math.round(perWeight * BUCKET_TIME_WEIGHTS.multiple_choice)),
+			fib: Math.max(20, Math.round(perWeight * BUCKET_TIME_WEIGHTS.fill_in_blank)),
+			sa: Math.max(60, Math.round(perWeight * BUCKET_TIME_WEIGHTS.short_answer)),
+			la: Math.max(120, Math.round(perWeight * BUCKET_TIME_WEIGHTS.long_answer)),
+		};
+}
+
+function buildGradeBandSection(grade: number | null | undefined): string {
+	if (grade == null || typeof grade !== "number" || !Number.isFinite(grade)) return "";
+	if (grade <= 8) {
+		return `### Grade band (about class ${grade})\n\n- Prefer shorter stems with fewer stacked clauses; one main task per question. Keep vocabulary aligned to NCERT tier for middle school.\n\n`;
+	}
+	if (grade <= 10) {
+		return `### Grade band (about class ${grade})\n\n- Standard secondary depth; avoid long multi-part stems unless the topic requires it.\n\n`;
+	}
+	return `### Grade band (about class ${grade})\n\n- May use denser stems, formal notation, and multi-step items where the syllabus expects it.\n\n`;
 }
 
 /**
@@ -72,6 +88,9 @@ function buildHardGatesBlock(args: {
 	bucketTimes: { mcq: number; fib: number; sa: number; la: number };
 	subjectIsMath: boolean;
 	visualsEnabled: boolean;
+	visualsPolicy?: PracticeUserMessagePayload["test_parameters"]["visuals_policy"];
+	/** Appended only on the final checklist pass — subject discipline + sanity self-audit. */
+	finalChecklistExtras?: string;
 }): string {
 	const c = args.counts;
 	const mathBanner =
@@ -93,16 +112,66 @@ function buildHardGatesBlock(args: {
 		? "- `visual` field: emit `null` UNLESS a load-bearing trigger fires per the Visuals discipline section. If non-null, every label in the stem MUST match the spec. When in doubt, prefer null."
 		: "- `visual` field: ALWAYS emit `null` for every question in this generation.";
 
+	let visualExtras = "";
+	if (args.visualsEnabled && args.visualsPolicy) {
+		const vp = args.visualsPolicy;
+		const kindsLine =
+			vp.preferred_kinds.length > 0 ?
+				`- Non-null \`visual.spec.kind\` MUST be one of: ${JSON.stringify(vp.preferred_kinds)}. Do not invent other kinds.`
+			:	`- \`visuals_policy.preferred_kinds\` is empty for this subject: emit \`visual: null\` on every question.`;
+		const capLine =
+			vp.max_non_null_visuals > 0 ?
+				`- At most ${vp.max_non_null_visuals} question(s) may have a non-null \`visual\`; all others MUST use \`visual: null\`. Choose the most load-bearing items.`
+			:	`- Non-null visuals are disabled (\`max_non_null_visuals\` = 0): emit \`visual: null\` on every question.`;
+		visualExtras = `\n${kindsLine}\n${capLine}`;
+	}
+
 	return `${args.heading}
 - Output JSON only — no markdown fences, no commentary, no leading or trailing prose.
 - Emit EXACTLY ${args.estimatedQuestionCount} questions across the four buckets: ${c.multiple_choice} multiple_choice, ${c.fill_in_blank} fill_in_blank, ${c.short_answer} short_answer, ${c.long_answer} long_answer. Buckets MUST contain exactly that many items — not one more, not one fewer. If a bucket is 0, emit an empty array \`[]\`.
 ${mathBanner}
 - topic_id COPY PROTOCOL: every \`topic_id\` MUST be copied character-for-character from \`test_parameters.allowed_topic_ids\` (or the same values under \`topic_grounding[].topic_id\`). Do NOT type a UUID from memory, do NOT splice segments from two different ids, do NOT lowercase/uppercase or trim. Set each question's \`topic_name\` to the \`topic_grounding[].topic_name\` matching that exact \`topic_id\`.
+- Chunk fidelity: paraphrase wording; reuse facts, numbers, labels, and scenario shapes from that item's \`topic_grounding\` chunks when they supply them. Stay consistent with \`curriculum_hint\`; do not contradict it. Use made-up numerics or novel setups only when chunks offer no concrete drill — then keep items conceptual and conservative per \`test_parameters.context_quality_instruction\`.
 - multiple_choice questions MUST include \`options\` with exactly the four keys A, B, C, D (string values). \`answer_key.correct_answer\` MUST be exactly one of "A", "B", "C", or "D" matching one of those keys. Do NOT emit \`options: null\` inside multiple_choice; if the stem is a single blank or short completion, place it in \`fill_in_blank\` instead.
 - fill_in_blank, short_answer, long_answer questions MUST omit \`options\` entirely (or set it to null). Their \`answer_key.correct_answer\` is a short string for FIB, sentences for short_answer, paragraph-style for long_answer.
 - MCQ self-consistency: for each MCQ, mentally re-solve the stem and confirm \`answer_key.correct_answer\` is the letter of the option that solves it. The explanation must justify THAT letter only. For numerically-keyed MCQs, recompute every option's value before locking the letter.
 - Time budget: SUM of every question's \`estimated_time_seconds\` across ALL buckets MUST be between ${args.timeSumMin} and ${args.timeSumMax} inclusive (target ~${args.timeLimitSeconds}). Per-bucket starting points: ${perBucketTimes || "n/a"}. Adjust ±20% within the band based on item complexity.
-${visualLine}`;
+${visualLine}${visualExtras}${args.finalChecklistExtras ? `\n${args.finalChecklistExtras}` : ""}`;
+}
+
+/** Universal anti-trivia and quality floor — applies to every subject and bucket. */
+function buildSubjectDisciplineBlock(difficulty: PracticeDifficulty): string {
+	const rememberCap =
+		difficulty === "easy" ?
+			"For an `easy` test, at most **30%** of items may be `Remember`-level recall."
+		:	"For `medium` and `hard` tests, at most **15%** of items may be `Remember`-level recall.";
+	return `## Subject discipline (every question must teach the SUBJECT)
+
+Each item exists to test the named subject's concepts, methods, or reasoning. If a non-subject expert could answer the item from general knowledge or trivia alone, the item is **OFF-BAND** — rewrite or replace it.
+
+### Hard bans (EVERY question, EVERY bucket)
+
+- **DATE / YEAR AS ANSWER.** Never key a four-digit year, a decade, or an "in what year" answer. Even if a date appears in \`topic_grounding\`, the year itself is not the subject concept — reframe to the process, mechanism, law, or theorem. (Bad: "Wöhler synthesised urea in ______" → 1828. Good: significance of urea synthesis for vital-force theory — only if that topic is in grounding.) **Exception — not assessing the year:** stems (e.g. Accountancy journal rows) may display transaction dates (dd Mmm yyyy); the keyed skill must remain classification or arithmetic, never "which calendar year…".
+- **BIOGRAPHY AS ANSWER.** Never key a scientist's, mathematician's, economist's, or author's **name** as the answer unless \`topic_grounding\` is explicitly about the history of the discipline for that figure. Names may appear in the stem as setting; the **keyed** target must be a subject concept.
+- **GENERAL-KNOWLEDGE / TRIVIA STEMS.** No "which country", "which capital", "which festival", "which year was X founded" unless the subject is Geography or Social Science and the chunk supports it.
+- **DEFINITIONAL FLASHCARDS.** A fill-in-blank whose answer is one glossary word copied verbatim from the book is a flashcard, not an assessment — upgrade to one-step application / inference, or use another bucket. (Bad: "The SI unit of power is ______" → watt. Good: a short numerical power problem with clean numbers.)
+- **SUBJECTIVE SUPERLATIVES WITHOUT GROUNDING.** Avoid "best", "latest", "most modern", "most important" unless the chunk explicitly supplies that ranking.
+- **NEAR-DUPLICATE STEMS.** Within one test, do not paraphrase the same fact twice (e.g. "Wöhler … in ___" plus "In 1828, Wöhler …"). Each item must teach a **distinct** skill — avoid copy-paste procedural twins (e.g. two Lassaigne setups differing only in trivial wording).
+
+### Cognitive-demand floor
+
+- ${rememberCap}
+- The rest must be \`Understand\`, \`Apply\`, \`Analyze\`, \`Evaluate\`, or \`Create\`. Convert pure recall into application, sign/trend prediction, or a one-line worked step.
+
+### Numeric and answer-key sanity (every numerical item)
+
+- Recompute the keyed answer end-to-end before emitting. If the result is impossible (supersonic speeds from everyday forces, percentage > 100%, probability outside [0, 1], balance sheet that does not balance), **change the input numbers** — do not ship the item.
+- For MCQs, recompute **every option's** numeric value, not only the keyed letter, so two options never accidentally match the correct value.
+- If the stem is fixed and only options shuffle between items, reshuffle so \`correct_answer\` stays consistent — never reuse the same stem with a different keyed letter unless the scenario changed.
+- For **fill_in_blank**, **short_answer**, and **long_answer**, numeric \`correct_answer\` must match the arithmetic in \`answer_key.explanation\` (catch half/double-mole and back-titration errors).
+- Drop or rewrite any item whose \`correct_answer\` is **only** a bare four-digit calendar year.
+
+Current difficulty band from payload: **${difficulty}**.`;
 }
 
 /**
@@ -124,8 +193,10 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 	const timeSumMin = Math.round(time_limit_seconds * 0.6);
 	const timeSumMax = Math.round(time_limit_seconds * 1.2);
 	const bucketTimes = computePerBucketTimeTargets(time_limit_seconds, question_type_counts);
-	const visualsEnabled = isPracticeVisualsEnabled();
+	const subjectNameForVisuals = userMessageSummary.subjectName ?? "";
+	const visualsEnabled = isPracticeVisualsEnabledForSubject(subjectNameForVisuals);
 
+	const vp = userMessageSummary.test_parameters.visuals_policy;
 	const hardGatesTop = buildHardGatesBlock({
 		heading: "## HARD GATES (non-negotiable machine constraints)",
 		estimatedQuestionCount: estimated_question_count,
@@ -136,7 +207,12 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 		bucketTimes,
 		subjectIsMath,
 		visualsEnabled,
+		visualsPolicy: vp,
 	});
+
+	const finalChecklistExtras = `- Subject-discipline check: every item tests a SUBJECT concept — not a date, biography trivia, standalone unit symbol / Greek letter / SI unit name as the keyed answer, or general-knowledge fact.
+- Cognitive-demand check: \`Remember\`-level items stay within the cap (easy ≤30% Remember; medium/hard ≤15% Remember) per Shared **Subject discipline** section.
+- Sanity check: every numerical answer recomputed; every MCQ option recomputed; written items' \`correct_answer\` agrees with the explanation; accounting entries balance; physical/economic outputs sit in plausible domains.`;
 
 	const finalChecklist = buildHardGatesBlock({
 		heading: "## FINAL COMPLIANCE CHECKLIST — verify before you emit",
@@ -148,17 +224,26 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 		bucketTimes,
 		subjectIsMath,
 		visualsEnabled,
+		visualsPolicy: vp,
+		finalChecklistExtras,
 	});
 
 	const visualsBlock = visualsEnabled
-		? buildVisualsDisciplineBlock()
+		? buildVisualsDisciplineBlock(vp)
 		: "## Visuals\n\nFor this generation set `visual: null` on every question. Do not emit a non-null visual envelope under any circumstance.";
 
-	const exemplarsBlock = visualsEnabled ? buildExemplarsBlock(userMessageSummary.subjectName) : "";
+	const exemplarsBlock = visualsEnabled
+		? buildExemplarsBlock(userMessageSummary.subjectName, getPracticeVisualExemplarCount())
+		: "";
+
+	const subjectDiscipline = buildSubjectDisciplineBlock(difficulty);
 
 	return `${hardGatesTop}
 
+${subjectDiscipline}
+
 ## Pedagogy
+${buildGradeBandSection(userMessageSummary.student_grade ?? userMessageSummary.subject_grade)}
 
 - Difficulty target: ${difficulty}. Calibrate reading length, computation steps, and distractor quality accordingly.
 - Bloom-inspired cognitive demand: map each item to one of Remember, Understand, Apply, Analyze, Evaluate, Create as appropriate to the subject and grade. Earlier items may lean lower; later items may climb where the global difficulty allows. Keep \`difficulty_level\` consistent with that cognitive demand.
@@ -236,10 +321,12 @@ For each topic, treat the two chunk arrays as a pair with distinct jobs:
 - \`exercise_chunks\` — NCERT-style end-of-chapter questions. Use them to decide HOW to ask (register, cadence, command verbs, scaffolding, format conventions).
 
 Rules:
-1. Style imitation. Match the register, cadence, and command-verb family of \`exercise_chunks\` for that topic. The test should sound like it came from the same chapter — without copying any chunk verbatim.
-2. Per-topic stylistic loyalty. In multi-topic tests, take stylistic cues for each item from THAT item's own topic chunks, not from a dominant topic.
-3. Do not import chunk noise. Silently correct typos, OCR artefacts, and stray captions. Imitate intent and register, not accidents.
-4. When \`grounding_meta.context_quality\` is \`low_context\` or \`no_context\`, stay at the conceptual / definition level for affected topics; do not invent specific named examples, dates, formulae, or numeric constants you cannot verify from the chunks.
+1. Style imitation. Match the register, cadence, and command-verb family of \`exercise_chunks\` for that topic. The test should sound like the same chapter — paraphrase sentences; do not paste a full chunk line-for-line.
+2. Traceability. Each question must be justifiable from that \`topic_id\`'s \`content_chunks\` / \`exercise_chunks\` when they are non-empty — same concepts, vocabulary tier, and (where chunks give them) numbers and diagram types.
+3. Per-topic loyalty. In multi-topic tests, take cues for each item from THAT item's own topic chunks, not from a dominant topic.
+4. Do not import chunk noise. Silently correct typos, OCR artefacts, and stray captions. Imitate intent and register, not accidents.
+5. When \`grounding_meta.context_quality\` is \`low_context\` or \`no_context\`, stay at the conceptual / definition level for affected topics; do not invent specific named examples, dates, formulae, or numeric constants you cannot verify. Still do not contradict \`curriculum_hint\` (unit/chapter/grade).
+6. When \`test_parameters.grounding_policy.prefer_chunk_aligned_items\` is true, treat chunk-aligned items as the default path — generic rewrites are second choice.
 
 ## Output shape
 
@@ -259,8 +346,19 @@ Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessage
  * but the rules here cap the failure modes (every-question-gets-a-visual,
  * label drift between stem and spec, syntactically invalid expressions).
  */
-function buildVisualsDisciplineBlock(): string {
+function buildVisualsDisciplineBlock(
+	vp: PracticeUserMessagePayload["test_parameters"]["visuals_policy"],
+): string {
+	const kindsEcho =
+		vp.preferred_kinds.length > 0 ? vp.preferred_kinds.join(", ") : "— leave every `visual` null —";
+	const maxEcho = vp.max_non_null_visuals;
 	return `## Visuals (\`visual\` field — required on every question)
+
+### Policy (must match \`test_parameters.visuals_policy\`)
+
+- Non-null \`visual.spec.kind\` must be drawn from: ${kindsEcho}.
+- Soft cap: at most ${maxEcho} question(s) with non-null \`visual\`; choose the most load-bearing T1/T2/T3 items first.
+- Avoid **orphan** diagrams: if you attach a non-null \`visual\`, the stem should reference it ("shown below", "in the table", etc.) or the visual is itself the worksheet layout (accountancy/statistics stimulus).
 
 The default is \`visual: null\`. Emit a non-null visual ONLY when one of these
 load-bearing triggers fires:
@@ -287,6 +385,24 @@ If you emit a visual, the stem MUST NOT restate data the visual already carries.
 Every label, letter, number, or unit referenced in the stem MUST appear in the
 spec; every label, letter, number in the spec MUST appear in the stem or be
 clearly secondary (axis ticks, gridlines).
+
+### Caption and altText (student-facing — must not spoil the item)
+
+Every non-null visual includes envelope fields \`caption\` (short, visible
+under the figure) and \`altText\` (richer description for screen readers).
+
+- \`caption\`: One line stating **what the stimulus is** — diagram type, table
+  purpose, axis meanings, or passage layout. NOT the conclusion, NOT
+  "therefore…", NOT the correct option letter, NOT the final keyed value unless
+  the **stem** already states that value as given data.
+- \`altText\`: Reading order — components, directions, tick/grid notes, legend,
+  column headers. Same anti-spoiler rules as \`caption\`.
+- Do **not** encode which MCQ option is correct (e.g. only the correct arrow
+  bolded, or altText naming one choice). Spec labels must not duplicate the
+  keyed answer string unless it already appears in the stem.
+- \`data_table\` / \`english_passage\`: describe structure (headers, line
+  numbers). Do not summarise the passage moral or the numeric result the
+  student must produce if that result **is** the answer.
 
 ### Renderer-specific syntax (HARD)
 
@@ -320,8 +436,7 @@ clearly secondary (axis ticks, gridlines).
   shape (journal_entry/cash_book/rectification → \`rows[]\`; ledger →
   \`ledger\`; trial_balance → \`rows[]\`; balance_sheet → \`assetsSide\` +
   \`equityAndLiabilitiesSide\`; p_and_l → \`rows[]\`).
-- \`economics_curve\` expressions are functions of \`p\` (price on the x-axis).
-  The renderer substitutes \`p\` → \`x\` before passing to the plotter.
+- \`economics_curve\`: horizontal axis is \`xMin\`…\`xMax\` — set \`xLabel\` to its meaning (often Quantity \`Q\` in intro micro). Vertical values come from each \`curves[].expr\`, written **in terms of \`p\`** where \`p\` is the horizontal-axis variable; the renderer substitutes \`p\` → the plotter's \`x\` internally (do not pre-substitute). Set \`yLabel\` to the vertical meaning (often Price \`P\`). Example: demand might use \`expr\` like \`80 - 0.4 * p\` for downward-sloping price vs quantity in \`Q\`–\`P\` space.
 - \`statistics_chart\`: pick the matching \`subKind\` (histogram, bar, line,
   scatter, pie, frequency_polygon, ogive, box). Histogram + frequency_polygon
   + ogive consume \`bins[]\`; ogive also requires \`cumulative\` =
@@ -338,9 +453,10 @@ clearly secondary (axis ticks, gridlines).
 
 1. Does the stem actually require this visual? If unsure → null.
 2. Does every label in the stem appear in the spec?
-3. Does the answer key reference the same labels and values as the spec?
-4. For function plots and curves: f(x) defined and finite over the plotted range?
-5. For chemistry: does the SMILES / mhchem string parse?
+3. Do \`caption\` and \`altText\` explain the stimulus without revealing the keyed answer?
+4. Does the answer key reference the same labels and values as the spec?
+5. For function plots and curves: f(x) defined and finite over the plotted range?
+6. For chemistry: does the SMILES / mhchem string parse?
 
 If any check fails and you cannot fix the spec, set \`visual: null\` and rewrite
 the stem to be self-contained. A correct question without a visual is ALWAYS
@@ -373,12 +489,12 @@ function pickExemplarSubjectKey(
 
 /**
  * Few-shot exemplars block — appended to the bottom of the shared system
- * instructions when visuals are enabled. Provides 4 worked stems with
- * matched `visual` shapes so the model has concrete patterns to imitate.
+ * instructions when visuals are enabled. Provides worked stems with
+ * matched \`visual\` shapes so the model has concrete patterns to imitate.
  */
-function buildExemplarsBlock(subjectName?: string | null): string {
+function buildExemplarsBlock(subjectName?: string | null, exemplarLimit = 6): string {
 	const subjectKey = pickExemplarSubjectKey(subjectName);
-	const exemplars = pickExemplarsForSubject(subjectKey, 4);
+	const exemplars = pickExemplarsForSubject(subjectKey, exemplarLimit);
 	if (exemplars.length === 0) return "";
 	const rendered = exemplars
 		.map((ex, i) => {
@@ -416,6 +532,8 @@ export function buildPracticeSystemPrompt(context: {
 	const summaryWithSubject: UserMessageSummary = {
 		...context.userMessageSummary,
 		subjectName: context.generationSubject.subjectName,
+		student_grade: context.generationSubject.studentGrade,
+		subject_grade: context.generationSubject.subjectGrade,
 	};
 	const shared = buildPracticeGenerationSharedSystemInstructions(summaryWithSubject);
 	return `${preamble}\n\n${shared}`;

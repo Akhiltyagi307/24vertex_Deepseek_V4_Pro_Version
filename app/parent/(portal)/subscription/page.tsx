@@ -16,6 +16,7 @@ import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getCachedPlanCatalog } from "@/lib/cache/deterministic-lookups";
 import { getCachedEntitlementsForProfile } from "@/lib/billing/entitlements";
+import { formatDateLongDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
@@ -95,13 +96,7 @@ export default async function ParentSubscriptionPage() {
 		contact: studentProfile.phone ?? undefined,
 	};
 
-	const renewalDate = entitlement
-		? new Date(entitlement.currentPeriodEnd).toLocaleDateString("en-IN", {
-				day: "numeric",
-				month: "long",
-				year: "numeric",
-			})
-		: "";
+	const renewalDate = entitlement ? formatDateLongDMYInAppTimeZone(entitlement.currentPeriodEnd) : "";
 
 	return (
 		<div className="w-full min-w-0 py-6 medium:py-8">

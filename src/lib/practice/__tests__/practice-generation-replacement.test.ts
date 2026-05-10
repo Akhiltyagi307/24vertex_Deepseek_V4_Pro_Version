@@ -41,11 +41,15 @@ describe("replacement prompt builders", () => {
 			failedQuestionIndexes: [3, 7],
 			failureCode: "stem_references_missing_visual",
 			failureDetails: "2 question(s) reference a visual that wasn't emitted.",
+			preferredVisualKinds: ["math_geometry"],
+			currentGroupedJson: '{"questions_by_type":{"multiple_choice":[]}}',
 		});
 		expect(text).toContain("BASE_PROMPT_TEXT");
+		expect(text).toContain("CURRENT_GROUPED_GENERATION_JSON");
 		expect(text).toContain("VISUAL_FIX_MODE");
 		expect(text).toContain("Failure code: stem_references_missing_visual");
-		expect(text).toContain('"FAILED_INDEXES"'.replace(/"/g, "")); // tolerate either JSON layout
+		expect(text).toContain("Repair hint:");
+		expect(text).toContain("math_geometry");
 		expect(text).toContain("[3,7]");
 		expect(text).toContain("(b) set visual to null and rewrite the stem");
 	});

@@ -7,6 +7,7 @@ import type {
 	PerformanceRowSerialized,
 	TrackerStatus,
 } from "@/lib/student/performance-matrix";
+import { formatDateMediumInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { cn } from "@/lib/utils";
 
 import type { PracticeEnrolledSubject } from "./types";
@@ -50,7 +51,7 @@ export function trendLabel(t: PerformanceRowSerialized["trend"]): string {
 export function formatLastTest(iso: string | null): string {
 	if (!iso) return "—";
 	try {
-		return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" });
+		return formatDateMediumInAppTimeZone(iso);
 	} catch {
 		return "—";
 	}

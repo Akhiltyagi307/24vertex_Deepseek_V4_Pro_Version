@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
 import { motion, type Variants } from "motion/react";
 
+import { formatDateMonthShortDayInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { dashboardSubjectCardCtaClassName } from "@/components/student/dashboard-subject-card";
 import { Button } from "@/components/ui/button";
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
@@ -27,7 +28,9 @@ export type DashboardSubjectCompactModel = {
 function formatLastTestShort(iso: string | null): string {
 	if (!iso) return "";
 	try {
-		return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+		const d = new Date(iso);
+		if (!Number.isFinite(d.getTime())) return "";
+		return formatDateMonthShortDayInAppTimeZone(iso);
 	} catch {
 		return "";
 	}

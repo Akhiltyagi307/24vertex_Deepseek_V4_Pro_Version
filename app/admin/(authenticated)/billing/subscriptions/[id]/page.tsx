@@ -6,6 +6,7 @@ import { AdminQuotaGrantsPanel } from "@/components/admin/billing/admin-quota-gr
 import { AdminSubscriptionActions } from "@/components/admin/billing/admin-subscription-actions";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { adminGetSubscriptionById } from "@/lib/admin/billing/subscription-detail";
+import { formatDateShortDMYInAppTimeZone, formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 export const metadata = {
 	title: "Admin · Billing · Subscription",
@@ -48,12 +49,18 @@ export default async function AdminBillingSubscriptionDetailPage({ params }: Pro
 				<Row label="Subscription id" value={<span className="font-mono text-xs">{s.id}</span>} />
 				<Row label="Plan" value={`${s.plan_code} — ${detail.plan_name}`} />
 				<Row label="Status" value={s.status} />
-				<Row label="Current period" value={`${s.current_period_start.toISOString().slice(0, 10)} → ${s.current_period_end.toISOString().slice(0, 10)}`} />
+				<Row
+					label="Current period"
+					value={`${formatDateShortDMYInAppTimeZone(s.current_period_start)} → ${formatDateShortDMYInAppTimeZone(s.current_period_end)}`}
+				/>
 				<Row label="Cancel at period end" value={s.cancel_at_period_end ? "yes" : "no"} />
 				<Row label="Staff override" value={s.staff_override ? "yes" : "no"} />
 				<Row label="Razorpay subscription" value={s.razorpay_subscription_id ? <span className="font-mono text-xs">{s.razorpay_subscription_id}</span> : "—"} />
 				<Row label="Pending plan change" value={s.pending_plan_code ?? "—"} />
-				<Row label="Trial ends" value={s.trial_ends_at ? s.trial_ends_at.toISOString() : "—"} />
+				<Row
+					label="Trial ends"
+					value={s.trial_ends_at ? formatDateTimeMediumShortInAppTimeZone(s.trial_ends_at) : "—"}
+				/>
 			</div>
 
 			<AdminSubscriptionActions

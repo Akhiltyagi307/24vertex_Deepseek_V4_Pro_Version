@@ -41,6 +41,7 @@ export function StudentShell({
 		<PaywallProvider>
 			<DashboardShell
 				isDoubtChatPath={isStudentDoubtChatPath}
+				isFixedViewportShellPath={isStudentPracticeTestSessionPath}
 				isSidebarHiddenPath={isStudentPracticeTestSessionPath}
 				isImmersiveShellPath={isStudentImmersiveShellPath}
 				topBar={

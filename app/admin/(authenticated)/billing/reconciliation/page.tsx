@@ -1,6 +1,7 @@
 import { and, count, desc, isNotNull, isNull, type SQL } from "drizzle-orm";
 
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { db } from "@/db";
 import { billingReconciliationDrift } from "@/db/schema/billing";
 
@@ -93,7 +94,9 @@ export default async function AdminBillingReconciliationPage({ searchParams }: P
 					<tbody>
 						{rows.map((r) => (
 							<tr key={r.id} className="border-b border-border/80">
-								<td className="px-3 py-2 text-muted-foreground">{r.detectedAt.toISOString().slice(0, 19)}</td>
+								<td className="px-3 py-2 text-muted-foreground">
+									{formatDateTimeMediumShortInAppTimeZone(r.detectedAt)}
+								</td>
 								<td className="px-3 py-2 font-mono">{r.field}</td>
 								<td className="max-w-xs truncate px-3 py-2">{r.localValue ?? "—"}</td>
 								<td className="max-w-xs truncate px-3 py-2">{r.razorpayValue ?? "—"}</td>

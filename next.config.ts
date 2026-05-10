@@ -62,6 +62,8 @@ const nextConfig: NextConfig = {
 		"@react-pdf/renderer",
 		"razorpay",
 		"resend",
+		// Practice visuals: statistics_chart (box) uses Plotly; keep as external for SSR edge cases.
+		"plotly.js-dist-min",
 	],
 	images: {
 		formats: ["image/avif", "image/webp"],

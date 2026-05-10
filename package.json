@@ -1,6 +1,6 @@
 {
   "name": "examprep-ai-webapp",
-  "version": "0.1.0",
+  "version": "3.3.1",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -29,7 +29,7 @@
     "test:e2e:debug": "playwright test --debug",
 		"perf:check": "node scripts/perf-check.mjs",
 		"bundle:budget": "node scripts/bundle-budget.mjs",
-		"eval:visuals": "node scripts/eval-visuals.mjs",
+		"eval:visuals": "tsx scripts/eval-visuals.ts",
     "deadcode": "knip --reporter compact --include files,dependencies",
     "deadcode:strict": "knip --reporter compact --no-progress --include files,exports,types,duplicates,dependencies",
     "preview:emails": "NODE_OPTIONS=\"--require ./scripts/_preview-cjs-loader.cjs\" tsx scripts/preview-emails.ts",

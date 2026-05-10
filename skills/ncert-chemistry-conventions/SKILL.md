@@ -42,6 +42,13 @@ expected NCERT shapes look like.
 - Conditions over the arrow: `\\xrightarrow{cat.}` or
   `\\xrightarrow[60^\\circ\\text{C}]{H2SO4}`.
 
+## Student-facing `caption` and `altText`
+
+Describe **connectivity and layout** (atoms, bonds, reaction arrow
+direction, species labels). Do **not** state which product is the "main"
+one, give yields, or spell out the answer to a "identify / predict"
+question unless the stem already fixed the species.
+
 ## Lint output
 
 `lint.mjs` reads the test JSON on stdin and emits

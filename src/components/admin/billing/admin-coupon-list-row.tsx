@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { DestructiveConfirm } from "@/components/admin/destructive-confirm";
 import { Button } from "@/components/ui/button";
+import { formatDateShortDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 export type AdminCouponListRowProps = {
 	id: string;
@@ -64,7 +65,7 @@ export function AdminCouponListRow({
 				</td>
 				<td className="px-3 py-2">{isActive ? "yes" : "no"}</td>
 				<td className="px-3 py-2 text-muted-foreground">
-					{expiresAt ? expiresAt.toISOString().slice(0, 10) : "—"}
+					{expiresAt ? formatDateShortDMYInAppTimeZone(expiresAt) : "—"}
 				</td>
 				<td className="px-3 py-2 text-right">
 					<Button

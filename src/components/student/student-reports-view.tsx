@@ -19,7 +19,7 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 import * as React from "react";
-import { format } from "date-fns";
+import { formatDateMediumInAppTimeZone, formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { motion, useReducedMotion } from "motion/react";
 
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
@@ -57,17 +57,17 @@ function rowTimestamp(r: StudentReportTestRowSerialized): number {
 	return Number.isFinite(t) ? t : 0;
 }
 
-/** Avoid `toLocaleString` / `Intl` — Node and browsers can emit different punctuation for the same locale. */
+/** Avoid mixing host/Browser local tz; all clocks use Asia/Kolkata. */
 function formatReportTableDateTime(raw: string): string {
 	const d = new Date(raw);
 	if (!Number.isFinite(d.getTime())) return "—";
-	return format(d, "MMM d, yyyy 'at' h:mm a");
+	return formatDateTimeMediumShortInAppTimeZone(raw);
 }
 
 function formatReportSummaryDate(raw: number): string {
 	const d = new Date(raw);
 	if (!Number.isFinite(d.getTime())) return "—";
-	return format(d, "MMM d, yyyy");
+	return formatDateMediumInAppTimeZone(d);
 }
 
 /** Below `medium` (768px): dense row + 2-column grid so the table surfaces sooner. */

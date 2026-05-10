@@ -5,6 +5,7 @@ import {
 	stringifyPracticeUserMessage,
 	stringifyPracticeUserMessageForModel,
 	toPracticeUserMessageForModel,
+	type PreFetchedTopicContext,
 } from "../user-message";
 
 const TOPICS = [
@@ -150,6 +151,56 @@ describe("buildPracticeUserMessage", () => {
 		expect(many.test_parameters.coverage_mode).toBe("many_topics");
 	});
 
+	it("sets grounding_policy to curriculum_hint_only when no chunks are loaded", () => {
+		const msg = buildPracticeUserMessage({
+			studentGrade: 9,
+			subject: { id: "x", name: "Physics" },
+			difficulty: "medium",
+			timeLimitSeconds: 3600,
+			topics: TOPICS,
+		});
+		expect(msg.test_parameters.grounding_policy).toEqual({
+			mode: "curriculum_hint_only",
+			prefer_chunk_aligned_items: false,
+		});
+	});
+
+	it("sets grounding_policy to chunk_aligned when pre-fetched chunks exist", () => {
+		const preFetched: PreFetchedTopicContext = {
+			byTopic: new Map([
+				[
+					TOPICS[0]!.topicId,
+					{
+						context: [{ text: "Newton's laws describe inertia and force pairs.", source_ref: null }],
+						exercise: [],
+					},
+				],
+				[TOPICS[1]!.topicId, { context: [], exercise: [] }],
+			]),
+			meta: {
+				topic_count: 2,
+				context_chunk_count: 1,
+				exercise_chunk_count: 0,
+				context_char_total: 50,
+				exercise_char_total: 0,
+				truncated: false,
+				context_quality: "ok",
+			},
+		};
+		const msg = buildPracticeUserMessage({
+			studentGrade: 11,
+			subject: { id: "x", name: "Physics" },
+			difficulty: "medium",
+			timeLimitSeconds: 3600,
+			topics: TOPICS,
+			preFetchedTopicContext: preFetched,
+		});
+		expect(msg.test_parameters.grounding_policy).toEqual({
+			mode: "chunk_aligned",
+			prefer_chunk_aligned_items: true,
+		});
+	});
+
 	it("populates visuals_policy from PRACTICE_VISUALS env and subject", () => {
 		const original = process.env.PRACTICE_VISUALS;
 		try {
@@ -164,7 +215,19 @@ describe("buildPracticeUserMessage", () => {
 			expect(physics.test_parameters.visuals_policy).toEqual({
 				enabled: true,
 				preferred_kinds: ["physics_diagram", "math_function_plot", "data_table"],
+				max_non_null_visuals: 8,
 			});
+
+			process.env.PRACTICE_VISUALS_MAX_ABS = "3";
+			const physicsCapped = buildPracticeUserMessage({
+				studentGrade: 11,
+				subject: { id: "x", name: "Physics" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(physicsCapped.test_parameters.visuals_policy.max_non_null_visuals).toBe(3);
+			delete process.env.PRACTICE_VISUALS_MAX_ABS;
 
 			const accountancy = buildPracticeUserMessage({
 				studentGrade: 12,
@@ -186,6 +249,7 @@ describe("buildPracticeUserMessage", () => {
 				topics: TOPICS,
 			});
 			expect(off.test_parameters.visuals_policy.enabled).toBe(false);
+			expect(off.test_parameters.visuals_policy.max_non_null_visuals).toBe(0);
 			// preferred_kinds is independent of the master flag — still populated
 			// so the model knows the subject's renderer surface even when
 			// emission is suppressed.

@@ -178,7 +178,7 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 	const serverStartedAtIso = rawStartedAt ? (hasTimezoneSuffix ? rawStartedAt : `${rawStartedAt}Z`) : null;
 
 	return (
-		<div className="flex min-h-[calc(100dvh-8rem)] flex-col">
+		<div className="flex min-h-0 flex-1 flex-col">
 			<PracticeTestSession
 				testId={testId}
 				subjectName={subjectName}

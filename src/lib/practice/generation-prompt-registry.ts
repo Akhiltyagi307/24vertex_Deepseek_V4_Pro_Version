@@ -203,7 +203,12 @@ Literature: cite grounding; language: test the rule. Keep distinct: speaker vs p
 
 ## Question-type fit
 
-MCQ — unseen/comprehension inference, devices, vocabulary-in-context, grammar-in-passage. FIB — integrated grammar, vocabulary, short recall. Short-answer — 40–50 words (2–4 sentences): justify with textual reference, theme/character/value reflection. Long-answer — full writing tasks (typically 120–200 words with format, register, audience stated) or literary answers with several references; case-based comprehension with sub-parts when parameters allow. Case-based: 100–200 word stimulus + one focused question grounded in that stimulus.
+MCQ — unseen/comprehension inference, devices, vocabulary-in-context, grammar-in-passage. FIB — one-line application, classification, or grammar-in-passage completion with a unique answer grounded in the stimulus or rule — **not** textbook-definition recall, title/author trivia, or glossary flashcards. Short-answer — 40–50 words (2–4 sentences): justify with textual reference, theme/character/value reflection. Long-answer — full writing tasks (typically 120–200 words with format, register, audience stated) or literary answers with several references; case-based comprehension with sub-parts when parameters allow. Case-based: 100–200 word stimulus + one focused question grounded in that stimulus.
+
+## Subject discipline (specific bans)
+
+- Never key a **publication year**, author's life dates, edition/publisher/editor metadata, or biography trivia as the answer. Never key a school-of-criticism name as the keyed answer unless \`topic_grounding\` is explicitly about that critical frame and names it.
+- Historical or biographical context may appear in stems; the **keyed** target must be device, theme, register, grammar, or evidence from prescribed or supplied text.
 
 ## Subject-specific grounding
 
@@ -237,9 +242,15 @@ Do not introduce material outside the student's current grade level.
 
 ## Question-type fit
 
-MCQ — conceptual checks, formula recognition, dimension/unit verification, single-step numerical, graph interpretation, assertion–reason in standard CBSE four-option format. FIB — formula completion, single numerical answers, unit identification, named-quantity recall. Short-answer (50–80 words or brief working) — conceptual explanations, statements of laws with brief justification, single-step derivations, one-step numerical with working. Long-answer — multi-step numerical, complete derivations with diagram description, case-based questions with a stimulus and 2–3 sub-parts, combined theory-plus-numerical items.
+MCQ — conceptual checks, formula recognition (when applied to a numeric or symbolic setup), dimension verification, single-step numerical, graph interpretation, assertion–reason in standard CBSE four-option format. FIB — single-step numerical with unit, one line of a derivation or identity completion, or a specific symbolic completion — **not** glossary recall, "name the SI unit", or one-word labels (scalar, centre, watt, etc.). If the only natural FIB is a vocabulary fill, use MCQ with reasoning distractors or short-answer instead. Short-answer (50–80 words or brief working) — conceptual explanations, statements of laws with brief justification, single-step derivations, one-step numerical with working. Long-answer — multi-step numerical, complete derivations with diagram description, case-based questions with a stimulus and 2–3 sub-parts, combined theory-plus-numerical items.
 
 Where allowed, use case-based framing for long-answer: 100–200 word stimulus (an experimental setup, a circuit, a graph described in text, a real-world scenario) followed by sub-parts that probe definition, application, and analysis.
+
+## Subject discipline (specific bans)
+
+- **Never key** a year, a historian-of-science question ("who proposed…" as keyed name), Aristotle/Galileo/Newton/Curie/etc. **as the answer**, SI unit names, standalone Greek letters or symbols as the keyed answer, or pure math drills with zero physical principle. Figures may appear in stems for context; assess the **law**, numerical step, limiting case, or vector/energy reasoning.
+- Reject "Physical World" trivia and biography-as-recall. Sanity-check numerics: everyday forces/stopping distances must yield plausible speeds; flag supersonic / negative mass / sin θ > 1 / T < 0 K and fix numbers before emitting.
+- Prefer items where the student predicts, explains a limiting case, or completes a derivation — not "fill the blank with the textbook heading."
 
 ## Subject-specific grounding
 
@@ -281,9 +292,17 @@ Do not introduce material outside the student's current grade level.
 
 ## Question-type fit
 
-MCQ — conceptual checks, IUPAC nomenclature recognition, standard reaction products, single-step physical-chemistry numerical, electron-configuration recall, periodic trend comparisons, assertion–reason in standard CBSE four-option format. FIB — formula and balanced-equation completion, single numerical answers (with unit), IUPAC name completion. Short-answer (50–80 words) — explanation of trends, brief mechanism descriptions, balanced equations with conditions, single-step physical-chemistry numerical with working. Long-answer — multi-step numerical (electrochemistry, kinetics, solutions, equilibrium), complete reaction sequences (especially organic conversions), structural reasoning with explanation, case-based items (100–200 word stimulus + 2–3 sub-parts).
+MCQ — conceptual checks, IUPAC or structure-based reasoning, standard reaction predictions with justification, single-step physical-chemistry numerical, periodic-trend explanations, assertion–reason in standard CBSE four-option format. FIB — single numerical answer **with unit** where applicable, completing one line of an equation setup, **or** a specific intermediate in a derivation — **not** year-of-discovery, naming Wöhler's year, glossary shape labels ("hexagon"), or trivia. If IUPAC is tested, stem must force locant/rule reasoning — not pattern-matching synonyms in options; recompute lowest locant yourself; drop duplicate wording between options.
 
-For organic chemistry, conversion sequences ("Convert ethanol to ethanoic acid via two steps") and predict-the-product items are high-value. For physical chemistry, full-working numericals (Nernst, rate law, Raoult's law, Ksp) are standard.
+Short-answer (50–80 words) — explanation of trends, brief mechanism rationale, predictions with reasoning, single-step physical-chemistry numerical with working. Long-answer — multi-step numerical (electrochemistry, kinetics, solutions, equilibrium), conversion sequences with conditions, structured case items (100–200 word stimulus + 2–3 sub-parts).
+
+For organic chemistry, conversion sequences ("Convert ethanol to ethanoic acid via two steps") and predict-the-product items are high-value. For physical chemistry, full-working numericals (Nernst, rate law, Raoult's law, Ksp, Kjeldahl back-titration) are standard — verify moles/H⁺ equivalents (e.g. H₂SO₄ is dibasic) and that percent yields/compositions ∈ [0, 100].
+
+## Subject discipline (specific bans)
+
+- **Never key** a year, decade, "in ___ Wöhler…", or scientist **name** as the answer — including Wöhler, Lavoisier, Mendeleev trivia — even if the chunk mentions the date. Reframe history-of-chemistry facts into **concept significance** if the strand requires it (and still no year as keyed answer).
+- Ban subjective superlatives ("best…", "latest…", "most modern technique…") unless the chunk ranks methods explicitly.
+- Do not emit two items that are the same procedural drill (e.g. duplicate Lassaigne / Kjeldahl / IUPAC-on-the-same-chain) with superficial rewording — each must target a different mechanism, error class, or inference.
 
 ## Subject-specific grounding
 
@@ -322,13 +341,18 @@ Do not introduce material outside the student's current grade level or chapters 
 
 ## Question-type fit
 
-MCQ — identification of structures and processes, naming of organisms, recognition of life-cycle stages, distinguishing between similar terms, single-fact recall, assertion–reason in standard CBSE four-option format. FIB — scientific name completion, term recall, labelled-structure identification described in text. Short-answer (50–80 words) — explanation of a process, structure-with-function description, justification of a biological observation, single-step inheritance problems. Long-answer — multi-step processes (Calvin cycle, glycolysis, Krebs cycle, urea cycle, gametogenesis), complete inheritance problems with Punnett-square reasoning, biotechnology process descriptions (PCR, restriction digestion, recombinant DNA workflow), case-based items (100–200 word stimulus + 2–3 sub-parts).
+MCQ — identification tied to process or comparison, crossing/dihybrid reasoning, pathway steps, assertion–reason in standard CBSE four-option format. FIB — one mechanistic or classification answer (e.g., product of a named step, genotype component) with a **non-trivial** keyed string — **not** one-word textbook glossaries or single organelle labels unless the stem forces mechanism. Short-answer (50–80 words) — explanation of a process, structure-with-function justification, genetic/biotech reasoning. Long-answer — multi-step pathways, inheritance problems, biotech workflows, case-based items (100–200 word stimulus + 2–3 sub-parts).
 
 Diagram-based items: v1 has no biology_diagram renderer in the visual set, so set \`visual: null\` and write a self-contained stem. Do NOT describe an imagined figure in prose; rephrase the item so it can be answered from the names, properties, and processes alone (e.g., "Identify the organelle responsible for ATP synthesis" rather than "In the figure shown, label the organelle that…"). Curated biology illustrations are planned for a later release.
 
+## Subject discipline (specific bans)
+
+- **Never key** Mendel / Watson–Crick / Sanger / Khorana / named discoverer **as the answer**, nor chromosome counts / codon tables / species trait numbers, **unless** the topic is explicitly that experiment or that species and the chunk supplies the figure. Use names in stems; assess **mechanism**, prediction, or interpretation.
+- Ban near-duplicate "who discovered X" items; assess what the discovery **explains**.
+
 ## Subject-specific grounding
 
-Use structures, processes, scientific names, named scientists' contributions, and definitions from the chunks. **This rule is especially strict for Biology: LLMs frequently hallucinate scientist–discovery attributions and species characteristics. Do not invent scientific names, scientist–discovery pairings, or numerical data (chromosome numbers, codon mappings, named species' characteristics) not in the grounding. If the grounding does not specify, do not produce the item.**
+Use structures, processes, scientific names, experimental outcomes, and definitions **as given in the chunks** — for historical figures, use them to **frame** questions only; never make the discoverer's name or a bare year the keyed answer unless the shared Subject discipline biography exception applies. **Hallucination guard:** do not invent scientist–discovery pairings, chromosome counts, codon tables, or species trait numbers; if the grounding does not specify, do not produce the item.
 
 ## Biology-specific distractors
 
@@ -358,11 +382,15 @@ Do not introduce material outside the student's current grade level.
 ## Item design (MCQ-only)
 
 Three demands across all MCQs:
-- Conceptual — type identification (one-one, onto, conic type, order of differential equation), property recall, choosing the correct method.
-- Procedural — single integration, differentiation, simplification, matrix operation, evaluation of an integral or derivative at a point; one clean numeric answer.
-- Multi-step problem — optimisation, application of derivatives or integrals, conditional/Bayes probability, vector + 3D-geometry combinations; the four options surface common error paths.
+- Conceptual — type identification requiring inference (which method applies, classify the conic given partial data, classify the order of an ODE **from structure**).
+- Procedural — at least one non-trivial transformation: evaluate, differentiate, integrate, invert, multiply matrices — never an MCQ that only names a formula letter with four raw formulae and no substitution step.
+- Multi-step problem — optimisation, definite integrals over regions, conditional/Bayes, vector/plane combos; distractors expose real error paths.
 
 For Class 12 specifically, integration techniques (substitution, partial fractions, by parts), maxima/minima word problems, and probability (conditional/Bayes) are heavy MCQ topics. Linear programming should be fully described in text with constraints listed.
+
+## Subject discipline (specific bans)
+
+- **Never key** a mathematician's name, publication year, or a bare Greek letter placeholder as the keyed answer without a computational stem. Pure formula-identification MCQs ("area of circle = …") are **forbidden** — every MCQ must require inference, substitution, case analysis, or multi-step elimination.
 
 ## Subject-specific grounding
 
@@ -407,7 +435,12 @@ Do not introduce material outside the student's current grade level.
 
 ## Question-type fit
 
-MCQ — conceptual checks (which account is debited, which type of expenditure, which accounting concept applies), single-rule applications, classification (capital vs revenue, current vs non-current), assertion–reason in standard CBSE four-option format. FIB — formula completion (working capital ratio, current ratio formula), term recall (going-concern concept, prudence principle), single-value answers. Short-answer — brief journal entries (1–2 lines), single calculations (depreciation by straight-line, single ratio), narrative concept explanation with example. Long-answer — complete journal-entry sequences, ledger postings with closing balances, full financial-statement preparation with adjustments, partnership reconstitution scenarios, comparative or common-size statements, multi-step ratio analysis with interpretation, full cash-flow statement preparation. Case-based items (100–250 word stimulus + 2–4 sub-parts) are standard at this level.
+MCQ — classification (debit/credit, concept application), single-rule application, assertion–reason in standard CBSE four-option format. FIB — one-line **application** (classify an item, complete a ratio expression with given numbers, state the effect of a single adjustment) — **not** bare term recall for concepts when a short scenario would test the same idea. Short-answer — brief journal lines, single calculations (depreciation, one ratio with interpretation), concept-with-mini-example. Long-answer — full formats (journal sequences, ledgers, statements, cash flow, partnership cases). Case-based items (100–250 word stimulus + 2–4 sub-parts) are standard.
+
+## Subject discipline (specific bans)
+
+- **Never key** a calendar year (AS issue year, Companies Act vintage, etc.) as the answer. Statute or standard **names** may appear in stems; the keyed step must be debit/credit, classification, measurement, or a computed figure.
+- Every journal / trial balance / statement you emit must **balance** (debits = credits; totals reconcile). If not, fix before emit.
 
 ## Format compliance is half the marks
 
@@ -467,9 +500,13 @@ Do not introduce material outside the student's current grade level.
 
 ## Question-type fit
 
-MCQ — definitional recall, classification (which type of plan, which function of management), identification of principle/concept from a brief description, assertion–reason in standard CBSE four-option format. FIB — term completion, named-concept identification. Short-answer (60–80 words) — brief concept explanation with example, distinguishing two related terms in 2–3 points, stating principles or features. Long-answer — multi-feature explanations, comparative analyses, case-based application items, detailed conceptual treatment with examples. Case-based items (150–250 word stimulus + 2–4 sub-parts) are standard at this level and high-value.
+MCQ — definitional application (which principle/function in this scenario — not bare "who coined…"), classification, assertion–reason in standard CBSE four-option format. FIB — single-line classification or consequence given a grounded scenario — **not** empty term-slot recall ("___ principle means…"). Short-answer (60–80 words) — distinguish concepts with grounded example, principle-in-case. Long-answer — comparative analyses and case applications; case-based (150–250 word stimulus + 2–4 sub-parts) is the gold standard.
 
 For Business Studies, application is everything: a question that asks the student to identify which principle/function/concept is being illustrated in a real-world scenario is the gold standard.
+
+## Subject discipline (specific bans)
+
+- **Never key** Fayol/Taylor/(any manager name), company founder lore, statute years, or SEBI "latest circular" trivia as the answer. Names may illustrate a stem; keyed answer = **concept / function / decision type**.
 
 ## Subject-specific grounding
 
@@ -503,9 +540,14 @@ Do not introduce material outside the student's current grade level.
 
 ## Question-type fit
 
-MCQ — conceptual checks, classification (movement along vs shift in curve, real vs nominal, fiscal vs monetary policy instrument), single-step Statistics computations, identification of curves/relationships from descriptions, assertion–reason in standard CBSE four-option format. FIB — formula completion (mean = ΣX / n), term recall, single numerical answers. Short-answer (60–80 words) — brief conceptual explanations, single-step statistical computations with working, distinguishing two related concepts. Long-answer — multi-step Statistics problems (mean and SD from frequency distribution, Spearman's rank correlation, index number calculations), full conceptual treatment with diagram descriptions (indifference-curve analysis, equilibrium of firm under perfect competition, fiscal multiplier), case-based items (100–250 word stimulus + 2–3 sub-parts).
+MCQ — conceptual checks, curve/classification reasoning, single-step Statistics with interpretation, assertion–reason in standard CBSE four-option format. FIB — complete a **numeric** sub-step (e.g., one cell in a table given the rest), or a short classification — **not** raw "mean = ΣX/n" empty formula recall when a micro-dataset would test the same skill. Short-answer (60–80 words) — explanations with grounding, computations with reasoning. Long-answer — multi-step statistics, conceptual macro/micro chains, case items (100–250 word stimulus + 2–3 sub-parts).
 
-Sub-discipline mapping: Statistics for Economics — computational items with full working. Indian Economic Development — conceptual with reference to specific policy periods or comparative analysis. Microeconomics — diagram-based items (curves described in text) and concept application. Macroeconomics — both numerical (national income, multiplier) and conceptual.
+Sub-discipline mapping: Statistics — computational items with full working **and bounded checks** (frequencies ≥ 0, |r| ≤ 1 after computation, variance ≥ 0). Indian Economic Development — mechanisms and period comparisons **without** keyed years, plan ordinals, headline GDP %, or economist names (even if chunks mention them — assess the idea, never the date or the name as the answer). Micro — curves + reasoning. Macro — NI identities, multipliers — verify algebra.
+
+## Subject discipline (specific bans)
+
+- **Never key** a policy year, five-year-plan ordinal, headline GDP/unemployment statistic, nor Smith/Marshall/Keynes **as the keyed answer** — not even when a chunk names them; probe mechanism, classification, or algebra instead. Statistics computed **from numbers you put in the stem** are legitimate.
+- Reject subjective "best/latest index" wording without chunk-ranked methods.
 
 ## Subject-specific grounding
 
@@ -515,7 +557,7 @@ Use formulas, definitions, named policies, and historical references from the ch
 
 - Verify Statistics computations internally before emitting the item.
 - Choose numbers in Statistics problems so that intermediate steps are clean.
-- Demand–supply, AS–AD, IS–LM, PPF, indifference, and Phillips-curve items MUST emit an \`economics_curve\` visual whose \`curves[].expr\` are functions of \`p\` (price on the x-axis). Mark equilibria, intercepts, or inflection points using the spec's \`marks\` array. The renderer substitutes \`p\` → \`x\` before plotting; do NOT pre-substitute.
+- Demand–supply, AS–AD, IS–LM, PPF, indifference, and Phillips-curve items MUST emit an \`economics_curve\` visual. Write each \`curves[].expr\` **in terms of \`p\`**, where \`p\` is the **horizontal-axis** variable after plotting (set \`xLabel\` to its meaning — often Quantity in intro micro); the vertical axis is the evaluated value (often Price — set \`yLabel\` accordingly). The renderer substitutes \`p\` → the plotter's internal \`x\`; do **not** pre-substitute. Mark equilibria or key points with the \`marks\` array.
 - Statistics items that require inference from grouped data, distribution shape, or regression direction MUST emit a \`statistics_chart\` (subKind: histogram | bar | line | scatter | pie | frequency_polygon | ogive | box) showing the data the question refers to. For ogive include \`cumulative\` ("less_than" or "more_than"). Computation-only items ("calculate elasticity from Q1, Q2, P1, P2") use \`visual: null\` and present the values inline.
 - Generic stimulus tables (e.g., a 6-row class-frequency table feeding a mean / median question) can use \`data_table\` if neither \`accountancy_table\` nor \`statistics_chart\` fits.
 
@@ -534,7 +576,14 @@ GDP vs GNP vs NNP vs national income; real vs nominal income (when to deflate); 
 - Year references: only use specific years when supplied in topic_grounding; otherwise refer to periods (the post-independence decade, the late 1980s, the early reform years).`,
 
 	default:
-		"You are an expert educator and assessment specialist for Indian CBSE/NCERT (senior secondary, grades 11–12). Generic item-writing rules, Bloom mapping, MCQ hygiene, and the JSON contract live in the shared system instructions. Align questions to the supplied topic grounding and the named subject; keep difficulty appropriate to Class XI/XII.",
+		`You are an expert educator and assessment specialist for Indian CBSE/NCERT (senior secondary, grades 11–12). Generic item-writing rules, Bloom mapping, MCQ hygiene, the shared Subject discipline gate in the system instructions (no date/biography/trivia as keyed answers), and the JSON contract apply.
+
+## Subject discipline (specific bans)
+
+- If you cannot name a **subject-concept** skill under test (not recall of a fact in isolation), **skip** that item — do not pad with glossary flashcards, unit names, or general knowledge.
+- Follow the same FIB rule as other subjects: application or short classification with a grounded answer — not empty definition slots.
+
+Align every item to topic_grounding; keep difficulty appropriate to Class XI/XII.`,
 };
 
 function norm(s: string): string {
@@ -631,6 +680,11 @@ export type PracticeGenerationPreambleContext = {
 	subjectGrade: number | null;
 };
 
+/** Appended to every subject preamble so chunk alignment is never dropped in long templates. */
+const CHUNK_ALIGNMENT_FOOTER = `## Chunk alignment
+
+Prioritise scenarios, numeric values, and problem shapes that appear or are implied in \`topic_grounding\` for each item's \`topic_id\`. When \`exercise_chunks\` show a standard diagram or drill pattern, prefer parallel items over generic substitutes. Paraphrase wording; keep content traceable to the supplied chunks and consistent with \`curriculum_hint\` (do not contradict unit/chapter/grade).`;
+
 /**
  * Subject-specific preamble paragraph(s). Shared JSON contract is appended separately.
  */
@@ -645,5 +699,5 @@ export function getPracticeGenerationSubjectPreamble(
 	const body =
 		routing.band === "6_10" ? PREAMBLES_6_10[routing.category] : PREAMBLES_11_12[routing.category];
 
-	return `${subjectLine}\n\n${body}\n\nYour task: generate a single practice test as strict JSON matching the contract in the instructions below.`;
+	return `${subjectLine}\n\n${body}\n\n${CHUNK_ALIGNMENT_FOOTER}\n\nYour task: generate a single practice test as strict JSON matching the contract in the instructions below.`;
 }

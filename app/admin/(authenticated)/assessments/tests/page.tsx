@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { requireAdmin } from "@/lib/admin/guards";
 import { adminListTests } from "@/lib/admin/tests-admin";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -103,7 +104,7 @@ export default async function AdminTestsListPage({
 										</div>
 									</td>
 									<td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-										{r.updated_at ? new Date(r.updated_at).toISOString() : "—"}
+										{r.updated_at ? formatDateTimeMediumShortInAppTimeZone(r.updated_at) : "—"}
 									</td>
 								</tr>
 							))

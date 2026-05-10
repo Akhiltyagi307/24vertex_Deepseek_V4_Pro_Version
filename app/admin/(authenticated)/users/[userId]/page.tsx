@@ -20,6 +20,7 @@ import {
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { getAdminUserDetailStats } from "@/lib/admin/user-detail-queries";
 import { adminGetUserById } from "@/lib/admin/users-list";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
 import { complianceRequests } from "@/db/schema/compliance-requests";
@@ -395,7 +396,7 @@ export default async function AdminUserDetailPage({
 														</div>
 													</td>
 													<td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-														{r.updated_at ? new Date(r.updated_at).toISOString() : "—"}
+														{r.updated_at ? formatDateTimeMediumShortInAppTimeZone(r.updated_at) : "—"}
 													</td>
 												</tr>
 											))
@@ -537,7 +538,7 @@ export default async function AdminUserDetailPage({
 													<td className="px-3 py-2">{r.subject_name ?? "—"}</td>
 													<td className="px-3 py-2">{r.status}</td>
 													<td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-														{r.due_date ? new Date(r.due_date).toISOString() : "—"}
+														{r.due_date ? formatDateTimeMediumShortInAppTimeZone(r.due_date) : "—"}
 													</td>
 												</tr>
 											))
@@ -594,14 +595,20 @@ export default async function AdminUserDetailPage({
 								:	notificationsList.rows.map((r) => (
 										<tr key={r.id} className="border-b border-border/80 align-top">
 											<td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-												{r.created_at ? new Date(r.created_at).toISOString() : "—"}
+												{r.created_at ? formatDateTimeMediumShortInAppTimeZone(r.created_at) : "—"}
 											</td>
 											<td className="px-3 py-2">{r.type}</td>
 											<td className="px-3 py-2">{r.title}</td>
 											<td className="max-w-[280px] px-3 py-2 text-muted-foreground">{r.body_preview}</td>
 											<td className="px-3 py-2">{r.is_read ? "Yes" : "No"}</td>
 											<td className="px-3 py-2 text-xs">
-												{r.email_sent ? `Yes${r.email_sent_at ? ` · ${r.email_sent_at}` : ""}` : "No"}
+												{r.email_sent ?
+													`Yes${
+														r.email_sent_at ?
+															` · ${formatDateTimeMediumShortInAppTimeZone(r.email_sent_at)}`
+														:	""
+													}`
+												:	"No"}
 											</td>
 										</tr>
 									))

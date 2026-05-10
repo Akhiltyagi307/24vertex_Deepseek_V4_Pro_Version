@@ -56,6 +56,22 @@ are blocking.
 - Wires connect two `nodes` by id; every node referenced by a component
   MUST appear in the `nodes` array.
 
+## Student-facing `caption` and `altText` (envelope — not just `spec`)
+
+Every non-null question `visual` includes top-level `caption` (visible line)
+and `altText` (screen-reader narrative). They must help a student **orient
+to the diagram** (axes, directions, labelled parts, table headers) without:
+
+- naming the **correct MCQ option** or writing "answer is …".
+- repeating the **keyed `correct_answer`** text unless the stem already
+  states that value as given data.
+- solving the task ("therefore the result is …", "the modal class is …").
+
+**Good** altText for a free-body diagram: incline angle, directions of
+weight and normal, reference to body centre.
+**Bad** altText: magnitudes chosen to match only the correct option, or
+narration that picks which force "wins".
+
 ## Lint output
 
 `lint.mjs` reads a JSON test file from stdin and writes a JSON report to

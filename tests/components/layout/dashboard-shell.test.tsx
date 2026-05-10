@@ -32,6 +32,7 @@ function mountShell(props: Partial<Parameters<typeof DashboardShell>[0]> = {}) {
 				topBar={<div data-testid="topbar">TOPBAR</div>}
 				sidebar={<div data-testid="sidebar">SIDEBAR</div>}
 				isDoubtChatPath={isDoubtChatPath}
+				isFixedViewportShellPath={isPracticeSessionPath}
 				isSidebarHiddenPath={isPracticeSessionPath}
 				isImmersiveShellPath={isImmersive}
 				{...props}
@@ -97,6 +98,14 @@ describe("DashboardShell", () => {
 		mountShell();
 		const main = container!.querySelector("#main-content");
 		expect(main?.className).not.toMatch(/\bflex-1\b/);
+	});
+
+	it("applies viewport-locked inset on practice session paths", () => {
+		pathnameRef.current = "/student/practice/abc-123";
+		mountShell();
+		const inset = container!.querySelector('[data-slot="sidebar-inset"]');
+		expect(inset?.className).toMatch(/overflow-hidden/);
+		expect(inset?.className).not.toMatch(/overflow-auto/);
 	});
 
 	it("applies the regular shell layout outside doubt-chat", () => {

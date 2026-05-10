@@ -668,7 +668,7 @@ export function PracticeTestSession({
 	}
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-4 p-4 medium:p-6 xl:flex-row xl:gap-6">
+		<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 medium:p-6 xl:flex-row xl:items-stretch xl:gap-6">
 			<SessionSidebar
 				sorted={sorted}
 				activeId={active.id}
@@ -679,7 +679,7 @@ export function PracticeTestSession({
 				onOpenShortcuts={() => setShortcutsOpen(true)}
 			/>
 
-			<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+			<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
 				<SessionAppBar
 					subjectName={subjectName}
 					sorted={sorted}

@@ -561,11 +561,73 @@ export const questionVisualSpecSchema = z.union([
 	ENGLISH_PASSAGE_SPEC,
 ]);
 
-export const questionVisualEnvelopeSchema = z.object({
-	caption: z.string().min(1).max(200),
-	altText: z.string().min(1).max(500),
-	spec: questionVisualSpecSchema,
-});
+export const questionVisualEnvelopeSchema = z
+	.object({
+		caption: z.string().min(1).max(200),
+		altText: z.string().min(1).max(500),
+		spec: questionVisualSpecSchema,
+	})
+	.superRefine((val, ctx) => {
+		const s = val.spec;
+		if (s.kind === "math_function_plot") {
+			if (s.xMax <= s.xMin) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "math_function_plot: xMax must be greater than xMin",
+					path: ["spec"],
+				});
+			}
+			if (s.yMin != null && s.yMax != null && s.yMax <= s.yMin) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "math_function_plot: yMax must exceed yMin when both are set",
+					path: ["spec"],
+				});
+			}
+		}
+		if (s.kind === "economics_curve") {
+			if (s.xMax <= s.xMin) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "economics_curve: xMax must exceed xMin",
+					path: ["spec"],
+				});
+			}
+			if (s.yMin != null && s.yMax != null && s.yMax <= s.yMin) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "economics_curve: yMax must exceed yMin when both vertical bounds are set",
+					path: ["spec"],
+				});
+			}
+		}
+		if (s.kind === "number_line") {
+			if (s.max <= s.min) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "number_line: max must exceed min",
+					path: ["spec"],
+				});
+			}
+			if (s.tickStep <= 0) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "number_line: tickStep must be positive",
+					path: ["spec"],
+				});
+			}
+		}
+		if (s.kind === "math_geometry") {
+			const v = s.view;
+			if (v.xMax <= v.xMin || v.yMax <= v.yMin) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "math_geometry: view must have positive width and height",
+					path: ["spec", "view"],
+				});
+			}
+		}
+	});
 
 export type QuestionVisualEnvelope = z.infer<typeof questionVisualEnvelopeSchema>;
 export type QuestionVisualSpec = z.infer<typeof questionVisualSpecSchema>;

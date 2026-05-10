@@ -42,8 +42,14 @@ import {
 	buildPracticeGenerationRepairUserPrompt,
 } from "@/lib/practice/practice-generation-repair";
 import { applyDeterministicPracticeAutofix } from "@/lib/practice/practice-generation-autofix";
-import { evaluatePracticeGenerationQuality } from "@/lib/practice/practice-generation-quality-gates";
+import {
+	buildTopicCorpusMap,
+	evaluatePracticeGenerationQuality,
+	VISUAL_FIX_ELIGIBLE_GATE_CODES,
+} from "@/lib/practice/practice-generation-quality-gates";
+import { buildVisualFixReplacementPrompt, type VisualFixFailureCode } from "@/lib/practice/practice-generation-replacement";
 import { applyVisualPatches } from "@/lib/practice/visuals/apply-visual-patches";
+import { getPracticeVisualFixMaxCalls } from "@/lib/practice/visuals/env";
 import { runValidatorPass } from "@/lib/practice/visuals/run-validator-pass";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
@@ -86,8 +92,14 @@ export type RunGenerationPipelineOptions = {
  *      wired into the pipeline. Pass-2 validator (PRACTICE_VISUAL_VALIDATOR)
  *      is wired but a no-op until the OpenAI Skills + shell-tool integration
  *      goes live.
+ * v6 — chunk-aligned grounding instructions, caption/altText anti-spoiler
+ *      discipline, grounding_policy in user JSON, visual_leaks_answer +
+ *      optional lexical chunk_alignment_weak quality gates
+ *      (PRACTICE_CHUNK_ALIGN_LEXICAL).
+ * v7 — OpenAI Responses shell + skills for Pass 2 when skill ids are
+ *      configured; targeted VISUAL_FIX loop after failing visual quality gates.
  */
-export const PRACTICE_PROMPT_REVISION = "v5" as const;
+export const PRACTICE_PROMPT_REVISION = "v7" as const;
 
 function formatGenerationError(e: unknown): string {
 	if (APICallError.isInstance(e)) {
@@ -407,6 +419,58 @@ async function runPracticeGenerationRepairGrouped(params: {
 	}
 }
 
+async function runPracticeGenerationVisualFixGrouped(params: {
+	systemPrompt: string;
+	visualFixUserPrompt: string;
+	generationOutputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>;
+	estimatedQuestionCount: number;
+	studentUserId: string;
+	abortSignal?: AbortSignal;
+}): Promise<
+	{ ok: true; object: PracticeGenerationGroupedOutput; modelMs: number } | { ok: false; message: string; modelMs: number }
+> {
+	const t0 = Date.now();
+	try {
+		const { object, usage } = await generateObject({
+			model: getOpenAIProvider()(getOpenAIPracticeChatModel()),
+			schema: params.generationOutputSchema,
+			system: params.systemPrompt,
+			prompt: params.visualFixUserPrompt,
+			maxOutputTokens: Math.min(12_000, Math.max(6_000, params.estimatedQuestionCount * 900)),
+			maxRetries: 1,
+			abortSignal: params.abortSignal,
+			providerOptions: {
+				openai: { strictJsonSchema: isStrictJsonSchemaForGenerationEnabled() },
+			},
+		});
+		void recordAiCall({
+			feature: "practice.generation.visual_fix",
+			model: getOpenAIPracticeChatModel(),
+			userId: params.studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+			latencyMs: Date.now() - t0,
+			status: "ok",
+		});
+		return { ok: true, object: object as PracticeGenerationGroupedOutput, modelMs: Date.now() - t0 };
+	} catch (e) {
+		logServerError("runPracticeGenerationVisualFixGrouped", e);
+		void recordAiCall({
+			feature: "practice.generation.visual_fix",
+			model: getOpenAIPracticeChatModel(),
+			userId: params.studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
+			inputTokens: 0,
+			outputTokens: 0,
+			latencyMs: Date.now() - t0,
+			status: "error",
+			error: formatGenerationError(e),
+		});
+		return { ok: false, message: formatGenerationError(e), modelMs: Date.now() - t0 };
+	}
+}
+
 /**
  * One shared path for persisting a generated test after validation (topic context, model, dedup, RPC, billing, embeddings).
  * Used by the server action and the streaming API route.
@@ -454,6 +518,7 @@ async function runPracticeGenerationAfterResolveCore(
 	// `practice_generation_attempts` once at the end with accurate spend.
 	let generationCallCount = 0;
 	let repairCallCount = 0;
+	let visualFixCallCount = 0;
 	let succeededOnCall: number | null = null;
 
 	void recordPracticeEvent(
@@ -628,11 +693,80 @@ async function runPracticeGenerationAfterResolveCore(
 			return { ok: false, message: out.message, code: "generation_invalid" };
 		}
 
-		// Quality gates: near-duplicate stems, topic concentration. These were
-		// previously dormant — the framework existed but was never invoked.
-		// Failure bounces to the retry policy; the existing retry loop handles
-		// the next attempt with a fresh model call.
-		const qualityGate = evaluatePracticeGenerationQuality({ questions: flattened.questions });
+		// Quality gates + optional targeted VISUAL_FIX loop (same attempt).
+		const corpusByTopicId = buildTopicCorpusMap(userPayload.topic_grounding);
+		let qualityGate = evaluatePracticeGenerationQuality({
+			questions: flattened.questions,
+			chunkAlignment: {
+				corpusByTopicId,
+				contextQuality: userPayload.grounding_meta.context_quality ?? "ok",
+			},
+		});
+
+		const maxVisualFix = getPracticeVisualFixMaxCalls();
+		let visualFixRounds = 0;
+		while (!qualityGate.ok && visualFixRounds < maxVisualFix) {
+			const failedIndexes = Array.isArray(qualityGate.details?.failedIndexes)
+				? (qualityGate.details!.failedIndexes as number[])
+				: [];
+			if (!VISUAL_FIX_ELIGIBLE_GATE_CODES.has(qualityGate.code) || failedIndexes.length === 0) {
+				break;
+			}
+			visualFixRounds++;
+			visualFixCallCount++;
+			const fixPrompt = buildVisualFixReplacementPrompt({
+				baseUserPrompt: userPrompt,
+				failedQuestionIndexes: failedIndexes,
+				failureCode: qualityGate.code as VisualFixFailureCode,
+				failureDetails: qualityGate.message,
+				preferredVisualKinds: userPayload.test_parameters.visuals_policy.preferred_kinds,
+				currentGroupedJson: JSON.stringify(grouped),
+			});
+			const fixed = await runPracticeGenerationVisualFixGrouped({
+				systemPrompt,
+				visualFixUserPrompt: fixPrompt,
+				generationOutputSchema,
+				estimatedQuestionCount: expectedCount,
+				studentUserId: resolved.userId,
+				abortSignal: opts.abortSignal,
+			});
+			cumulativeModelMs += fixed.modelMs;
+			if (!fixed.ok) {
+				logServerError("generatePracticeTest.visualFix", fixed.message, {
+					subjectId,
+					gateCode: qualityGate.code,
+					correlationId,
+				});
+				return { ok: false, message: fixed.message, code: "generation_invalid" };
+			}
+			grouped = normalizeGroupedEstimatedTimesToPlan(fixed.object, durationSeconds);
+			flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
+			out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
+				expectedDurationSeconds: durationSeconds,
+				expectedTypeCounts,
+			});
+			if (!out.ok) {
+				const actualTypeCounts = summarizeGroupedQuestionTypeCounts(grouped);
+				logServerError("generatePracticeTest.validation", out.message, {
+					subjectId,
+					durationSeconds,
+					expectedCount,
+					expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
+					actualTypeCounts: formatTypeCounts(actualTypeCounts),
+					correlationId,
+					phase: "post_visual_fix",
+				});
+				return { ok: false, message: out.message, code: "generation_invalid" };
+			}
+			qualityGate = evaluatePracticeGenerationQuality({
+				questions: flattened.questions,
+				chunkAlignment: {
+					corpusByTopicId,
+					contextQuality: userPayload.grounding_meta.context_quality ?? "ok",
+				},
+			});
+		}
+
 		if (!qualityGate.ok) {
 			logServerError("generatePracticeTest.qualityGate", qualityGate.message, {
 				subjectId,
@@ -707,7 +841,7 @@ async function runPracticeGenerationAfterResolveCore(
 			const r = await generateAndStrip();
 			if (!r.ok) return { ok: false, message: r.message };
 			stripped = r.public;
-			succeededOnCall = generationCallCount + repairCallCount;
+			succeededOnCall = generationCallCount + repairCallCount + visualFixCallCount;
 			return { ok: true, value: r.object };
 		},
 		{
@@ -729,6 +863,7 @@ async function runPracticeGenerationAfterResolveCore(
 			{
 				generation_calls: generationCallCount,
 				repair_calls: repairCallCount,
+				visual_fix_calls: visualFixCallCount,
 				succeeded_on_call: null,
 				prompt_revision: PRACTICE_PROMPT_REVISION,
 				outcome: "generation_failed",
@@ -756,6 +891,7 @@ async function runPracticeGenerationAfterResolveCore(
 			{
 				generation_calls: generationCallCount,
 				repair_calls: repairCallCount,
+				visual_fix_calls: visualFixCallCount,
 				succeeded_on_call: null,
 				prompt_revision: PRACTICE_PROMPT_REVISION,
 				outcome: "generation_invalid",
@@ -787,6 +923,7 @@ async function runPracticeGenerationAfterResolveCore(
 		{
 			generation_calls: generationCallCount,
 			repair_calls: repairCallCount,
+			visual_fix_calls: visualFixCallCount,
 			succeeded_on_call: succeededOnCall,
 			prompt_revision: PRACTICE_PROMPT_REVISION,
 			outcome: "ok",

@@ -1,0 +1,25 @@
+{
+  "question_number": 1,
+  "topic_id": "22222222-2222-4222-8222-222222222222",
+  "topic_name": "Chemical equations",
+  "question_text": "Balance the reaction shown in the equation below.",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "Synthesis", "B": "Decomposition", "C": "Displacement", "D": "Double displacement" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Two reactants combine to form one product — a synthesis reaction.",
+    "common_mistakes": [],
+    "related_concept": "Types of chemical reactions"
+  },
+  "estimated_time_seconds": 90,
+  "visual": {
+    "caption": "Reactants and product for a common gas-phase reaction.",
+    "altText": "Chemical equation showing hydrogen and oxygen as reactants and water as the product; formatting uses standard equation layout.",
+    "spec": {
+      "kind": "chemistry_reaction",
+      "ce": "2 H2 + O2 -> 2 H2O",
+      "label": null
+    }
+  }
+}

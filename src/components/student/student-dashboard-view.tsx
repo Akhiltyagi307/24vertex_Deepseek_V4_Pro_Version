@@ -25,6 +25,7 @@ import type { StudentDashboardAnalyticsPayload } from "@/lib/student/dashboard-a
 import type { DashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
 import type { SubjectTopicRadarDatum } from "@/lib/charts/subject-topic-radar-config";
 import { partitionDashboardSubjectsByPriority } from "@/lib/student/dashboard-subject-priority";
+import { formatDateMediumInAppTimeZone } from "@/lib/datetime/app-timezone";
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
 import { getSubjectCardIconConfig, getTopicProgressCardIconConfig } from "@/lib/student/subject-lucide-icon";
 import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
@@ -79,7 +80,7 @@ export type StudentDashboardSubjectCard = {
 function formatLastTest(iso: string | null): string {
 	if (!iso) return "—";
 	try {
-		return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" });
+		return formatDateMediumInAppTimeZone(iso);
 	} catch {
 		return "—";
 	}
