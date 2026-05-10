@@ -44,6 +44,27 @@ const BUDGETS = [
 	{ route: "/admin/(authenticated)/dashboard/page", budgetKb: 200, tier: "feature" },
 ];
 
+/**
+ * Visual renderer chunks added by the v2 visuals work. Every renderer is
+ * `dynamic({ ssr: false })` so a math-only practice session must not pull
+ * the chemistry / plotly / mermaid bundles. When the manifest-aware
+ * version of this script lands, enforce that:
+ *
+ *   - mafs / function-plot are part of the math-route chunk only.
+ *   - smiles-drawer ships only when chemistry_molecule is rendered.
+ *   - plotly.js-dist-min ships only when statistics_chart subKind is "box".
+ *   - mermaid is allowlisted but unused in v1 (biology_diagram dropped).
+ *
+ * Per-chunk thresholds (gzipped KB):
+ */
+export const VISUAL_CHUNK_BUDGETS = {
+	mafs: 90,
+	"function-plot": 70,
+	"smiles-drawer": 60,
+	"plotly.js-dist-min": 380,
+	mermaid: 320,
+};
+
 const SLACK_PCT = Number(process.env.BUDGET_SLACK_PCT ?? "5");
 
 function readJson(file) {
