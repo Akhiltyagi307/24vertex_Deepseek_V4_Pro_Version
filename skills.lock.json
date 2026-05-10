@@ -1,0 +1,43 @@
+{
+  "$schema": "./skills.schema.json",
+  "comment": "Pinned skill manifest. Bump versions when SKILL.md or validate.mjs / lint.mjs changes. Production must NEVER pin 'latest' (per v2 visuals guide §3.5).",
+  "schemaVersion": 1,
+  "skills": {
+    "ncert-diagram-conventions": {
+      "version": "v0.1.0-pending-upload",
+      "path": "skills/ncert-diagram-conventions",
+      "entrypoint": "lint.mjs",
+      "kind": "conventions"
+    },
+    "ncert-chemistry-conventions": {
+      "version": "v0.1.0-pending-upload",
+      "path": "skills/ncert-chemistry-conventions",
+      "entrypoint": "lint.mjs",
+      "kind": "conventions"
+    },
+    "validate-smiles": {
+      "version": "v0.1.0-pending-upload",
+      "path": "skills/validate-smiles",
+      "entrypoint": "validate.mjs",
+      "kind": "validator"
+    },
+    "validate-function-plot": {
+      "version": "v0.1.0-pending-upload",
+      "path": "skills/validate-function-plot",
+      "entrypoint": "validate.mjs",
+      "kind": "validator"
+    },
+    "validate-accountancy": {
+      "version": "v0.1.0-pending-upload",
+      "path": "skills/validate-accountancy",
+      "entrypoint": "validate.mjs",
+      "kind": "validator"
+    },
+    "validate-student-language": {
+      "version": "v0.1.0-pending-upload",
+      "path": "skills/validate-student-language",
+      "entrypoint": "validate.mjs",
+      "kind": "validator"
+    }
+  }
+}

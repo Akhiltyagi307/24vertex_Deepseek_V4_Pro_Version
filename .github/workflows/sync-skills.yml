@@ -1,0 +1,56 @@
+# Skills hash gate + (future) OpenAI Platform sync. Runs the sync script
+# in dry-run mode on every PR that touches skills/, then on push to main
+# can be configured to run with SYNC_OPENAI_SKILLS=true once the upload
+# integration is pinned. See `scripts/sync-openai-skills.mjs` for the
+# v1 vs v2 roadmap.
+name: Sync OpenAI Skills
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+      - "skills.lock.json"
+      - "scripts/sync-openai-skills.mjs"
+      - ".github/workflows/sync-skills.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - "skills.lock.json"
+      - "scripts/sync-openai-skills.mjs"
+  workflow_dispatch:
+
+jobs:
+  sync-skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Dry-run sync
+        run: node scripts/sync-openai-skills.mjs
+
+      # Re-pin step: opt-in via SKILLS_LOCK_PIN=true. Useful when running
+      # the workflow manually after editing a skill but before the lock
+      # is committed.
+      - name: Re-pin skills.lock.json (manual only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SKILLS_LOCK_PIN: "true"
+        run: node scripts/sync-openai-skills.mjs
+
+      # Production upload (disabled until the upload API integration is
+      # pinned — see scripts/sync-openai-skills.mjs comment).
+      # - name: Upload skills to OpenAI Platform
+      #   if: github.ref == 'refs/heads/main'
+      #   env:
+      #     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      #     SYNC_OPENAI_SKILLS: "true"
+      #   run: node scripts/sync-openai-skills.mjs
