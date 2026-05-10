@@ -1,0 +1,19 @@
+{
+  "question_number": 2,
+  "topic_id": "11111111-1111-4111-8111-111111111111",
+  "topic_name": "Linear equations",
+  "question_text": "Solve for x: 2x + 5 = 17.",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "5", "B": "6", "C": "7", "D": "8" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "x = 6. Subtract 5 from both sides to get 2x = 12; divide both sides by 2 to get x = 6. Linear equations always solve by isolating the variable, undoing the operations in reverse order.",
+    "common_mistakes": [
+      "Students often divide the right-hand side by 2 first; this leads to 8.5 instead of 6 because they apply division before subtraction."
+    ],
+    "related_concept": "Solving linear equations"
+  },
+  "estimated_time_seconds": 60,
+  "visual": null
+}

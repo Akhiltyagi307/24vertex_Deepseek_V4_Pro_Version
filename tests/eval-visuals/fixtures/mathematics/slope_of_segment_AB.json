@@ -1,0 +1,31 @@
+{
+  "question_number": 1,
+  "topic_id": "11111111-1111-4111-8111-111111111111",
+  "topic_name": "Coordinate geometry — slope",
+  "question_text": "Find the slope of segment AB shown below.",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "1", "B": "2", "C": "3", "D": "4" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The slope is 2. Slope is rise over run — change in y divided by change in x. Here y goes from 2 to 8 (rise = 6) and x goes from 1 to 4 (run = 3); 6/3 = 2. This is the same idea as the gradient of any straight line in coordinate geometry.",
+    "common_mistakes": [
+      "Students often invert run and rise; this leads to 1/2 instead of 2 because they divide change in x by change in y."
+    ],
+    "related_concept": "Slope and gradient"
+  },
+  "estimated_time_seconds": 90,
+  "visual": {
+    "caption": "Segment AB on the coordinate plane.",
+    "altText": "Coordinate plane with point A at (1,2) and point B at (4,8) joined by a segment.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": 0, "xMax": 6, "yMin": 0, "yMax": 10, "showGrid": true, "showAxes": true },
+      "primitives": [
+        { "type": "point", "at": { "x": 1, "y": 2 }, "label": "A" },
+        { "type": "point", "at": { "x": 4, "y": 8 }, "label": "B" },
+        { "type": "segment", "from": { "x": 1, "y": 2 }, "to": { "x": 4, "y": 8 }, "label": null, "dashed": false }
+      ]
+    }
+  }
+}
