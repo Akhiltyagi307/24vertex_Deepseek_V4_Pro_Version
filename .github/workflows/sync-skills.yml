@@ -18,6 +18,7 @@ on:
       - "skills/**"
       - "skills.lock.json"
       - "scripts/sync-openai-skills.mjs"
+      - ".github/workflows/sync-skills.yml"
   workflow_dispatch:
 
 jobs:
