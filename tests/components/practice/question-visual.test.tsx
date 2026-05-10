@@ -49,16 +49,18 @@ describe("QuestionVisual dispatcher", () => {
 		);
 	});
 
-	it("renders a fallback message when no renderer is registered for the kind", () => {
-		// Until commits 6-9 land, every kind falls through to the default
-		// branch. Once renderers are added, replace this assertion with one
-		// per registered kind.
-		const exemplar = VISUAL_EXEMPLARS.find((ex) => ex.visual !== null);
+	it("renders a fallback message when the spec's kind has no renderer registered", () => {
+		// Pick an exemplar whose kind hasn't been wired yet in this commit.
+		// Update or drop this case as renderers ship in subsequent commits.
+		const unsupportedExemplar = VISUAL_EXEMPLARS.find(
+			(ex) => ex.visual?.spec.kind === "english_passage",
+		);
+		expect(unsupportedExemplar?.visual).toBeTruthy();
 		container = document.createElement("div");
 		document.body.appendChild(container);
 		root = createRoot(container);
 		act(() => {
-			root!.render(<QuestionVisual visual={exemplar!.visual} />);
+			root!.render(<QuestionVisual visual={unsupportedExemplar!.visual} />);
 		});
 		const figure = container.querySelector("[data-question-visual]");
 		expect(figure?.textContent ?? "").toContain("not yet supported");

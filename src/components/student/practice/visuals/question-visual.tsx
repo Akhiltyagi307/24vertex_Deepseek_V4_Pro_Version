@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 
 import { cn } from "@/lib/utils";
 import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
@@ -21,6 +22,30 @@ import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
  * `next/dynamic({ ssr: false })` inside their own renderer files so the
  * server bundle stays light.
  */
+
+function RendererLoading(): React.ReactElement {
+	return (
+		<div
+			className="bg-muted/40 flex h-[180px] w-full max-w-[480px] items-center justify-center rounded text-muted-foreground text-sm"
+			aria-hidden="true"
+		>
+			Loading visual…
+		</div>
+	);
+}
+
+const MathGeometry = dynamic(
+	() => import("./renderers/math-geometry").then((m) => ({ default: m.MathGeometry })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const MathFunctionPlot = dynamic(
+	() => import("./renderers/math-function-plot").then((m) => ({ default: m.MathFunctionPlot })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const NumberLine = dynamic(
+	() => import("./renderers/number-line").then((m) => ({ default: m.NumberLine })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
 export function QuestionVisual({
 	visual,
 	className,
@@ -55,15 +80,21 @@ function RendererDispatch({
 }: {
 	visual: QuestionVisualEnvelope;
 }): React.ReactElement {
-	const kind = visual.spec.kind;
-	switch (kind) {
+	const spec = visual.spec;
+	switch (spec.kind) {
+		case "math_geometry":
+			return <MathGeometry spec={spec} />;
+		case "math_function_plot":
+			return <MathFunctionPlot spec={spec} />;
+		case "number_line":
+			return <NumberLine spec={spec} />;
 		default:
 			// Fallback for kinds whose renderer hasn't shipped yet. Visible to
 			// internal QA only; PRACTICE_VISUALS=false in production keeps the
 			// model from emitting any visual until renderers land.
 			return (
 				<span className="text-muted-foreground text-sm" aria-hidden="true">
-					Visual ({kind}) not yet supported on this client.
+					Visual ({spec.kind}) not yet supported on this client.
 				</span>
 			);
 	}
