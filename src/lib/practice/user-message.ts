@@ -1,6 +1,8 @@
 import { getPracticeQuestionPlanForSubject, isMathematicsSubject } from "./constants";
 import type { PracticeFocusArea } from "./schemas";
 import type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
+import { isPracticeVisualsEnabled } from "./visuals/env";
+import type { QuestionVisualKind } from "./visuals/types";
 
 const FOCUS_AREA_INSTRUCTION: Record<PracticeFocusArea, string> = {
 	all: "Cover all selected topics evenly. No directional bias from focus_area.",
@@ -147,6 +149,16 @@ export type PracticeUserMessagePayload = {
 		context_quality_instruction: string;
 		/** Exact UUID allowlist for topic_id on every question (same as topics[].topic_id). */
 		allowed_topic_ids: string[];
+		/**
+		 * Visuals policy. `enabled` mirrors the PRACTICE_VISUALS env flag;
+		 * when false the model is told elsewhere (system prompt) to emit
+		 * `visual: null` on every question. `preferred_kinds` advertises the
+		 * subset of visual kinds whose renderers are wired for this subject.
+		 */
+		visuals_policy: {
+			enabled: boolean;
+			preferred_kinds: QuestionVisualKind[];
+		};
 	};
 	/** Per-topic performance only; curriculum names live under `topic_grounding`. */
 	topics: Array<{
@@ -191,6 +203,50 @@ const CONTEXT_QUALITY_INSTRUCTION: Record<NonNullable<PracticeGroundingMeta["con
 	low_context: "Several selected topics have empty `content_chunks` and `exercise_chunks`. For those topics, stick to NCERT-style outcomes implied by `curriculum_hint` and AVOID inventing specific named examples, dates, or formulae you cannot verify.",
 	no_context: "ALL selected topics have empty grounding chunks. You are working from `curriculum_hint` only — keep questions at conceptual / definition level and AVOID specific case studies, named experiments, or numeric data that depend on a textbook source. If a question can't be written safely, prefer a simpler conceptual variant.",
 };
+
+/**
+ * Per-subject allowed visual kinds. The model receives this list verbatim
+ * inside the user message; the system prompt's discipline section is the
+ * source of truth on WHEN to emit. Subjects without a renderer-supported
+ * visual route ship an empty array — the prompt then keeps them on
+ * visual: null.
+ */
+function preferredVisualKindsForSubject(subjectName: string | null | undefined): QuestionVisualKind[] {
+	if (!subjectName) return [];
+	const lower = subjectName.toLowerCase();
+	if (lower.includes("mathematics") || lower.includes("math")) {
+		return ["math_geometry", "math_function_plot", "number_line", "data_table"];
+	}
+	if (lower.includes("physics")) {
+		return ["physics_diagram", "math_function_plot", "data_table"];
+	}
+	if (lower.includes("chemistry")) {
+		return ["chemistry_molecule", "chemistry_reaction"];
+	}
+	if (lower.includes("accountancy") || lower.includes("financial accounting")) {
+		return ["accountancy_table"];
+	}
+	if (lower.includes("economics") || lower.includes("statistics")) {
+		return [
+			"economics_curve",
+			"statistics_chart",
+			"data_table",
+			"math_function_plot",
+		];
+	}
+	if (lower.includes("science")) {
+		return [
+			"physics_diagram",
+			"chemistry_molecule",
+			"chemistry_reaction",
+			"data_table",
+		];
+	}
+	if (lower.includes("english")) {
+		return ["english_passage"];
+	}
+	return [];
+}
 
 export function buildPracticeUserMessage(input: {
 	studentGrade: number | null;
@@ -280,6 +336,10 @@ export function buildPracticeUserMessage(input: {
 			question_type_counts,
 			context_quality_instruction: contextQualityInstruction,
 			allowed_topic_ids,
+			visuals_policy: {
+				enabled: isPracticeVisualsEnabled(),
+				preferred_kinds: preferredVisualKindsForSubject(input.subject.name),
+			},
 		},
 		topics: input.topics.map((t) => ({
 			topic_id: t.topicId,

@@ -150,6 +150,52 @@ describe("buildPracticeUserMessage", () => {
 		expect(many.test_parameters.coverage_mode).toBe("many_topics");
 	});
 
+	it("populates visuals_policy from PRACTICE_VISUALS env and subject", () => {
+		const original = process.env.PRACTICE_VISUALS;
+		try {
+			process.env.PRACTICE_VISUALS = "true";
+			const physics = buildPracticeUserMessage({
+				studentGrade: 11,
+				subject: { id: "x", name: "Physics" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(physics.test_parameters.visuals_policy).toEqual({
+				enabled: true,
+				preferred_kinds: ["physics_diagram", "math_function_plot", "data_table"],
+			});
+
+			const accountancy = buildPracticeUserMessage({
+				studentGrade: 12,
+				subject: { id: "x", name: "Accountancy" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(accountancy.test_parameters.visuals_policy.preferred_kinds).toEqual([
+				"accountancy_table",
+			]);
+
+			process.env.PRACTICE_VISUALS = "false";
+			const off = buildPracticeUserMessage({
+				studentGrade: 11,
+				subject: { id: "x", name: "Physics" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(off.test_parameters.visuals_policy.enabled).toBe(false);
+			// preferred_kinds is independent of the master flag — still populated
+			// so the model knows the subject's renderer surface even when
+			// emission is suppressed.
+			expect(off.test_parameters.visuals_policy.preferred_kinds.length).toBeGreaterThan(0);
+		} finally {
+			if (original === undefined) delete process.env.PRACTICE_VISUALS;
+			else process.env.PRACTICE_VISUALS = original;
+		}
+	});
+
 	it("includes recent_errors when present", () => {
 		const msg = buildPracticeUserMessage({
 			studentGrade: 9,
