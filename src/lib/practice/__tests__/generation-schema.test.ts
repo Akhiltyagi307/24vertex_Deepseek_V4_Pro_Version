@@ -36,6 +36,7 @@ function makeQuestion(overrides: Partial<PracticeGenerationOutput["questions"][n
 			related_concept: "Addition",
 		},
 		estimated_time_seconds: 240,
+		visual: null,
 		...overrides,
 	};
 }
@@ -56,6 +57,7 @@ function makeDraftQuestion(
 			related_concept: "Addition",
 		},
 		estimated_time_seconds: 240,
+		visual: null,
 		...overrides,
 	};
 }

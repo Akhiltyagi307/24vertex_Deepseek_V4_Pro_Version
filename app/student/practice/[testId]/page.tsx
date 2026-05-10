@@ -8,6 +8,8 @@ import {
 } from "@/components/student/practice/practice-test-session";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
+import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
+import { logServerError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +112,7 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 	const { data: qRows, error: qErr } = await supabase
 		.from("questions")
 		.select(
-			"id, question_number, question_text, question_type, difficulty_level, options, topic_id, topics(topic_name, chapter_name)",
+			"id, question_number, question_text, question_type, difficulty_level, options, topic_id, metadata, topics(topic_name, chapter_name)",
 		)
 		.eq("test_id", testId)
 		.order("question_number", { ascending: true });
@@ -126,6 +128,15 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 
 	const questions: PracticeSessionQuestion[] = qRows.map((r) => {
 		const tf = topicsFieldsFromRow(r.topics);
+		const visualParse = parseStoredQuestionVisualFromMetadata(r.metadata);
+		if (!visualParse.ok) {
+			// Bad / legacy visual on this row — log+drop so the page never
+			// crashes on a corrupt envelope. Render with no visual.
+			logServerError("PracticeSessionPage.parseStoredVisual", visualParse.reason, {
+				questionId: r.id as string,
+				testId,
+			});
+		}
 		return {
 			id: r.id as string,
 			question_number: r.question_number as number,
@@ -136,6 +147,7 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 			topic_id: r.topic_id as string,
 			topic_name: tf.topic_name,
 			chapter_name: tf.chapter_name,
+			visual: visualParse.ok ? visualParse.envelope : null,
 		};
 	});
 

@@ -837,7 +837,10 @@ async function runPracticeGenerationAfterResolveCore(
 		difficulty_level: q.difficulty_level,
 		answer_key: q.answer_key,
 		options: q.question_type === "multiple_choice" ? q.options : null,
-		metadata: {},
+		// Persist the structured visual envelope (or null) under
+		// `questions.metadata.visual` per v2 visuals plan §4.3 — no DB
+		// migration needed in v1; promote to a typed column in Phase 4.
+		metadata: { visual: q.visual ?? null },
 	}));
 
 	const rpcT0 = Date.now();

@@ -35,6 +35,7 @@ describe("applyDeterministicPracticeAutofix", () => {
 					related_concept: "bio",
 				},
 				estimated_time_seconds: -3,
+				visual: null,
 			},
 			{
 				question_number: 99,
@@ -51,6 +52,7 @@ describe("applyDeterministicPracticeAutofix", () => {
 					related_concept: "math",
 				},
 				estimated_time_seconds: 24.6,
+				visual: null,
 			},
 		]);
 
@@ -81,6 +83,7 @@ describe("applyDeterministicPracticeAutofix", () => {
 					related_concept: "x",
 				},
 				estimated_time_seconds: 10,
+				visual: null,
 			},
 		]);
 
@@ -105,6 +108,7 @@ describe("applyDeterministicPracticeAutofix", () => {
 					related_concept: "x",
 				},
 				estimated_time_seconds: 10,
+				visual: null,
 			},
 		]);
 

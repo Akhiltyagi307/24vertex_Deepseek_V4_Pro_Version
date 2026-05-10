@@ -21,6 +21,7 @@ function makeQuestion(
 			related_concept: "addition",
 		},
 		estimated_time_seconds: 60,
+		visual: null,
 		...overrides,
 	};
 }

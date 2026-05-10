@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { PracticeQuestionTypeCounts } from "./constants";
+import { questionVisualEnvelopeSchema } from "./visuals/schemas";
 
 const questionTypeSchema = z.enum(["multiple_choice", "fill_in_blank", "short_answer", "long_answer"]);
 const difficultyLevelSchema = z.enum(["easy", "medium", "hard"]);
@@ -23,6 +24,13 @@ export const practiceQuestionGeneratedSchema = z.object({
 	options: z.record(z.string()).nullable(),
 	answer_key: practiceAnswerKeySchema,
 	estimated_time_seconds: z.number().int().positive(),
+	/**
+	 * Optional visual envelope — see `src/lib/practice/visuals/schemas.ts`.
+	 * Default is `null`; the model emits a non-null envelope only when the
+	 * question is genuinely load-bearing on the figure (per the Visuals
+	 * discipline block in the system prompt).
+	 */
+	visual: questionVisualEnvelopeSchema.nullable(),
 });
 
 export const practiceGenerationOutputSchema = z.object({
@@ -45,6 +53,7 @@ const practiceQuestionDraftBaseSchema = z.object({
 	difficulty_level: difficultyLevelSchema,
 	answer_key: practiceAnswerKeySchema,
 	estimated_time_seconds: z.number().int().positive(),
+	visual: questionVisualEnvelopeSchema.nullable(),
 });
 
 const practiceGeneratedMultipleChoiceDraftSchema = practiceQuestionDraftBaseSchema.extend({
@@ -95,6 +104,7 @@ export type PublicPracticeQuestion = {
 	difficulty_level: z.infer<typeof difficultyLevelSchema>;
 	options: Record<string, string> | null;
 	estimated_time_seconds: number;
+	visual: z.infer<typeof questionVisualEnvelopeSchema> | null;
 };
 
 export type PublicGenerationMetadata = PracticeGenerationOutput["generation_metadata"];
@@ -175,6 +185,7 @@ export function flattenPracticeGenerationOutput(
 			options: q.options,
 			answer_key: q.answer_key,
 			estimated_time_seconds: q.estimated_time_seconds,
+			visual: q.visual ?? null,
 		})),
 		fill_in_blank: raw.questions_by_type.fill_in_blank.map((q) => ({
 			question_number: 0,
@@ -186,6 +197,7 @@ export function flattenPracticeGenerationOutput(
 			options: null,
 			answer_key: q.answer_key,
 			estimated_time_seconds: q.estimated_time_seconds,
+			visual: q.visual ?? null,
 		})),
 		short_answer: raw.questions_by_type.short_answer.map((q) => ({
 			question_number: 0,
@@ -197,6 +209,7 @@ export function flattenPracticeGenerationOutput(
 			options: null,
 			answer_key: q.answer_key,
 			estimated_time_seconds: q.estimated_time_seconds,
+			visual: q.visual ?? null,
 		})),
 		long_answer: raw.questions_by_type.long_answer.map((q) => ({
 			question_number: 0,
@@ -208,6 +221,7 @@ export function flattenPracticeGenerationOutput(
 			options: null,
 			answer_key: q.answer_key,
 			estimated_time_seconds: q.estimated_time_seconds,
+			visual: q.visual ?? null,
 		})),
 	};
 
@@ -424,6 +438,7 @@ export function validateAndStripGeneration(
 		difficulty_level: q.difficulty_level,
 		options: q.question_type === "multiple_choice" ? q.options : null,
 		estimated_time_seconds: q.estimated_time_seconds,
+		visual: q.visual ?? null,
 	}));
 
 	const generation_metadata: PublicGenerationMetadata = {

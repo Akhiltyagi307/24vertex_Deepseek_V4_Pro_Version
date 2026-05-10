@@ -130,6 +130,7 @@ describe("practice-session-storage — mergeServerAndLocalDraft", () => {
 			topic_id: "t1",
 			topic_name: "T1",
 			chapter_name: null,
+			visual: null,
 		},
 		{
 			id: "q2",
@@ -141,6 +142,7 @@ describe("practice-session-storage — mergeServerAndLocalDraft", () => {
 			topic_id: "t2",
 			topic_name: "T2",
 			chapter_name: null,
+			visual: null,
 		},
 	];
 

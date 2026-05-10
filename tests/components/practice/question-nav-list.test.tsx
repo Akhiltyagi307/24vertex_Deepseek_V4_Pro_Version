@@ -18,6 +18,7 @@ function buildQuestion(overrides: Partial<PracticeSessionQuestion> = {}): Practi
 		topic_id: "t1",
 		topic_name: "Arithmetic",
 		chapter_name: null,
+		visual: null,
 		...overrides,
 	};
 }
