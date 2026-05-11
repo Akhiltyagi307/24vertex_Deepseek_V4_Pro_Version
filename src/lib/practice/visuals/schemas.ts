@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { INDIA_MAP_LOCATION_IDS } from "./india-map-regions";
+
 /**
  * Zod schemas for question visuals (the structured `visual` field on every
  * generated practice question). The grouped output is what the model emits
@@ -67,6 +69,16 @@ const MATH_GEOMETRY_PRIMITIVE = z.discriminatedUnion("type", [
 		type: z.literal("circle"),
 		center: POINT_2D,
 		radius: z.number().positive(),
+		label: z.string().max(24).nullable(),
+	}),
+	z.object({
+		type: z.literal("arc"),
+		center: POINT_2D,
+		radius: z.number().positive(),
+		startAngleDeg: z.number(),
+		endAngleDeg: z.number(),
+		minorArc: z.boolean().nullable(),
+		dashed: z.boolean().nullable(),
 		label: z.string().max(24).nullable(),
 	}),
 ]);
@@ -522,6 +534,20 @@ const DATA_TABLE_SPEC = z.object({
 });
 
 // ───────────────────────────────────────────────────────────────────────
+// india_map (India admin boundaries — @svg-maps/india)
+// ───────────────────────────────────────────────────────────────────────
+
+const INDIA_MAP_LOCATION_ID = z.enum(INDIA_MAP_LOCATION_IDS);
+
+const INDIA_MAP_SPEC = z.object({
+	kind: z.literal("india_map"),
+	/** Visual treatment; null defaults to political-style fills in renderers. */
+	mapStyle: z.enum(["political", "outline", "physical_palette"]).nullable(),
+	/** Lowercase ids matching @svg-maps/india paths (e.g. rj, mh, tn). Null or [] = no highlight. */
+	highlightedStates: z.array(INDIA_MAP_LOCATION_ID).max(INDIA_MAP_LOCATION_IDS.length).nullable(),
+});
+
+// ───────────────────────────────────────────────────────────────────────
 // english_passage (line-numbered stimulus prose)
 // ───────────────────────────────────────────────────────────────────────
 
@@ -558,6 +584,7 @@ export const questionVisualSpecSchema = z.union([
 	ECONOMICS_CURVE_SPEC,
 	STATISTICS_CHART_SPEC,
 	DATA_TABLE_SPEC,
+	INDIA_MAP_SPEC,
 	ENGLISH_PASSAGE_SPEC,
 ]);
 
@@ -627,6 +654,16 @@ export const questionVisualEnvelopeSchema = z
 				});
 			}
 		}
+		if (s.kind === "india_map" && s.highlightedStates && s.highlightedStates.length > 0) {
+			const uniq = new Set(s.highlightedStates);
+			if (uniq.size !== s.highlightedStates.length) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "india_map: highlightedStates must not repeat ids",
+					path: ["spec", "highlightedStates"],
+				});
+			}
+		}
 	});
 
 export type QuestionVisualEnvelope = z.infer<typeof questionVisualEnvelopeSchema>;
@@ -643,6 +680,7 @@ export type AccountancyTableSpec = z.infer<typeof ACCOUNTANCY_TABLE_SPEC>;
 export type EconomicsCurveSpec = z.infer<typeof ECONOMICS_CURVE_SPEC>;
 export type StatisticsChartSpec = z.infer<typeof STATISTICS_CHART_SPEC>;
 export type DataTableSpec = z.infer<typeof DATA_TABLE_SPEC>;
+export type IndiaMapSpec = z.infer<typeof INDIA_MAP_SPEC>;
 export type EnglishPassageSpec = z.infer<typeof ENGLISH_PASSAGE_SPEC>;
 
 /** Stable list of accepted kind discriminators (used by gates and policy). */
@@ -657,6 +695,7 @@ export const QUESTION_VISUAL_KINDS = [
 	"economics_curve",
 	"statistics_chart",
 	"data_table",
+	"india_map",
 	"english_passage",
 ] as const;
 export type QuestionVisualKind = (typeof QUESTION_VISUAL_KINDS)[number];

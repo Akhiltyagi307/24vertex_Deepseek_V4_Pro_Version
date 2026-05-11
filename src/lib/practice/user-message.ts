@@ -1,7 +1,7 @@
 import { getPracticeQuestionPlanForSubject, isMathematicsSubject } from "./constants";
 import type { PracticeFocusArea } from "./schemas";
 import type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
-import { computeMaxNonNullVisuals, isPracticeVisualsEnabled, isPracticeVisualsEnabledForSubject } from "./visuals/env";
+import { isPracticeVisualsEnabled, isPracticeVisualsEnabledForSubject } from "./visuals/env";
 import type { QuestionVisualKind } from "./visuals/types";
 
 const FOCUS_AREA_INSTRUCTION: Record<PracticeFocusArea, string> = {
@@ -158,7 +158,11 @@ export type PracticeUserMessagePayload = {
 		visuals_policy: {
 			enabled: boolean;
 			preferred_kinds: QuestionVisualKind[];
-			/** Soft cap: at most this many questions may use non-null `visual`. */
+			/**
+			 * Upper bound aligned with test size when visuals apply (`estimated_question_count`);
+			 * there is no fractional quota — every item may use a non-null `visual` if T1/T2/T3 warrants it.
+			 * Zero means non-null visuals are disallowed for this generation.
+			 */
 			max_non_null_visuals: number;
 		};
 		/**
@@ -236,6 +240,9 @@ function preferredVisualKindsForSubject(subjectName: string | null | undefined):
 	if (lower.includes("accountancy") || lower.includes("financial accounting")) {
 		return ["accountancy_table"];
 	}
+	if (lower.includes("business studies")) {
+		return ["statistics_chart", "data_table", "economics_curve", "math_function_plot"];
+	}
 	if (lower.includes("economics") || lower.includes("statistics")) {
 		return [
 			"economics_curve",
@@ -244,17 +251,33 @@ function preferredVisualKindsForSubject(subjectName: string | null | undefined):
 			"math_function_plot",
 		];
 	}
+	// Before plain "science": otherwise "social science" matches integrated Science visuals.
+	if (
+		lower.includes("geography") ||
+		lower.includes("social science") ||
+		lower.includes("political science") ||
+		lower.includes("civics") ||
+		lower.includes("history")
+	) {
+		return ["india_map", "statistics_chart", "data_table", "math_function_plot"];
+	}
 	if (lower.includes("science")) {
 		return [
 			"physics_diagram",
 			"chemistry_molecule",
 			"chemistry_reaction",
 			"data_table",
+			"statistics_chart",
 		];
 	}
 	if (lower.includes("english")) {
 		return ["english_passage"];
 	}
+	if (lower.includes("biology")) {
+		// No dedicated tissue / organ diagram renderer; tables & charts cover many data-heavy items.
+		return ["data_table", "statistics_chart"];
+	}
+	// Unknown subject names: keep empty until explicitly routed (avoid invented kinds).
 	return [];
 }
 
@@ -315,6 +338,10 @@ export function buildPracticeUserMessage(input: {
 			:	[]
 		:	preferredVisualKindsForSubject(input.subject.name);
 
+	/** Mirrors question count when visuals apply so payloads stay backward-compatible; no fractional cap. */
+	const maxNonNullVisuals =
+		visualsEffective && preferredKinds.length > 0 ? estimated_question_count : 0;
+
 	const generation_summary: PracticeGenerationSummary = {
 		total: estimated_question_count,
 		counts: question_type_counts,
@@ -359,7 +386,7 @@ export function buildPracticeUserMessage(input: {
 			visuals_policy: {
 				enabled: visualsEffective,
 				preferred_kinds: preferredKinds,
-				max_non_null_visuals: visualsEffective ? computeMaxNonNullVisuals(estimated_question_count) : 0,
+				max_non_null_visuals: maxNonNullVisuals,
 			},
 			grounding_policy: {
 				mode: hasTopicChunks ? "chunk_aligned" : "curriculum_hint_only",

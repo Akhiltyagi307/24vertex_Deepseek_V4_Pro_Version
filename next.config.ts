@@ -54,6 +54,10 @@ const nextConfig: NextConfig = {
 	// SWC transpiler. Same for any future visual-renderer dep that
 	// ships untranspiled TS — add to this list rather than ejecting
 	// from `next/dynamic({ ssr: false })`.
+	//
+	// `@svg-maps/india` is plain `export default { viewBox, locations[] }` JS — no TS,
+	// no parse failures; production `next build` succeeds without listing it here.
+	// See `src/lib/practice/visuals/__tests__/svg-maps-india-package.test.ts`.
 	transpilePackages: ["smiles-drawer"],
 	serverExternalPackages: [
 		"@sentry/nextjs",

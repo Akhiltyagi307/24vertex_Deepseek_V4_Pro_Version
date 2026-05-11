@@ -660,9 +660,8 @@ async function gradePracticeTestWithAiInner(
 		.update({
 			status: "graded",
 			is_draft: false,
-			// PDR: reports and `practice_update_tracker_running` use this as the
-			// test’s place in time; set at completion, not only at row creation.
-			test_date: nowIso,
+			// test_date is stamped at submit in `practice_start_grading` so “Find a
+			// test” matches when the student handed in, not when grading/PDF finished.
 			duration_seconds: elapsedSeconds,
 			correct_answers: nCorrect,
 			total_score: totalScoreStr,

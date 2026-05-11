@@ -307,9 +307,10 @@ export function evaluatePracticeGenerationQuality(input: EvaluatePracticeGenerat
 }
 
 /**
- * Stems whose wording implies a diagram/table/figure ("shown below", "the graph",
- * etc.) but have no `visual` envelope — same heuristic as `pnpm eval:visuals`
- * criteria 1 and 4.
+ * Stems whose wording implies a diagram/table/figure/passage/etc. (see
+ * `stem-visual-hints.ts`) but have no `visual` envelope — same heuristic as
+ * `pnpm eval:visuals` criteria 1 and 4. Intentionally avoids bare “below/above”
+ * MCQ boilerplate so gates behave consistently across subjects.
  */
 function gateStemReferencesMissingVisual(
 	questions: PracticeGenerationOutput["questions"],

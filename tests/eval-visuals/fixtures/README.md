@@ -12,8 +12,9 @@ Criteria:
 2. **spec_valid** — visual envelope (when present) parses against the schema.
 3. **renders** — spec passes the renderer's preconditions (range > 0, at
    least one primitive, valid SMILES/mhchem etc.).
-4. **stem_self_contained** — when visual is null, the stem doesn't
-   reference "above/below/shown" without a figure.
+4. **stem_self_contained** — when visual is null, the stem must **not** match
+   `stemNeedsVisualHint` (explicit stimulus cues such as “the diagram”, “shown below”, etc.,
+   but **not** bare MCQ boilerplate like “options below”).
 5. **caption_alt_substantial** — when visual is non-null, `caption` and
    `altText` each have at least three words.
 6. **visual_anti_spoiler** — `caption`/`altText` must not use banned answer

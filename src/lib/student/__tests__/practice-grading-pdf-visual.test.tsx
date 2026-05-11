@@ -45,6 +45,16 @@ describe("QuestionVisualPdf — render smoke", () => {
 					{ type: "point", at: { x: 1, y: 2 }, label: "A" },
 					{ type: "point", at: { x: 4, y: 8 }, label: "B" },
 					{ type: "segment", from: { x: 1, y: 2 }, to: { x: 4, y: 8 }, label: null, dashed: false },
+					{
+						type: "arc",
+						center: { x: 1, y: 2 },
+						radius: 2,
+						startAngleDeg: 0,
+						endAngleDeg: 90,
+						minorArc: true,
+						dashed: true,
+						label: null,
+					},
 				],
 			},
 		});
@@ -203,6 +213,19 @@ describe("QuestionVisualPdf — render smoke", () => {
 					{ number: 2, text: "A silver thread through fields of wheat," },
 					{ number: 3, text: "The wind bent down to whisper softly." },
 				],
+			},
+		});
+		assertLooksLikePdf(buf);
+	});
+
+	it("renders an india_map envelope", async () => {
+		const buf = await renderToPdfBuffer({
+			caption: "Western littoral units",
+			altText: "India map with Kerala, Karnataka, and Goa shaded.",
+			spec: {
+				kind: "india_map",
+				mapStyle: "political",
+				highlightedStates: ["kl", "ka", "ga"],
 			},
 		});
 		assertLooksLikePdf(buf);

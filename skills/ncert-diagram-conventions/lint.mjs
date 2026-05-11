@@ -94,6 +94,35 @@ function checkMathGeometry(index, spec) {
 	return out;
 }
 
+/** Numeric behaviour aligned with `src/lib/practice/visuals/math-geometry-arc.ts`. */
+function arcSweepRadiansLint(startAngleDeg, endAngleDeg, minorArc) {
+	const d2r = (d) => (d * Math.PI) / 180;
+	const s = d2r(startAngleDeg);
+	const e = d2r(endAngleDeg);
+	let diff = e - s;
+	diff = ((diff + Math.PI * 3) % (2 * Math.PI)) - Math.PI;
+	if (minorArc) {
+		if (diff > Math.PI) diff -= 2 * Math.PI;
+		if (diff < -Math.PI) diff += 2 * Math.PI;
+	} else {
+		if (diff > 0 && diff < Math.PI) diff -= 2 * Math.PI;
+		else if (diff < 0 && diff > -Math.PI) diff += 2 * Math.PI;
+		else if (diff === 0) diff = 2 * Math.PI;
+	}
+	return diff;
+}
+
+function sampleArcPolylineLint(center, radius, startAngleDeg, endAngleDeg, minorArc, steps = 48) {
+	const s = (startAngleDeg * Math.PI) / 180;
+	const sweep = arcSweepRadiansLint(startAngleDeg, endAngleDeg, minorArc);
+	const pts = [];
+	for (let i = 0; i <= steps; i++) {
+		const t = s + (sweep * i) / steps;
+		pts.push({ x: center.x + radius * Math.cos(t), y: center.y + radius * Math.sin(t) });
+	}
+	return pts;
+}
+
 function collectPrimitivePoints(prim) {
 	if (!prim || typeof prim !== "object") return [];
 	switch (prim.type) {
@@ -109,6 +138,13 @@ function collectPrimitivePoints(prim) {
 			return [prim.vertex, prim.fromRayPoint, prim.toRayPoint];
 		case "circle":
 			return [prim.center];
+		case "arc": {
+			const c = prim.center;
+			if (!c || typeof c !== "object" || typeof prim.radius !== "number") return [];
+			const minor = prim.minorArc == null ? true : prim.minorArc;
+			const sampled = sampleArcPolylineLint(c, prim.radius, prim.startAngleDeg, prim.endAngleDeg, minor);
+			return [c, ...sampled];
+		}
 		default:
 			return [];
 	}

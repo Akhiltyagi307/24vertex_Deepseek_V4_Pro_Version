@@ -74,6 +74,10 @@ const DataTable = dynamic(
 	() => import("./renderers/data-table").then((m) => ({ default: m.DataTable })),
 	{ ssr: false, loading: () => <RendererLoading /> },
 );
+const IndiaMap = dynamic(
+	() => import("./renderers/india-map").then((m) => ({ default: m.IndiaMap })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
 const EnglishPassage = dynamic(
 	() => import("./renderers/english-passage").then((m) => ({ default: m.EnglishPassage })),
 	{ ssr: false, loading: () => <RendererLoading /> },
@@ -136,6 +140,8 @@ function RendererDispatch({
 			return <EconomicsCurve spec={spec} />;
 		case "data_table":
 			return <DataTable spec={spec} />;
+		case "india_map":
+			return <IndiaMap spec={spec} />;
 		case "english_passage":
 			return <EnglishPassage spec={spec} />;
 	}

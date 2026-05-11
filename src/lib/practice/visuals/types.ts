@@ -17,6 +17,7 @@ export type {
 	EconomicsCurveSpec,
 	StatisticsChartSpec,
 	DataTableSpec,
+	IndiaMapSpec,
 	EnglishPassageSpec,
 	Point2D,
 } from "./schemas";

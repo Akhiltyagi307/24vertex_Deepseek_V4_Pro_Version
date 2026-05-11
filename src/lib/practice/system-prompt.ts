@@ -27,6 +27,11 @@ type UserMessageSummary = Pick<
 	student_grade?: number | null;
 	/** Curriculum subject grade when known (from routing / subject row). */
 	subject_grade?: number | null;
+	/**
+	 * Lowercase concat of selected topic names + unit/chapter hints, built server-side
+	 * for exemplar relevance only (not sent on the student-facing user JSON schema).
+	 */
+	topic_exemplar_hint?: string | null;
 };
 
 /**
@@ -121,7 +126,7 @@ function buildHardGatesBlock(args: {
 			:	`- \`visuals_policy.preferred_kinds\` is empty for this subject: emit \`visual: null\` on every question.`;
 		const capLine =
 			vp.max_non_null_visuals > 0 ?
-				`- At most ${vp.max_non_null_visuals} question(s) may have a non-null \`visual\`; all others MUST use \`visual: null\`. Choose the most load-bearing items.`
+				`- Non-null \`visual\`: no artificial per-test quota — attach wherever T1/T2/T3 applies (see Visuals section); every other question MUST use \`visual: null\`.`
 			:	`- Non-null visuals are disabled (\`max_non_null_visuals\` = 0): emit \`visual: null\` on every question.`;
 		visualExtras = `\n${kindsLine}\n${capLine}`;
 	}
@@ -232,9 +237,14 @@ export function buildPracticeGenerationSharedSystemInstructions(userMessageSumma
 		? buildVisualsDisciplineBlock(vp)
 		: "## Visuals\n\nFor this generation set `visual: null` on every question. Do not emit a non-null visual envelope under any circumstance.";
 
-	const exemplarsBlock = visualsEnabled
-		? buildExemplarsBlock(userMessageSummary.subjectName, getPracticeVisualExemplarCount())
-		: "";
+	const exemplarsBlock =
+		visualsEnabled && vp.preferred_kinds.length > 0 ?
+			buildExemplarsBlock(
+				userMessageSummary.subjectName,
+				getPracticeVisualExemplarCount(),
+				userMessageSummary.topic_exemplar_hint ?? null,
+			)
+		:	"";
 
 	const subjectDiscipline = buildSubjectDisciplineBlock(difficulty);
 
@@ -342,7 +352,8 @@ Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessage
  *
  * Only emitted when `PRACTICE_VISUALS=true`. Tells the model when to attach
  * a non-null `visual` envelope and what each renderer expects. Intentionally
- * verbose — exemplars at the bottom of the prompt do most of the lifting,
+ * verbose — exemplars at the bottom of the prompt do most of the lifting
+ * (including NCERT/CBSE-typical and broader international-exam-shaped stimuli),
  * but the rules here cap the failure modes (every-question-gets-a-visual,
  * label drift between stem and spec, syntactically invalid expressions).
  */
@@ -351,13 +362,12 @@ function buildVisualsDisciplineBlock(
 ): string {
 	const kindsEcho =
 		vp.preferred_kinds.length > 0 ? vp.preferred_kinds.join(", ") : "— leave every `visual` null —";
-	const maxEcho = vp.max_non_null_visuals;
 	return `## Visuals (\`visual\` field — required on every question)
 
 ### Policy (must match \`test_parameters.visuals_policy\`)
 
 - Non-null \`visual.spec.kind\` must be drawn from: ${kindsEcho}.
-- Soft cap: at most ${maxEcho} question(s) with non-null \`visual\`; choose the most load-bearing T1/T2/T3 items first.
+- No quota limiting how many questions may use a non-null \`visual\`: every item that satisfies T1/T2/T3 below may carry one; items without those triggers stay \`visual: null\`.
 - Avoid **orphan** diagrams: if you attach a non-null \`visual\`, the stem should reference it ("shown below", "in the table", etc.) or the visual is itself the worksheet layout (accountancy/statistics stimulus).
 
 The default is \`visual: null\`. Emit a non-null visual ONLY when one of these
@@ -408,7 +418,9 @@ under the figure) and \`altText\` (richer description for screen readers).
 
 - \`math_geometry\`: integer or single-decimal coordinates only. The view must
   contain every primitive with at least 1 unit of margin. Every primitive's
-  \`type\` is one of: point, segment, polygon, vector, angle_marker, circle.
+  \`type\` is one of: point, segment, polygon, vector, angle_marker, circle, arc.
+  For \`arc\`, angles are in degrees (0° = +x, CCW); \`minorArc\` null defaults to
+  true (shorter arc between the two bearings); use \`dashed\` for construction strokes.
 - \`math_function_plot\`: mathjs syntax (\`x^2\`, \`sin(x)\`, \`exp(-x^2)\`,
   \`abs(x)\`, \`sqrt(x)\`). Every function MUST be defined and finite over its
   plotted range. Never plot \`ln(-x)\`, \`1/0\`, or \`sqrt(negative)\` over the
@@ -444,6 +456,20 @@ under the figure) and \`altText\` (richer description for screen readers).
 - \`data_table\`: rows are arrays of cells; each cell has \`value\`, \`bold\`,
   \`align\` ("left" | "center" | "right"). Use this for short stimulus tables
   that don't fit accountancy or statistics shapes.
+- **Geography / Social Science (grades 8–12):** Use \`india_map\` when the stem truly
+  depends on **which states/regions** are shown (boundaries, neighbours, coasts,
+  plateaus). Set \`mapStyle\` to \`political\` (pastel states), \`outline\` (minimal
+  fills, bold borders), or \`physical_palette\` (muted earth-tone fills — not relief).
+  Put lowercase ids in \`highlightedStates\` only for regions the stem names or
+  contrasts (\`mh\`, \`rj\`, \`tn\`, … — ids match \`@svg-maps/india\`). Also use
+  \`statistics_chart\` (line, bar, pie, histogram, scatter, ogive, frequency_polygon,
+  box as appropriate) and \`data_table\` for climate tables, population or resource
+  comparisons, and land-use shares. Prefer values and place names from \`topic_grounding\`.
+- **Business Studies:** Use \`statistics_chart\` (bar, line, pie for revenue or market
+  mix), \`data_table\` for short case facts, and \`economics_curve\` when intersecting
+  demand/supply or similar curves carry the question; reserve \`math_function_plot\`
+  for rare quantitative sketches that are not better as a curve diagram.
+- **Biology:** Use \`data_table\` for experimental tallies, assay summaries, or comparative measurements when the numbers carry the question. Use \`statistics_chart\` (bar, line, histogram, scatter, pie as appropriate) when the item depends on plotted frequencies or measurements. There is **no** dedicated histology / organ / life-cycle diagram renderer in v1 — follow the subject preamble: keep structure-and-localisation items textual unless you use an allowed tabular/chart stimulus.
 - \`english_passage\`: \`lines[]\` with \`number\` (positive int) and \`text\`.
   Inline \`$...$\` LaTeX is supported in line text.
 - All text labels in any spec are LaTeX-aware — \`$x_0$\`, \`$\\\\theta$\` will
@@ -463,7 +489,14 @@ the stem to be self-contained. A correct question without a visual is ALWAYS
 preferred to a wrong or noisy visual.`;
 }
 
+/** Keys matched with `subjectName.toLowerCase().includes(key)` — put `social science` before `science`. */
 const SUBJECT_EXEMPLAR_KEY: Record<string, VisualExemplar["subjects"][number]> = {
+	"social science": "social_science",
+	geography: "geography",
+	"political science": "social_science",
+	civics: "social_science",
+	history: "social_science",
+	maths: "mathematics",
 	mathematics: "mathematics",
 	physics: "physics",
 	chemistry: "chemistry",
@@ -471,8 +504,9 @@ const SUBJECT_EXEMPLAR_KEY: Record<string, VisualExemplar["subjects"][number]> =
 	economics: "economics_statistics",
 	statistics: "economics_statistics",
 	economics_statistics: "economics_statistics",
+	"business studies": "business_studies",
 	science: "science",
-	biology: "science",
+	biology: "biology",
 	english: "english",
 };
 
@@ -492,9 +526,15 @@ function pickExemplarSubjectKey(
  * instructions when visuals are enabled. Provides worked stems with
  * matched \`visual\` shapes so the model has concrete patterns to imitate.
  */
-function buildExemplarsBlock(subjectName?: string | null, exemplarLimit = 6): string {
+function buildExemplarsBlock(
+	subjectName?: string | null,
+	exemplarLimit = 6,
+	topicExemplarHint?: string | null,
+): string {
 	const subjectKey = pickExemplarSubjectKey(subjectName);
-	const exemplars = pickExemplarsForSubject(subjectKey, exemplarLimit);
+	const exemplars = pickExemplarsForSubject(subjectKey, exemplarLimit, {
+		topicHintNorm: topicExemplarHint?.trim() ? topicExemplarHint.trim().toLowerCase() : undefined,
+	});
 	if (exemplars.length === 0) return "";
 	const rendered = exemplars
 		.map((ex, i) => {
@@ -505,9 +545,13 @@ function buildExemplarsBlock(subjectName?: string | null, exemplarLimit = 6): st
   visual: ${visual}`;
 		})
 		.join("\n\n");
-	return `\n\n## Examples (worked stems with matching visuals)\n\nThe following are concrete stem ↔ visual pairs. Imitate the SHAPE — not the
-content — when constructing your own questions.
-
+	const topicOrderingNote =
+		topicExemplarHint?.trim() ?
+			"\nSelected-topic ordering: exemplars whose catalogue keywords overlap the student's chosen topic/chapter titles are listed earlier when possible; still vary supported visual shapes across the test.\n"
+		:	"";
+	return `\n\n## Examples (worked stems with matching visuals)\n\nThe following concrete stem ↔ visual pairs mix Indian-board-typical items and international-exam-shaped graphs (AP, IB, SAT-style where applicable). Imitate the SHAPE — not the
+content — when constructing your own questions; keep notation, currency, and syllabus cues aligned with the student's topic unless the stem explicitly states another convention.
+${topicOrderingNote}
 ${rendered}\n`;
 }
 

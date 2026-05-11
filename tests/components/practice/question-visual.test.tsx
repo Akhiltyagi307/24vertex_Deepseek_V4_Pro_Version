@@ -50,7 +50,7 @@ describe("QuestionVisual dispatcher", () => {
 	});
 
 	it("dispatches every exemplar without throwing", () => {
-		// All eleven kinds have renderers wired. Every exemplar should mount
+		// All kinds have renderers wired. Every exemplar should mount
 		// (renderers are dynamic-imported so we may see a loading placeholder
 		// rather than the final visual; we just assert the figure shell appears).
 		for (const exemplar of VISUAL_EXEMPLARS) {

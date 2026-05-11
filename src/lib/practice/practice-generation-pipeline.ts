@@ -596,12 +596,26 @@ async function runPracticeGenerationAfterResolveCore(
 		void tagTopicContextTruncated();
 	}
 
+	const topicExemplarHint =
+		userPayload.topic_grounding.length > 0 ?
+			userPayload.topic_grounding
+				.map((t) =>
+					[t.topic_name, t.curriculum_hint.unit_name, t.curriculum_hint.chapter_name]
+						.filter((s) => s && String(s).trim().length > 0)
+						.join(" "),
+				)
+				.join(" · ")
+				.toLowerCase()
+				.slice(0, 1500)
+		:	null;
+
 	const systemPrompt = buildPracticeSystemPrompt({
 		userMessageSummary: {
 			schema_version: userPayload.schema_version,
 			intent: userPayload.intent,
 			test_parameters: userPayload.test_parameters,
 			constraints: userPayload.constraints,
+			topic_exemplar_hint: topicExemplarHint,
 		},
 		generationSubject: {
 			subjectName: resolved.subjectName,

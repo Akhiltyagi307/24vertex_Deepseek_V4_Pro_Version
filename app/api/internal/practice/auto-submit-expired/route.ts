@@ -47,6 +47,7 @@ async function runAutoSubmitExpired(): Promise<Response> {
 			.update({
 				status: "grading",
 				auto_submitted: true,
+				test_date: new Date().toISOString(),
 				duration_seconds: Math.min(elapsed, (t.time_limit_seconds as number | null) ?? elapsed),
 				updated_at: new Date().toISOString(),
 			})

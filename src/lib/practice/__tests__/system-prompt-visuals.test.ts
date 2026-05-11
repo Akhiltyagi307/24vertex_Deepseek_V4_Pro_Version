@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { buildPracticeGenerationSharedSystemInstructions } from "../system-prompt";
+import type { QuestionVisualKind } from "../visuals/types";
 
 const userMessageBaseline = {
 	schema_version: 3 as const,
@@ -23,7 +24,7 @@ const userMessageBaseline = {
 		allowed_topic_ids: [],
 		visuals_policy: {
 			enabled: false,
-			preferred_kinds: ["math_geometry", "math_function_plot", "number_line", "data_table"],
+			preferred_kinds: ["math_geometry", "math_function_plot", "number_line", "data_table"] as QuestionVisualKind[],
 			max_non_null_visuals: 0,
 		},
 		grounding_policy: {
@@ -77,7 +78,7 @@ describe("system prompt — visuals flag", () => {
 				...userMessageBaseline.test_parameters,
 				visuals_policy: {
 					enabled: true,
-					preferred_kinds: ["math_geometry", "math_function_plot", "number_line", "data_table"],
+					preferred_kinds: ["math_geometry", "math_function_plot", "number_line", "data_table"] as QuestionVisualKind[],
 					max_non_null_visuals: 10,
 				},
 			},
@@ -91,7 +92,7 @@ describe("system prompt — visuals flag", () => {
 		expect(prompt).toContain("## Examples");
 		expect(prompt).toContain("question_text:");
 		expect(prompt).toContain("horizontal axis");
-		expect(prompt).toContain("At most 10 question(s) may have a non-null");
+		expect(prompt).toContain("no artificial per-test quota");
 		// Hard-gate mirror line should match the discipline phrasing.
 		expect(prompt).toContain("emit `null` UNLESS a load-bearing trigger fires");
 	});
@@ -116,7 +117,7 @@ describe("system prompt — visuals flag", () => {
 				...userMessageBaseline.test_parameters,
 				visuals_policy: {
 					enabled: true,
-					preferred_kinds: ["math_geometry"],
+					preferred_kinds: ["math_geometry"] as QuestionVisualKind[],
 					max_non_null_visuals: 10,
 				},
 			},
@@ -135,7 +136,7 @@ describe("system prompt — visuals flag", () => {
 				...userMessageBaseline.test_parameters,
 				visuals_policy: {
 					enabled: true,
-					preferred_kinds: ["math_geometry"],
+					preferred_kinds: ["math_geometry"] as QuestionVisualKind[],
 					max_non_null_visuals: 10,
 				},
 			},
@@ -152,12 +153,30 @@ describe("system prompt — visuals flag", () => {
 				...userMessageBaseline.test_parameters,
 				visuals_policy: {
 					enabled: true,
-					preferred_kinds: ["accountancy_table"],
+					preferred_kinds: ["accountancy_table"] as QuestionVisualKind[],
 					max_non_null_visuals: 8,
 				},
 			},
 		});
 		// Accountancy exemplar features the journal entry skeleton.
 		expect(prompt).toContain("journal_entry");
+	});
+
+	it("omits few-shot ## Examples when preferred_kinds is empty (e.g. Biology)", () => {
+		process.env.PRACTICE_VISUALS = "true";
+		const prompt = buildPracticeGenerationSharedSystemInstructions({
+			...userMessageBaseline,
+			subjectName: "Biology",
+			test_parameters: {
+				...userMessageBaseline.test_parameters,
+				visuals_policy: {
+					enabled: true,
+					preferred_kinds: [] as QuestionVisualKind[],
+					max_non_null_visuals: 0,
+				},
+			},
+		});
+		expect(prompt).toContain("Visuals (`visual` field — required");
+		expect(prompt).not.toContain("## Examples");
 	});
 });

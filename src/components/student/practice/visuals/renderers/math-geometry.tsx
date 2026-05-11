@@ -5,6 +5,7 @@ import {
 	Coordinates,
 	Mafs,
 	Polygon as MafsPolygon,
+	Plot,
 	Theme,
 	Circle as MafsCircle,
 	Line,
@@ -15,13 +16,14 @@ import {
 import "mafs/core.css";
 import "mafs/font.css";
 
+import { arcSweepRadians } from "@/lib/practice/visuals/math-geometry-arc";
 import type { MathGeometrySpec } from "@/lib/practice/visuals/types";
 
 /**
  * `math_geometry` renderer.
  *
  * Routes the spec's primitives onto Mafs — points, segments, polygons,
- * vectors, angle markers, circles. The dispatcher wraps us in a <figure>
+ * vectors, angle markers, circles, circular arcs. The dispatcher wraps us in a <figure>
  * with an aria-label so we do not duplicate accessibility metadata here.
  *
  * Heavy dependency: Mafs and its CSS bundle. Imported only when the
@@ -119,6 +121,25 @@ function renderPrimitive(
 					color={Theme.blue}
 				/>
 			);
+		case "arc": {
+			const minor = primitive.minorArc ?? true;
+			const dashed = primitive.dashed ?? false;
+			const s = (primitive.startAngleDeg * Math.PI) / 180;
+			const sweep = arcSweepRadians(primitive.startAngleDeg, primitive.endAngleDeg, minor);
+			return (
+				<Plot.Parametric
+					key={`arc-${idx}`}
+					domain={[0, 1]}
+					xy={(t) => [
+						primitive.center.x + primitive.radius * Math.cos(s + t * sweep),
+						primitive.center.y + primitive.radius * Math.sin(s + t * sweep),
+					]}
+					color={Theme.foreground}
+					weight={2}
+					style={dashed ? "dashed" : "solid"}
+				/>
+			);
+		}
 		default:
 			return null;
 	}

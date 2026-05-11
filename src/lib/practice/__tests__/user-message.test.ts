@@ -215,19 +215,8 @@ describe("buildPracticeUserMessage", () => {
 			expect(physics.test_parameters.visuals_policy).toEqual({
 				enabled: true,
 				preferred_kinds: ["physics_diagram", "math_function_plot", "data_table"],
-				max_non_null_visuals: 8,
+				max_non_null_visuals: 15,
 			});
-
-			process.env.PRACTICE_VISUALS_MAX_ABS = "3";
-			const physicsCapped = buildPracticeUserMessage({
-				studentGrade: 11,
-				subject: { id: "x", name: "Physics" },
-				difficulty: "medium",
-				timeLimitSeconds: 3600,
-				topics: TOPICS,
-			});
-			expect(physicsCapped.test_parameters.visuals_policy.max_non_null_visuals).toBe(3);
-			delete process.env.PRACTICE_VISUALS_MAX_ABS;
 
 			const accountancy = buildPracticeUserMessage({
 				studentGrade: 12,
@@ -238,6 +227,62 @@ describe("buildPracticeUserMessage", () => {
 			});
 			expect(accountancy.test_parameters.visuals_policy.preferred_kinds).toEqual([
 				"accountancy_table",
+			]);
+
+			const businessStudies = buildPracticeUserMessage({
+				studentGrade: 12,
+				subject: { id: "x", name: "Business Studies" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(businessStudies.test_parameters.visuals_policy.preferred_kinds).toEqual([
+				"statistics_chart",
+				"data_table",
+				"economics_curve",
+				"math_function_plot",
+			]);
+
+			const social = buildPracticeUserMessage({
+				studentGrade: 9,
+				subject: { id: "x", name: "Social Science" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(social.test_parameters.visuals_policy.preferred_kinds).toEqual([
+				"india_map",
+				"statistics_chart",
+				"data_table",
+				"math_function_plot",
+			]);
+
+			const biology = buildPracticeUserMessage({
+				studentGrade: 12,
+				subject: { id: "x", name: "Biology" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(biology.test_parameters.visuals_policy).toEqual({
+				enabled: true,
+				preferred_kinds: ["data_table", "statistics_chart"],
+				max_non_null_visuals: 15,
+			});
+
+			const integratedScience = buildPracticeUserMessage({
+				studentGrade: 9,
+				subject: { id: "x", name: "Science" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(integratedScience.test_parameters.visuals_policy.preferred_kinds).toEqual([
+				"physics_diagram",
+				"chemistry_molecule",
+				"chemistry_reaction",
+				"data_table",
+				"statistics_chart",
 			]);
 
 			process.env.PRACTICE_VISUALS = "false";

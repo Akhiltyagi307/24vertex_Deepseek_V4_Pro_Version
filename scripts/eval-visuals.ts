@@ -87,6 +87,7 @@ const VALID_KINDS = new Set([
 	"economics_curve",
 	"statistics_chart",
 	"data_table",
+	"india_map",
 	"english_passage",
 ]);
 
@@ -196,6 +197,8 @@ function passesRendererPreconditions(visual: { spec: Record<string, unknown> }):
 			return typeof spec.subKind === "string";
 		case "data_table":
 			return Array.isArray(spec.headers) && Array.isArray(spec.rows);
+		case "india_map":
+			return true;
 		case "english_passage":
 			return Array.isArray(spec.lines) && spec.lines.length > 0;
 		default:

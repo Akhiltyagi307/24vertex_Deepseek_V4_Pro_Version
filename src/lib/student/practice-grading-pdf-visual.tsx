@@ -2,6 +2,7 @@ import {
 	Circle,
 	G,
 	Line,
+	Path,
 	Polygon,
 	Polyline,
 	Rect,
@@ -10,7 +11,17 @@ import {
 	Text,
 	View,
 } from "@react-pdf/renderer";
+import india from "@svg-maps/india";
 import type { ReactElement, ReactNode } from "react";
+
+import { parseSvgViewBox, type IndiaMapLocationId } from "@/lib/practice/visuals/india-map-regions";
+import {
+	INDIA_MAP_ATTRIBUTION,
+	indiaMapOceanFill,
+	indiaRegionPaint,
+	normalizeIndiaMapStyle,
+} from "@/lib/practice/visuals/india-map-paint";
+import { sampleArcPolyline } from "@/lib/practice/visuals/math-geometry-arc";
 
 import type {
 	AccountancyTableSpec,
@@ -19,6 +30,7 @@ import type {
 	DataTableSpec,
 	EconomicsCurveSpec,
 	EnglishPassageSpec,
+	IndiaMapSpec,
 	MathFunctionPlotSpec,
 	MathGeometrySpec,
 	NumberLineSpec,
@@ -35,7 +47,7 @@ import type {
  * Coverage in v1:
  *   - HIGH fidelity (native SVG/View): math_geometry, number_line,
  *     physics_diagram (all subKinds), accountancy_table, data_table,
- *     english_passage, statistics_chart (histogram, bar, line, scatter,
+ *     english_passage, india_map, statistics_chart (histogram, bar, line, scatter,
  *     frequency_polygon, ogive).
  *   - TEXT fallback (caption + altText + raw spec string): chemistry_molecule
  *     (no SMILES parser in PDF), chemistry_reaction (no KaTeX/mhchem in
@@ -50,6 +62,12 @@ import type {
 
 const PDF_VISUAL_WIDTH = 360;
 const PDF_VISUAL_HEIGHT = 220;
+
+/** Height scales with @svg-maps/india aspect ratio when rendered at PDF_VISUAL_WIDTH. */
+function indiaMapPdfHeight(): number {
+	const { vw, vh } = parseSvgViewBox(india.viewBox);
+	return vw > 0 ? Math.round((vh / vw) * PDF_VISUAL_WIDTH) : 410;
+}
 
 // Design-token hex literals. Matches the on-screen palette closely enough
 // for visual recognition; the PDF stays consistent across light/dark since
@@ -172,6 +190,8 @@ function RenderSpec({ visual }: { visual: QuestionVisualEnvelope }): ReactElemen
 			return <StatisticsChartPdf spec={spec} altText={visual.altText} />;
 		case "data_table":
 			return <DataTablePdf spec={spec} />;
+		case "india_map":
+			return <IndiaMapPdf spec={spec} />;
 		case "english_passage":
 			return <EnglishPassagePdf spec={spec} />;
 	}
@@ -375,6 +395,37 @@ function renderGeometryPrimitive(
 					fill="none"
 				/>
 			);
+		case "arc": {
+			const minor = p.minorArc ?? true;
+			const pts = sampleArcPolyline(
+				p.center,
+				p.radius,
+				p.startAngleDeg,
+				p.endAngleDeg,
+				minor,
+			);
+			const mid = pts[Math.floor(pts.length / 2)]!;
+			return (
+				<G key={`arc-${idx}`}>
+					<Polyline
+						points={pts.map((pt) => `${xToScreen(pt.x)},${yToScreen(pt.y)}`).join(" ")}
+						stroke={TOKEN.foreground}
+						strokeWidth={1.2}
+						fill="none"
+						strokeDasharray={p.dashed ? "3 2" : undefined}
+					/>
+					{p.label ? (
+						<Text
+							x={xToScreen(mid.x) + 4}
+							y={yToScreen(mid.y) - 4}
+							style={{ fontSize: 9, fill: TOKEN.foreground }}
+						>
+							{p.label}
+						</Text>
+					) : null}
+				</G>
+			);
+		}
 		default:
 			return null;
 	}
@@ -1324,6 +1375,47 @@ function DataTablePdf({ spec }: { spec: DataTableSpec }): ReactElement {
 }
 
 // ───────────────────────────────────────────────────────────────────────
+// india_map
+// ───────────────────────────────────────────────────────────────────────
+
+function IndiaMapPdf({ spec }: { spec: IndiaMapSpec }): ReactElement {
+	const mapStyle = normalizeIndiaMapStyle(spec.mapStyle);
+	const highlighted = new Set(spec.highlightedStates ?? []);
+	const vb = parseSvgViewBox(india.viewBox);
+	const ocean = indiaMapOceanFill(mapStyle);
+	const W = PDF_VISUAL_WIDTH;
+	const H = indiaMapPdfHeight();
+	const sorted = [...india.locations].sort((a, b) => {
+		const ah = highlighted.has(a.id) ? 1 : 0;
+		const bh = highlighted.has(b.id) ? 1 : 0;
+		return ah - bh;
+	});
+
+	return (
+		<View>
+			<Svg width={W} height={H} viewBox={india.viewBox}>
+				<Rect x={vb.vx} y={vb.vy} width={vb.vw} height={vb.vh} fill={ocean} />
+				{sorted.map((loc) => {
+					const paint = indiaRegionPaint(mapStyle, loc.id as IndiaMapLocationId, highlighted);
+					return (
+						<Path
+							key={loc.id}
+							d={loc.path}
+							fill={paint.fill}
+							stroke={paint.stroke}
+							strokeWidth={paint.strokeWidth}
+						/>
+					);
+				})}
+			</Svg>
+			<Text style={[styles.fallbackBody, { fontSize: 7, color: TOKEN.muted, marginTop: 4 }]}>
+				{INDIA_MAP_ATTRIBUTION}
+			</Text>
+		</View>
+	);
+}
+
+// ───────────────────────────────────────────────────────────────────────
 // english_passage
 // ───────────────────────────────────────────────────────────────────────
 
@@ -1438,6 +1530,7 @@ export type _PdfRendererTypes = {
 	DataTableSpec: DataTableSpec;
 	EconomicsCurveSpec: EconomicsCurveSpec;
 	EnglishPassageSpec: EnglishPassageSpec;
+	IndiaMapSpec: IndiaMapSpec;
 	MathFunctionPlotSpec: MathFunctionPlotSpec;
 	MathGeometrySpec: MathGeometrySpec;
 	NumberLineSpec: NumberLineSpec;
