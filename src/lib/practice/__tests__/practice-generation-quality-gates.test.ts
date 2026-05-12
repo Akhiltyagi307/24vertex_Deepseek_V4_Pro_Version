@@ -89,6 +89,17 @@ describe("evaluatePracticeGenerationQuality", () => {
 		expect(out.code).toBe("topic_concentration");
 	});
 
+	it("allows one-topic requests to use the only selected topic", () => {
+		const questions: PracticeGenerationOutput["questions"] = Array.from({ length: 10 }, (_, i) =>
+			makeQuestion({
+				question_number: i + 1,
+				question_text: `Single selected topic question ${i + 1}`,
+			}),
+		);
+		const out = evaluatePracticeGenerationQuality({ questions, allowedTopicCount: 1 });
+		expect(out.ok).toBe(true);
+	});
+
 	it("allows single-difficulty tests when other quality checks pass", () => {
 		const questions: PracticeGenerationOutput["questions"] = Array.from({ length: 10 }, (_, i) =>
 			makeQuestion({
@@ -120,6 +131,21 @@ describe("evaluatePracticeGenerationQuality", () => {
 		if (out.ok) return;
 		expect(out.code).toBe("stem_references_missing_visual");
 		expect(out.details?.failedIndexes).toEqual([0]);
+	});
+
+	it("can defer missing-visual references during pre-enrichment drafting", () => {
+		const questions: PracticeGenerationOutput["questions"] = Array.from({ length: 10 }, (_, i) =>
+			makeQuestion({
+				question_number: i + 1,
+				question_text:
+					i === 0 ?
+						"Read the passage below and identify the speaker's main conflict."
+					:	`Question ${i + 1} with distinct English supplementary wording.`,
+				topic_id: `11111111-1111-4111-8111-11111111111${i}`,
+			}),
+		);
+		const out = evaluatePracticeGenerationQuality({ questions, skipMissingVisualGate: true });
+		expect(out.ok).toBe(true);
 	});
 
 	it("flags label drift between stem and visual spec", () => {

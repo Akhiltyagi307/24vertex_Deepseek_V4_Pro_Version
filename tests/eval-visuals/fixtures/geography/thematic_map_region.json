@@ -1,0 +1,29 @@
+{
+  "question_text": "Use the map shown below for the highlighted Western Ghats region. Which rainfall pattern best explains it?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Heavy orographic rainfall",
+    "B": "Very low desert rainfall",
+    "C": "Polar snowfall",
+    "D": "No seasonal wind effect"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The Western Ghats receive heavy orographic rainfall during the monsoon.",
+    "common_mistakes": [],
+    "related_concept": "Indian monsoon"
+  },
+  "visual": {
+    "caption": "Thematic map stimulus with one highlighted region.",
+    "altText": "An India-scope thematic map listing the Western Ghats as the highlighted region.",
+    "spec": {
+      "kind": "map_visual",
+      "scope": "india",
+      "title": "Monsoon region",
+      "mapStyle": "thematic",
+      "regions": [
+        { "id": "western-ghats", "label": "Western Ghats", "role": "highlight" }
+      ]
+    }
+  }
+}

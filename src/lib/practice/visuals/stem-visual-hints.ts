@@ -11,7 +11,7 @@
 
 /** Nouns that normally correspond to `visual.spec` families when preceded by the/in/from/etc. */
 const STIMULUS_NOUN =
-	"figure|diagram|graphs?|charts?|tables?|circuits?|structures?|images?|drawings?|sketches?|plots?|maps?|histograms?|ogives?|polygons?|curves?|axes";
+	"figure|diagram|graphs?|charts?|tables?|circuits?|structures?|images?|drawings?|sketches?|plots?|maps?|histograms?|ogives?|polygons?|curves?|axes|timelines?|flowcharts?|flow\\s+charts?|source\\s+extracts?|extracts?|field\\s+lines?|wave\\s+diagrams?";
 
 /**
  * Stems matching should carry a non-null `visual`, or be rewritten to remove dangling references.
@@ -44,6 +44,8 @@ export const STEM_NEEDS_VISUAL_HINT = new RegExp(
 		`|as\\s+(?:shown|illustrated|depicted)\\s+(?:in\\s+the\\s+(?:${STIMULUS_NOUN})|below|above)`,
 		// English / comprehension stems (structured passage envelope)
 		`|the\\s+following\\s+passage`,
+		`|read\\s+the\\s+source\\s+extract`,
+		`|source\\s+extract\\s+(?:given\\s+)?(?:below|above)`,
 		`|read\\s+the\\s+passage\\s+(?:given\\s+)?(?:below|above)`,
 		`|passage\\s+(?:given\\s+)?(?:below|above)`,
 		// Chemistry / numeric stems (“shown in the equation below”) — “shown” and “below” are not adjacent

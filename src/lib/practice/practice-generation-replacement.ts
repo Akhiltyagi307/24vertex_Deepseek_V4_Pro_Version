@@ -129,7 +129,7 @@ export function buildVisualFixReplacementPrompt(args: VisualFixReplacementArgs):
 		"- If the failure is visual_leaks_answer: rewrite caption and altText only so they still describe layout/axes/labels but never repeat the keyed answer, correct option text, or spoiling conclusions; keep spec data unless it must change for consistency.",
 		"- If the failure is chunk_alignment_weak: rewrite stems (and visuals if needed) so key content words and scenarios overlap the topic's topic_grounding chunks.",
 		"- For each fix you may either (a) repair the visual spec, or (b) set visual to null and rewrite the stem to be self-contained.",
-		"- A correct question without a visual is ALWAYS preferred to a wrong or noisy visual.",
+		"- Prefer repairing the visual spec, stem, caption, or altText first; set `visual: null` only as a last resort when the visual cannot be made valid, faithful, and non-spoiling. A wrong, noisy, or spoiler visual is never acceptable.",
 		"FAILED_INDEXES:",
 		JSON.stringify(args.failedQuestionIndexes),
 	].join("\n");

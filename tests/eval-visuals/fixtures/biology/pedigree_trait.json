@@ -1,0 +1,31 @@
+{
+  "question_text": "Use the diagram shown below to identify which generation first shows the trait.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Generation I",
+    "B": "The lower generation",
+    "C": "Generation III",
+    "D": "No generation shows it"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The shaded label appears first in Generation II.",
+    "common_mistakes": [],
+    "related_concept": "Pedigree analysis"
+  },
+  "visual": {
+    "caption": "Pedigree stimulus with two generations labelled for trait tracking.",
+    "altText": "A pedigree-style biology diagram with generation labels I and II and a shaded trait marker in generation II.",
+    "spec": {
+      "kind": "biology_diagram",
+      "subKind": "pedigree",
+      "title": "Trait pedigree",
+      "labels": [
+        { "id": "i", "text": "I", "x": 25, "y": 25 },
+        { "id": "ii", "text": "II", "x": 25, "y": 60 },
+        { "id": "trait", "text": "Trait", "x": 65, "y": 60 }
+      ],
+      "notes": ["Shaded marker denotes the observed trait."]
+    }
+  }
+}

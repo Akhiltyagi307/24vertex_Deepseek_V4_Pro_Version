@@ -147,6 +147,43 @@ describe("createPracticeGenerationOutputSchema", () => {
 		expect(parsed.success).toBe(false);
 	});
 
+	it("rejects non-null visuals when visuals are disabled for generation", () => {
+		const counts = {
+			multiple_choice: 1,
+			fill_in_blank: 0,
+			short_answer: 0,
+			long_answer: 0,
+		} as const;
+		const raw = {
+			questions_by_type: {
+				multiple_choice: [
+					makeDraftQuestion({
+						visual: {
+							caption: "Read the passage.",
+							altText: "A one-line passage.",
+							spec: {
+								kind: "english_passage" as const,
+								title: null,
+								source: null,
+								lines: [{ number: 1, text: "Line one." }],
+							},
+						},
+					}),
+				],
+				fill_in_blank: [],
+				short_answer: [],
+				long_answer: [],
+			},
+			generation_metadata: {
+				adaptation_rationale: "Test policy.",
+			},
+		};
+		const parsed = createPracticeGenerationOutputSchema(counts, {
+			visualsEnabled: false,
+		}).safeParse(raw);
+		expect(parsed.success).toBe(false);
+	});
+
 	it("rejects grouped output when a bucket length is wrong", () => {
 		const plan = getPracticeQuestionPlan(3600);
 		const raw = makeGroupedGeneration(plan.counts);

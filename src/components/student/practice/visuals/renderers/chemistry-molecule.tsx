@@ -3,6 +3,7 @@
 import * as React from "react";
 import SmilesDrawer from "smiles-drawer";
 
+import { LatexText } from "../../latex-text";
 import type { ChemistryMoleculeSpec } from "@/lib/practice/visuals/types";
 
 const SVG_WIDTH = 320;
@@ -18,8 +19,7 @@ const SVG_HEIGHT = 220;
  *
  * Theme: smiles-drawer ships a 'light' / 'dark' theme; we always pass
  * 'light' for legibility in v1 and rely on the surrounding figure shell
- * for visual context. The schema's `display: "3d"` is accepted but v1
- * always renders 2D — 3D depends on `3dmol` which is not installed.
+ * for visual context.
  */
 export function ChemistryMolecule({
 	spec,
@@ -79,19 +79,31 @@ export function ChemistryMolecule({
 			<div className="flex flex-col items-center gap-1 text-muted-foreground text-sm">
 				<span>Could not render molecule.</span>
 				<code className="text-xs">{spec.smiles}</code>
+				{spec.label ? (
+					<span className="text-muted-foreground text-xs">
+						<LatexText text={spec.label} className="justify-center text-center" />
+					</span>
+				) : null}
 			</div>
 		);
 	}
 
 	return (
-		<svg
-			ref={svgRef}
-			width={SVG_WIDTH}
-			height={SVG_HEIGHT}
-			viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
-			role="img"
-			aria-hidden="true"
-			className="text-foreground"
-		/>
+		<div className="flex w-full max-w-[320px] flex-col items-center">
+			<svg
+				ref={svgRef}
+				width={SVG_WIDTH}
+				height={SVG_HEIGHT}
+				viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+				role="img"
+				aria-hidden="true"
+				className="text-foreground"
+			/>
+			{spec.label ? (
+				<span className="text-muted-foreground text-xs">
+					<LatexText text={spec.label} className="justify-center text-center" />
+				</span>
+			) : null}
+		</div>
 	);
 }

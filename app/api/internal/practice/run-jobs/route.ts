@@ -6,6 +6,11 @@ import {
 } from "@/lib/practice/ai-grade-practice-test";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { pLimit } from "@/lib/practice/ai-retry";
+import {
+	PRACTICE_JOB_WORKER_DEFAULT_BATCH_LIMIT,
+	PRACTICE_JOB_WORKER_MAX_BATCH_LIMIT,
+} from "@/lib/practice/practice-worker-constants";
+import { triggerPracticeWorkerInBackground } from "@/lib/admin/practice-worker-trigger";
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
 import { logPracticeObs } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -15,12 +20,30 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Per-job wall-clock cap. The function-level maxDuration is 300s; without a
- * per-job cap, one stuck AI grading call can starve the rest of the batch by
- * eating the whole budget. 90s is generous (typical grade chunk is 10-25s)
- * but fast enough that the worker can move on and reschedule the stuck job.
+ * Per-job wall-clock caps by type. Grade/PDF can legitimately exceed a tight
+ * budget on large tests; PDF renders especially benefit from headroom. Jobs
+ * that exceed these limits are retried via existing backoff + reclaim.
  */
-const PER_JOB_TIMEOUT_MS = 90_000;
+function perJobTimeoutMs(jobType: ClaimedJob["job_type"]): number {
+	switch (jobType) {
+		case "grade":
+			return 120_000;
+		case "pdf":
+			return 165_000;
+		case "email":
+			return 75_000;
+		case "tracker_update":
+			return 90_000;
+		default:
+			return 90_000;
+	}
+}
+
+/** Recognizes `in_app_emitted` across JSONB round-trips and legacy rows. */
+function practiceEmailPayloadSaysInAppEmitted(payload: Record<string, unknown>): boolean {
+	const v = payload.in_app_emitted;
+	return v === true || v === "true";
+}
 
 class JobTimeoutError extends Error {
 	constructor(jobType: string, ms: number) {
@@ -142,6 +165,24 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 		p_payload: {},
 		p_run_after: new Date().toISOString(),
 	});
+	if (!enqueueError) {
+		// Grading finished mid-invocation; PDF was not in the batch we claimed.
+		// Wake another worker pass so PDF/email do not depend solely on pg_cron
+		// (cron often targets prod while dev DB queues never drain locally).
+		void triggerPracticeWorkerInBackground()
+			.then((r) => {
+				if (!r.ok) {
+					logServerError("handleGradeJob.triggerPracticeWorkerInBackground", r.message, {
+						testId: job.test_id,
+					});
+				}
+			})
+			.catch((err) => {
+				logServerError("handleGradeJob.triggerPracticeWorkerInBackground", err, {
+					testId: job.test_id,
+				});
+			});
+	}
 	if (enqueueError) {
 		logSupabaseError("handleGradeJob.practice_enqueue_job", enqueueError, {
 			testId: job.test_id,
@@ -163,6 +204,7 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 					testId: job.test_id,
 					subjectName: pdfResult.subjectName,
 					overallPercent: pdfResult.overallPercent,
+					submittedAtIso: pdfResult.submittedAtIso,
 				});
 			} catch (err) {
 				logServerError("handleGradeJob.fallback_in_app_notify", err, {
@@ -224,6 +266,22 @@ async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false
 	if (!result.ok) {
 		return { ok: false, message: result.message };
 	}
+	// In-app "report ready" is emitted as soon as the PDF exists so bell timing
+	// is independent of email queue lag or provider retries.
+	try {
+		await notifyTestReportReady({
+			studentId: result.studentId,
+			testId: job.test_id,
+			subjectName: result.subjectName,
+			overallPercent: result.overallPercent,
+			submittedAtIso: result.submittedAtIso,
+		});
+	} catch (err) {
+		logServerError("handlePdfJob.in_app_notify", err, {
+			testId: job.test_id,
+			jobId: job.id,
+		});
+	}
 	// Enqueue an email job rather than sending inline. This routes email
 	// retries through the same backoff / dead-letter machinery as grade
 	// and pdf jobs, instead of fire-and-forget without retry.
@@ -236,6 +294,7 @@ async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false
 			subject_name: result.subjectName,
 			overall_percent: result.overallPercent,
 			storage_path: result.storagePath,
+			in_app_emitted: true,
 		},
 		p_run_after: new Date().toISOString(),
 	});
@@ -243,21 +302,7 @@ async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false
 		logSupabaseError("handlePdfJob.email_enqueue", enqueueError, {
 			testId: job.test_id,
 		});
-		// Inline fallback so an enqueue glitch doesn't silently drop emails OR
-		// the in-app bell. Same in-app-then-email order as handleEmailJob.
-		try {
-			await notifyTestReportReady({
-				studentId: result.studentId,
-				testId: job.test_id,
-				subjectName: result.subjectName,
-				overallPercent: result.overallPercent,
-			});
-		} catch (err) {
-			logServerError("handlePdfJob.fallback_in_app_notify", err, {
-				testId: job.test_id,
-				jobId: job.id,
-			});
-		}
+		// Inline fallback so an enqueue glitch doesn't silently drop emails.
 		const inline = await notifyTestReportPdfReadyEmails({
 			testId: job.test_id,
 			studentId: result.studentId,
@@ -272,6 +317,20 @@ async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false
 				{ testId: job.test_id },
 			);
 		}
+	} else {
+		void triggerPracticeWorkerInBackground()
+			.then((r) => {
+				if (!r.ok) {
+					logServerError("handlePdfJob.triggerPracticeWorkerInBackground", r.message, {
+						testId: job.test_id,
+					});
+				}
+			})
+			.catch((err) => {
+				logServerError("handlePdfJob.triggerPracticeWorkerInBackground", err, {
+					testId: job.test_id,
+				});
+			});
 	}
 	return { ok: true };
 }
@@ -284,36 +343,53 @@ async function handleEmailJob(
 		subject_name?: string;
 		overall_percent?: number | null;
 		storage_path?: string;
+		in_app_emitted?: boolean;
 	};
-	if (!payload?.student_id || !payload?.subject_name || typeof payload?.storage_path !== "string") {
-		// Permanently malformed — mark as failure but don't retry forever.
-		return { ok: false, message: "Email job payload missing required fields." };
+	// `practice_enqueue_job` snapshots `student_id` from `tests` — prefer that over JSON
+	// payload so a corrupted payload cannot send under the wrong student.
+	if (!job.student_id) {
+		return { ok: false, message: "Email job missing authoritative student_id." };
+	}
+	const studentId = job.student_id;
+	const payloadStudentId = typeof payload?.student_id === "string" ? payload.student_id.trim() : "";
+	if (payloadStudentId && payloadStudentId !== studentId) {
+		logServerError("handleEmailJob.payload_student_mismatch", new Error("payload student_id ≠ job.student_id"), {
+			jobId: job.id,
+			testId: job.test_id,
+			payloadStudentId,
+			jobStudentId: studentId,
+		});
 	}
 
-	// In-app "report ready" goes out FIRST so the bell lights up even if the
-	// email half hits a transient SMTP failure and re-queues. Both calls are
-	// idempotent (per-recipient dedup row in `notifications`), so retries
-	// don't produce duplicate cards.
-	try {
-		await notifyTestReportReady({
-			studentId: payload.student_id,
-			testId: job.test_id,
-			subjectName: payload.subject_name,
-			overallPercent: payload.overall_percent ?? null,
-		});
-	} catch (err) {
-		logServerError("handleEmailJob.in_app_notify", err, {
-			testId: job.test_id,
-			jobId: job.id,
-		});
+	// Email body/PDF facts are resolved from Postgres at send time; payload fields are hints only.
+	const payloadSubjectName = typeof payload?.subject_name === "string" ? payload.subject_name.trim() : "";
+	const payloadStoragePath = typeof payload?.storage_path === "string" ? payload.storage_path.trim() : "";
+
+	// Email is intentionally decoupled from bell emission (sent in `handlePdfJob`).
+	// Backward-compat: legacy queued jobs (pre-deploy) won't have
+	// `in_app_emitted=true`, so emit here once to avoid dropping those cards.
+	if (!practiceEmailPayloadSaysInAppEmitted(job.payload as Record<string, unknown>)) {
+		try {
+			await notifyTestReportReady({
+				studentId,
+				testId: job.test_id,
+				subjectName: payloadSubjectName || "Subject",
+				overallPercent: payload?.overall_percent ?? null,
+			});
+		} catch (err) {
+			logServerError("handleEmailJob.legacy_in_app_notify", err, {
+				testId: job.test_id,
+				jobId: job.id,
+			});
+		}
 	}
 
 	const result = await notifyTestReportPdfReadyEmails({
 		testId: job.test_id,
-		studentId: payload.student_id,
-		subjectName: payload.subject_name,
-		overallPercent: payload.overall_percent ?? null,
-		storagePath: payload.storage_path,
+		studentId,
+		subjectName: payloadSubjectName || "Subject",
+		overallPercent: payload?.overall_percent ?? null,
+		storagePath: payloadStoragePath || null,
 	});
 	if (result.ok) return { ok: true };
 	if (result.permanentlyFailed) {
@@ -331,7 +407,17 @@ async function handleEmailJob(
 
 async function runPracticeJobs(request: Request): Promise<Response> {
 	const url = new URL(request.url);
-	const limit = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get("limit") ?? "5", 10) || 5));
+	const parsedLimit = Number.parseInt(
+		url.searchParams.get("limit") ?? String(PRACTICE_JOB_WORKER_DEFAULT_BATCH_LIMIT),
+		10,
+	);
+	const limit = Math.max(
+		1,
+		Math.min(
+			PRACTICE_JOB_WORKER_MAX_BATCH_LIMIT,
+			Number.isFinite(parsedLimit) ? parsedLimit : PRACTICE_JOB_WORKER_DEFAULT_BATCH_LIMIT,
+		),
+	);
 	const workerId = `vercel-${process.env.VERCEL_REGION ?? "local"}-${crypto.randomUUID().slice(0, 8)}`;
 	const workerStarted = Date.now();
 
@@ -376,7 +462,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 			// Per-job timeout: a stuck AI call cannot block the whole worker
 			// invocation. Timed-out jobs land in markJobFailure and get retried
 			// with the existing exponential backoff.
-			const out = await withTimeout(handlerPromise, PER_JOB_TIMEOUT_MS, job.job_type);
+			const out = await withTimeout(handlerPromise, perJobTimeoutMs(job.job_type), job.job_type);
 
 			if (out.ok) {
 				await markJobDone(job.id);

@@ -1,0 +1,34 @@
+{
+  "question_number": 1,
+  "topic_id": "22222222-aaaa-4222-8222-222222222221",
+  "topic_name": "Laws of motion",
+  "question_text": "In the free-body diagram shown below, what is the magnitude of the applied force F?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "10 N", "B": "15 N", "C": "20 N", "D": "25 N" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The force arrow is labelled F = 15 N.",
+    "common_mistakes": [],
+    "related_concept": "Force vectors"
+  },
+  "estimated_time_seconds": 75,
+  "visual": {
+    "caption": "Free-body diagram with magnitudes and units shown.",
+    "altText": "Block on a rough incline with force arrows for F, N, and mg. Axis legend, incline angle, and component guides are drawn.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "free_body",
+      "bodyLabel": "Block",
+      "inclineDeg": 30,
+      "inclineLabel": "30°",
+      "surfaceHatched": true,
+      "axisLegend": true,
+      "forces": [
+        { "name": "F", "magnitude": 15, "angleDeg": 30, "unit": "N", "showMagnitude": true, "componentArrows": true },
+        { "name": "N", "magnitude": 12, "angleDeg": 120, "unit": "N", "showMagnitude": true, "componentArrows": false },
+        { "name": "mg", "magnitude": 20, "angleDeg": -90, "unit": "N", "showMagnitude": true, "componentArrows": false }
+      ]
+    }
+  }
+}

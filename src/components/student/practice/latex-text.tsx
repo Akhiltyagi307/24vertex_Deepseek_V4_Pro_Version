@@ -19,6 +19,7 @@ function renderKatexFragment(tex: string, displayMode: boolean): string | null {
 			displayMode,
 			strict: "ignore",
 			trust: false,
+			output: "html",
 		});
 	} catch {
 		return null;

@@ -46,35 +46,47 @@ export const practiceGenerationOutputSchema = z.object({
 export type PracticeGenerationOutput = z.infer<typeof practiceGenerationOutputSchema>;
 export type GeneratedPracticeQuestion = z.infer<typeof practiceQuestionGeneratedSchema>;
 
-const practiceQuestionDraftBaseSchema = z.object({
-	topic_id: z.string().uuid(),
-	topic_name: z.string(),
-	question_text: z.string(),
-	difficulty_level: difficultyLevelSchema,
-	answer_key: practiceAnswerKeySchema,
-	estimated_time_seconds: z.number().int().positive(),
-	visual: questionVisualEnvelopeSchema.nullable(),
-});
-
-const practiceGeneratedMultipleChoiceDraftSchema = practiceQuestionDraftBaseSchema.extend({
-	options: z.object({
-		A: z.string(),
-		B: z.string(),
-		C: z.string(),
-		D: z.string(),
-	}),
-});
-
-/** `options` must be explicit `null` (not omitted). OpenAI strict structured outputs require every object `property` to appear in `required`; optional keys break generation with invalid_json_schema. */
-const practiceGeneratedWrittenDraftSchema = practiceQuestionDraftBaseSchema.extend({
-	options: z.null(),
-});
+function createPracticeQuestionDraftBaseSchema(visualsEnabled: boolean) {
+	return z.object({
+		topic_id: z.string().uuid(),
+		topic_name: z.string(),
+		question_text: z.string(),
+		difficulty_level: difficultyLevelSchema,
+		answer_key: practiceAnswerKeySchema,
+		estimated_time_seconds: z.number().int().positive(),
+		// When visuals are disabled for this generation request, enforce explicit nulls
+		// so the model is not burdened by the large visual union schema.
+		visual:
+			visualsEnabled ?
+				questionVisualEnvelopeSchema.nullable()
+			:	z.null(),
+	});
+}
 
 const PRACTICE_BUCKET_KEYS = ["multiple_choice", "fill_in_blank", "short_answer", "long_answer"] as const;
 
 export type PracticeGenerationBucketKey = (typeof PRACTICE_BUCKET_KEYS)[number];
 
-export function createPracticeGenerationOutputSchema(expectedTypeCounts: PracticeQuestionTypeCounts) {
+export function createPracticeGenerationOutputSchema(
+	expectedTypeCounts: PracticeQuestionTypeCounts,
+	options?: { visualsEnabled?: boolean },
+) {
+	const visualsEnabled = options?.visualsEnabled !== false;
+	const practiceQuestionDraftBaseSchema = createPracticeQuestionDraftBaseSchema(visualsEnabled);
+	const practiceGeneratedMultipleChoiceDraftSchema = practiceQuestionDraftBaseSchema.extend({
+		options: z.object({
+			A: z.string(),
+			B: z.string(),
+			C: z.string(),
+			D: z.string(),
+		}),
+	});
+
+	/** `options` must be explicit `null` (not omitted). OpenAI strict structured outputs require every object `property` to appear in `required`; optional keys break generation with invalid_json_schema. */
+	const practiceGeneratedWrittenDraftSchema = practiceQuestionDraftBaseSchema.extend({
+		options: z.null(),
+	});
+
 	return z.object({
 		questions_by_type: z.object({
 			multiple_choice: z
@@ -249,6 +261,381 @@ export function flattenPracticeGenerationOutput(
 	};
 }
 
+/** Maps flattened question order (round-robin across buckets) to bucket + slot for repairs. */
+export type PracticeRoundRobinFlatIndexMapEntry = {
+	flattenedIndex: number;
+	bucket: PracticeGenerationBucketKey;
+	/** 0-based index within `questions_by_type[bucket]` */
+	slotInBucket: number;
+};
+
+/**
+ * Same round-robin interleaving as {@link flattenPracticeGenerationOutput}: for each
+ * round, take one question from each non-empty bucket in MCQ → fill → short → long order.
+ */
+export function buildPracticeRoundRobinFlatIndexMap(
+	bucketLengths: Record<PracticeGenerationBucketKey, number>,
+): PracticeRoundRobinFlatIndexMapEntry[] {
+	const remaining: Record<PracticeGenerationBucketKey, number> = { ...bucketLengths };
+	const out: PracticeRoundRobinFlatIndexMapEntry[] = [];
+	let flat = 0;
+	while (PRACTICE_BUCKET_KEYS.some((k) => (remaining[k] ?? 0) > 0)) {
+		for (const key of PRACTICE_BUCKET_KEYS) {
+			const left = remaining[key] ?? 0;
+			if (left <= 0) continue;
+			const slotInBucket = bucketLengths[key] - left;
+			out.push({
+				flattenedIndex: flat++,
+				bucket: key,
+				slotInBucket,
+			});
+			remaining[key] = left - 1;
+		}
+	}
+	return out;
+}
+
+/** Structured context for VALIDATION repairs (mirrors {@link validateAndStripGeneration}). */
+export type PracticeValidationRepairDiagnostics = {
+	failureCode: string;
+	expected: {
+		totalQuestions: number;
+		timeLimitSeconds: number | null;
+		timeSumMin: number | null;
+		timeSumMax: number | null;
+		requiredTypeCounts: PracticeQuestionTypeCounts | null;
+		allowedTopicIdsSample: readonly string[];
+	};
+	groupedBucketLengths: Record<PracticeGenerationBucketKey, number>;
+	observed: {
+		questionCount: number;
+		estimatedTimeSum: number;
+		typeCounts: Record<PracticeGenerationBucketKey, number>;
+	};
+	/** Point the model at exact bucket slots or flattened indices */
+	targets: Array<{
+		flattenedIndex: number | null;
+		bucket: PracticeGenerationBucketKey | null;
+		slotInBucket: number | null;
+		question_number?: number;
+		topic_id?: string;
+		issue: string;
+		hint: string;
+	}>;
+	globalHint: string;
+};
+
+/**
+ * Builds machine-readable diagnostics for repair after {@link validateAndStripGeneration} fails.
+ * Call with the same `flattened` / params that produced the validator message.
+ */
+export function buildPracticeValidationRepairDiagnostics(
+	flattened: PracticeGenerationOutput,
+	groupedBucketLengths: Record<PracticeGenerationBucketKey, number>,
+	flatIndexMap: PracticeRoundRobinFlatIndexMapEntry[],
+	params: {
+		expectedQuestionCount: number;
+		allowedTopicIds: Set<string>;
+		expectedDurationSeconds?: number | null;
+		expectedTypeCounts?: PracticeQuestionTypeCounts | null;
+	},
+	validatorMessage: string,
+): PracticeValidationRepairDiagnostics {
+	const flatLookup = new Map<number, PracticeRoundRobinFlatIndexMapEntry>();
+	for (const e of flatIndexMap) {
+		flatLookup.set(e.flattenedIndex, e);
+	}
+
+	const topicIdsSample = [...params.allowedTopicIds].slice(0, 24);
+	const timeLo =
+		params.expectedDurationSeconds != null && params.expectedDurationSeconds > 0 ?
+			params.expectedDurationSeconds * 0.6
+		:	null;
+	const timeHi =
+		params.expectedDurationSeconds != null && params.expectedDurationSeconds > 0 ?
+			params.expectedDurationSeconds * 1.2
+		:	null;
+
+	const baseExpected = (): PracticeValidationRepairDiagnostics["expected"] => ({
+		totalQuestions: params.expectedQuestionCount,
+		timeLimitSeconds: params.expectedDurationSeconds ?? null,
+		timeSumMin: timeLo,
+		timeSumMax: timeHi,
+		requiredTypeCounts: params.expectedTypeCounts ?? null,
+		allowedTopicIdsSample: topicIdsSample,
+	});
+
+	const countMismatch = (): PracticeValidationRepairDiagnostics => ({
+		failureCode: "question_count_mismatch",
+		expected: baseExpected(),
+		groupedBucketLengths,
+		observed: {
+			questionCount: flattened.questions.length,
+			estimatedTimeSum: 0,
+			typeCounts: {
+				multiple_choice: 0,
+				fill_in_blank: 0,
+				short_answer: 0,
+				long_answer: 0,
+			},
+		},
+		targets: [],
+		globalHint: `Grouped buckets sum to ${Object.values(groupedBucketLengths).reduce((a, b) => a + b, 0)} items; flattened list length is ${flattened.questions.length}. Each questions_by_type array length must equal REQUIRED_BUCKET_LENGTHS.`,
+	});
+
+	if (flattened.questions.length !== params.expectedQuestionCount) {
+		return countMismatch();
+	}
+
+	const canonicalTopicIdByNormalized = new Map<string, string>();
+	for (const id of params.allowedTopicIds) {
+		canonicalTopicIdByNormalized.set(normalizePracticeTopicId(id), id);
+	}
+	const allowedNormalized = new Set(canonicalTopicIdByNormalized.keys());
+
+	const seenNumbers = new Map<number, number>();
+	const typeCounts: Record<PracticeGenerationBucketKey, number> = {
+		multiple_choice: 0,
+		fill_in_blank: 0,
+		short_answer: 0,
+		long_answer: 0,
+	};
+	let totalTime = 0;
+
+	for (let i = 0; i < flattened.questions.length; i++) {
+		const q = flattened.questions[i]!;
+		const loc = flatLookup.get(i);
+		const tloc = (): PracticeValidationRepairDiagnostics["targets"][0] => ({
+			flattenedIndex: i,
+			bucket: loc?.bucket ?? null,
+			slotInBucket: loc?.slotInBucket ?? null,
+			question_number: q.question_number,
+			topic_id: q.topic_id,
+			issue: "",
+			hint: "",
+		});
+
+		if (seenNumbers.has(q.question_number)) {
+			const prevIdx = seenNumbers.get(q.question_number)!;
+			return {
+				failureCode: "duplicate_question_number",
+				expected: baseExpected(),
+				groupedBucketLengths,
+				observed: {
+					questionCount: flattened.questions.length,
+					estimatedTimeSum: totalTime,
+					typeCounts,
+				},
+				targets: [
+					{
+						...tloc(),
+						issue: `Duplicate question_number ${q.question_number}`,
+						hint: `Also appears at flattenedIndex ${prevIdx}. Renumber sequentially 1…N in round-robin order or fix duplicates.`,
+					},
+					{
+						flattenedIndex: prevIdx,
+						bucket: flatLookup.get(prevIdx)?.bucket ?? null,
+						slotInBucket: flatLookup.get(prevIdx)?.slotInBucket ?? null,
+						question_number: q.question_number,
+						topic_id: flattened.questions[prevIdx]?.topic_id,
+						issue: `Duplicate question_number ${q.question_number}`,
+						hint: "Keep exactly one occurrence per question_number.",
+					},
+				],
+				globalHint: "question_number values must be unique across the flattened test.",
+			};
+		}
+		seenNumbers.set(q.question_number, i);
+
+		const topicKey = normalizePracticeTopicId(q.topic_id);
+		if (!allowedNormalized.has(topicKey)) {
+			const hint =
+				params.allowedTopicIds.size <= 48 ?
+					`Copy topic_id verbatim from ALLOWED_TOPIC_IDS (${[...params.allowedTopicIds].join(", ")}).`
+				:	"Copy topic_id verbatim from ALLOWED_TOPIC_IDS (see JSON list in user prompt).";
+
+			return {
+				failureCode: "disallowed_topic_id",
+				expected: baseExpected(),
+				groupedBucketLengths,
+				observed: {
+					questionCount: flattened.questions.length,
+					estimatedTimeSum: totalTime,
+					typeCounts,
+				},
+				targets: [{ ...tloc(), issue: `topic_id ${q.topic_id} is not allowed`, hint }],
+				globalHint:
+					"Each topic_id must be an exact UUID from the student's topic selection (case-normalized match).",
+			};
+		}
+
+		if (q.question_type === "multiple_choice") {
+			const optionMap = mcqOptionMap(q.options);
+			if (!optionMap) {
+				const keys = q.options ? Object.keys(q.options) : [];
+				return {
+					failureCode: "mcq_missing_options",
+					expected: baseExpected(),
+					groupedBucketLengths,
+					observed: {
+						questionCount: flattened.questions.length,
+						estimatedTimeSum: totalTime,
+						typeCounts,
+					},
+					targets: [
+						{
+							...tloc(),
+							issue: "MCQ missing valid A,B,C,D option keys",
+							hint:
+								`Present keys: ${JSON.stringify(keys)}. Add/adjust options so keys A,B,C,D exist with non-empty strings.`,
+						},
+					],
+					globalHint:
+						"multiple_choice rows require options object with exactly A,B,C,D (uppercase keys after trim).",
+				};
+			}
+			const check = validateMcqAnswerKey(q.answer_key.correct_answer, optionMap);
+			if (!check.ok) {
+				return {
+					failureCode: "mcq_bad_answer_key",
+					expected: baseExpected(),
+					groupedBucketLengths,
+					observed: {
+						questionCount: flattened.questions.length,
+						estimatedTimeSum: totalTime,
+						typeCounts,
+					},
+					targets: [
+						{
+							...tloc(),
+							issue: `correct_answer "${q.answer_key.correct_answer}"`,
+							hint:
+								"Set correct_answer to exactly one letter A, B, C, or D that exists as an option key.",
+						},
+					],
+					globalHint:
+						"MCQ answer_key.correct_answer must be a single letter A–D matching an option key.",
+				};
+			}
+		} else if (q.options != null && Object.keys(q.options).length > 0) {
+			return {
+				failureCode: "non_mcq_has_options",
+				expected: baseExpected(),
+				groupedBucketLengths,
+				observed: {
+					questionCount: flattened.questions.length,
+					estimatedTimeSum: totalTime,
+					typeCounts,
+				},
+				targets: [
+					{
+						...tloc(),
+						issue: `Question type ${q.question_type} has options object`,
+						hint: "Set options to null for non-multiple-choice items.",
+					},
+				],
+				globalHint: "Only multiple_choice rows may carry options.",
+			};
+		}
+
+		typeCounts[q.question_type]++;
+		totalTime += q.estimated_time_seconds;
+	}
+
+	const distinctTypes = (Object.values(typeCounts) as number[]).filter((n) => n > 0).length;
+	const typesRequiredByPlan =
+		params.expectedTypeCounts != null ?
+			PRACTICE_BUCKET_KEYS.filter((k) => (params.expectedTypeCounts![k] ?? 0) > 0).length
+		:	null;
+
+	if (typesRequiredByPlan == null) {
+		if (distinctTypes < 2) {
+			return {
+				failureCode: "type_variety",
+				expected: baseExpected(),
+				groupedBucketLengths,
+				observed: {
+					questionCount: flattened.questions.length,
+					estimatedTimeSum: totalTime,
+					typeCounts,
+				},
+				targets: [],
+				globalHint: `Only ${distinctTypes} distinct question_type(s) present; need ≥2.`,
+			};
+		}
+	} else if (typesRequiredByPlan >= 2 && distinctTypes < 2) {
+		return {
+			failureCode: "type_variety",
+			expected: baseExpected(),
+			groupedBucketLengths,
+			observed: {
+				questionCount: flattened.questions.length,
+				estimatedTimeSum: totalTime,
+				typeCounts,
+			},
+			targets: [],
+			globalHint: "Plan requires multiple types but output collapsed to fewer types.",
+		};
+	}
+
+	if (params.expectedTypeCounts) {
+		const t = params.expectedTypeCounts;
+		for (const key of PRACTICE_BUCKET_KEYS) {
+			const got = typeCounts[key];
+			const want = t[key];
+			if (got !== want) {
+				return {
+					failureCode: "type_mix_mismatch",
+					expected: baseExpected(),
+					groupedBucketLengths,
+					observed: {
+						questionCount: flattened.questions.length,
+						estimatedTimeSum: totalTime,
+						typeCounts,
+					},
+					targets: [],
+					globalHint: `Per-type counts after flatten: ${JSON.stringify(typeCounts)}. Required ${JSON.stringify(t)} — move/regenerate rows across questions_by_type buckets so each array length matches REQUIRED_BUCKET_LENGTHS.`,
+				};
+			}
+		}
+	}
+
+	if (
+		params.expectedDurationSeconds != null &&
+		params.expectedDurationSeconds > 0 &&
+		totalTime > 0 &&
+		timeLo != null &&
+		timeHi != null &&
+		(totalTime < timeLo || totalTime > timeHi)
+	) {
+		return {
+			failureCode: "time_budget",
+			expected: baseExpected(),
+			groupedBucketLengths,
+			observed: {
+				questionCount: flattened.questions.length,
+				estimatedTimeSum: totalTime,
+				typeCounts,
+			},
+			targets: [],
+			globalHint: `Sum of estimated_time_seconds is ${totalTime}s; must be in [${Math.round(timeLo)}, ${Math.round(timeHi)}]. Scale times proportionally or adjust a few questions only.`,
+		};
+	}
+
+	// Should not happen if validatorMessage already failed
+	return {
+		failureCode: "unknown_validation",
+		expected: baseExpected(),
+		groupedBucketLengths,
+		observed: {
+			questionCount: flattened.questions.length,
+			estimatedTimeSum: totalTime,
+			typeCounts,
+		},
+		targets: [],
+		globalHint: validatorMessage,
+	};
+}
 function mcqOptionMap(opts: Record<string, string> | null): Map<string, string> | null {
 	if (!opts) return null;
 	const out = new Map<string, string>();

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { LatexText } from "../../latex-text";
 import { cn } from "@/lib/utils";
 import type { DataTableSpec } from "@/lib/practice/visuals/types";
 
@@ -17,7 +18,7 @@ export function DataTable({ spec }: { spec: DataTableSpec }): React.ReactElement
 		<div className="w-full max-w-[640px]">
 			{spec.caption ? (
 				<div className="text-foreground mb-1 text-center text-sm font-semibold">
-					{spec.caption}
+					<LatexText text={spec.caption} className="justify-center text-center" />
 				</div>
 			) : null}
 			<table className="w-full border-collapse text-sm tabular-nums">
@@ -28,7 +29,7 @@ export function DataTable({ spec }: { spec: DataTableSpec }): React.ReactElement
 								key={`h-${i}`}
 								className="border border-border bg-muted/40 px-2 py-1 text-left font-semibold"
 							>
-								{header}
+								<LatexText text={header} />
 							</th>
 						))}
 					</tr>
@@ -47,7 +48,7 @@ export function DataTable({ spec }: { spec: DataTableSpec }): React.ReactElement
 										cell.align === "left" && "text-left",
 									)}
 								>
-									{cell.value}
+									<LatexText text={cell.value} />
 								</td>
 							))}
 						</tr>

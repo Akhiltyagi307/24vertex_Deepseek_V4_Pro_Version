@@ -18,6 +18,8 @@ import {
 	type GeneratePracticeResult,
 } from "../../../app/student/practice/actions/types";
 import {
+	buildPracticeRoundRobinFlatIndexMap,
+	buildPracticeValidationRepairDiagnostics,
 	buildPracticeSystemPrompt,
 	buildPracticeUserMessage,
 	createPracticeGenerationOutputSchema,
@@ -30,7 +32,14 @@ import {
 	validateAndStripGeneration,
 	type PracticeGenerationGroupedOutput,
 	type PracticeGenerationOutput,
+	type PracticeRoundRobinFlatIndexMapEntry,
 } from "@/lib/practice";
+import {
+	buildPracticeGenerationJobContext,
+	generationJobConfigSnapshot,
+	type PracticeGenerationJobContext,
+} from "@/lib/practice/generation-job-context";
+import { selectEvidenceForFailedIndexes } from "@/lib/practice/generation-evidence-pack";
 import {
 	getPracticeQuestionPlan,
 	getPracticeQuestionPlanForSubject,
@@ -40,29 +49,48 @@ import {
 import {
 	buildPracticeGenerationRepairSystemPrompt,
 	buildPracticeGenerationRepairUserPrompt,
+	failedIndexesFromQualityGate,
+	type PracticeGenerationRepairReason,
 } from "@/lib/practice/practice-generation-repair";
-import { applyDeterministicPracticeAutofix } from "@/lib/practice/practice-generation-autofix";
 import {
-	buildTopicCorpusMap,
-	evaluatePracticeGenerationQuality,
-	VISUAL_FIX_ELIGIBLE_GATE_CODES,
-} from "@/lib/practice/practice-generation-quality-gates";
-import { buildVisualFixReplacementPrompt, type VisualFixFailureCode } from "@/lib/practice/practice-generation-replacement";
+	flattenPracticeGenerationBlueprint,
+	type PracticeGenerationBlueprintSlot,
+} from "@/lib/practice/practice-generation-blueprint-schema";
+import { sanitizeForPostgresJsonb } from "@/lib/practice/postgres-jsonb-sanitize";
+import { generatePracticeBlueprint } from "@/lib/practice/practice-generation-blueprint";
+import { applyDeterministicPracticeAutofix } from "@/lib/practice/practice-generation-autofix";
+import { buildTopicCorpusMap, evaluatePracticeGenerationQuality } from "@/lib/practice/practice-generation-quality-gates";
 import { applyVisualPatches } from "@/lib/practice/visuals/apply-visual-patches";
-import { getPracticeVisualFixMaxCalls } from "@/lib/practice/visuals/env";
+import {
+	getPracticeVisualEnrichmentBatchSize,
+	getPracticeVisualStemGroundingMode,
+} from "@/lib/practice/visuals/env";
+import { buildDeterministicFallbackVisual } from "@/lib/practice/visuals/fallback-visual";
+import { generateVisualEnrichmentPass } from "@/lib/practice/visuals/generate-visual-enrichment";
 import { runValidatorPass } from "@/lib/practice/visuals/run-validator-pass";
+import {
+	resolveQuestionVisualIntent,
+	selectVisualCandidateIndexes,
+	shouldRequireAtLeastOneVisual,
+	summarizeVisualIntentDecisions,
+} from "@/lib/practice/visuals/visual-intent";
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
-import {
-	PRACTICE_REPAIR_MAX_CALLS,
-	repeatPracticeAiResultUntilSuccessOrExhausted,
-} from "@/lib/practice/ai-retry";
+import { getPracticeGenerationRepairBudget } from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import {
 	embedQuestionTexts,
 	findDuplicatesAgainstStudent,
 	persistQuestionEmbeddings,
 } from "@/lib/practice/dedup-embeddings";
+import {
+	appendGenerationStep,
+	attachTestIdToRunAiCalls,
+	finishGenerationRun,
+	startGenerationRun,
+	updateGenerationRunConfigSnapshot,
+	type PracticeGenerationStepStatus,
+} from "@/lib/practice/generation-telemetry";
 import { finalizePracticeConfigSchema, type FinalizePracticeConfigInput } from "@/lib/practice/schemas";
 import type { PracticeConfigResolveSuccess } from "@/lib/practice/resolve-config";
 import { logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
@@ -70,6 +98,32 @@ import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-erro
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 type ServerSupabase = SupabaseClient;
+
+type PracticePersistRpcError = {
+	message?: string;
+	code?: string;
+	details?: string | null;
+	hint?: string | null;
+};
+
+const PRACTICE_PERSIST_MAX_ATTEMPTS = 3;
+
+function isRetryablePracticePersistError(error: PracticePersistRpcError | null): boolean {
+	if (!error) return false;
+	const text = `${error.code ?? ""} ${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`.toLowerCase();
+	return (
+		/\b5\d\d\b/.test(text) ||
+		text.includes("cloudflare") ||
+		text.includes("web server is returning an unknown error") ||
+		text.includes("fetch failed") ||
+		text.includes("network") ||
+		text.includes("timeout")
+	);
+}
+
+function wait(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export type RunGenerationPipelineOptions = {
 	useStreamObject: boolean;
@@ -98,8 +152,18 @@ export type RunGenerationPipelineOptions = {
  *      (PRACTICE_CHUNK_ALIGN_LEXICAL).
  * v7 — OpenAI Responses shell + skills for Pass 2 when skill ids are
  *      configured; targeted VISUAL_FIX loop after failing visual quality gates.
+ * v8 — Repair-first pipeline: one initial generation, no full regenerations;
+ *      unified repair passes for validation, quality, and dedup; optional
+ *      `PRACTICE_GENERATION_MAX_OUTPUT_TOKENS` / `PRACTICE_REPAIR_MAX_OUTPUT_TOKENS`
+ *      for latency.
+ * v9 — visual intent loosened (blueprint medium + broader stem cues),
+ *      batched enrichment candidates, strict stem-grounded enrichment/validator
+ *      checks, and post-validator visual recovery pass.
+ * v10 — blueprint-stage visual_idea + required preferred_kind when visuals
+ *      enabled; cross-subject graphical stimulus bias; enrichment receives
+ *      blueprint_visual_idea; blueprint_intent kind fallback prefers diagrams/plots.
  */
-export const PRACTICE_PROMPT_REVISION = "v7" as const;
+export const PRACTICE_PROMPT_REVISION = "v10" as const;
 
 function formatGenerationError(e: unknown): string {
 	if (APICallError.isInstance(e)) {
@@ -196,6 +260,28 @@ function isStrictJsonSchemaForRepairEnabled(): boolean {
 }
 
 /**
+ * Default caps favor ~60s generation (one large structured call + a few repairs).
+ * Override with PRACTICE_GENERATION_MAX_OUTPUT_TOKENS / PRACTICE_REPAIR_MAX_OUTPUT_TOKENS.
+ */
+function practiceGenerationMaxOutputTokens(estimatedQuestionCount: number): number {
+	const raw = process.env.PRACTICE_GENERATION_MAX_OUTPUT_TOKENS?.trim();
+	if (raw) {
+		const n = Number.parseInt(raw, 10);
+		if (Number.isFinite(n) && n >= 4_096 && n <= 16_384) return n;
+	}
+	return Math.min(10_000, Math.max(5_500, estimatedQuestionCount * 750));
+}
+
+function practiceRepairMaxOutputTokens(estimatedQuestionCount: number): number {
+	const raw = process.env.PRACTICE_REPAIR_MAX_OUTPUT_TOKENS?.trim();
+	if (raw) {
+		const n = Number.parseInt(raw, 10);
+		if (Number.isFinite(n) && n >= 3_072 && n <= 16_384) return n;
+	}
+	return Math.min(9_000, Math.max(4_800, estimatedQuestionCount * 650));
+}
+
+/**
  * Errors that should trigger a fallback-model retry (not the same model
  * with `maxRetries`). Capacity / rate-limit / overload errors typically
  * persist for many seconds, so retrying the same model just delays a hard
@@ -219,13 +305,31 @@ async function runModelOnce(
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
 	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
 	studentUserId: string,
+	telemetry: {
+		generationRunId: string | null;
+		correlationId: string;
+		stepKey: string;
+		testId?: string | null;
+	},
 	chatModelId: string = getOpenAIPracticeChatModel(),
-): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string; error: unknown }> {
+): Promise<
+	| {
+			ok: true;
+			object: PracticeGenerationGroupedOutput;
+			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
+	  }
+	| {
+			ok: false;
+			message: string;
+			error: unknown;
+			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
+	  }
+> {
 	// Hard-cap output tokens at 12k regardless of question count. The previous
 	// scaling could request up to 32k for high-question tests, which exceeds
 	// per-request limits on some models and produces unpredictable cost. 12k
 	// fits a 40-question schema comfortably.
-	const maxOutputTokens = Math.min(12_000, Math.max(6_000, estimatedQuestionCount * 900));
+	const maxOutputTokens = practiceGenerationMaxOutputTokens(estimatedQuestionCount);
 	const model = getOpenAIProvider()(chatModelId);
 	const baseParams = {
 		model,
@@ -246,8 +350,8 @@ async function runModelOnce(
 	};
 
 	if (opts.useStreamObject) {
+		const t0 = Date.now();
 		try {
-			const t0 = Date.now();
 			const result = streamObject(baseParams);
 			const streamPartial = (async () => {
 				if (!opts.onPartialObject) {
@@ -268,20 +372,50 @@ async function runModelOnce(
 				outputTokens: usage?.outputTokens ?? 0,
 				latencyMs: Date.now() - t0,
 				status: "ok",
+				generationRunId: telemetry.generationRunId,
+				correlationId: telemetry.correlationId,
+				testId: telemetry.testId ?? null,
+				stepKey: telemetry.stepKey,
 			});
-			return { ok: true, object: object as PracticeGenerationGroupedOutput };
+			return {
+				ok: true,
+				object: object as PracticeGenerationGroupedOutput,
+				usage: {
+					inputTokens: usage?.inputTokens ?? 0,
+					outputTokens: usage?.outputTokens ?? 0,
+					latencyMs: Date.now() - t0,
+					model: chatModelId,
+				},
+			};
 		} catch (e) {
 			logServerError("runPracticeGeneration.streamObject", e);
+			const latencyMs = Date.now() - t0;
+			void recordAiCall({
+				feature: "practice.generation",
+				model: chatModelId,
+				userId: studentUserId,
+				promptId: PRACTICE_PROMPT_REVISION,
+				generationRunId: telemetry.generationRunId,
+				correlationId: telemetry.correlationId,
+				testId: telemetry.testId ?? null,
+				stepKey: telemetry.stepKey,
+				inputTokens: 0,
+				outputTokens: 0,
+				latencyMs,
+				status: "error",
+				error: formatGenerationError(e),
+			});
 			return {
 				ok: false,
 				message: `Could not generate the test. ${formatGenerationError(e)}`,
 				error: e,
+				usage: { inputTokens: 0, outputTokens: 0, latencyMs, model: chatModelId },
 			};
 		}
 	}
 
+	const t0 = Date.now();
 	try {
-		const t0 = Date.now();
 		const { object, usage } = await generateObject(baseParams);
 		void recordAiCall({
 			feature: "practice.generation",
@@ -292,14 +426,44 @@ async function runModelOnce(
 			outputTokens: usage?.outputTokens ?? 0,
 			latencyMs: Date.now() - t0,
 			status: "ok",
+			generationRunId: telemetry.generationRunId,
+			correlationId: telemetry.correlationId,
+			testId: telemetry.testId ?? null,
+			stepKey: telemetry.stepKey,
 		});
-		return { ok: true, object: object as PracticeGenerationGroupedOutput };
+		return {
+			ok: true,
+			object: object as PracticeGenerationGroupedOutput,
+			usage: {
+				inputTokens: usage?.inputTokens ?? 0,
+				outputTokens: usage?.outputTokens ?? 0,
+				latencyMs: Date.now() - t0,
+				model: chatModelId,
+			},
+		};
 	} catch (e) {
 		logServerError("generatePracticeTest.generateObject", e);
+		const latencyMs = Date.now() - t0;
+		void recordAiCall({
+			feature: "practice.generation",
+			model: chatModelId,
+			userId: studentUserId,
+			promptId: PRACTICE_PROMPT_REVISION,
+			generationRunId: telemetry.generationRunId,
+			correlationId: telemetry.correlationId,
+			testId: telemetry.testId ?? null,
+			stepKey: telemetry.stepKey,
+			inputTokens: 0,
+			outputTokens: 0,
+			latencyMs,
+			status: "error",
+			error: formatGenerationError(e),
+		});
 		return {
 			ok: false,
 			message: `Could not generate the test. ${formatGenerationError(e)}`,
 			error: e,
+			usage: { inputTokens: 0, outputTokens: 0, latencyMs, model: chatModelId },
 		};
 	}
 }
@@ -316,7 +480,19 @@ async function runModelOnceWithFallback(
 	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
 	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
 	studentUserId: string,
-): Promise<{ ok: true; object: PracticeGenerationGroupedOutput } | { ok: false; message: string }> {
+	telemetry: { generationRunId: string | null; correlationId: string; stepKey: string },
+): Promise<
+	| {
+			ok: true;
+			object: PracticeGenerationGroupedOutput;
+			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
+	  }
+	| {
+			ok: false;
+			message: string;
+			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
+	  }
+> {
 	const primary = getOpenAIPracticeChatModel();
 	const first = await runModelOnce(
 		systemPrompt,
@@ -325,13 +501,14 @@ async function runModelOnceWithFallback(
 		outputSchema,
 		opts,
 		studentUserId,
+		telemetry,
 		primary,
 	);
 	if (first.ok) return first;
 
 	const fallback = getOpenAIPracticeChatModelFallback();
 	if (!fallback || !isRetryableForFallback(first.error)) {
-		return { ok: false, message: first.message };
+		return { ok: false, message: first.message, usage: first.usage };
 	}
 	logServerError(
 		"generatePracticeTest.modelFallback",
@@ -345,46 +522,73 @@ async function runModelOnceWithFallback(
 		outputSchema,
 		opts,
 		studentUserId,
+		telemetry,
 		fallback,
 	);
 	if (second.ok) return second;
-	return { ok: false, message: second.message };
+	return { ok: false, message: second.message, usage: second.usage };
 }
 
 function isPracticeGenerationRepairEnabled(): boolean {
 	return process.env.PRACTICE_GENERATION_REPAIR?.trim().toLowerCase() !== "false";
 }
 
+function isPracticeRepairFullContextEnabled(): boolean {
+	return process.env.PRACTICE_REPAIR_INCLUDE_FULL_CONTEXT === "true";
+}
+
 async function runPracticeGenerationRepairGrouped(params: {
 	failedGrouped: PracticeGenerationGroupedOutput;
-	validationMessage: string;
+	reason: PracticeGenerationRepairReason;
+	baseUserPrompt?: string;
+	targetedContextJson?: string;
+	includeBaseUserPrompt?: boolean;
+	flatIndexMap: PracticeRoundRobinFlatIndexMapEntry[];
 	durationSeconds: number;
 	expectedTypeCounts: PracticeQuestionTypeCounts;
 	allowedTopicIds: string[];
 	generationOutputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>;
 	estimatedQuestionCount: number;
 	studentUserId: string;
+	telemetry: {
+		generationRunId: string | null;
+		correlationId: string;
+		stepKey: string;
+		testId?: string | null;
+	};
 	abortSignal?: AbortSignal;
 }): Promise<
-	{ ok: true; object: PracticeGenerationGroupedOutput; modelMs: number } | { ok: false; message: string; modelMs: number }
+	| {
+			ok: true;
+			object: PracticeGenerationGroupedOutput;
+			modelMs: number;
+			inputTokens: number;
+			outputTokens: number;
+	  }
+	| { ok: false; message: string; modelMs: number; inputTokens: number; outputTokens: number }
 > {
 	const repairUser = buildPracticeGenerationRepairUserPrompt({
-		validationMessage: params.validationMessage,
+		reason: params.reason,
 		timeLimitSeconds: params.durationSeconds,
 		timeSumMin: Math.round(params.durationSeconds * 0.6),
 		timeSumMax: Math.round(params.durationSeconds * 1.2),
 		allowedTopicIds: params.allowedTopicIds,
 		questionTypeCounts: params.expectedTypeCounts,
 		failedGroupedJson: JSON.stringify(params.failedGrouped),
+		baseUserPrompt: params.baseUserPrompt,
+		targetedContextJson: params.targetedContextJson,
+		includeBaseUserPrompt: params.includeBaseUserPrompt,
+		flatIndexMap: params.flatIndexMap,
 	});
 	const t0 = Date.now();
+	const maxRepairTokens = practiceRepairMaxOutputTokens(params.estimatedQuestionCount);
 	try {
 		const { object, usage } = await generateObject({
 			model: getOpenAIProvider()(getOpenAIPracticeChatModel()),
 			schema: params.generationOutputSchema,
 			system: buildPracticeGenerationRepairSystemPrompt(),
 			prompt: repairUser,
-			maxOutputTokens: Math.min(12_000, Math.max(6_000, params.estimatedQuestionCount * 900)),
+			maxOutputTokens: maxRepairTokens,
 			maxRetries: 1,
 			abortSignal: params.abortSignal,
 			providerOptions: {
@@ -400,8 +604,18 @@ async function runPracticeGenerationRepairGrouped(params: {
 			outputTokens: usage?.outputTokens ?? 0,
 			latencyMs: Date.now() - t0,
 			status: "ok",
+			generationRunId: params.telemetry.generationRunId,
+			correlationId: params.telemetry.correlationId,
+			testId: params.telemetry.testId ?? null,
+			stepKey: params.telemetry.stepKey,
 		});
-		return { ok: true, object: object as PracticeGenerationGroupedOutput, modelMs: Date.now() - t0 };
+		return {
+			ok: true,
+			object: object as PracticeGenerationGroupedOutput,
+			modelMs: Date.now() - t0,
+			inputTokens: usage?.inputTokens ?? 0,
+			outputTokens: usage?.outputTokens ?? 0,
+		};
 	} catch (e) {
 		logServerError("runPracticeGenerationRepairGrouped", e);
 		void recordAiCall({
@@ -414,60 +628,18 @@ async function runPracticeGenerationRepairGrouped(params: {
 			latencyMs: Date.now() - t0,
 			status: "error",
 			error: formatGenerationError(e),
+			generationRunId: params.telemetry.generationRunId,
+			correlationId: params.telemetry.correlationId,
+			testId: params.telemetry.testId ?? null,
+			stepKey: params.telemetry.stepKey,
 		});
-		return { ok: false, message: formatGenerationError(e), modelMs: Date.now() - t0 };
-	}
-}
-
-async function runPracticeGenerationVisualFixGrouped(params: {
-	systemPrompt: string;
-	visualFixUserPrompt: string;
-	generationOutputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>;
-	estimatedQuestionCount: number;
-	studentUserId: string;
-	abortSignal?: AbortSignal;
-}): Promise<
-	{ ok: true; object: PracticeGenerationGroupedOutput; modelMs: number } | { ok: false; message: string; modelMs: number }
-> {
-	const t0 = Date.now();
-	try {
-		const { object, usage } = await generateObject({
-			model: getOpenAIProvider()(getOpenAIPracticeChatModel()),
-			schema: params.generationOutputSchema,
-			system: params.systemPrompt,
-			prompt: params.visualFixUserPrompt,
-			maxOutputTokens: Math.min(12_000, Math.max(6_000, params.estimatedQuestionCount * 900)),
-			maxRetries: 1,
-			abortSignal: params.abortSignal,
-			providerOptions: {
-				openai: { strictJsonSchema: isStrictJsonSchemaForGenerationEnabled() },
-			},
-		});
-		void recordAiCall({
-			feature: "practice.generation.visual_fix",
-			model: getOpenAIPracticeChatModel(),
-			userId: params.studentUserId,
-			promptId: PRACTICE_PROMPT_REVISION,
-			inputTokens: usage?.inputTokens ?? 0,
-			outputTokens: usage?.outputTokens ?? 0,
-			latencyMs: Date.now() - t0,
-			status: "ok",
-		});
-		return { ok: true, object: object as PracticeGenerationGroupedOutput, modelMs: Date.now() - t0 };
-	} catch (e) {
-		logServerError("runPracticeGenerationVisualFixGrouped", e);
-		void recordAiCall({
-			feature: "practice.generation.visual_fix",
-			model: getOpenAIPracticeChatModel(),
-			userId: params.studentUserId,
-			promptId: PRACTICE_PROMPT_REVISION,
+		return {
+			ok: false,
+			message: formatGenerationError(e),
+			modelMs: Date.now() - t0,
 			inputTokens: 0,
 			outputTokens: 0,
-			latencyMs: Date.now() - t0,
-			status: "error",
-			error: formatGenerationError(e),
-		});
-		return { ok: false, message: formatGenerationError(e), modelMs: Date.now() - t0 };
+		};
 	}
 }
 
@@ -518,8 +690,54 @@ async function runPracticeGenerationAfterResolveCore(
 	// `practice_generation_attempts` once at the end with accurate spend.
 	let generationCallCount = 0;
 	let repairCallCount = 0;
-	let visualFixCallCount = 0;
 	let succeededOnCall: number | null = null;
+	const requestMode = opts.useStreamObject ? "stream" : "server_action";
+	const generationRunId: string | null = await startGenerationRun({
+		correlationId,
+		studentId: resolved.userId,
+		subjectId: parsed.subjectId,
+		requestMode,
+		configSnapshot: {
+			subject_id: parsed.subjectId,
+			difficulty: parsed.difficulty,
+			duration_seconds: parsed.durationSeconds,
+			focus_area: parsed.focusArea ?? null,
+			selected_topic_count: resolved.canonicalTopics.length,
+			prompt_revision: PRACTICE_PROMPT_REVISION,
+		},
+		startedAt: new Date(pipelineT0),
+	});
+	let stepOrder = 0;
+	const nextStepOrder = () => {
+		stepOrder += 1;
+		return stepOrder;
+	};
+	const writeGenerationStep = async (params: {
+		stepKey: string;
+		status: PracticeGenerationStepStatus;
+		model?: string | null;
+		feature?: string | null;
+		latencyMs?: number | null;
+		inputTokens?: number | null;
+		outputTokens?: number | null;
+		error?: string | null;
+		metadata?: Record<string, unknown>;
+	}) => {
+		if (!generationRunId) return;
+		await appendGenerationStep({
+			runId: generationRunId,
+			stepOrder: nextStepOrder(),
+			stepKey: params.stepKey,
+			status: params.status,
+			model: params.model ?? null,
+			feature: params.feature ?? null,
+			latencyMs: params.latencyMs ?? null,
+			inputTokens: params.inputTokens ?? null,
+			outputTokens: params.outputTokens ?? null,
+			error: params.error ?? null,
+			metadata: params.metadata ?? {},
+		});
+	};
 
 	void recordPracticeEvent(
 		supabase,
@@ -530,6 +748,8 @@ async function runPracticeGenerationAfterResolveCore(
 			duration_seconds: parsed.durationSeconds,
 			question_count: getPracticeQuestionPlan(parsed.durationSeconds).total,
 			topic_count: resolved.canonicalTopics.length,
+			correlation_id: correlationId,
+			generation_run_id: generationRunId,
 		},
 		{ studentId: resolved.userId },
 	);
@@ -541,13 +761,21 @@ async function runPracticeGenerationAfterResolveCore(
 	const plan = getPracticeQuestionPlanForSubject(durationSeconds, resolved.subjectName);
 	const expectedTypeCounts = plan.counts;
 	const questionMixJson = practiceTypeCountsToQuestionMixJson(plan.counts);
-	const generationOutputSchema = createPracticeGenerationOutputSchema(expectedTypeCounts);
 
 	const topicIds = resolved.canonicalTopics.map((t) => t.topicId);
 	const admin = createServiceRoleClient();
 	const tc0 = Date.now();
 	const preFetchedTopicContext = await fetchTopicContextChunksByTopicIds(admin, topicIds);
 	timingsMs.topicContextFetch = Date.now() - tc0;
+	await writeGenerationStep({
+		stepKey: "topic_context_fetch",
+		status: "ok",
+		latencyMs: timingsMs.topicContextFetch,
+		metadata: {
+			topic_count: topicIds.length,
+			context_quality: preFetchedTopicContext.meta.context_quality ?? "ok",
+		},
+	});
 
 	const userPayload = buildPracticeUserMessage({
 		studentGrade: resolved.studentGrade,
@@ -559,13 +787,23 @@ async function runPracticeGenerationAfterResolveCore(
 		focusArea: parsed.focusArea,
 		preFetchedTopicContext,
 	});
+	// Pass 1 is intentionally text-first. Visuals are appended later by the
+	// dedicated visual enrichment + validator passes, which avoids strict-schema
+	// incompatibilities in large visual unions during core question drafting.
+	const generationOutputSchema = createPracticeGenerationOutputSchema(expectedTypeCounts, {
+		visualsEnabled: false,
+	});
 
 	const gmeta = preFetchedTopicContext.meta;
 	if (!gmeta.fetch_error && gmeta.topic_count > 0 && gmeta.context_chunk_count === 0 && gmeta.exercise_chunk_count === 0) {
 		void recordPracticeEvent(
 			supabase,
 			"practice_topic_context_empty",
-			{ topic_count: gmeta.topic_count },
+			{
+				topic_count: gmeta.topic_count,
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
+			},
 			{ studentId: resolved.userId },
 		);
 	}
@@ -578,6 +816,8 @@ async function runPracticeGenerationAfterResolveCore(
 				context_quality: gmeta.context_quality,
 				context_chunks: gmeta.context_chunk_count,
 				exercise_chunks: gmeta.exercise_chunk_count,
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
 			},
 			{ studentId: resolved.userId },
 		);
@@ -590,6 +830,8 @@ async function runPracticeGenerationAfterResolveCore(
 				context_chars: gmeta.context_char_total,
 				exercise_chars: gmeta.exercise_char_total,
 				topic_count: gmeta.topic_count,
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
 			},
 			{ studentId: resolved.userId },
 		);
@@ -608,6 +850,27 @@ async function runPracticeGenerationAfterResolveCore(
 				.toLowerCase()
 				.slice(0, 1500)
 		:	null;
+
+	const jobContext: PracticeGenerationJobContext = buildPracticeGenerationJobContext({
+		correlationId,
+		generationRunId,
+		requestMode,
+		parsed,
+		resolved,
+		userPayload,
+		topicExemplarHint,
+	});
+	if (generationRunId) {
+		await updateGenerationRunConfigSnapshot(
+			generationRunId,
+			generationJobConfigSnapshot(jobContext),
+		);
+	}
+	await writeGenerationStep({
+		stepKey: "job_context_built",
+		status: "ok",
+		metadata: generationJobConfigSnapshot(jobContext),
+	});
 
 	const systemPrompt = buildPracticeSystemPrompt({
 		userMessageSummary: {
@@ -633,21 +896,121 @@ async function runPracticeGenerationAfterResolveCore(
 			.map((key) => `${key}=${counts[key] ?? 0}`)
 			.join(", ");
 
+	const corpusForQuality = () =>
+		buildTopicCorpusMap(userPayload.topic_grounding);
+	const chunkAlignmentForQuality = () =>
+		({
+			corpusByTopicId: corpusForQuality(),
+			contextQuality: userPayload.grounding_meta.context_quality ?? "ok",
+		}) as const;
+
+	function tryFinalizeGroupedOutput(
+		g: PracticeGenerationGroupedOutput,
+	):
+		| {
+				flat: PracticeGenerationOutput;
+				strippedOk: Extract<
+					ReturnType<typeof validateAndStripGeneration>,
+					{ ok: true }
+				>;
+		  }
+		| null {
+		const norm = normalizeGroupedEstimatedTimesToPlan(g, durationSeconds);
+		const flat = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(norm));
+		const val = validateAndStripGeneration(flat, expectedCount, topicIdSet, {
+			expectedDurationSeconds: durationSeconds,
+			expectedTypeCounts,
+		});
+		if (!val.ok) return null;
+		const qg = evaluatePracticeGenerationQuality({
+			questions: flat.questions,
+			allowedTopicCount: topicIdSet.size,
+			skipMissingVisualGate: jobContext.visuals.enabled,
+			chunkAlignment: chunkAlignmentForQuality(),
+		});
+		if (!qg.ok) return null;
+		return { flat, strippedOk: val };
+	}
+
+	// Single initial generation + repair-only follow-ups (no full regeneration retries).
+	const repairBudgetTotal = getPracticeGenerationRepairBudget();
+
 	async function generateAndStrip(): Promise<
-		| { ok: true; object: PracticeGenerationOutput; public: ReturnType<typeof validateAndStripGeneration> }
+		| {
+				ok: true;
+				object: PracticeGenerationOutput;
+				public: ReturnType<typeof validateAndStripGeneration>;
+				grouped: PracticeGenerationGroupedOutput;
+				blueprintSlots: PracticeGenerationBlueprintSlot[];
+		  }
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
+		const blueprintResult = await generatePracticeBlueprint({
+			jobContext,
+			promptRevision: PRACTICE_PROMPT_REVISION,
+			abortSignal: opts.abortSignal,
+		});
+		cumulativeModelMs += blueprintResult.modelMs;
+		await writeGenerationStep({
+			stepKey: "blueprint_generate",
+			status: blueprintResult.ok ? "ok" : "error",
+			model: blueprintResult.model,
+			feature: "practice.generation.blueprint",
+			latencyMs: blueprintResult.modelMs,
+			inputTokens: blueprintResult.inputTokens,
+			outputTokens: blueprintResult.outputTokens,
+			error: blueprintResult.ok ? null : blueprintResult.message,
+		});
+		if (!blueprintResult.ok) {
+			return {
+				ok: false,
+				message: `Could not generate a valid blueprint. ${blueprintResult.message}`,
+				code: "generation_failed",
+			};
+		}
+
+		const blueprintSlots = flattenPracticeGenerationBlueprint(blueprintResult.blueprint);
+		const generationSystemPrompt = `${systemPrompt}
+
+## BLUEPRINT CONTRACT (required)
+- A blueprint has been produced for this test. Follow it strictly.
+- Keep question order aligned with BLUEPRINT_SLOTS_JSON order.
+- For each slot: keep topic_id and question_type as specified.
+- Keep difficulty_level close to slot.difficulty_level unless safety/validation constraints force a minimal adjustment.
+- If slot.visual_intent.needs_visual is true, write the stem so a later visual can naturally support it (e.g. "shown below", "use the graph/table", or a visual-first setup) without leaking answers. The stem + options must be consistent with slot.visual_intent.visual_idea and align with slot.visual_intent.preferred_kind (same modality — do not describe a graph in prose if the plan is a table unless the idea calls for both).
+- If slot.visual_intent.needs_visual is false, keep the stem fully understandable without relying on an unseen figure.
+- For this pass, emit \`visual: null\` on every question. You may include lightweight visual cues for slots marked \`needs_visual=true\`, but avoid making stems unsolvable without the later enrichment visual.`;
+		const generationUserPrompt = `${userPrompt}
+
+BLUEPRINT_SLOTS_JSON:
+${JSON.stringify(blueprintSlots)}`;
+
 		const m0 = Date.now();
 		generationCallCount++;
 		const r = await runModelOnceWithFallback(
-			systemPrompt,
-			userPrompt,
+			generationSystemPrompt,
+			generationUserPrompt,
 			expectedCount,
 			generationOutputSchema,
 			opts,
 			resolved.userId,
+			{
+				generationRunId,
+				correlationId,
+				stepKey: "question_generation",
+			},
 		);
 		cumulativeModelMs += Date.now() - m0;
+		await writeGenerationStep({
+			stepKey: "question_generation",
+			status: r.ok ? "ok" : "error",
+			model: r.usage.model,
+			feature: "practice.generation",
+			latencyMs: r.usage.latencyMs,
+			inputTokens: r.usage.inputTokens,
+			outputTokens: r.usage.outputTokens,
+			error: r.ok ? null : r.message,
+		});
 		if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
 
 		let grouped: PracticeGenerationGroupedOutput = normalizeGroupedEstimatedTimesToPlan(
@@ -655,240 +1018,271 @@ async function runPracticeGenerationAfterResolveCore(
 			durationSeconds,
 		);
 
-		const v0 = Date.now();
-		let flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
-		let out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
-			expectedDurationSeconds: durationSeconds,
-			expectedTypeCounts,
-		});
+		const chunkAlignmentCtx = chunkAlignmentForQuality();
+		const targetedIndexesForReason = (reason: PracticeGenerationRepairReason): number[] => {
+			if (reason.kind === "validation") {
+				return reason.diagnostics.targets
+					.map((t) => t.flattenedIndex)
+					.filter((n): n is number => n != null && Number.isFinite(n) && n >= 0);
+			}
+			return reason.failedIndexes.filter((n) => Number.isFinite(n) && n >= 0);
+		};
 
-		// Pipeline-scoped repair budget (max PRACTICE_REPAIR_MAX_CALLS across
-		// the entire pipeline, NOT per attempt). Earlier code allowed one
-		// repair per attempt, which silently doubled spend on slow days.
-		if (
-			!out.ok &&
-			isPracticeGenerationRepairEnabled() &&
-			repairCallCount < PRACTICE_REPAIR_MAX_CALLS
-		) {
+		const buildTargetedContextJson = (
+			reason: PracticeGenerationRepairReason,
+			flattenedQuestions: PracticeGenerationOutput["questions"],
+		): string | undefined => {
+			const failedIndexes = targetedIndexesForReason(reason);
+			if (failedIndexes.length === 0) return undefined;
+			const topicEvidence = selectEvidenceForFailedIndexes(
+				jobContext.evidenceByTopicId,
+				flattenedQuestions,
+				failedIndexes,
+			);
+			return JSON.stringify({
+				failed_indexes: failedIndexes,
+				failed_questions: failedIndexes.map((idx) => flattenedQuestions[idx] ?? null),
+				blueprint_slots: failedIndexes.map((idx) => ({
+					index: idx,
+					slot: blueprintSlots[idx] ?? null,
+				})),
+				topic_evidence: topicEvidence,
+			});
+		};
+
+		async function consumeRepair(
+			reason: PracticeGenerationRepairReason,
+			flatIndexMap: PracticeRoundRobinFlatIndexMapEntry[],
+			flattenedQuestions: PracticeGenerationOutput["questions"],
+		): Promise<boolean> {
+			if (!isPracticeGenerationRepairEnabled() || repairCallCount >= repairBudgetTotal) {
+				return false;
+			}
 			repairCallCount++;
+			const includeFullContext = reason.kind === "quality" && isPracticeRepairFullContextEnabled();
+			const stepKey = `repair_attempt_${repairCallCount}`;
+
 			const repaired = await runPracticeGenerationRepairGrouped({
 				failedGrouped: grouped,
-				validationMessage: out.message,
+				reason,
+				baseUserPrompt: includeFullContext ? generationUserPrompt : undefined,
+				targetedContextJson: buildTargetedContextJson(reason, flattenedQuestions),
+				includeBaseUserPrompt: includeFullContext,
+				flatIndexMap,
 				durationSeconds,
 				expectedTypeCounts,
 				allowedTopicIds: [...topicIdSet],
 				generationOutputSchema,
 				estimatedQuestionCount: expectedCount,
 				studentUserId: resolved.userId,
+				telemetry: {
+					generationRunId,
+					correlationId,
+					stepKey,
+				},
 				abortSignal: opts.abortSignal,
 			});
 			cumulativeModelMs += repaired.modelMs;
-			if (repaired.ok) {
-				grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
-				flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
-				out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
-					expectedDurationSeconds: durationSeconds,
-					expectedTypeCounts,
-				});
-			}
+			await writeGenerationStep({
+				stepKey,
+				status: repaired.ok ? "ok" : "error",
+				model: getOpenAIPracticeChatModel(),
+				feature: "practice.generation.repair",
+				latencyMs: repaired.modelMs,
+				inputTokens: repaired.inputTokens,
+				outputTokens: repaired.outputTokens,
+				error: repaired.ok ? null : repaired.message,
+				metadata: { reason_kind: reason.kind },
+			});
+			if (!repaired.ok) return false;
+			grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
+			return true;
 		}
 
-		cumulativeValidationMs += Date.now() - v0;
-		if (!out.ok) {
-			const actualTypeCounts = summarizeGroupedQuestionTypeCounts(grouped);
-			logServerError("generatePracticeTest.validation", out.message, {
-				subjectId,
-				durationSeconds,
-				expectedCount,
-				expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
-				actualTypeCounts: formatTypeCounts(actualTypeCounts),
-				correlationId,
-			});
-			return { ok: false, message: out.message, code: "generation_invalid" };
-		}
-
-		// Quality gates + optional targeted VISUAL_FIX loop (same attempt).
-		const corpusByTopicId = buildTopicCorpusMap(userPayload.topic_grounding);
-		let qualityGate = evaluatePracticeGenerationQuality({
-			questions: flattened.questions,
-			chunkAlignment: {
-				corpusByTopicId,
-				contextQuality: userPayload.grounding_meta.context_quality ?? "ok",
-			},
-		});
-
-		const maxVisualFix = getPracticeVisualFixMaxCalls();
-		let visualFixRounds = 0;
-		while (!qualityGate.ok && visualFixRounds < maxVisualFix) {
-			const failedIndexes = Array.isArray(qualityGate.details?.failedIndexes)
-				? (qualityGate.details!.failedIndexes as number[])
-				: [];
-			if (!VISUAL_FIX_ELIGIBLE_GATE_CODES.has(qualityGate.code) || failedIndexes.length === 0) {
-				break;
-			}
-			visualFixRounds++;
-			visualFixCallCount++;
-			const fixPrompt = buildVisualFixReplacementPrompt({
-				baseUserPrompt: userPrompt,
-				failedQuestionIndexes: failedIndexes,
-				failureCode: qualityGate.code as VisualFixFailureCode,
-				failureDetails: qualityGate.message,
-				preferredVisualKinds: userPayload.test_parameters.visuals_policy.preferred_kinds,
-				currentGroupedJson: JSON.stringify(grouped),
-			});
-			const fixed = await runPracticeGenerationVisualFixGrouped({
-				systemPrompt,
-				visualFixUserPrompt: fixPrompt,
-				generationOutputSchema,
-				estimatedQuestionCount: expectedCount,
-				studentUserId: resolved.userId,
-				abortSignal: opts.abortSignal,
-			});
-			cumulativeModelMs += fixed.modelMs;
-			if (!fixed.ok) {
-				logServerError("generatePracticeTest.visualFix", fixed.message, {
-					subjectId,
-					gateCode: qualityGate.code,
-					correlationId,
-				});
-				return { ok: false, message: fixed.message, code: "generation_invalid" };
-			}
-			grouped = normalizeGroupedEstimatedTimesToPlan(fixed.object, durationSeconds);
-			flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
-			out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
+		for (;;) {
+			const v0 = Date.now();
+			const flattened = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(grouped));
+			const out = validateAndStripGeneration(flattened, expectedCount, topicIdSet, {
 				expectedDurationSeconds: durationSeconds,
 				expectedTypeCounts,
 			});
+
 			if (!out.ok) {
-				const actualTypeCounts = summarizeGroupedQuestionTypeCounts(grouped);
-				logServerError("generatePracticeTest.validation", out.message, {
-					subjectId,
-					durationSeconds,
-					expectedCount,
-					expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
-					actualTypeCounts: formatTypeCounts(actualTypeCounts),
-					correlationId,
-					phase: "post_visual_fix",
-				});
-				return { ok: false, message: out.message, code: "generation_invalid" };
+				const groupedLens = summarizeGroupedQuestionTypeCounts(grouped);
+				const flatIndexMap = buildPracticeRoundRobinFlatIndexMap(groupedLens);
+				const diagnostics = buildPracticeValidationRepairDiagnostics(
+					flattened,
+					groupedLens,
+					flatIndexMap,
+					{
+						expectedQuestionCount: expectedCount,
+						allowedTopicIds: topicIdSet,
+						expectedDurationSeconds: durationSeconds,
+						expectedTypeCounts,
+					},
+					out.message,
+				);
+				const repaired = await consumeRepair(
+					{
+						kind: "validation",
+						message: out.message,
+						diagnostics,
+					},
+					flatIndexMap,
+					flattened.questions,
+				);
+				cumulativeValidationMs += Date.now() - v0;
+				if (!repaired) {
+					const actualTypeCounts = summarizeGroupedQuestionTypeCounts(grouped);
+					logServerError("generatePracticeTest.validation", out.message, {
+						subjectId,
+						durationSeconds,
+						expectedCount,
+						expectedTypeCounts: formatTypeCounts(expectedTypeCounts),
+						actualTypeCounts: formatTypeCounts(actualTypeCounts),
+						correlationId,
+					});
+					return { ok: false, message: out.message, code: "generation_invalid" };
+				}
+				continue;
 			}
-			qualityGate = evaluatePracticeGenerationQuality({
+
+			const qualityGate = evaluatePracticeGenerationQuality({
 				questions: flattened.questions,
-				chunkAlignment: {
-					corpusByTopicId,
-					contextQuality: userPayload.grounding_meta.context_quality ?? "ok",
-				},
+				allowedTopicCount: topicIdSet.size,
+				skipMissingVisualGate: jobContext.visuals.enabled,
+				chunkAlignment: chunkAlignmentCtx,
 			});
-		}
 
-		if (!qualityGate.ok) {
-			logServerError("generatePracticeTest.qualityGate", qualityGate.message, {
-				subjectId,
-				gateCode: qualityGate.code,
-				correlationId,
-			});
-			return { ok: false, message: qualityGate.message, code: "generation_invalid" };
-		}
+			if (!qualityGate.ok) {
+				const groupedLens = summarizeGroupedQuestionTypeCounts(grouped);
+				const flatIndexMap = buildPracticeRoundRobinFlatIndexMap(groupedLens);
+				const failedIndexes = failedIndexesFromQualityGate(qualityGate);
+				const repaired = await consumeRepair(
+					{
+						kind: "quality",
+						code: qualityGate.code,
+						message: qualityGate.message,
+						failedIndexes,
+						gateDetails: qualityGate.details,
+						preferredVisualKinds: userPayload.test_parameters.visuals_policy.preferred_kinds,
+					},
+					flatIndexMap,
+					flattened.questions,
+				);
+				cumulativeValidationMs += Date.now() - v0;
+				if (!repaired) {
+					logServerError("generatePracticeTest.qualityGate", qualityGate.message, {
+						subjectId,
+						gateCode: qualityGate.code,
+						correlationId,
+					});
+					return { ok: false, message: qualityGate.message, code: "generation_invalid" };
+				}
+				continue;
+			}
 
-		// Hybrid moderation:
-		// 1) Per-question regex/profanity (free) — flags individual bad items
-		//    so a single tainted question can't kill the whole generation.
-		// 2) Blob-level pass for the embedding rule (paid only when admins
-		//    seed embedding patterns in `content_blacklist`).
-		const perItem = await moderatePracticeQuestionsPerItem(
-			flattened.questions.map((q) => q.question_text),
-		);
-		if (!perItem.ok) {
-			// If too many items are flagged, regenerate the whole test rather
-			// than ship a too-short test. Otherwise we accept losing a few.
-			const retainedCount = flattened.questions.length - perItem.flagged.length;
-			const flaggedTooMany = retainedCount < expectedCount;
-			for (const flag of perItem.flagged) {
+			cumulativeValidationMs += Date.now() - v0;
+
+			const perItem = await moderatePracticeQuestionsPerItem(
+				flattened.questions.map((q) => q.question_text),
+			);
+			if (!perItem.ok) {
+				const retainedCount = flattened.questions.length - perItem.flagged.length;
+				const flaggedTooMany = retainedCount < expectedCount;
+				for (const flag of perItem.flagged) {
+					try {
+						await insertHeuristicModerationFlag({
+							entityType: "practice_generation_question",
+							entityId: randomUUID(),
+							source: flag.source,
+							reason: flag.reason,
+							severity: flag.source === "profanity" ? "high" : "medium",
+						});
+					} catch (e) {
+						logServerError("generatePracticeTest.moderation_flag.per_item", e, { correlationId });
+					}
+				}
+				if (flaggedTooMany) {
+					return {
+						ok: false,
+						message: "Output blocked by moderation filters.",
+						code: "generation_invalid",
+					};
+				}
+				const dropSet = new Set(perItem.flagged.map((f) => f.index));
+				flattened.questions = flattened.questions.filter((_, i) => !dropSet.has(i));
+			}
+
+			const modBlob = JSON.stringify(flattened.questions);
+			const mod = await moderatePracticeGenerationText(modBlob);
+			if (!mod.ok) {
 				try {
 					await insertHeuristicModerationFlag({
-						entityType: "practice_generation_question",
+						entityType: "practice_generation",
 						entityId: randomUUID(),
-						source: flag.source,
-						reason: flag.reason,
-						severity: flag.source === "profanity" ? "high" : "medium",
+						source: mod.source,
+						reason: mod.reason,
+						severity: mod.source === "profanity" ? "high" : "medium",
 					});
 				} catch (e) {
-					logServerError("generatePracticeTest.moderation_flag.per_item", e, { correlationId });
+					logServerError("generatePracticeTest.moderation_flag", e, { correlationId });
 				}
+				return { ok: false, message: "Output blocked by moderation filters.", code: "generation_invalid" };
 			}
-			if (flaggedTooMany) {
-				return {
-					ok: false,
-					message: "Output blocked by moderation filters.",
-					code: "generation_invalid",
-				};
-			}
-			// Drop flagged questions so the rest of the test is preserved.
-			const dropSet = new Set(perItem.flagged.map((f) => f.index));
-			flattened.questions = flattened.questions.filter((_, i) => !dropSet.has(i));
-		}
 
-		const modBlob = JSON.stringify(flattened.questions);
-		const mod = await moderatePracticeGenerationText(modBlob);
-		if (!mod.ok) {
-			try {
-				await insertHeuristicModerationFlag({
-					entityType: "practice_generation",
-					entityId: randomUUID(),
-					source: mod.source,
-					reason: mod.reason,
-					severity: mod.source === "profanity" ? "high" : "medium",
-				});
-			} catch (e) {
-				logServerError("generatePracticeTest.moderation_flag", e, { correlationId });
-			}
-			return { ok: false, message: "Output blocked by moderation filters.", code: "generation_invalid" };
+			return {
+				ok: true,
+				object: flattened,
+				public: out,
+				grouped,
+				blueprintSlots,
+			};
 		}
-
-		return { ok: true, object: flattened, public: out };
 	}
 
 	let stripped!: ReturnType<typeof validateAndStripGeneration>;
-	const attempt = await repeatPracticeAiResultUntilSuccessOrExhausted<PracticeGenerationOutput>(
-		"generatePracticeTest",
-		async () => {
-			const r = await generateAndStrip();
-			if (!r.ok) return { ok: false, message: r.message };
-			stripped = r.public;
-			succeededOnCall = generationCallCount + repairCallCount + visualFixCallCount;
-			return { ok: true, value: r.object };
-		},
-		{
-			onFailedAttempt: (failure, attemptNumber, totalAttempts) => {
-				logServerError("generatePracticeTest.retry", failure.message, {
-					subjectId,
-					durationSeconds,
-					attemptNumber,
-					totalAttempts,
-					correlationId,
-				});
-			},
-		},
-	);
+
+	const attempt = await generateAndStrip();
 	if (!attempt.ok) {
+		const failCode = attempt.code === "generation_failed" ? "generation_failed" : "generation_invalid";
 		void recordPracticeEvent(
 			supabase,
 			"practice_generation_attempts",
 			{
 				generation_calls: generationCallCount,
 				repair_calls: repairCallCount,
-				visual_fix_calls: visualFixCallCount,
+				visual_fix_calls: 0,
 				succeeded_on_call: null,
 				prompt_revision: PRACTICE_PROMPT_REVISION,
-				outcome: "generation_failed",
+				outcome: failCode === "generation_failed" ? "generation_failed" : "generation_invalid",
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
 			},
 			{ studentId: resolved.userId },
 		);
+		void recordPracticeEvent(
+			supabase,
+			"practice_generation_failed",
+			{
+				code: attempt.code,
+				message: attempt.message,
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
+			},
+			{ studentId: resolved.userId },
+		);
+		await writeGenerationStep({
+			stepKey: "pipeline_failed",
+			status: "error",
+			error: attempt.message,
+			metadata: { fail_code: failCode },
+		});
 		logPracticeObs({
 			phase: "practice_generation",
-			correlationId,
+			correlation_id: correlationId,
 			ok: false,
-			code: "generation_failed",
+			code: failCode,
 			durationMs: Date.now() - pipelineT0,
 			timingsMs: {
 				...timingsMs,
@@ -896,40 +1290,27 @@ async function runPracticeGenerationAfterResolveCore(
 				validationMs: cumulativeValidationMs,
 			},
 		});
-		return { ok: false, code: "generation_failed", message: attempt.message };
+		if (generationRunId) {
+			await finishGenerationRun({
+				runId: generationRunId,
+				status: "failed",
+				failureCode: attempt.code,
+				failureMessage: attempt.message,
+				timingsMs: {
+					...timingsMs,
+					modelMs: cumulativeModelMs,
+					validationMs: cumulativeValidationMs,
+					totalDurationMs: Date.now() - pipelineT0,
+				},
+			});
+		}
+		return { ok: false, code: attempt.code, message: attempt.message };
 	}
-	if (!stripped || !stripped.ok) {
-		void recordPracticeEvent(
-			supabase,
-			"practice_generation_attempts",
-			{
-				generation_calls: generationCallCount,
-				repair_calls: repairCallCount,
-				visual_fix_calls: visualFixCallCount,
-				succeeded_on_call: null,
-				prompt_revision: PRACTICE_PROMPT_REVISION,
-				outcome: "generation_invalid",
-			},
-			{ studentId: resolved.userId },
-		);
-		logPracticeObs({
-			phase: "practice_generation",
-			correlationId,
-			ok: false,
-			code: "generation_invalid",
-			durationMs: Date.now() - pipelineT0,
-			timingsMs: {
-				...timingsMs,
-				modelMs: cumulativeModelMs,
-				validationMs: cumulativeValidationMs,
-			},
-		});
-		return {
-			ok: false,
-			code: "generation_invalid",
-			message: "The generator output could not be validated.",
-		};
-	}
+
+	stripped = attempt.public;
+	let lastGrouped = attempt.grouped;
+	const blueprintSlots = attempt.blueprintSlots;
+	succeededOnCall = generationCallCount + repairCallCount;
 
 	void recordPracticeEvent(
 		supabase,
@@ -937,29 +1318,39 @@ async function runPracticeGenerationAfterResolveCore(
 		{
 			generation_calls: generationCallCount,
 			repair_calls: repairCallCount,
-			visual_fix_calls: visualFixCallCount,
+			visual_fix_calls: 0,
 			succeeded_on_call: succeededOnCall,
 			prompt_revision: PRACTICE_PROMPT_REVISION,
 			outcome: "ok",
+			correlation_id: correlationId,
+			generation_run_id: generationRunId,
 		},
 		{ studentId: resolved.userId },
 	);
 
-	const fullOutput = attempt.value;
+	const fullOutput = attempt.object;
 	const totalQ = fullOutput.questions.length;
 
-	// Generation-time dedup is OFF by default (set 2026-05): the product
-	// requirement is that students MUST see important questions, even if
-	// they've appeared in a past test. Earlier behavior regenerated whole
-	// tests when ≥1 question matched a past one ≥0.92 cosine similarity,
-	// which silently removed high-value questions on repeat practice.
-	// Set PRACTICE_DEDUP_MAX_REGENS=1 (or higher) to re-enable.
+	// Generation-time dedup is OFF by default (PRACTICE_DEDUP_MAX_REGENS=0). When
+	// enabled, near-duplicate questions vs this student's history get one dedup-focused
+	// repair — never a fresh full-generation pass.
 	const dedupThreshold = Number.parseInt(process.env.PRACTICE_DEDUP_MAX_REGENS ?? "0", 10);
 	if (Number.isFinite(dedupThreshold) && dedupThreshold > 0) {
 		const dedupT0 = Date.now();
 		try {
 			const texts = fullOutput.questions.map((q) => q.question_text);
-			const embeddings = await embedQuestionTexts(texts, { userId: resolved.userId });
+			const embeddings = await embedQuestionTexts(texts, {
+				userId: resolved.userId,
+				generationRunId,
+				correlationId,
+				stepKey: "dedup_embeddings",
+			});
+			await writeGenerationStep({
+				stepKey: "dedup_embeddings",
+				status: "ok",
+				feature: "embeddings.dedup",
+				metadata: { text_count: texts.length },
+			});
 			const dupes = await findDuplicatesAgainstStudent(
 				supabase,
 				resolved.userId,
@@ -972,11 +1363,63 @@ async function runPracticeGenerationAfterResolveCore(
 					correlation_id: correlationId,
 					duplicates: dupes.length,
 				});
-				const regen = await generateAndStrip();
-				if (regen.ok) {
-					stripped = regen.public;
-					(fullOutput as PracticeGenerationOutput).questions = regen.object.questions;
-					(fullOutput as PracticeGenerationOutput).generation_metadata = regen.object.generation_metadata;
+				if (isPracticeGenerationRepairEnabled() && repairCallCount < repairBudgetTotal) {
+					repairCallCount++;
+					const dedupGroupedLens = summarizeGroupedQuestionTypeCounts(lastGrouped);
+					const dedupFlatMap = buildPracticeRoundRobinFlatIndexMap(dedupGroupedLens);
+					const dedupRepaired = await runPracticeGenerationRepairGrouped({
+						failedGrouped: lastGrouped,
+						reason: {
+							kind: "dedup",
+							message: `${dupes.length} question(s) are too similar to this student's recent questions on the same topic; rewrite only those items.`,
+							failedIndexes: dupes,
+						},
+						targetedContextJson: JSON.stringify({
+							failed_indexes: dupes,
+							failed_questions: dupes.map((idx) => fullOutput.questions[idx] ?? null),
+							topic_evidence: selectEvidenceForFailedIndexes(
+								jobContext.evidenceByTopicId,
+								fullOutput.questions,
+								dupes,
+							),
+						}),
+						flatIndexMap: dedupFlatMap,
+						durationSeconds,
+						expectedTypeCounts,
+						allowedTopicIds: [...topicIdSet],
+						generationOutputSchema,
+						estimatedQuestionCount: expectedCount,
+						studentUserId: resolved.userId,
+						telemetry: {
+							generationRunId,
+							correlationId,
+							stepKey: `repair_dedup_${repairCallCount}`,
+						},
+						abortSignal: opts.abortSignal,
+					});
+					cumulativeModelMs += dedupRepaired.modelMs;
+					await writeGenerationStep({
+						stepKey: `repair_dedup_${repairCallCount}`,
+						status: dedupRepaired.ok ? "ok" : "error",
+						model: getOpenAIPracticeChatModel(),
+						feature: "practice.generation.repair",
+						latencyMs: dedupRepaired.modelMs,
+						inputTokens: dedupRepaired.inputTokens,
+						outputTokens: dedupRepaired.outputTokens,
+						error: dedupRepaired.ok ? null : dedupRepaired.message,
+						metadata: { reason_kind: "dedup", duplicate_count: dupes.length },
+					});
+					if (dedupRepaired.ok) {
+						const ng = normalizeGroupedEstimatedTimesToPlan(dedupRepaired.object, durationSeconds);
+						const mat = tryFinalizeGroupedOutput(ng);
+						if (mat) {
+							lastGrouped = ng;
+							(fullOutput as PracticeGenerationOutput).questions = mat.flat.questions;
+							(fullOutput as PracticeGenerationOutput).generation_metadata =
+								mat.flat.generation_metadata;
+							stripped = mat.strippedOk;
+						}
+					}
 				}
 			}
 			(fullOutput as PracticeGenerationOutput & { __embeddings?: number[][] }).__embeddings = embeddings;
@@ -985,8 +1428,258 @@ async function runPracticeGenerationAfterResolveCore(
 				subjectId,
 				correlationId,
 			});
+			await writeGenerationStep({
+				stepKey: "dedup_embeddings",
+				status: "error",
+				feature: "embeddings.dedup",
+				error: e instanceof Error ? e.message : String(e),
+			});
 		} finally {
 			timingsMs.dedup = Date.now() - dedupT0;
+		}
+	}
+
+	const visualIntentDecisions = resolveQuestionVisualIntent({
+		questions: fullOutput.questions,
+		blueprintSlots,
+		allowedKinds: jobContext.visuals.preferredKinds,
+	});
+	const visualIntentSummary = summarizeVisualIntentDecisions(visualIntentDecisions);
+	await writeGenerationStep({
+		stepKey: "visual_intent_gate",
+		status: "ok",
+		metadata: visualIntentSummary,
+	});
+	logPracticeObs({
+		phase: "practice_generation_visual_intent_gate",
+		correlation_id: correlationId,
+		...visualIntentSummary,
+	});
+
+	const countNonNullVisuals = () => fullOutput.questions.reduce((acc, q) => acc + (q.visual ? 1 : 0), 0);
+	const buildCandidateIntent = (candidateIndexes: number[]) =>
+		candidateIndexes.flatMap((index) => {
+			const decision = visualIntentDecisions[index];
+			if (!decision || decision.priority === "none") return [];
+			const idea = blueprintSlots[index]?.visual_intent?.visual_idea?.trim() ?? "";
+			return [
+				{
+					index,
+					priority: decision.priority as "necessary" | "high" | "medium",
+					reason: decision.reason,
+					preferred_kind: decision.preferredKind,
+					blueprint_visual_idea: idea.length > 0 ? idea : null,
+				},
+			];
+		});
+	const stemGroundingMode = getPracticeVisualStemGroundingMode();
+	const strictGroundingForVisuals = stemGroundingMode !== "off";
+	const enrichmentBatchSize = getPracticeVisualEnrichmentBatchSize();
+	const initialCandidateIndexes = selectVisualCandidateIndexes({
+		round: "initial",
+		questions: fullOutput.questions,
+		decisions: visualIntentDecisions,
+	});
+	const initialCandidateBatch = initialCandidateIndexes.slice(0, enrichmentBatchSize);
+	const initialRequireAtLeastOneVisual = shouldRequireAtLeastOneVisual(
+		initialCandidateBatch,
+		visualIntentDecisions,
+	);
+	const initialCandidateIntent = buildCandidateIntent(initialCandidateBatch);
+	const visualEnrichmentResult = await generateVisualEnrichmentPass({
+		output: fullOutput,
+		userId: resolved.userId,
+		subjectName: resolved.subjectName,
+		preferredKinds: jobContext.visuals.preferredKinds,
+		evidenceByTopicId: jobContext.evidenceByTopicId,
+		topicExemplarHint: jobContext.topicExemplarHint,
+		templatePolicy: jobContext.visuals.templatePolicy,
+		candidateIndexes: initialCandidateBatch,
+		candidateIntent: initialCandidateIntent,
+		maxCandidateCount: initialCandidateBatch.length,
+		strictGrounding: strictGroundingForVisuals,
+		requireAtLeastOneVisual: initialRequireAtLeastOneVisual,
+		generationRunId,
+		correlationId,
+		abortSignal: opts.abortSignal,
+	});
+	if (
+		visualEnrichmentResult.modelMs > 0 ||
+		visualEnrichmentResult.patches.length > 0 ||
+		initialCandidateBatch.length > 0
+	) {
+		await writeGenerationStep({
+			stepKey: "visual_enrichment",
+			status: visualEnrichmentResult.ok ? "ok" : "error",
+			model: getOpenAIPracticeChatModel(),
+			feature: "practice.generation.visual_enrichment",
+			latencyMs: visualEnrichmentResult.modelMs,
+			inputTokens: visualEnrichmentResult.inputTokens,
+			outputTokens: visualEnrichmentResult.outputTokens,
+			error: visualEnrichmentResult.ok ? null : "Visual enrichment failed.",
+			metadata: {
+				candidate_indexes: initialCandidateBatch.length,
+				patch_candidates: visualEnrichmentResult.patches.length,
+				required_candidate_round: initialRequireAtLeastOneVisual,
+			},
+		});
+	}
+	if (visualEnrichmentResult.ok && visualEnrichmentResult.patches.length > 0) {
+		const enriched = applyVisualPatches(fullOutput, visualEnrichmentResult.patches);
+		fullOutput.questions = enriched.output.questions;
+		logPracticeObs({
+			phase: "practice_generation_visual_enrichment_applied",
+			correlation_id: correlationId,
+			applied: enriched.applied,
+			candidates: visualEnrichmentResult.patches.length,
+			non_null_visuals: countNonNullVisuals(),
+		});
+	}
+
+	// Two retry rounds max. Prioritize questions where visuals are necessary/high first.
+	const visualTarget = Math.min(
+		jobContext.visuals.maxNonNullVisuals,
+		fullOutput.questions.length,
+		visualIntentSummary.needs_visual_true,
+	);
+	if (jobContext.visuals.enabled && jobContext.visuals.preferredKinds.length > 0 && visualTarget > 0) {
+		const maxRetryRounds = 2;
+		for (let retryRound = 1; retryRound <= maxRetryRounds; retryRound++) {
+			const beforeRetryVisualCount = countNonNullVisuals();
+			if (beforeRetryVisualCount >= visualTarget) {
+				break;
+			}
+			const retryCandidateIndexes = selectVisualCandidateIndexes({
+				round: retryRound === 1 ? "retry_1" : "retry_2",
+				questions: fullOutput.questions,
+				decisions: visualIntentDecisions,
+			});
+			const retryCandidateBatch = retryCandidateIndexes.slice(0, enrichmentBatchSize);
+			if (retryCandidateBatch.length === 0) {
+				break;
+			}
+			const requireAtLeastOneVisual = shouldRequireAtLeastOneVisual(
+				retryCandidateBatch,
+				visualIntentDecisions,
+			);
+			const retryCandidateIntent = buildCandidateIntent(retryCandidateBatch);
+			const retryVisualEnrichment = await generateVisualEnrichmentPass({
+				output: fullOutput,
+				userId: resolved.userId,
+				subjectName: resolved.subjectName,
+				preferredKinds: jobContext.visuals.preferredKinds,
+				evidenceByTopicId: jobContext.evidenceByTopicId,
+				topicExemplarHint: jobContext.topicExemplarHint,
+				templatePolicy: jobContext.visuals.templatePolicy,
+				candidateIndexes: retryCandidateBatch,
+				candidateIntent: retryCandidateIntent,
+				maxCandidateCount: retryCandidateBatch.length,
+				strictGrounding: strictGroundingForVisuals,
+				requireAtLeastOneVisual,
+				generationRunId,
+				correlationId,
+				abortSignal: opts.abortSignal,
+			});
+			if (
+				retryVisualEnrichment.modelMs > 0 ||
+				retryVisualEnrichment.patches.length > 0 ||
+				retryCandidateBatch.length > 0
+			) {
+				await writeGenerationStep({
+					stepKey: "visual_enrichment_retry",
+					status: retryVisualEnrichment.ok ? "ok" : "error",
+					model: getOpenAIPracticeChatModel(),
+					feature: "practice.generation.visual_enrichment",
+					latencyMs: retryVisualEnrichment.modelMs,
+					inputTokens: retryVisualEnrichment.inputTokens,
+					outputTokens: retryVisualEnrichment.outputTokens,
+					error: retryVisualEnrichment.ok ? null : "Visual enrichment retry failed.",
+					metadata: {
+						candidate_indexes: retryCandidateBatch.length,
+						patch_candidates: retryVisualEnrichment.patches.length,
+						required_candidate_round: requireAtLeastOneVisual,
+						round: retryRound,
+						target_non_null_visuals: visualTarget,
+						before_non_null_visuals: beforeRetryVisualCount,
+					},
+				});
+			}
+			if (retryVisualEnrichment.ok && retryVisualEnrichment.patches.length > 0) {
+				const enrichedRetry = applyVisualPatches(fullOutput, retryVisualEnrichment.patches);
+				fullOutput.questions = enrichedRetry.output.questions;
+				const afterRetryVisualCount = countNonNullVisuals();
+				logPracticeObs({
+					phase: "practice_generation_visual_enrichment_retry_applied",
+					correlation_id: correlationId,
+					applied: enrichedRetry.applied,
+					candidates: retryVisualEnrichment.patches.length,
+					non_null_visuals: afterRetryVisualCount,
+					retry_round: retryRound,
+					visual_target: visualTarget,
+				});
+			} else {
+				const afterRetryVisualCount = countNonNullVisuals();
+				logPracticeObs({
+					phase: "practice_generation_visual_enrichment_retry_applied",
+					correlation_id: correlationId,
+					applied: 0,
+					candidates: retryVisualEnrichment.patches.length,
+					non_null_visuals: afterRetryVisualCount,
+					retry_round: retryRound,
+					visual_target: visualTarget,
+				});
+			}
+		}
+		const unresolvedNeededIndexes = selectVisualCandidateIndexes({
+			round: "retry_2",
+			questions: fullOutput.questions,
+			decisions: visualIntentDecisions,
+		});
+		let fallbackApplied = 0;
+		for (const index of unresolvedNeededIndexes) {
+			if (countNonNullVisuals() >= visualTarget) break;
+			const question = fullOutput.questions[index];
+			const decision = visualIntentDecisions[index];
+			if (!question || !decision || question.visual) continue;
+			const fallbackVisual = buildDeterministicFallbackVisual({
+				questionText: question.question_text,
+				preferredKind: decision.preferredKind,
+				allowedKinds: jobContext.visuals.preferredKinds,
+				strictGrounding: strictGroundingForVisuals,
+				visualIdea: blueprintSlots[index]?.visual_intent?.visual_idea ?? null,
+			});
+			if (!fallbackVisual) continue;
+			question.visual = fallbackVisual;
+			fallbackApplied += 1;
+		}
+		if (fallbackApplied > 0) {
+			await writeGenerationStep({
+				stepKey: "visual_enrichment_fallback",
+				status: "ok",
+				feature: "practice.generation.visual_enrichment",
+				metadata: {
+					applied: fallbackApplied,
+					target_non_null_visuals: visualTarget,
+					remaining_needed_after_fallback: Math.max(0, visualTarget - countNonNullVisuals()),
+				},
+			});
+			logPracticeObs({
+				phase: "practice_generation_visual_enrichment_fallback_applied",
+				correlation_id: correlationId,
+				applied: fallbackApplied,
+				non_null_visuals: countNonNullVisuals(),
+				visual_target: visualTarget,
+			});
+		}
+		if (countNonNullVisuals() < visualTarget) {
+			logPracticeObs({
+				phase: "practice_generation_visual_enrichment_missing",
+				correlation_id: correlationId,
+				non_null_visuals: countNonNullVisuals(),
+				visual_target: visualTarget,
+				needs_visual_true: visualIntentSummary.needs_visual_true,
+				preferred_kind_count: jobContext.visuals.preferredKinds.length,
+			});
 		}
 	}
 
@@ -998,6 +1691,13 @@ async function runPracticeGenerationAfterResolveCore(
 	const validatorResult = await runValidatorPass(fullOutput, {
 		correlationId,
 		userId: resolved.userId,
+		generationRunId,
+	});
+	await writeGenerationStep({
+		stepKey: "visual_validator",
+		status: validatorResult.ok ? "ok" : "error",
+		feature: "practice.generation.validator_pass",
+		metadata: { patch_candidates: validatorResult.patches.length },
 	});
 	if (validatorResult.ok && validatorResult.patches.length > 0) {
 		const patched = applyVisualPatches(fullOutput, validatorResult.patches);
@@ -1009,30 +1709,148 @@ async function runPracticeGenerationAfterResolveCore(
 			candidates: validatorResult.patches.length,
 		});
 	}
+	const validatorNullIndexes = new Set<number>(
+		validatorResult.patches.flatMap((patch) => patch.action === "null_visual" ? [patch.index] : []),
+	);
+	if (
+		stemGroundingMode === "enforce" &&
+		validatorResult.ok &&
+		validatorNullIndexes.size > 0 &&
+		jobContext.visuals.enabled &&
+		jobContext.visuals.preferredKinds.length > 0 &&
+		visualTarget > 0 &&
+		countNonNullVisuals() < visualTarget
+	) {
+		const unresolvedNeededIndexes = selectVisualCandidateIndexes({
+			round: "retry_2",
+			questions: fullOutput.questions,
+			decisions: visualIntentDecisions,
+		});
+		const recoveryCandidates = unresolvedNeededIndexes
+			.filter((index) => validatorNullIndexes.has(index))
+			.slice(0, enrichmentBatchSize);
+		if (recoveryCandidates.length > 0) {
+			const recoveryRequireAtLeastOneVisual = shouldRequireAtLeastOneVisual(
+				recoveryCandidates,
+				visualIntentDecisions,
+			);
+			const recoveryCandidateIntent = buildCandidateIntent(recoveryCandidates);
+			const recoveryResult = await generateVisualEnrichmentPass({
+				output: fullOutput,
+				userId: resolved.userId,
+				subjectName: resolved.subjectName,
+				preferredKinds: jobContext.visuals.preferredKinds,
+				evidenceByTopicId: jobContext.evidenceByTopicId,
+				topicExemplarHint: jobContext.topicExemplarHint,
+				templatePolicy: jobContext.visuals.templatePolicy,
+				candidateIndexes: recoveryCandidates,
+				candidateIntent: recoveryCandidateIntent,
+				maxCandidateCount: recoveryCandidates.length,
+				strictGrounding: true,
+				requireAtLeastOneVisual: recoveryRequireAtLeastOneVisual,
+				generationRunId,
+				correlationId,
+				abortSignal: opts.abortSignal,
+			});
+			await writeGenerationStep({
+				stepKey: "visual_enrichment_recovery",
+				status: recoveryResult.ok ? "ok" : "error",
+				model: getOpenAIPracticeChatModel(),
+				feature: "practice.generation.visual_enrichment",
+				latencyMs: recoveryResult.modelMs,
+				inputTokens: recoveryResult.inputTokens,
+				outputTokens: recoveryResult.outputTokens,
+				error: recoveryResult.ok ? null : "Visual recovery enrichment failed.",
+				metadata: {
+					candidate_indexes: recoveryCandidates.length,
+					patch_candidates: recoveryResult.patches.length,
+					target_non_null_visuals: visualTarget,
+					before_non_null_visuals: countNonNullVisuals(),
+				},
+			});
+			if (recoveryResult.ok && recoveryResult.patches.length > 0) {
+				const recovered = applyVisualPatches(fullOutput, recoveryResult.patches);
+				fullOutput.questions = recovered.output.questions;
+				logPracticeObs({
+					phase: "practice_generation_visual_enrichment_recovery_applied",
+					correlation_id: correlationId,
+					applied: recovered.applied,
+					candidates: recoveryResult.patches.length,
+					non_null_visuals: countNonNullVisuals(),
+					visual_target: visualTarget,
+				});
 
-	const questionsPayload = fullOutput.questions.map((q) => ({
-		topic_id: q.topic_id,
-		question_text: q.question_text,
-		question_type: q.question_type,
-		difficulty_level: q.difficulty_level,
-		answer_key: q.answer_key,
-		options: q.question_type === "multiple_choice" ? q.options : null,
-		// Persist the structured visual envelope (or null) under
-		// `questions.metadata.visual` per v2 visuals plan §4.3 — no DB
-		// migration needed in v1; promote to a typed column in Phase 4.
-		metadata: { visual: q.visual ?? null },
-	}));
+				const recoveryValidatorResult = await runValidatorPass(fullOutput, {
+					correlationId,
+					userId: resolved.userId,
+					generationRunId,
+				});
+				await writeGenerationStep({
+					stepKey: "visual_validator_recheck",
+					status: recoveryValidatorResult.ok ? "ok" : "error",
+					feature: "practice.generation.validator_pass",
+					metadata: { patch_candidates: recoveryValidatorResult.patches.length },
+				});
+				if (recoveryValidatorResult.ok && recoveryValidatorResult.patches.length > 0) {
+					const rechecked = applyVisualPatches(fullOutput, recoveryValidatorResult.patches);
+					fullOutput.questions = rechecked.output.questions;
+					logPracticeObs({
+						phase: "practice_generation_visual_recovery_validator_patches_applied",
+						correlation_id: correlationId,
+						applied: rechecked.applied,
+						candidates: recoveryValidatorResult.patches.length,
+					});
+				}
+			}
+		}
+	}
+
+	const questionsPayload = sanitizeForPostgresJsonb(
+		fullOutput.questions.map((q) => ({
+			topic_id: q.topic_id,
+			question_text: q.question_text,
+			question_type: q.question_type,
+			difficulty_level: q.difficulty_level,
+			answer_key: q.answer_key,
+			options: q.question_type === "multiple_choice" ? q.options : null,
+			// Persist the structured visual envelope (or null) under
+			// `questions.metadata.visual` per v2 visuals plan §4.3 — no DB
+			// migration needed in v1; promote to a typed column in Phase 4.
+			metadata: { visual: q.visual ?? null },
+		})),
+	);
 
 	const rpcT0 = Date.now();
-	const { data: newTestId, error: rpcErr } = await supabase.rpc("practice_generate_test", {
-		p_subject_id: subjectId,
-		p_difficulty: difficulty,
-		p_duration_seconds: durationSeconds,
-		p_question_count: totalQ,
-		p_question_mix: questionMixJson,
-		p_questions: questionsPayload,
-	});
+	let newTestId: unknown = null;
+	let rpcErr: PracticePersistRpcError | null = null;
+	let rpcAttempts = 0;
+	for (let attempt = 1; attempt <= PRACTICE_PERSIST_MAX_ATTEMPTS; attempt++) {
+		rpcAttempts = attempt;
+		const result = await supabase.rpc("practice_generate_test", {
+			p_subject_id: subjectId,
+			p_difficulty: difficulty,
+			p_duration_seconds: durationSeconds,
+			p_question_count: totalQ,
+			p_question_mix: questionMixJson,
+			p_questions: questionsPayload,
+		});
+		newTestId = result.data;
+		rpcErr = result.error;
+		if (!rpcErr && newTestId) break;
+		if (!isRetryablePracticePersistError(rpcErr) || attempt === PRACTICE_PERSIST_MAX_ATTEMPTS) break;
+		await wait(750 * attempt);
+	}
 	timingsMs.rpcPersist = Date.now() - rpcT0;
+	await writeGenerationStep({
+		stepKey: "persist_test_rpc",
+		status: rpcErr || !newTestId ? "error" : "ok",
+		latencyMs: timingsMs.rpcPersist,
+		error: rpcErr ? rpcErr.message : null,
+		metadata: {
+			attempts: rpcAttempts,
+			question_count: totalQ,
+		},
+	});
 
 	if (rpcErr || !newTestId) {
 		if (rpcErr) {
@@ -1040,7 +1858,7 @@ async function runPracticeGenerationAfterResolveCore(
 		}
 		logPracticeObs({
 			phase: "practice_generation",
-			correlationId,
+			correlation_id: correlationId,
 			ok: false,
 			code: "database_error",
 			durationMs: Date.now() - pipelineT0,
@@ -1050,6 +1868,31 @@ async function runPracticeGenerationAfterResolveCore(
 				validationMs: cumulativeValidationMs,
 			},
 		});
+		if (generationRunId) {
+			await finishGenerationRun({
+				runId: generationRunId,
+				status: "failed",
+				failureCode: "database_error",
+				failureMessage: rpcErr?.message ?? "Could not create the test session.",
+				timingsMs: {
+					...timingsMs,
+					modelMs: cumulativeModelMs,
+					validationMs: cumulativeValidationMs,
+					totalDurationMs: Date.now() - pipelineT0,
+				},
+			});
+		}
+		void recordPracticeEvent(
+			supabase,
+			"practice_generation_failed",
+			{
+				code: "database_error",
+				message: rpcErr?.message ?? "Could not create the test session.",
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
+			},
+			{ studentId: resolved.userId },
+		);
 		return {
 			ok: false,
 			code: "database_error",
@@ -1067,9 +1910,14 @@ async function runPracticeGenerationAfterResolveCore(
 			subject_id: subjectId,
 			question_count: totalQ,
 			topic_count: resolved.canonicalTopics.length,
+			correlation_id: correlationId,
+			generation_run_id: generationRunId,
 		},
 		{ studentId: resolved.userId },
 	);
+	if (generationRunId) {
+		await attachTestIdToRunAiCalls(generationRunId, testId);
+	}
 
 	const embeddings = (fullOutput as PracticeGenerationOutput & { __embeddings?: number[][] }).__embeddings;
 	if (embeddings && embeddings.length === totalQ) {
@@ -1105,7 +1953,7 @@ async function runPracticeGenerationAfterResolveCore(
 
 	logPracticeObs({
 		phase: "practice_generation_complete",
-		correlationId,
+		correlation_id: correlationId,
 		testId,
 		ok: true,
 		durationMs: Date.now() - pipelineT0,
@@ -1117,14 +1965,33 @@ async function runPracticeGenerationAfterResolveCore(
 		questionCount: totalQ,
 		topicCount: resolved.canonicalTopics.length,
 	});
+	if (generationRunId) {
+		await finishGenerationRun({
+			runId: generationRunId,
+			status: "succeeded",
+			testId,
+			timingsMs: {
+				...timingsMs,
+				modelMs: cumulativeModelMs,
+				validationMs: cumulativeValidationMs,
+				totalDurationMs: Date.now() - pipelineT0,
+			},
+		});
+	}
+
+	const finalPublic = validateAndStripGeneration(fullOutput, expectedCount, topicIdSet, {
+		expectedDurationSeconds: durationSeconds,
+		expectedTypeCounts,
+	});
+	const publicResult = finalPublic.ok ? finalPublic : stripped;
 
 	return {
 		ok: true,
 		testId,
 		subjectName: resolved.subjectName,
-		questions: stripped.ok ? stripped.questions : [],
-		generation_metadata: stripped.ok
-			? stripped.generation_metadata
+		questions: publicResult.ok ? publicResult.questions : [],
+		generation_metadata: publicResult.ok
+			? publicResult.generation_metadata
 			: {
 					topic_distribution: {},
 					difficulty_distribution: {},

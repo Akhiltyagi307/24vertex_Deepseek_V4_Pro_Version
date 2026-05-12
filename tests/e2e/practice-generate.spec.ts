@@ -6,7 +6,7 @@
  * What this proves:
  *   - System prompt rev v4 (HARD GATES → pedagogy → final compliance recap)
  *   - PRACTICE_STRICT_JSON_SCHEMA_GENERATE=on default
- *   - PRACTICE_AI_USER_FACING_RETRIES=2 + PRACTICE_REPAIR_MAX_CALLS=2 budget
+ * `PRACTICE_GENERATION_REPAIR_BUDGET` (default **3**) — validation/quality/dedup repairs only; no full regenerate retries.
  *   - The streaming envelope ends with a `done` line (not `error`)
  *
  * Why we hit /api/student/practice/generate-stream rather than walking the
@@ -29,6 +29,9 @@
  */
 
 import { expect, test } from "@playwright/test";
+
+import { questionVisualEnvelopeSchema } from "@/lib/practice/visuals/schemas";
+import { stemNeedsVisualHint } from "@/lib/practice/visuals/stem-visual-hints";
 
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
 const SERVICE_ROLE = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
@@ -116,6 +119,33 @@ type StreamEnvelope =
 	| { type: "done"; result: { ok: true; testId: string; subjectName: string; questions: unknown[]; generation_metadata: unknown } }
 	| { type: "error"; code?: string; message: string };
 
+function assertVisualQualityWhenEnabled(questions: unknown[], tag: string): void {
+	if (process.env.PRACTICE_VISUALS !== "true") return;
+
+	const questionRecords = questions.filter(
+		(question): question is Record<string, unknown> =>
+			question != null && typeof question === "object" && !Array.isArray(question),
+	);
+	const visualQuestions = questionRecords.filter((question) => {
+		const visual = (question.metadata as { visual?: unknown } | undefined)?.visual ?? question.visual;
+		return visual != null;
+	});
+	const danglingVisualRefs = questionRecords.filter((question) => {
+		const questionText = typeof question.question_text === "string" ? question.question_text : "";
+		const visual = (question.metadata as { visual?: unknown } | undefined)?.visual ?? question.visual;
+		return stemNeedsVisualHint(questionText) && visual == null;
+	});
+
+	expect(visualQuestions.length, `${tag}: PRACTICE_VISUALS=true should produce at least one visual`).toBeGreaterThan(0);
+	expect(danglingVisualRefs, `${tag}: visual-referencing stems must include a visual`).toEqual([]);
+
+	for (const question of visualQuestions) {
+		const visual = (question.metadata as { visual?: unknown } | undefined)?.visual ?? question.visual;
+		const parsed = questionVisualEnvelopeSchema.safeParse(visual);
+		expect(parsed.success, `${tag}: visual envelope should match schema`).toBe(true);
+	}
+}
+
 async function runOneGeneration(
 	page: import("@playwright/test").Page,
 	body: { subjectId: string; trackerIds: string[]; difficulty: "easy" | "medium" | "hard"; durationSeconds: 3600 | 10800 },
@@ -173,6 +203,7 @@ async function runOneGeneration(
 			/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 		);
 		expect(last.result.questions.length, `${tag}: must produce questions`).toBeGreaterThan(0);
+		assertVisualQualityWhenEnabled(last.result.questions, tag);
 	}
 	return summary;
 }

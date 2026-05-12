@@ -17,9 +17,12 @@ import {
 	Cell,
 	ResponsiveContainer,
 	CartesianGrid,
+	Legend,
+	LabelList,
 } from "recharts";
 
 import type { StatisticsChartSpec } from "@/lib/practice/visuals/types";
+import { ChartAxisLatexLayout, visualMathNeedsKatex } from "../visual-math-text";
 
 const CHART_HEIGHT = 280;
 const PIE_COLORS = [
@@ -87,21 +90,42 @@ function Histogram({
 }: {
 	spec: Extract<StatisticsChartSpec, { subKind: "histogram" }>;
 }): React.ReactElement {
+	const summary = spec.bins.map((bin) => `${bin.label}: ${bin.frequency}`).join(", ");
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 	return (
-		<div className="w-full max-w-[480px]">
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
 				<BarChart
 					data={spec.bins.map((bin) => ({ label: bin.label, value: bin.frequency }))}
 					margin={{ top: 8, right: 16, bottom: 24, left: 16 }}
 				>
 					<CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
-					<XAxis dataKey="label" tickLine={false} label={{ value: spec.xLabel, position: "insideBottom", offset: -8 }} />
-					<YAxis allowDecimals={false} label={{ value: spec.yLabel, angle: -90, position: "insideLeft" }} />
+					<XAxis
+						dataKey="label"
+						tickLine={false}
+						label={
+							xMath
+								? undefined
+								: { value: spec.xLabel, position: "insideBottom", offset: -8 }
+						}
+					/>
+					<YAxis
+						allowDecimals={false}
+						label={
+							yMath
+								? undefined
+								: { value: spec.yLabel, angle: -90, position: "insideLeft" }
+						}
+					/>
 					<Tooltip />
-					<Bar dataKey="value" fill="#3b82f6" />
+					<Bar dataKey="value" fill="#3b82f6">
+						<LabelList dataKey="value" position="top" fontSize={10} />
+					</Bar>
 				</BarChart>
 			</ResponsiveContainer>
-		</div>
+			<p className="sr-only">{summary}</p>
+		</ChartAxisLatexLayout>
 	);
 }
 
@@ -110,18 +134,37 @@ function BarSimple({
 }: {
 	spec: Extract<StatisticsChartSpec, { subKind: "bar" }>;
 }): React.ReactElement {
+	const summary = spec.data.map((row) => `${row.label}: ${row.value}`).join(", ");
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 	return (
-		<div className="w-full max-w-[480px]">
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
 				<BarChart data={spec.data} margin={{ top: 8, right: 16, bottom: 24, left: 16 }}>
 					<CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
-					<XAxis dataKey="label" label={{ value: spec.xLabel, position: "insideBottom", offset: -8 }} />
-					<YAxis label={{ value: spec.yLabel, angle: -90, position: "insideLeft" }} />
+					<XAxis
+						dataKey="label"
+						label={
+							xMath
+								? undefined
+								: { value: spec.xLabel, position: "insideBottom", offset: -8 }
+						}
+					/>
+					<YAxis
+						label={
+							yMath
+								? undefined
+								: { value: spec.yLabel, angle: -90, position: "insideLeft" }
+						}
+					/>
 					<Tooltip />
-					<Bar dataKey="value" fill="#10b981" />
+					<Bar dataKey="value" fill="#10b981">
+						<LabelList dataKey="value" position="top" fontSize={10} />
+					</Bar>
 				</BarChart>
 			</ResponsiveContainer>
-		</div>
+			<p className="sr-only">{summary}</p>
+		</ChartAxisLatexLayout>
 	);
 }
 
@@ -131,14 +174,31 @@ function LineSeries({
 	spec: Extract<StatisticsChartSpec, { subKind: "line" }>;
 }): React.ReactElement {
 	const merged = mergeLineSeries(spec.series);
+	const summary = spec.series.map((series) => series.name).join(", ");
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 	return (
-		<div className="w-full max-w-[480px]">
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
 				<LineChart data={merged} margin={{ top: 8, right: 16, bottom: 24, left: 16 }}>
 					<CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
-					<XAxis dataKey="x" label={{ value: spec.xLabel, position: "insideBottom", offset: -8 }} />
-					<YAxis label={{ value: spec.yLabel, angle: -90, position: "insideLeft" }} />
+					<XAxis
+						dataKey="x"
+						label={
+							xMath
+								? undefined
+								: { value: spec.xLabel, position: "insideBottom", offset: -8 }
+						}
+					/>
+					<YAxis
+						label={
+							yMath
+								? undefined
+								: { value: spec.yLabel, angle: -90, position: "insideLeft" }
+						}
+					/>
 					<Tooltip />
+					<Legend />
 					{spec.series.map((s, i) => (
 						<Line
 							key={s.name}
@@ -151,7 +211,8 @@ function LineSeries({
 					))}
 				</LineChart>
 			</ResponsiveContainer>
-		</div>
+			<p className="sr-only">{summary}</p>
+		</ChartAxisLatexLayout>
 	);
 }
 
@@ -160,18 +221,36 @@ function ScatterPoints({
 }: {
 	spec: Extract<StatisticsChartSpec, { subKind: "scatter" }>;
 }): React.ReactElement {
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 	return (
-		<div className="w-full max-w-[480px]">
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
 				<ScatterChart margin={{ top: 8, right: 16, bottom: 24, left: 16 }}>
 					<CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
-					<XAxis type="number" dataKey="x" label={{ value: spec.xLabel, position: "insideBottom", offset: -8 }} />
-					<YAxis type="number" dataKey="y" label={{ value: spec.yLabel, angle: -90, position: "insideLeft" }} />
+					<XAxis
+						type="number"
+						dataKey="x"
+						label={
+							xMath
+								? undefined
+								: { value: spec.xLabel, position: "insideBottom", offset: -8 }
+						}
+					/>
+					<YAxis
+						type="number"
+						dataKey="y"
+						label={
+							yMath
+								? undefined
+								: { value: spec.yLabel, angle: -90, position: "insideLeft" }
+						}
+					/>
 					<Tooltip cursor={{ strokeDasharray: "3 3" }} />
 					<Scatter data={spec.points} fill="#3b82f6" />
 				</ScatterChart>
 			</ResponsiveContainer>
-		</div>
+		</ChartAxisLatexLayout>
 	);
 }
 
@@ -180,6 +259,13 @@ function PieSlices({
 }: {
 	spec: Extract<StatisticsChartSpec, { subKind: "pie" }>;
 }): React.ReactElement {
+	const total = spec.slices.reduce((sum, slice) => sum + slice.value, 0);
+	const summary = spec.slices
+		.map((slice) => {
+			const pct = total > 0 ? Math.round((slice.value / total) * 100) : 0;
+			return `${slice.label} (${pct}%)`;
+		})
+		.join(", ");
 	return (
 		<div className="w-full max-w-[480px]">
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
@@ -198,6 +284,7 @@ function PieSlices({
 					</Pie>
 				</PieChart>
 			</ResponsiveContainer>
+			<p className="sr-only">{summary}</p>
 		</div>
 	);
 }
@@ -208,18 +295,33 @@ function FrequencyPolygon({
 	spec: Extract<StatisticsChartSpec, { subKind: "frequency_polygon" }>;
 }): React.ReactElement {
 	const points = spec.bins.map((bin) => ({ label: bin.label, value: bin.frequency }));
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 	return (
-		<div className="w-full max-w-[480px]">
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
 				<LineChart data={points} margin={{ top: 8, right: 16, bottom: 24, left: 16 }}>
 					<CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
-					<XAxis dataKey="label" label={{ value: spec.xLabel, position: "insideBottom", offset: -8 }} />
-					<YAxis label={{ value: spec.yLabel, angle: -90, position: "insideLeft" }} />
+					<XAxis
+						dataKey="label"
+						label={
+							xMath
+								? undefined
+								: { value: spec.xLabel, position: "insideBottom", offset: -8 }
+						}
+					/>
+					<YAxis
+						label={
+							yMath
+								? undefined
+								: { value: spec.yLabel, angle: -90, position: "insideLeft" }
+						}
+					/>
 					<Tooltip />
 					<Line type="linear" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot />
 				</LineChart>
 			</ResponsiveContainer>
-		</div>
+		</ChartAxisLatexLayout>
 	);
 }
 
@@ -244,25 +346,50 @@ function Ogive({
 		}
 	}
 	const data = spec.bins.map((bin, i) => ({ label: bin.label, value: cumulative[i] }));
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 	return (
-		<div className="w-full max-w-[480px]">
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
 			<ResponsiveContainer width="100%" height={CHART_HEIGHT}>
 				<LineChart data={data} margin={{ top: 8, right: 16, bottom: 24, left: 16 }}>
 					<CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
-					<XAxis dataKey="label" label={{ value: spec.xLabel, position: "insideBottom", offset: -8 }} />
-					<YAxis label={{ value: spec.yLabel, angle: -90, position: "insideLeft" }} />
+					<XAxis
+						dataKey="label"
+						label={
+							xMath
+								? undefined
+								: { value: spec.xLabel, position: "insideBottom", offset: -8 }
+						}
+					/>
+					<YAxis
+						label={
+							yMath
+								? undefined
+								: { value: spec.yLabel, angle: -90, position: "insideLeft" }
+						}
+					/>
 					<Tooltip />
 					<Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} dot />
 				</LineChart>
 			</ResponsiveContainer>
-		</div>
+		</ChartAxisLatexLayout>
 	);
 }
 
-function renderPieSliceLabel(props: { name?: string | number; value?: number }): string {
-	if (typeof props.name === "string") return props.name;
-	if (typeof props.name === "number") return String(props.name);
-	return "";
+function renderPieSliceLabel(props: {
+	name?: string | number;
+	percent?: number;
+}): string {
+	const name =
+		typeof props.name === "number"
+			? String(props.name)
+			: (props.name ?? "");
+	if (!name) return "";
+	const pct =
+		typeof props.percent === "number"
+			? Math.round(props.percent * 100)
+			: null;
+	return pct != null ? `${name} (${pct}%)` : name;
 }
 
 function mergeLineSeries(series: { name: string; points: { x: number; y: number }[] }[]) {

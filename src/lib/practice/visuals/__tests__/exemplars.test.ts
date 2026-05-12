@@ -4,6 +4,51 @@ import { pickExemplarsForSubject, VISUAL_EXEMPLARS } from "../exemplars";
 import { questionVisualEnvelopeSchema } from "../schemas";
 
 describe("visual exemplars", () => {
+	const SUBJECT_KEYS = [
+		"mathematics",
+		"physics",
+		"chemistry",
+		"biology",
+		"accountancy",
+		"economics_statistics",
+		"business_studies",
+		"geography",
+		"social_science",
+		"science",
+		"english",
+	] as const;
+
+	const ALLOWED_KINDS_BY_SUBJECT = {
+		mathematics: new Set(["math_geometry", "math_function_plot", "number_line", "data_table"]),
+		physics: new Set(["physics_diagram", "math_function_plot", "data_table"]),
+		chemistry: new Set(["chemistry_molecule", "chemistry_reaction"]),
+		biology: new Set(["data_table", "statistics_chart"]),
+		accountancy: new Set(["accountancy_table"]),
+		economics_statistics: new Set([
+			"economics_curve",
+			"statistics_chart",
+			"data_table",
+			"math_function_plot",
+		]),
+		business_studies: new Set([
+			"statistics_chart",
+			"data_table",
+			"economics_curve",
+			"math_function_plot",
+		]),
+		geography: new Set(["india_map", "statistics_chart", "data_table", "math_function_plot"]),
+		social_science: new Set(["india_map", "statistics_chart", "data_table", "math_function_plot"]),
+		science: new Set([
+			"physics_diagram",
+			"math_function_plot",
+			"chemistry_molecule",
+			"chemistry_reaction",
+			"data_table",
+			"statistics_chart",
+		]),
+		english: new Set(["english_passage"]),
+	} as const;
+
 	it("parses every exemplar through the envelope schema", () => {
 		for (const ex of VISUAL_EXEMPLARS) {
 			if (ex.visual === null) continue;
@@ -81,5 +126,121 @@ describe("visual exemplars", () => {
 	it("includes a null-visual anchor for physics", () => {
 		const picked = pickExemplarsForSubject("physics", 8);
 		expect(picked.some((ex) => ex.visual === null)).toBe(true);
+	});
+
+	it("keeps picks subject-scoped (no cross-subject borrowing)", () => {
+		for (const subject of SUBJECT_KEYS) {
+			const ownCount = VISUAL_EXEMPLARS.filter((ex) => ex.subjects.includes(subject)).length;
+			const picked = pickExemplarsForSubject(subject, 8);
+			expect(picked.length).toBeLessThanOrEqual(ownCount);
+			expect(
+				picked.every((ex) => ex.subjects.includes(subject)),
+				`Found borrowed exemplar in ${subject} picks`,
+			).toBe(true);
+		}
+	});
+
+	it("keeps exemplar subject tags aligned with routed visual kinds", () => {
+		for (const ex of VISUAL_EXEMPLARS) {
+			if (ex.visual == null) continue;
+			const kind = ex.visual.spec.kind;
+			for (const subject of ex.subjects) {
+				expect(
+					ALLOWED_KINDS_BY_SUBJECT[subject].has(kind),
+					`Kind ${kind} is not routed for subject ${subject} (stem: ${ex.stem})`,
+				).toBe(true);
+			}
+		}
+	});
+
+	it("surfaces diverse non-null visual families within the default cap", () => {
+		const econ = pickExemplarsForSubject("economics_statistics", 8);
+		const econKinds = new Set(econ.map((ex) => ex.visual?.spec.kind ?? "null"));
+		expect(econKinds.has("statistics_chart")).toBe(true);
+		expect(econKinds.has("economics_curve")).toBe(true);
+		expect(econKinds.has("data_table")).toBe(true);
+
+		const geo = pickExemplarsForSubject("geography", 8);
+		const geoKinds = new Set(geo.map((ex) => ex.visual?.spec.kind ?? "null"));
+		expect(geoKinds.has("statistics_chart")).toBe(true);
+		expect(geoKinds.has("india_map")).toBe(true);
+		expect(geoKinds.has("data_table")).toBe(true);
+	});
+
+	it("covers every shipped visual kind with at least one exemplar", () => {
+		const visualKinds = new Set(
+			VISUAL_EXEMPLARS
+				.filter((ex): ex is (typeof VISUAL_EXEMPLARS)[number] & { visual: NonNullable<(typeof VISUAL_EXEMPLARS)[number]["visual"]> } => ex.visual != null)
+				.map((ex) => ex.visual.spec.kind),
+		);
+		expect(visualKinds).toEqual(
+			new Set([
+				"math_geometry",
+				"math_function_plot",
+				"number_line",
+				"physics_diagram",
+				"chemistry_molecule",
+				"chemistry_reaction",
+				"accountancy_table",
+				"economics_curve",
+				"statistics_chart",
+				"data_table",
+				"india_map",
+				"english_passage",
+			]),
+		);
+	});
+
+	it("covers all physics, statistics, and accountancy sub-kinds", () => {
+		const physicsSubKinds = new Set<string>();
+		const statsSubKinds = new Set<string>();
+		const accountancySubKinds = new Set<string>();
+		for (const ex of VISUAL_EXEMPLARS) {
+			const spec = ex.visual?.spec;
+			if (!spec) continue;
+			if (spec.kind === "physics_diagram") physicsSubKinds.add(spec.subKind);
+			if (spec.kind === "statistics_chart") statsSubKinds.add(spec.subKind);
+			if (spec.kind === "accountancy_table") accountancySubKinds.add(spec.subKind);
+		}
+		expect(physicsSubKinds).toEqual(new Set(["free_body", "ray_optics", "circuit"]));
+		expect(statsSubKinds).toEqual(
+			new Set([
+				"histogram",
+				"bar",
+				"line",
+				"scatter",
+				"pie",
+				"frequency_polygon",
+				"ogive",
+				"box",
+			]),
+		);
+		expect(accountancySubKinds).toEqual(
+			new Set([
+				"journal_entry",
+				"ledger",
+				"trial_balance",
+				"balance_sheet",
+				"p_and_l",
+				"cash_book",
+				"rectification",
+			]),
+		);
+	});
+
+	it("keeps captions and alt text free from direct answer reveals", () => {
+		const spoilerPatterns = [
+			/\bcorrect answer\b/i,
+			/\boption\s*[A-D]\b/i,
+			/\btherefore the answer\b/i,
+			/\bthe answer is\b/i,
+		];
+		for (const ex of VISUAL_EXEMPLARS) {
+			if (ex.visual == null) continue;
+			for (const pattern of spoilerPatterns) {
+				expect(ex.visual.caption).not.toMatch(pattern);
+				expect(ex.visual.altText).not.toMatch(pattern);
+			}
+		}
 	});
 });

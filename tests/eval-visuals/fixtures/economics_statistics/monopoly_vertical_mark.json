@@ -1,0 +1,37 @@
+{
+  "question_number": 1,
+  "topic_id": "44444444-bbbb-4444-8444-444444444442",
+  "topic_name": "Monopoly",
+  "question_text": "In the monopoly graph shown below, read the profit-maximizing quantity marker.",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "options": { "A": "20", "B": "30", "C": "40", "D": "50" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The vertical mark Q* is placed at quantity 40.",
+    "common_mistakes": [],
+    "related_concept": "MR-MC rule"
+  },
+  "estimated_time_seconds": 90,
+  "visual": {
+    "caption": "Monopoly diagram with AR, MR, MC and quantity marker.",
+    "altText": "AR and MR are downward sloping while MC is horizontal. A vertical-line style mark labelled Q* indicates the quantity at MR-MC intersection.",
+    "spec": {
+      "kind": "economics_curve",
+      "xLabel": "Quantity (Q)",
+      "yLabel": "Price / Cost",
+      "xMin": 0,
+      "xMax": 60,
+      "yMin": 0,
+      "yMax": 110,
+      "curves": [
+        { "expr": "100 - p", "color": "primary", "label": "AR" },
+        { "expr": "100 - 2 * p", "color": "secondary", "label": "MR" },
+        { "expr": "20", "color": "muted", "label": "MC" }
+      ],
+      "marks": [
+        { "x": 40, "y": 20, "label": "Q*", "kind": "vertical_line" }
+      ]
+    }
+  }
+}

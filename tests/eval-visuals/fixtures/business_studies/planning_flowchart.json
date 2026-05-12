@@ -1,0 +1,33 @@
+{
+  "question_text": "Use the flowchart shown below to identify the missing step in the planning process.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "The comparison step",
+    "B": "Closing the business",
+    "C": "Ignoring objectives",
+    "D": "Removing feedback"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "After setting objectives, planning compares possible courses of action before selecting a plan.",
+    "common_mistakes": [],
+    "related_concept": "Planning process"
+  },
+  "visual": {
+    "caption": "Planning-process flowchart with one decision step highlighted.",
+    "altText": "A flowchart moving from setting objectives to evaluating alternatives and then selecting a plan.",
+    "spec": {
+      "kind": "flowchart",
+      "title": "Planning process",
+      "nodes": [
+        { "id": "objectives", "label": "Set objectives", "detail": null, "kind": "start" },
+        { "id": "alternatives", "label": "Evaluate alternatives", "detail": "Compare options", "kind": "process" },
+        { "id": "plan", "label": "Select plan", "detail": null, "kind": "outcome" }
+      ],
+      "edges": [
+        { "from": "objectives", "to": "alternatives", "label": null },
+        { "from": "alternatives", "to": "plan", "label": "best fit" }
+      ]
+    }
+  }
+}

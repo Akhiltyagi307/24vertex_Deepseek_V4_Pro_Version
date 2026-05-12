@@ -1,7 +1,15 @@
 import { getPracticeQuestionPlanForSubject, isMathematicsSubject } from "./constants";
 import type { PracticeFocusArea } from "./schemas";
 import type { PracticeCanonicalTopic, PracticeDifficulty } from "./types";
-import { isPracticeVisualsEnabled, isPracticeVisualsEnabledForSubject } from "./visuals/env";
+import {
+	isPracticeVisualsEnabled,
+	isPracticeVisualsEnabledForSubject,
+	isPracticeVisualTemplateEngineEnabled,
+} from "./visuals/env";
+import {
+	resolveVisualTemplatePolicy,
+	type VisualTemplateGradeBand,
+} from "./visuals/templates";
 import type { QuestionVisualKind } from "./visuals/types";
 
 const FOCUS_AREA_INSTRUCTION: Record<PracticeFocusArea, string> = {
@@ -160,10 +168,22 @@ export type PracticeUserMessagePayload = {
 			preferred_kinds: QuestionVisualKind[];
 			/**
 			 * Upper bound aligned with test size when visuals apply (`estimated_question_count`);
-			 * there is no fractional quota — every item may use a non-null `visual` if T1/T2/T3 warrants it.
+			 * there is no fractional quota — the model is instructed to maximize
+			 * non-null visuals per item when `preferred_kinds` allows.
 			 * Zero means non-null visuals are disallowed for this generation.
 			 */
 			max_non_null_visuals: number;
+			template_policy?: {
+				enabled: boolean;
+				templates: Array<{
+					id: string;
+					kind: QuestionVisualKind;
+					required_slots: string[];
+					optional_slots: string[];
+					constraints: string[];
+				}>;
+				prompt_brief: string;
+			};
 		};
 		/**
 		 * When chunks exist, `prefer_chunk_aligned_items` is true so the model
@@ -232,10 +252,10 @@ function preferredVisualKindsForSubject(subjectName: string | null | undefined):
 		return ["math_geometry", "math_function_plot", "number_line", "data_table"];
 	}
 	if (lower.includes("physics")) {
-		return ["physics_diagram", "math_function_plot", "data_table"];
+		return ["physics_diagram", "math_geometry", "math_function_plot", "data_table"];
 	}
 	if (lower.includes("chemistry")) {
-		return ["chemistry_molecule", "chemistry_reaction"];
+		return ["chemistry_reaction", "chemistry_molecule", "data_table"];
 	}
 	if (lower.includes("accountancy") || lower.includes("financial accounting")) {
 		return ["accountancy_table"];
@@ -264,6 +284,8 @@ function preferredVisualKindsForSubject(subjectName: string | null | undefined):
 	if (lower.includes("science")) {
 		return [
 			"physics_diagram",
+			"math_geometry",
+			"math_function_plot",
 			"chemistry_molecule",
 			"chemistry_reaction",
 			"data_table",
@@ -279,6 +301,20 @@ function preferredVisualKindsForSubject(subjectName: string | null | undefined):
 	}
 	// Unknown subject names: keep empty until explicitly routed (avoid invented kinds).
 	return [];
+}
+
+function gradeToVisualTemplateBand(grade: number | null | undefined): VisualTemplateGradeBand | null {
+	if (typeof grade !== "number" || !Number.isFinite(grade)) return null;
+	if (grade <= 8) return "6-8";
+	if (grade <= 10) return "9-10";
+	return "11-12";
+}
+
+function buildVisualTemplateTopicHint(topics: PracticeCanonicalTopic[]): string {
+	return topics
+		.flatMap((topic) => [topic.topicName, topic.chapterName, topic.unitName])
+		.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+		.join(" ");
 }
 
 export function buildPracticeUserMessage(input: {
@@ -331,12 +367,24 @@ export function buildPracticeUserMessage(input: {
 	const subject_is_math = isMathematicsSubject(input.subject.name);
 	const visualsMasterOn = isPracticeVisualsEnabled();
 	const visualsEffective = isPracticeVisualsEnabledForSubject(input.subject.name);
+	const templatePolicy =
+		isPracticeVisualTemplateEngineEnabled() ?
+			resolveVisualTemplatePolicy({
+				subjectName: input.subject.name,
+				topicHint: buildVisualTemplateTopicHint(input.topics),
+				gradeBand: gradeToVisualTemplateBand(input.studentGrade ?? input.topics[0]?.grade ?? null),
+				maxTemplates: 8,
+			})
+		:	null;
+	const basePreferredKinds = templatePolicy?.preferredKinds.length ?
+		templatePolicy.preferredKinds
+	:	preferredVisualKindsForSubject(input.subject.name);
 	const preferredKinds =
 		visualsMasterOn ?
 			visualsEffective ?
-				preferredVisualKindsForSubject(input.subject.name)
+				basePreferredKinds
 			:	[]
-		:	preferredVisualKindsForSubject(input.subject.name);
+		:	basePreferredKinds;
 
 	/** Mirrors question count when visuals apply so payloads stay backward-compatible; no fractional cap. */
 	const maxNonNullVisuals =
@@ -387,6 +435,21 @@ export function buildPracticeUserMessage(input: {
 				enabled: visualsEffective,
 				preferred_kinds: preferredKinds,
 				max_non_null_visuals: maxNonNullVisuals,
+				...(templatePolicy ?
+					{
+						template_policy: {
+							enabled: visualsEffective && templatePolicy.enabled,
+							templates: templatePolicy.templates.map((template) => ({
+								id: template.id,
+								kind: template.kind,
+								required_slots: template.slotContract.requiredSlots,
+								optional_slots: template.slotContract.optionalSlots,
+								constraints: template.slotContract.constraints,
+							})),
+							prompt_brief: templatePolicy.promptBrief,
+						},
+					}
+				:	{}),
 			},
 			grounding_policy: {
 				mode: hasTopicChunks ? "chunk_aligned" : "curriculum_hint_only",

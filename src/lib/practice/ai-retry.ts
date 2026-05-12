@@ -1,13 +1,12 @@
 /**
- * Practice flows call the model with structured output. Transient failures (rate limits,
- * empty responses, schema mismatch) should retry before the user sees an error.
+ * Practice flows call the model with structured output; some helpers retry on failure.
  *
- * `PRACTICE_AI_USER_FACING_RETRIES` is how many *additional* attempts after the first.
+ * Practice **generation** uses a single initial `generateObject` plus up to
+ * {@link getPracticeGenerationRepairBudget} repair passes (`PRACTICE_GENERATION_REPAIR_BUDGET`)
+ * — it does **not** re-run full generation from scratch.
  *
- * Lowered from 5 → 2 (release v3.2.1) once the prompt rework, strict JSON schema, and
- * pipeline-scoped repair counter made one-shot the dominant path. Five retries cost
- * 6× model calls per pipeline in the worst case; the new budget is 3 generation calls
- * + at most {@link PRACTICE_REPAIR_MAX_CALLS} repair calls = 5 model calls worst case.
+ * Other flows (e.g. grading chunks) still use {@link PRACTICE_AI_USER_FACING_RETRIES} /
+ * {@link PRACTICE_AI_MAX_ATTEMPTS} via {@link withPracticeAiAttempts}.
  */
 export const PRACTICE_AI_USER_FACING_RETRIES = 2;
 
@@ -15,9 +14,22 @@ export const PRACTICE_AI_USER_FACING_RETRIES = 2;
 export const PRACTICE_AI_MAX_ATTEMPTS = 1 + PRACTICE_AI_USER_FACING_RETRIES;
 
 /**
- * Maximum number of repair-pass model calls allowed across the entire generation
- * pipeline (NOT per-attempt). Two repairs is a cap on pure validator-fixup spend
- * that is independent of how many full generation attempts we make.
+ * Max repair passes after the initial practice generation (validation, quality,
+ * dedup). No full regeneration loop — only repairs. Override with
+ * `PRACTICE_GENERATION_REPAIR_BUDGET`.
+ */
+export function getPracticeGenerationRepairBudget(): number {
+	const raw = process.env.PRACTICE_GENERATION_REPAIR_BUDGET?.trim();
+	if (raw) {
+		const n = Number.parseInt(raw, 10);
+		if (Number.isFinite(n) && n >= 0) return n;
+	}
+	// Default 3: keeps worst-case latency closer to production targets (~60s typical)
+	return 3;
+}
+
+/**
+ * @deprecated Use {@link getPracticeGenerationRepairBudget}. Kept for older env docs.
  */
 export const PRACTICE_REPAIR_MAX_CALLS = 2;
 

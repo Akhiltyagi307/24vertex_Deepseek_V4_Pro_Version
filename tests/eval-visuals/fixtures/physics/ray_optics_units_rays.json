@@ -1,0 +1,37 @@
+{
+  "question_number": 1,
+  "topic_id": "22222222-bbbb-4222-8222-222222222222",
+  "topic_name": "Ray optics",
+  "question_text": "In the ray diagram shown below, where is the image formed relative to the lens?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "options": { "A": "At 5 cm on left", "B": "At 15 cm on right", "C": "At 10 cm on right", "D": "At infinity" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The image marker I1 is shown at x = 15 cm on the right side.",
+    "common_mistakes": [],
+    "related_concept": "Image formation by lenses"
+  },
+  "estimated_time_seconds": 120,
+  "visual": {
+    "caption": "Principal-axis ray diagram with focal labels and distances.",
+    "altText": "Convex lens at the origin with focal points marked. Object O1 at -20 cm and image I1 at 15 cm are shown with ray traces and distance labels.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "ray_optics",
+      "axisMin": -30,
+      "axisMax": 30,
+      "axisUnit": "cm",
+      "axisTickStep": 5,
+      "axisMajorTickStep": 10,
+      "drawRays": true,
+      "objects": [
+        { "kind": "object", "x": -20, "height": 5, "dashed": false, "label": "O1" },
+        { "kind": "image", "x": 15, "height": -3, "dashed": true, "label": "I1" }
+      ],
+      "lenses": [
+        { "type": "convex_lens", "x": 0, "focalLength": 10, "label": "Convex lens" }
+      ]
+    }
+  }
+}

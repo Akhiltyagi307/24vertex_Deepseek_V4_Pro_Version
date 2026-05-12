@@ -41,9 +41,16 @@ describe("QuestionVisual dispatcher", () => {
 		const figure = container.querySelector("[data-question-visual]");
 		expect(figure).not.toBeNull();
 		expect(figure?.getAttribute("aria-label")).toBe(exemplar!.visual!.altText);
-		expect(figure?.querySelector("figcaption")?.textContent).toBe(
-			exemplar!.visual!.caption,
-		);
+		const caption = exemplar!.visual!.caption;
+		const figcaption = figure?.querySelector("figcaption");
+		expect(figcaption).not.toBeNull();
+		if (caption.includes("$")) {
+			expect(figcaption?.querySelector(".katex")).not.toBeNull();
+			const prefix = caption.split("$")[0]?.trim() ?? "";
+			expect(figcaption?.textContent?.startsWith(prefix)).toBe(true);
+		} else {
+			expect(figcaption?.textContent).toBe(caption);
+		}
 		expect(figure?.getAttribute("data-question-visual-kind")).toBe(
 			exemplar!.visual!.spec.kind,
 		);

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { LatexText } from "../../latex-text";
 import { cn } from "@/lib/utils";
 import type { AccountancyTableSpec } from "@/lib/practice/visuals/types";
 
@@ -68,8 +69,12 @@ function JournalLikeTable({
 				{spec.rows.map((row, i) => (
 					<React.Fragment key={`r-${i}`}>
 						<tr>
-							<td>{row.date}</td>
-							<td className="whitespace-pre-wrap">{row.particulars}</td>
+							<td>
+								<LatexText text={row.date} />
+							</td>
+							<td className="whitespace-pre-wrap">
+								<LatexText text={row.particulars} />
+							</td>
 							<td className="text-right">{formatRupee(row.debit)}</td>
 							<td className="text-right">{formatRupee(row.credit)}</td>
 						</tr>
@@ -77,7 +82,7 @@ function JournalLikeTable({
 							<tr>
 								<td />
 								<td colSpan={3} className="text-muted-foreground italic text-xs">
-									{row.narration}
+									<LatexText text={row.narration} />
 								</td>
 							</tr>
 						) : null}
@@ -98,7 +103,7 @@ function LedgerTable({
 	return (
 		<div className="w-full max-w-[640px]">
 			<div className="text-foreground mb-1 text-center text-sm font-semibold">
-				{ledger.accountName} A/c
+				<LatexText text={`${ledger.accountName} A/c`} />
 			</div>
 			<table className={tableBase}>
 				<thead>
@@ -117,11 +122,19 @@ function LedgerTable({
 						const cr = ledger.creditSide[i];
 						return (
 							<tr key={`l-${i}`}>
-								<td>{dr?.date ?? ""}</td>
-								<td>{dr?.particulars ?? ""}</td>
+								<td>
+									<LatexText text={dr?.date ?? ""} />
+								</td>
+								<td>
+									<LatexText text={dr?.particulars ?? ""} />
+								</td>
 								<td className="text-right">{dr ? formatRupee(dr.amount) : ""}</td>
-								<td>{cr?.date ?? ""}</td>
-								<td>{cr?.particulars ?? ""}</td>
+								<td>
+									<LatexText text={cr?.date ?? ""} />
+								</td>
+								<td>
+									<LatexText text={cr?.particulars ?? ""} />
+								</td>
 								<td className="text-right">{cr ? formatRupee(cr.amount) : ""}</td>
 							</tr>
 						);
@@ -151,7 +164,9 @@ function TrialBalanceTable({
 			<tbody>
 				{spec.rows.map((row, i) => (
 					<tr key={`tb-${i}`}>
-						<td>{row.particulars}</td>
+						<td>
+							<LatexText text={row.particulars} />
+						</td>
 						<td className="text-right">{formatRupee(row.debit)}</td>
 						<td className="text-right">{formatRupee(row.credit)}</td>
 					</tr>
@@ -249,7 +264,7 @@ function BalanceSheetRow({
 				className={cn("whitespace-pre-wrap", row.bold && "font-semibold")}
 				style={{ paddingLeft: 8 + indentPx }}
 			>
-				{row.particulars}
+				<LatexText text={row.particulars} />
 			</td>
 			<td className={cn("text-right", row.bold && "font-semibold")}>
 				{formatRupee(row.amount)}

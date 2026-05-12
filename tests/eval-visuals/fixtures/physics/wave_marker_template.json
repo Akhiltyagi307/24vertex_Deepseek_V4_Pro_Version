@@ -1,0 +1,34 @@
+{
+  "question_text": "Use the wave diagram shown below to identify the point marked as an antinode.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "A",
+    "B": "B",
+    "C": "C",
+    "D": "D"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "Point B is placed at maximum displacement on the standing-wave sketch.",
+    "common_mistakes": [],
+    "related_concept": "Standing waves"
+  },
+  "visual": {
+    "caption": "Standing-wave stimulus with node and antinode markers.",
+    "altText": "A standing-wave curve with labelled markers including an antinode at Point B.",
+    "spec": {
+      "kind": "physics_wave_diagram",
+      "waveType": "standing",
+      "title": "Standing wave",
+      "xMin": 0,
+      "xMax": 10,
+      "amplitude": 2,
+      "wavelength": 5,
+      "markers": [
+        { "x": 0, "label": "A" },
+        { "x": 2.5, "label": "B" },
+        { "x": 5, "label": "C" }
+      ]
+    }
+  }
+}

@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { getAppUrl, getOpenAIChatModel } from "@/lib/env";
+import { triggerPracticeWorkerInBackground } from "@/lib/admin/practice-worker-trigger";
+import { getOpenAIChatModel } from "@/lib/env";
 import { practiceGenerationOutputSchema, validateAndStripGeneration } from "@/lib/practice";
 import { consumeAdaptiveFollowupsRateLimit } from "@/lib/practice/practice-rate-limit";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -141,40 +142,6 @@ async function restorePracticeTestStatus(
 	}
 }
 
-async function triggerWorkerInBackground(): Promise<{ ok: true } | { ok: false; message: string }> {
-	let base: string;
-	try {
-		base = getAppUrl();
-	} catch (error) {
-		logServerError("triggerWorkerInBackground.getAppUrl", error);
-		return { ok: false, message: "The worker endpoint is not configured." };
-	}
-
-	const headers: Record<string, string> = {};
-	if (process.env.CRON_SECRET) {
-		headers.authorization = `Bearer ${process.env.CRON_SECRET}`;
-	}
-
-	try {
-		const response = await fetch(`${base}/api/internal/practice/run-jobs`, {
-			method: "POST",
-			headers,
-			cache: "no-store",
-			keepalive: true,
-			// Cold starts and large job batches can exceed a few seconds; do not give up before the handler responds.
-			signal: AbortSignal.timeout(20_000),
-		});
-		if (!response.ok) {
-			logServerError("triggerWorkerInBackground.fetch", `Worker returned ${response.status}`);
-			return { ok: false, message: "The worker endpoint did not accept the request." };
-		}
-		return { ok: true };
-	} catch (error) {
-		logServerError("triggerWorkerInBackground.fetch", error);
-		return { ok: false, message: "Could not reach the worker endpoint." };
-	}
-}
-
 /**
  * Marks the test as grading and enqueues a background job. In dev or with
  * PRACTICE_SYNC_GRADING=true, grading still runs synchronously (kill switch).
@@ -248,16 +215,18 @@ export async function submitPracticeTest(
 		return { ok: false, message: friendlyDbError("submit") };
 	}
 
-	void triggerWorkerInBackground()
+	void triggerPracticeWorkerInBackground()
 		.then((triggerResult) => {
 			if (!triggerResult.ok) {
-				logServerError("submitPracticeTest.triggerWorkerInBackground", triggerResult.message, {
+				logServerError("submitPracticeTest.triggerPracticeWorkerInBackground", triggerResult.message, {
 					testId: row.test_id,
 				});
 			}
 		})
 		.catch((err) => {
-			logServerError("submitPracticeTest.triggerWorkerInBackground", err, { testId: row.test_id });
+			logServerError("submitPracticeTest.triggerPracticeWorkerInBackground", err, {
+				testId: row.test_id,
+			});
 		});
 
 	return {
@@ -323,9 +292,9 @@ export async function retryPracticeGrading(
 		return { ok: false, message: friendlyDbError("submit") };
 	}
 
-	const triggerResult = await triggerWorkerInBackground();
+	const triggerResult = await triggerPracticeWorkerInBackground();
 	if (!triggerResult.ok) {
-		logServerError("retryPracticeGrading.triggerWorkerInBackground", triggerResult.message, {
+		logServerError("retryPracticeGrading.triggerPracticeWorkerInBackground", triggerResult.message, {
 			testId: parsed.data.testId,
 		});
 	}

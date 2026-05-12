@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import type { NumberLineSpec } from "@/lib/practice/visuals/types";
+import { SvgMixedTextLabel } from "../visual-math-text";
 
 const SVG_WIDTH = 480;
 const SVG_HEIGHT = 100;
@@ -30,6 +31,7 @@ export function NumberLine({ spec }: { spec: NumberLineSpec }): React.ReactEleme
 	const xToScreen = (x: number): number => PADDING_X + ((x - spec.min) / range) * innerWidth;
 
 	const ticks: number[] = [];
+	const minorTicks: number[] = [];
 	{
 		// Cap iterations defensively — bad spec numbers should not loop forever.
 		const maxTicks = 200;
@@ -37,6 +39,19 @@ export function NumberLine({ spec }: { spec: NumberLineSpec }): React.ReactEleme
 		while (v <= spec.max + 1e-9 && ticks.length < maxTicks) {
 			ticks.push(v);
 			v += spec.tickStep;
+		}
+	}
+	if (
+		spec.minorTickStep != null &&
+		spec.minorTickStep > 0 &&
+		spec.minorTickStep < spec.tickStep
+	) {
+		const maxTicks = 400;
+		let v = spec.min;
+		while (v <= spec.max + 1e-9 && minorTicks.length < maxTicks) {
+			const majorAligned = Math.abs((v - spec.min) % spec.tickStep) < 1e-9;
+			if (!majorAligned) minorTicks.push(v);
+			v += spec.minorTickStep;
 		}
 	}
 
@@ -106,6 +121,18 @@ export function NumberLine({ spec }: { spec: NumberLineSpec }): React.ReactEleme
 					</text>
 				</g>
 			))}
+			{minorTicks.map((t, i) => (
+				<line
+					key={`minor-${i}`}
+					x1={xToScreen(t)}
+					y1={AXIS_Y - 3}
+					x2={xToScreen(t)}
+					y2={AXIS_Y + 3}
+					stroke="currentColor"
+					strokeWidth={1}
+					strokeOpacity={0.65}
+				/>
+			))}
 
 			<g className="text-primary">
 				{spec.intervals.map((interval, i) => {
@@ -140,15 +167,13 @@ export function NumberLine({ spec }: { spec: NumberLineSpec }): React.ReactEleme
 								strokeWidth={2}
 							/>
 							{interval.label ? (
-								<text
+								<SvgMixedTextLabel
 									x={(x1 + x2) / 2}
 									y={AXIS_Y - 14}
-									textAnchor="middle"
+									text={interval.label}
 									fontSize={11}
-									fill="currentColor"
-								>
-									{interval.label}
-								</text>
+									textAnchor="middle"
+								/>
 							) : null}
 						</g>
 					);
@@ -167,19 +192,26 @@ export function NumberLine({ spec }: { spec: NumberLineSpec }): React.ReactEleme
 							strokeWidth={2}
 						/>
 						{point.label ? (
-							<text
+							<SvgMixedTextLabel
 								x={xToScreen(point.value)}
 								y={AXIS_Y - 14}
-								textAnchor="middle"
+								text={point.label}
 								fontSize={11}
-								fill="currentColor"
-							>
-								{point.label}
-							</text>
+								textAnchor="middle"
+							/>
 						) : null}
 					</g>
 				))}
 			</g>
+			{spec.axisLabel ? (
+				<SvgMixedTextLabel
+					x={SVG_WIDTH - PADDING_X + 16}
+					y={AXIS_Y - 10}
+					text={spec.axisLabel}
+					fontSize={11}
+					textAnchor="end"
+				/>
+			) : null}
 		</svg>
 	);
 }

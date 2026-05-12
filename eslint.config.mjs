@@ -5,7 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
 	...nextVitals,
 	...nextTs,
-	globalIgnores([".next/**", "node_modules/**"]),
+	globalIgnores([".next/**", "node_modules/**", ".claude/**"]),
 	{
 		// `.cjs` files are CommonJS by definition — `require()` is the only way
 		// to write them. The TS-ESLint config bundled with `eslint-config-next`

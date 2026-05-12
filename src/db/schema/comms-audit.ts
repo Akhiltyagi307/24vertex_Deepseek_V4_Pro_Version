@@ -35,10 +35,10 @@ export const notifications = pgTable(
 		/** Student profile this row is about (parent portal and multi-child context). */
 		contextStudentId: uuid("context_student_id"),
 		isRead: boolean("is_read").default(false),
-		readAt: timestamp("read_at"),
+		readAt: timestamp("read_at", { withTimezone: true }),
 		emailSent: boolean("email_sent").default(false),
-		emailSentAt: timestamp("email_sent_at"),
-		createdAt: timestamp("created_at").defaultNow(),
+		emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 	},
 	(t) => [
 		index("idx_notif_recipient").on(t.recipientId, t.isRead),

@@ -19,6 +19,14 @@ export type {
 	DataTableSpec,
 	IndiaMapSpec,
 	EnglishPassageSpec,
+	BiologyDiagramSpec,
+	FlowchartSpec,
+	TimelineSpec,
+	SourceExtractSpec,
+	MapVisualSpec,
+	ChemistryCellDiagramSpec,
+	PhysicsFieldDiagramSpec,
+	PhysicsWaveDiagramSpec,
 	Point2D,
 } from "./schemas";
 

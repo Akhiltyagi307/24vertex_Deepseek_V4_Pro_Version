@@ -1,0 +1,25 @@
+{
+  "question_number": 1,
+  "topic_id": "33333333-bbbb-4333-8333-333333333332",
+  "topic_name": "Chemical equilibrium",
+  "question_text": "In the equilibrium reaction shown below, what catalyst is indicated above the arrow?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "options": { "A": "Pt", "B": "Fe", "C": "Ni", "D": "MnO2" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The equation annotation shows Fe catalyst.",
+    "common_mistakes": [],
+    "related_concept": "Haber process conditions"
+  },
+  "estimated_time_seconds": 120,
+  "visual": {
+    "caption": "Reversible reaction with catalyst and operating conditions.",
+    "altText": "Ammonia synthesis equation with gaseous state symbols and Fe catalyst condition written above the reversible arrow.",
+    "spec": {
+      "kind": "chemistry_reaction",
+      "ce": "N2(g) + 3H2(g) <=>[\\text{Fe}][450^\\circ\\text{C},\\ 200\\ \\text{atm}] 2NH3(g)",
+      "label": "Haber process"
+    }
+  }
+}

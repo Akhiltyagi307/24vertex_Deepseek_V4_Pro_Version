@@ -4,6 +4,12 @@ import * as React from "react";
 import functionPlot from "function-plot";
 
 import type { EconomicsCurveSpec } from "@/lib/practice/visuals/types";
+import { LatexText } from "../../latex-text";
+import {
+	ChartAxisLatexLayout,
+	SvgMixedTextLabel,
+	visualMathNeedsKatex,
+} from "../visual-math-text";
 
 const COLOR_MAP: Record<NonNullable<EconomicsCurveSpec["curves"][number]["color"]>, string> = {
 	primary: "#3b82f6",
@@ -35,16 +41,27 @@ export function EconomicsCurve({
 }): React.ReactElement {
 	const containerRef = React.useRef<HTMLDivElement | null>(null);
 	const [error, setError] = React.useState<string | null>(null);
+	const yDomain: [number, number] | null =
+		spec.yMin != null && spec.yMax != null && spec.yMax > spec.yMin
+			? [spec.yMin, spec.yMax]
+			: null;
+	const pointMarks = spec.marks.filter((mark) => (mark.kind ?? "point") === "point");
+	const verticalMarks = spec.marks.filter(
+		(mark) => (mark.kind ?? "point") === "vertical_line",
+	);
+
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
+	const verticalKatexMarks = verticalMarks.filter((m) => visualMathNeedsKatex(m.label));
+	const showPointOverlay = yDomain != null && pointMarks.length > 0;
+	const showVerticalKatexOverlay = verticalKatexMarks.length > 0;
 
 	React.useEffect(() => {
 		const target = containerRef.current;
 		if (!target) return undefined;
 		target.innerHTML = "";
 		try {
-			const yDomain: [number, number] | undefined =
-				spec.yMin != null && spec.yMax != null && spec.yMax > spec.yMin
-					? [spec.yMin, spec.yMax]
-					: undefined;
+			const yDomainForPlot: [number, number] | undefined = yDomain ?? undefined;
 			functionPlot({
 				target,
 				width: PLOT_WIDTH,
@@ -53,11 +70,11 @@ export function EconomicsCurve({
 				disableZoom: true,
 				xAxis: {
 					domain: [spec.xMin, spec.xMax],
-					label: spec.xLabel,
+					label: xMath ? "" : spec.xLabel,
 				},
 				yAxis: {
-					domain: yDomain,
-					label: spec.yLabel,
+					domain: yDomainForPlot,
+					label: yMath ? "" : spec.yLabel,
 				},
 				data: spec.curves.map((curve) => ({
 					fn: substitutePForX(curve.expr),
@@ -65,9 +82,9 @@ export function EconomicsCurve({
 					color: curve.color != null ? COLOR_MAP[curve.color] : COLOR_MAP.primary,
 					nSamples: 200,
 				})),
-				annotations: spec.marks.map((mark) => ({
+				annotations: verticalMarks.map((mark) => ({
 					x: mark.x,
-					text: mark.label,
+					text: visualMathNeedsKatex(mark.label) ? "" : mark.label,
 				})),
 			});
 			setError(null);
@@ -77,6 +94,8 @@ export function EconomicsCurve({
 		return () => {
 			if (target) target.innerHTML = "";
 		};
+		// Derived marks/domains come from `spec`; listing filtered arrays would churn deps every render.
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- imperative plot keyed on full spec snapshot
 	}, [spec]);
 
 	if (error) {
@@ -88,7 +107,79 @@ export function EconomicsCurve({
 		);
 	}
 
-	return <div ref={containerRef} className="w-full max-w-[480px]" />;
+	return (
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
+			<div className="relative h-[320px] w-[480px] max-w-full overflow-hidden">
+				<div ref={containerRef} />
+				{showPointOverlay || showVerticalKatexOverlay ? (
+					<svg
+						className="pointer-events-none absolute inset-0"
+						width={PLOT_WIDTH}
+						height={PLOT_HEIGHT}
+						viewBox={`0 0 ${PLOT_WIDTH} ${PLOT_HEIGHT}`}
+						aria-hidden="true"
+					>
+						{showPointOverlay
+							? pointMarks.map((mark, idx) => {
+									const [yMin, yMax] = yDomain as [number, number];
+									const px = toPlotX(mark.x, spec.xMin, spec.xMax);
+									const py = toPlotY(mark.y, yMin, yMax);
+									return (
+										<g key={`mark-${idx}`}>
+											<circle cx={px} cy={py} r={4} fill="#111827" />
+											<rect
+												x={px + 6}
+												y={py - 16}
+												width={Math.max(30, mark.label.length * 6.4)}
+												height={14}
+												rx={3}
+												fill="#ffffff"
+												stroke="#111827"
+												strokeWidth={0.8}
+											/>
+											<SvgMixedTextLabel
+												x={px + 10}
+												y={py - 6}
+												text={mark.label}
+												fontSize={10}
+												textAnchor="start"
+											/>
+										</g>
+									);
+								})
+							: null}
+						{showVerticalKatexOverlay
+							? verticalKatexMarks.map((mark, idx) => (
+									<SvgMixedTextLabel
+										key={`vm-${idx}`}
+										x={toPlotX(mark.x, spec.xMin, spec.xMax)}
+										y={28}
+										text={mark.label}
+										fontSize={10}
+										textAnchor="middle"
+									/>
+								))
+							: null}
+					</svg>
+				) : null}
+			</div>
+			<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+				{spec.curves.map((curve, idx) => {
+					const color = curve.color != null ? COLOR_MAP[curve.color] : COLOR_MAP.primary;
+					return (
+						<div key={`legend-${idx}`} className="flex items-center gap-2 text-muted-foreground">
+							<span
+								aria-hidden="true"
+								className="inline-block h-2.5 w-2.5 rounded-sm"
+								style={{ backgroundColor: color }}
+							/>
+							<LatexText text={curve.label} />
+						</div>
+					);
+				})}
+			</div>
+		</ChartAxisLatexLayout>
+	);
 }
 
 /**
@@ -99,6 +190,20 @@ export function EconomicsCurve({
  */
 function substitutePForX(expr: string): string {
 	return expr.replace(/(^|[^A-Za-z0-9_])p(?=$|[^A-Za-z0-9_])/g, "$1x");
+}
+
+function toPlotX(x: number, xMin: number, xMax: number): number {
+	const left = 44;
+	const right = PLOT_WIDTH - 20;
+	const span = Math.max(xMax - xMin, 1e-6);
+	return left + ((x - xMin) / span) * (right - left);
+}
+
+function toPlotY(y: number, yMin: number, yMax: number): number {
+	const top = 18;
+	const bottom = PLOT_HEIGHT - 40;
+	const span = Math.max(yMax - yMin, 1e-6);
+	return bottom - ((y - yMin) / span) * (bottom - top);
 }
 
 export const __test = { substitutePForX };

@@ -1,0 +1,29 @@
+{
+  "question_text": "In the electrochemical cell shown below, identify the electrode where oxidation occurs.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Zinc electrode",
+    "B": "Copper electrode",
+    "C": "Salt bridge",
+    "D": "External wire"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "In a galvanic cell, oxidation occurs at the anode; the visual labels zinc as the anode.",
+    "common_mistakes": [],
+    "related_concept": "Electrochemical cells"
+  },
+  "visual": {
+    "caption": "Galvanic cell stimulus with electrodes, salt bridge, and electron-flow direction.",
+    "altText": "A zinc anode in zinc sulfate and copper cathode in copper sulfate connected by a salt bridge.",
+    "spec": {
+      "kind": "chemistry_cell_diagram",
+      "cellType": "galvanic",
+      "anode": { "label": "Anode", "material": "Zn", "electrolyte": "ZnSO4", "polarity": "negative" },
+      "cathode": { "label": "Cathode", "material": "Cu", "electrolyte": "CuSO4", "polarity": "positive" },
+      "saltBridge": "KNO3",
+      "electronFlow": "anode_to_cathode",
+      "labels": ["Salt bridge", "External wire"]
+    }
+  }
+}

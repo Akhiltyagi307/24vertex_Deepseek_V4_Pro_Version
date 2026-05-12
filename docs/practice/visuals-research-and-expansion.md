@@ -36,8 +36,8 @@ Subject routing currently allows:
 
 Important renderer notes:
 
-- `chemistry_molecule.display: "3d"` is schema-valid, but the current screen renderer still draws molecules in 2D.
-- `math_geometry.angle_marker` is a simplified marker, not a full arc with rich labels.
+- `chemistry_molecule.display` is now constrained to `2d`; captions/labels should not imply true 3D rendering.
+- `math_geometry.angle_marker` now renders explicit angle arcs (with right-angle square when applicable), plus primitive label support.
 - `statistics_chart.pie` and `statistics_chart.box` have screen renderers, but PDF rendering falls back to text/code blocks.
 - `physics_diagram` cannot show electric field lines, magnetic fields, phasors, waves, or semiconductor symbols as first-class diagrams.
 - Biology, Social Science maps/timelines, and Business Studies flowcharts are not first-class visual kinds today.
@@ -342,16 +342,16 @@ Future renderer candidates:
 
 High-priority fixes:
 
-1. Correct the PPF exemplar. The point labelled as an inefficient output should sit inside the frontier, not above it.
-2. Rework the monopoly curve marks so `Q*` appears on the horizontal-axis quantity and `P*` appears on the demand/AR curve at that output, or change the stem to avoid projection ambiguity.
-3. Fix the sine plot caption: the current range is about two periods, not one full period.
-4. Review examples where the stem restates most of the visual data; move data into the visual where possible.
+1. ~~Correct the PPF exemplar. The point labelled as an inefficient output should sit inside the frontier, not above it.~~ ✅
+2. ~~Rework the monopoly curve marks so `Q*` appears on the horizontal-axis quantity and `P*` appears on the demand/AR curve at that output, or change the stem to avoid projection ambiguity.~~ ✅
+3. ~~Fix the sine plot caption: the current range is about two periods, not one full period.~~ ✅
+4. ~~Review examples where the stem restates most of the visual data; move data into the visual where possible.~~ ✅ (enrichment pass + caption tightening)
 
 Medium-priority fixes:
 
-1. Add subject tags for overlap cases where appropriate, especially Science-friendly physics and chemistry examples.
-2. Avoid `display: "3d"` in chemistry exemplars until the renderer genuinely supports 3D or the limitation is explicitly documented in prompts/tests.
-3. Add examples for renderer component coverage: bulb, switch, ammeter, voltmeter, convex mirror, more-than ogive.
+1. ~~Add subject tags for overlap cases where appropriate, especially Science-friendly physics and chemistry examples.~~ ✅
+2. ~~Avoid `display: "3d"` in chemistry exemplars until the renderer genuinely supports 3D or the limitation is explicitly documented in prompts/tests.~~ ✅
+3. ~~Add examples for renderer component coverage: bulb, switch, ammeter, voltmeter, convex mirror, more-than ogive.~~ ✅
 
 Low-priority polish:
 
@@ -363,30 +363,30 @@ Low-priority polish:
 
 Priority 0: fix existing risky examples.
 
-- Correct PPF geometry and stem.
-- Clarify monopoly marks or simplify the exemplar.
-- Correct sine caption.
+- ~~Correct PPF geometry and stem.~~ ✅
+- ~~Clarify monopoly marks or simplify the exemplar.~~ ✅
+- ~~Correct sine caption.~~ ✅
 
 Priority 1: fill missing supported components.
 
-- Physics circuit with bulb + open/closed switch.
-- Physics circuit with ammeter in series and voltmeter across resistor.
-- Physics ray optics with convex mirror.
-- Statistics more-than ogive.
+- ~~Physics circuit with bulb + open/closed switch.~~ ✅
+- ~~Physics circuit with ammeter in series and voltmeter across resistor.~~ ✅
+- ~~Physics ray optics with convex mirror.~~ ✅
+- ~~Statistics more-than ogive.~~ ✅
 
 Priority 2: add high-yield board-style exemplars.
 
-- Mathematics tangent-radius / chord theorem.
-- Mathematics height-distance trigonometry setup.
-- Mathematics LPP feasible region using `math_geometry`.
-- Chemistry equilibrium/redox mhchem example.
-- Accountancy share forfeiture journal.
-- Accountancy revaluation account ledger.
+- ~~Mathematics tangent-radius / chord theorem.~~ ✅
+- ~~Mathematics height-distance trigonometry setup.~~ ✅
+- ~~Mathematics LPP feasible region using `math_geometry`.~~ ✅
+- ~~Chemistry equilibrium/redox mhchem example.~~ ✅
+- ~~Accountancy share forfeiture journal.~~ ✅
+- ~~Accountancy revaluation account ledger.~~ ✅
 - Accountancy ratio-analysis `data_table` if Accountancy visual policy expands to allow `data_table`.
-- Economics price ceiling/floor.
-- Economics budget line.
-- English factual passage and dialogue extract.
-- Science nutrition/material classification table.
+- ~~Economics price ceiling/floor.~~ ✅
+- ~~Economics budget line.~~ ✅
+- ~~English factual passage and dialogue extract.~~ ✅
+- ~~Science nutrition/material classification table.~~ ✅
 
 Priority 3: routing/prompt improvements to consider.
 
@@ -430,18 +430,18 @@ Existing tests to keep running:
 
 Recommended test additions:
 
-- Parameterized exemplar coverage test asserting at least one exemplar for:
+- ~~Parameterized exemplar coverage test asserting at least one exemplar for:~~ ✅
   - every top-level `QUESTION_VISUAL_KINDS` value.
   - every `statistics_chart.subKind`.
   - every `accountancy_table.subKind`.
   - every `physics_diagram.subKind`.
   - all circuit component types: battery, resistor, bulb, switch, ammeter, voltmeter, wire.
   - all ray optics lens/mirror types: concave mirror, convex mirror, concave lens, convex lens.
-- Quality regression tests for:
+- ~~Quality regression tests for:~~ ✅
   - `pickExemplarsForSubject` surfaces subject-local null anchor first.
   - exemplar captions do not contain phrases like "answer", "correct option", or "therefore".
   - every exemplar parses through `questionVisualEnvelopeSchema`.
-- Renderer tests for:
+- ~~Renderer tests for:~~ ✅
   - `MathGeometry` primitives.
   - `MathFunctionPlot` valid and invalid expressions.
   - all `StatisticsChart` subKinds.
@@ -450,16 +450,16 @@ Recommended test additions:
 
 Recommended eval fixtures:
 
-- `tests/eval-visuals/fixtures/mathematics/geometry_tangent.json`
-- `tests/eval-visuals/fixtures/mathematics/lpp_region.json`
-- `tests/eval-visuals/fixtures/physics/circuit_measurement.json`
-- `tests/eval-visuals/fixtures/physics/convex_mirror.json`
-- `tests/eval-visuals/fixtures/chemistry/reaction_conditions.json`
-- `tests/eval-visuals/fixtures/accountancy/share_forfeiture.json`
-- `tests/eval-visuals/fixtures/economics/price_floor.json`
-- `tests/eval-visuals/fixtures/statistics/more_than_ogive.json`
-- `tests/eval-visuals/fixtures/english/dialogue_extract.json`
-- `tests/eval-visuals/fixtures/science/classification_table.json`
+- ~~`tests/eval-visuals/fixtures/mathematics/geometry_tangent.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/mathematics/lpp_region.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/physics/circuit_measurement.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/physics/convex_mirror.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/chemistry/reaction_conditions.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/accountancy/share_forfeiture.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/economics/price_floor.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/statistics/more_than_ogive.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/english/dialogue_extract.json`~~ ✅
+- ~~`tests/eval-visuals/fixtures/science/classification_table.json`~~ ✅
 
 ## Recommended Implementation Order
 

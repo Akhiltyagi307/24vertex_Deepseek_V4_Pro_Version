@@ -6,6 +6,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import "katex/dist/contrib/mhchem.mjs";
 
+import { LatexText } from "../../latex-text";
 import type { ChemistryReactionSpec } from "@/lib/practice/visuals/types";
 
 /**
@@ -32,6 +33,7 @@ export function ChemistryReaction({
 				displayMode: true,
 				strict: "ignore",
 				trust: false,
+				output: "html",
 			});
 		} catch {
 			return null;
@@ -50,7 +52,9 @@ export function ChemistryReaction({
 	return (
 		<div className="flex w-full flex-col items-center gap-1 px-2">
 			{spec.label ? (
-				<span className="text-muted-foreground text-xs">{spec.label}</span>
+				<span className="text-muted-foreground text-xs">
+					<LatexText text={spec.label} className="justify-center text-center" />
+				</span>
 			) : null}
 			<div
 				className="text-foreground [&_.katex]:text-base"

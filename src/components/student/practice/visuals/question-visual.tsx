@@ -3,6 +3,7 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 
+import { LatexText } from "../latex-text";
 import { cn } from "@/lib/utils";
 import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
 
@@ -82,6 +83,38 @@ const EnglishPassage = dynamic(
 	() => import("./renderers/english-passage").then((m) => ({ default: m.EnglishPassage })),
 	{ ssr: false, loading: () => <RendererLoading /> },
 );
+const BiologyDiagram = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.BiologyDiagram })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const Flowchart = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.Flowchart })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const Timeline = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.Timeline })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const SourceExtract = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.SourceExtract })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const MapVisual = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.MapVisual })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const ChemistryCellDiagram = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.ChemistryCellDiagram })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const PhysicsFieldDiagram = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.PhysicsFieldDiagram })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
+const PhysicsWaveDiagram = dynamic(
+	() => import("./renderers/template-renderers").then((m) => ({ default: m.PhysicsWaveDiagram })),
+	{ ssr: false, loading: () => <RendererLoading /> },
+);
 export function QuestionVisual({
 	visual,
 	className,
@@ -107,7 +140,7 @@ export function QuestionVisual({
 				</div>
 			</div>
 			<figcaption className="text-muted-foreground text-center text-xs">
-				{visual.caption}
+				<LatexText text={visual.caption} className="justify-center text-center" />
 			</figcaption>
 		</figure>
 	);
@@ -144,5 +177,21 @@ function RendererDispatch({
 			return <IndiaMap spec={spec} />;
 		case "english_passage":
 			return <EnglishPassage spec={spec} />;
+		case "biology_diagram":
+			return <BiologyDiagram spec={spec} />;
+		case "flowchart":
+			return <Flowchart spec={spec} />;
+		case "timeline":
+			return <Timeline spec={spec} />;
+		case "source_extract":
+			return <SourceExtract spec={spec} />;
+		case "map_visual":
+			return <MapVisual spec={spec} />;
+		case "chemistry_cell_diagram":
+			return <ChemistryCellDiagram spec={spec} />;
+		case "physics_field_diagram":
+			return <PhysicsFieldDiagram spec={spec} />;
+		case "physics_wave_diagram":
+			return <PhysicsWaveDiagram spec={spec} />;
 	}
 }

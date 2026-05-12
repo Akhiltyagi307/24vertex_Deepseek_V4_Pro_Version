@@ -38,6 +38,7 @@ describe("useNetworkStatus", () => {
 		const h = renderHook(() => useNetworkStatus());
 		expect(h.current).toBe(true);
 		act(() => {
+			Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
 			window.dispatchEvent(new Event("offline"));
 		});
 		expect(h.current).toBe(false);
@@ -49,6 +50,7 @@ describe("useNetworkStatus", () => {
 		const h = renderHook(() => useNetworkStatus());
 		expect(h.current).toBe(false);
 		act(() => {
+			Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
 			window.dispatchEvent(new Event("online"));
 		});
 		expect(h.current).toBe(true);

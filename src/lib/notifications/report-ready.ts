@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/auth-users";
-import { notifications } from "@/db/schema/comms-audit";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
 import { sendParentPortalReportReadyEmail, sendReportReadyEmail } from "@/lib/email/notifications-emails";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
@@ -12,59 +11,63 @@ import {
 	findNotificationIdForEmailRef,
 	insertInAppNotification,
 	markNotificationEmailSent,
+	MAX_NOTIFICATION_TITLE_LEN,
 } from "@/lib/notifications/insert";
 import { getNotificationPrefs, isEmailAllowed } from "@/lib/notifications/prefs";
 import { logServerError } from "@/lib/server/log-supabase-error";
+import { formatPracticeReportSubmittedLabel } from "@/lib/notifications/report-datetime-label";
+import { resolvePracticeReportEmailFacts } from "@/lib/notifications/practice-report-email-facts";
 import { createStudentTestReportPdfSignedUrl } from "@/lib/practice/student-test-report-pdf-signed-url";
+
+export { formatPracticeReportSubmittedLabel } from "@/lib/notifications/report-datetime-label";
 
 export type NotifyTestReportReadyInput = {
 	studentId: string;
 	testId: string;
 	subjectName: string;
 	overallPercent: number | null;
+	/** `tests.test_date` (submit time). Makes duplicate subject titles distinguishable in the bell. */
+	submittedAtIso?: string | null;
 };
 
-/**
- * Has a `test_report_ready` notification already been written for
- * (recipient × test)? Used by both the student and parent in-app emit so
- * grading retries / overlapping submit + worker calls don't duplicate cards.
- */
-async function hasExistingReportReadyRow(recipientId: string, testId: string): Promise<boolean> {
-	try {
-		const rows = await db
-			.select({ id: notifications.id })
-			.from(notifications)
-			.where(
-				and(
-					eq(notifications.recipientId, recipientId),
-					eq(notifications.referenceType, "test"),
-					eq(notifications.referenceId, testId),
-					eq(notifications.category, "test_report_ready"),
-				),
-			)
-			.limit(1);
-		return rows.length > 0;
-	} catch (err) {
-		logServerError("notifications.report_ready.dedup_check", err, { recipientId, testId });
-		// Fail-closed: skip insert when we can't verify, so we don't risk dups.
-		return true;
-	}
+function trimTitle(raw: string): string {
+	return raw.length <= MAX_NOTIFICATION_TITLE_LEN ?
+			raw
+		:	`${raw.slice(0, Math.max(0, MAX_NOTIFICATION_TITLE_LEN - 1))}…`;
+}
+
+function studentReportReadyTitle(input: NotifyTestReportReadyInput): string {
+	const label = formatPracticeReportSubmittedLabel(input.submittedAtIso);
+	const base = `Your ${input.subjectName} report is ready`;
+	const withWhen = label ? `${base} (${label})` : base;
+	return trimTitle(withWhen);
+}
+
+function parentReportReadyTitle(childLabel: string, input: NotifyTestReportReadyInput): string {
+	const label = formatPracticeReportSubmittedLabel(input.submittedAtIso);
+	const base = `${childLabel} — ${input.subjectName} report ready`;
+	const withWhen = label ? `${base} (${label})` : base;
+	return trimTitle(withWhen);
 }
 
 /**
- * Emits the "your report is ready" in-app notification after grading finishes.
+ * Emits the "your report is ready" in-app notification as soon as grading
+ * persists (`gradePracticeTestWithAi`). The PDF/email pipeline calls this again
+ * after upload for idempotent no-ops under the partial unique index — students
+ * see the bell immediately instead of waiting behind a backed-up PDF queue.
  *
- * Idempotency contract — both halves below are checked against the
- * `notifications` table by `(recipientId, referenceType=test, referenceId,
- * category=test_report_ready)`, so:
+ * Idempotency contract — both halves below write `notifications` rows keyed by
+ * `(recipient_id, reference_type=test, reference_id, category=test_report_ready)`.
+ * A partial unique index enforces this at the DB layer, so retries or
+ * overlapping workers naturally collapse to one card per recipient × test.
  *
- *  - Student emit: dedup check → insert (or skip).
- *  - Parent emit:  per-parent dedup check → insert (or skip) for each linked parent.
+ *  - Student emit: insert (or no-op on unique conflict).
+ *  - Parent emit:  per-parent insert (or no-op on unique conflict).
  *
  * The two halves are independent on purpose: a parent emit failure must NOT
  * cause the student emit to retry (and vice versa). On any retry, both halves
- * re-run their dedup checks and only insert rows that don't yet exist —
- * which is correct behavior, not desync. Do not "unify" by sharing a single
+ * remain idempotent — which is correct behavior, not desync. Do not "unify"
+ * by sharing a single
  * dedup row across roles; the bell UI keys by recipient.
  *
  * Report-ready emails (student + linked parents) are sent from the email job
@@ -73,19 +76,17 @@ async function hasExistingReportReadyRow(recipientId: string, testId: string): P
  */
 export async function notifyTestReportReady(input: NotifyTestReportReadyInput): Promise<void> {
 	try {
-		if (!(await hasExistingReportReadyRow(input.studentId, input.testId))) {
-			const prefs = await getNotificationPrefs(input.studentId);
-			await insertInAppNotification({
-				recipientId: input.studentId,
-				title: `Your ${input.subjectName} report is ready`,
-				body: buildReportBody(input),
-				type: "test_result",
-				category: "test_report_ready",
-				referenceType: "test",
-				referenceId: input.testId,
-				prefs,
-			});
-		}
+		const prefs = await getNotificationPrefs(input.studentId);
+		await insertInAppNotification({
+			recipientId: input.studentId,
+			title: studentReportReadyTitle(input),
+			body: buildReportBody(input),
+			type: "test_result",
+			category: "test_report_ready",
+			referenceType: "test",
+			referenceId: input.testId,
+			prefs,
+		});
 	} catch (err) {
 		logServerError("notifications.report_ready", err, {
 			studentId: input.studentId,
@@ -122,11 +123,10 @@ async function notifyLinkedParentsTestReportReadyInApp(input: NotifyTestReportRe
 	await Promise.allSettled(
 		linkRows.map(async ({ parentId }) => {
 			try {
-				if (await hasExistingReportReadyRow(parentId, input.testId)) return;
 				const prefs = await getNotificationPrefs(parentId);
 				await insertInAppNotification({
 					recipientId: parentId,
-					title: `${childLabel} — ${input.subjectName} report ready`,
+					title: parentReportReadyTitle(childLabel, input),
 					body: buildParentPortalReportBody(input, childLabel),
 					type: "test_result",
 					category: "test_report_ready",
@@ -149,15 +149,17 @@ async function notifyLinkedParentsTestReportReadyInApp(input: NotifyTestReportRe
 export type NotifyTestReportPdfReadyEmailsInput = {
 	testId: string;
 	studentId: string;
+	/** Queue hint only — email body/PDF use DB-resolved subject after grading. */
 	subjectName: string;
 	overallPercent: number | null;
-	storagePath: string;
+	/** Queue hint only — signing uses canonical `{studentId}/{testId}.pdf` unless DB path validates. */
+	storagePath?: string | null;
 };
 
 /**
  * Aggregated email-send result. `permanentlyFailed` is set when the
- * underlying issue cannot be retried (e.g., null storage path) so the
- * caller can mark the queue job dead immediately instead of retrying
+ * underlying issue cannot be retried (e.g., unknown test / owner mismatch)
+ * so the caller can mark the queue job dead immediately instead of retrying
  * indefinitely.
  */
 export type NotifyTestReportPdfReadyEmailsResult =
@@ -168,6 +170,11 @@ export type NotifyTestReportPdfReadyEmailsResult =
  * Sends student + parent "report ready" emails after the PDF is in Storage.
  * Uses a time-limited signed URL so the PDF opens without EduAI authentication.
  *
+ * Subject line, score, PDF storage path, and submission label are **resolved
+ * from Postgres at send time** (`tests`, `subjects`, `test_reports`) so queued
+ * job payloads cannot drift from the interactive report (stale subject names
+ * from delayed email jobs were misleading users).
+ *
  * Idempotency: `sendHtmlEmailLogged` is called with a `dedupKey` per recipient
  * (`report-ready:${testId}:${student|parent}:${recipientId}`) so concurrent
  * grading retries do not produce duplicate sends.
@@ -175,22 +182,29 @@ export type NotifyTestReportPdfReadyEmailsResult =
 export async function notifyTestReportPdfReadyEmails(
 	input: NotifyTestReportPdfReadyEmailsInput,
 ): Promise<NotifyTestReportPdfReadyEmailsResult> {
-	if (!input.storagePath) {
-		// Permanently terminal: there's no PDF to attach. Caller should NOT
-		// retry — the upstream PDF render didn't complete. We still report
-		// because the queue job needs to know to mark itself dead.
-		return {
-			ok: false,
-			sent: 0,
-			failedCount: 0,
-			permanentlyFailed: true,
-			reason: "missing_storage_path",
-		};
-	}
 	let sent = 0;
 	let failedCount = 0;
 	try {
-		const signed = await createStudentTestReportPdfSignedUrl(input.storagePath);
+		const resolved = await resolvePracticeReportEmailFacts({
+			testId: input.testId,
+			studentId: input.studentId,
+			payloadSubjectName: input.subjectName,
+			payloadStoragePath: input.storagePath ?? null,
+		});
+
+		if (!resolved.ok) {
+			const permanent =
+				resolved.reason === "test_not_found" || resolved.reason === "student_test_mismatch";
+			return {
+				ok: false,
+				sent: 0,
+				failedCount: 0,
+				permanentlyFailed: permanent,
+				reason: resolved.reason,
+			};
+		}
+
+		const signed = await createStudentTestReportPdfSignedUrl(resolved.storagePath);
 		if (!signed.ok) {
 			logServerError("notifications.report_pdf_ready.signed_url", new Error(signed.message), {
 				testId: input.testId,
@@ -206,6 +220,8 @@ export async function notifyTestReportPdfReadyEmails(
 		}
 		const pdfSignedUrl = signed.url;
 
+		const submittedLabel = formatPracticeReportSubmittedLabel(resolved.submittedAtIso);
+
 		const studentContact = await loadProfileContact(input.studentId);
 		const childLabel = formatPersonDisplayName(studentContact?.fullName ?? "") || "your child";
 
@@ -215,10 +231,11 @@ export async function notifyTestReportPdfReadyEmails(
 				to: studentContact.email,
 				recipientUserId: input.studentId,
 				studentName: studentContact.fullName ?? undefined,
-				subjectName: input.subjectName,
-				overallPercent: input.overallPercent,
+				subjectName: resolved.subjectName,
+				overallPercent: resolved.overallPercent,
 				testId: input.testId,
 				pdfSignedUrl,
+				submittedLabel,
 			});
 			if (error) {
 				failedCount++;
@@ -228,9 +245,9 @@ export async function notifyTestReportPdfReadyEmails(
 				});
 			} else {
 				sent++;
-				// In-app row was written by `notifyTestReportReady` inside the
-				// grader; mark it `email_sent=true` so admin tooling and the
-				// bell UI know the user got both halves.
+				// In-app row was written by `notifyTestReportReady` during grading (and
+				// optionally replayed after PDF); mark `email_sent=true` so admin tooling
+				// and the bell UI know the user got both halves.
 				const id = await findNotificationIdForEmailRef({
 					recipientId: input.studentId,
 					referenceType: "test",
@@ -262,10 +279,11 @@ export async function notifyTestReportPdfReadyEmails(
 						parentDisplayName,
 						childDisplayName: childLabel,
 						studentId: input.studentId,
-						subjectName: input.subjectName,
-						overallPercent: input.overallPercent,
+						subjectName: resolved.subjectName,
+						overallPercent: resolved.overallPercent,
 						testId: input.testId,
 						pdfSignedUrl,
+						submittedLabel,
 					});
 					if (error) {
 						failedCount++;
@@ -322,7 +340,7 @@ function buildReportBody(input: NotifyTestReportReadyInput): string {
 		input.overallPercent != null && Number.isFinite(input.overallPercent)
 			? `You scored ${Math.round(input.overallPercent)}%. `
 			: "";
-	return `${pct}Tap View report for topic-level strengths, weaknesses, and your next recommended practice.`;
+	return `${pct}Tap View report for topic breakdowns and next practice. A printable PDF follows by email when rendering finishes.`;
 }
 
 function buildParentPortalReportBody(input: NotifyTestReportReadyInput, childLabel: string): string {
@@ -330,7 +348,7 @@ function buildParentPortalReportBody(input: NotifyTestReportReadyInput, childLab
 		input.overallPercent != null && Number.isFinite(input.overallPercent)
 			? `${childLabel} scored ${Math.round(input.overallPercent)}%. `
 			: "";
-	return `${pct}Open the report for topic strengths, gaps, and suggested next practice.`;
+	return `${pct}Open the report for topic strengths, gaps, and suggested next practice. A printable PDF email may arrive shortly.`;
 }
 
 /**

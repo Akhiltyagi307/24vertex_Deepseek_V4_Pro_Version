@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAppUrl } from "@/lib/env";
+import { PRACTICE_JOB_WORKER_DEFAULT_BATCH_LIMIT } from "@/lib/practice/practice-worker-constants";
 import { logServerError } from "@/lib/server/log-supabase-error";
 
 /** Triggers `/api/internal/practice/run-jobs` (same as student submit / retry grading). */
@@ -19,12 +20,14 @@ export async function triggerPracticeWorkerInBackground(): Promise<{ ok: true } 
 	}
 
 	try {
-		const response = await fetch(`${base}/api/internal/practice/run-jobs`, {
+		const u = new URL(`${base}/api/internal/practice/run-jobs`);
+		u.searchParams.set("limit", String(PRACTICE_JOB_WORKER_DEFAULT_BATCH_LIMIT));
+		const response = await fetch(u.toString(), {
 			method: "POST",
 			headers,
 			cache: "no-store",
 			keepalive: true,
-			signal: AbortSignal.timeout(20_000),
+			signal: AbortSignal.timeout(45_000),
 		});
 		if (!response.ok) {
 			logServerError("triggerPracticeWorkerInBackground.fetch", `Worker returned ${response.status}`);

@@ -29,7 +29,6 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const LOCKFILE = path.join(ROOT, "skills.lock.json");
-const SKILLS_DIR = path.join(ROOT, "skills");
 
 function hashDirectory(dir) {
 	const hash = createHash("sha256");

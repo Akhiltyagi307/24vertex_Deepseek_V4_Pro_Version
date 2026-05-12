@@ -1,0 +1,32 @@
+{
+  "question_number": 1,
+  "topic_id": "11111111-aaaa-4111-8111-111111111111",
+  "topic_name": "Coordinate geometry",
+  "question_text": "In the labelled triangle shown below, which side is marked equal to AB?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "BC", "B": "AC", "C": "None", "D": "Cannot be determined" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Both AB and BC have one tick mark.",
+    "common_mistakes": [],
+    "related_concept": "Equal side markings"
+  },
+  "estimated_time_seconds": 90,
+  "visual": {
+    "caption": "Triangle with labelled vertices and side tick marks.",
+    "altText": "Coordinate diagram with points A, B, and C. Segments AB and BC each have one hatch mark indicating equal length.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 8, "yMin": -1, "yMax": 7, "showGrid": true, "showAxes": true },
+      "primitives": [
+        { "type": "point", "at": { "x": 1, "y": 1 }, "label": "A", "labelPosition": "sw" },
+        { "type": "point", "at": { "x": 6, "y": 1 }, "label": "B", "labelPosition": "se" },
+        { "type": "point", "at": { "x": 4, "y": 5 }, "label": "C", "labelPosition": "n" },
+        { "type": "segment", "from": { "x": 1, "y": 1 }, "to": { "x": 6, "y": 1 }, "label": "AB", "dashed": false, "tickMarks": 1, "arrowEnd": false },
+        { "type": "segment", "from": { "x": 6, "y": 1 }, "to": { "x": 4, "y": 5 }, "label": "BC", "dashed": false, "tickMarks": 1, "arrowEnd": false },
+        { "type": "segment", "from": { "x": 4, "y": 5 }, "to": { "x": 1, "y": 1 }, "label": "AC", "dashed": false, "tickMarks": 0, "arrowEnd": false }
+      ]
+    }
+  }
+}

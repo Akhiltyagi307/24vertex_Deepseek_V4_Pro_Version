@@ -1,0 +1,30 @@
+{
+  "question_text": "Read the source extract and identify the principle being illustrated.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Equality before law",
+    "B": "Single-party rule",
+    "C": "Hereditary privilege",
+    "D": "Military governance"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The extract says the same law applies equally to all citizens.",
+    "common_mistakes": [],
+    "related_concept": "Democratic rights"
+  },
+  "visual": {
+    "caption": "Line-numbered civic source extract for interpretation.",
+    "altText": "A short source extract with numbered lines about equal application of law to citizens.",
+    "spec": {
+      "kind": "source_extract",
+      "title": "Civic source",
+      "source": "Practice source",
+      "context": "Read the lines before answering.",
+      "lines": [
+        { "number": 1, "text": "The same law applies to every citizen." },
+        { "number": 2, "text": "No office or title places a person above it." }
+      ]
+    }
+  }
+}

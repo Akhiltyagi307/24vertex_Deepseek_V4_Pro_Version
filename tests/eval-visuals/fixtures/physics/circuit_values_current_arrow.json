@@ -1,0 +1,36 @@
+{
+  "question_number": 1,
+  "topic_id": "22222222-cccc-4222-8222-222222222223",
+  "topic_name": "Current electricity",
+  "question_text": "In the circuit shown below, what is the resistance of the resistor connected between nodes b and c?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "50 Ω", "B": "100 Ω", "C": "150 Ω", "D": "200 Ω" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The resistor label indicates 100 Ω.",
+    "common_mistakes": [],
+    "related_concept": "Circuit components and values"
+  },
+  "estimated_time_seconds": 90,
+  "visual": {
+    "caption": "Closed-loop circuit with labelled battery and resistor values.",
+    "altText": "Rectangular loop with nodes a, b, c, and d. Battery on top branch, resistor on right branch, and current arrow shown on one wire.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "circuit",
+      "nodes": [
+        { "id": "a", "x": 0, "y": 0 },
+        { "id": "b", "x": 4, "y": 0 },
+        { "id": "c", "x": 4, "y": 3 },
+        { "id": "d", "x": 0, "y": 3 }
+      ],
+      "components": [
+        { "type": "battery", "from": "a", "to": "b", "emfVolts": 12, "label": null, "polarityMarks": true, "currentArrow": true },
+        { "type": "resistor", "from": "b", "to": "c", "resistanceOhms": 100, "label": null, "currentArrow": false },
+        { "type": "wire", "from": "c", "to": "d", "currentArrow": true },
+        { "type": "wire", "from": "d", "to": "a", "currentArrow": false }
+      ]
+    }
+  }
+}

@@ -25,18 +25,26 @@ import { sampleArcPolyline } from "@/lib/practice/visuals/math-geometry-arc";
 
 import type {
 	AccountancyTableSpec,
+	BiologyDiagramSpec,
+	ChemistryCellDiagramSpec,
 	ChemistryMoleculeSpec,
 	ChemistryReactionSpec,
 	DataTableSpec,
 	EconomicsCurveSpec,
 	EnglishPassageSpec,
+	FlowchartSpec,
 	IndiaMapSpec,
+	MapVisualSpec,
 	MathFunctionPlotSpec,
 	MathGeometrySpec,
 	NumberLineSpec,
+	PhysicsFieldDiagramSpec,
 	PhysicsDiagramSpec,
+	PhysicsWaveDiagramSpec,
 	QuestionVisualEnvelope,
+	SourceExtractSpec,
 	StatisticsChartSpec,
+	TimelineSpec,
 } from "@/lib/practice/visuals/types";
 
 /**
@@ -194,7 +202,161 @@ function RenderSpec({ visual }: { visual: QuestionVisualEnvelope }): ReactElemen
 			return <IndiaMapPdf spec={spec} />;
 		case "english_passage":
 			return <EnglishPassagePdf spec={spec} />;
+		case "biology_diagram":
+			return <BiologyDiagramPdf spec={spec} altText={visual.altText} />;
+		case "flowchart":
+			return <FlowchartPdf spec={spec} altText={visual.altText} />;
+		case "timeline":
+			return <TimelinePdf spec={spec} altText={visual.altText} />;
+		case "source_extract":
+			return <SourceExtractPdf spec={spec} />;
+		case "map_visual":
+			return <MapVisualPdf spec={spec} altText={visual.altText} />;
+		case "chemistry_cell_diagram":
+			return <ChemistryCellDiagramPdf spec={spec} altText={visual.altText} />;
+		case "physics_field_diagram":
+			return <PhysicsFieldDiagramPdf spec={spec} altText={visual.altText} />;
+		case "physics_wave_diagram":
+			return <PhysicsWaveDiagramPdf spec={spec} altText={visual.altText} />;
 	}
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// template visual families
+// ───────────────────────────────────────────────────────────────────────
+
+function BiologyDiagramPdf({
+	spec,
+	altText,
+}: {
+	spec: BiologyDiagramSpec;
+	altText: string;
+}): ReactElement {
+	return (
+		<FallbackBlock
+			title={spec.title}
+			altText={altText}
+			bodyLines={[
+				`Kind: ${spec.subKind.replace(/_/g, " ")}`,
+				...spec.labels.map((label) => `${label.text} (${Math.round(label.x)}, ${Math.round(label.y)})`),
+				...spec.notes,
+			]}
+		/>
+	);
+}
+
+function FlowchartPdf({ spec, altText }: { spec: FlowchartSpec; altText: string }): ReactElement {
+	return (
+		<FallbackBlock
+			title={spec.title}
+			altText={altText}
+			bodyLines={[
+				...spec.nodes.map((node) => `${node.label}${node.detail ? `: ${node.detail}` : ""}`),
+				...spec.edges.map((edge) => `${edge.from} -> ${edge.to}${edge.label ? ` (${edge.label})` : ""}`),
+			]}
+		/>
+	);
+}
+
+function TimelinePdf({ spec, altText }: { spec: TimelineSpec; altText: string }): ReactElement {
+	return (
+		<FallbackBlock
+			title={spec.title}
+			altText={altText}
+			bodyLines={spec.events.map((event) => `${event.dateLabel}: ${event.label}${event.description ? ` - ${event.description}` : ""}`)}
+		/>
+	);
+}
+
+function SourceExtractPdf({ spec }: { spec: SourceExtractSpec }): ReactElement {
+	return (
+		<View>
+			{spec.title ? <Text style={styles.fallbackTitle}>{spec.title}</Text> : null}
+			{spec.context ? <Text style={styles.fallbackBody}>{spec.context}</Text> : null}
+			{spec.lines.map((line) => (
+				<View key={line.number} style={styles.passageLine}>
+					<Text style={styles.passageNumber}>{line.number}</Text>
+					<Text style={styles.passageText}>{line.text}</Text>
+				</View>
+			))}
+			{spec.source ? <Text style={styles.caption}>Source: {spec.source}</Text> : null}
+		</View>
+	);
+}
+
+function MapVisualPdf({ spec, altText }: { spec: MapVisualSpec; altText: string }): ReactElement {
+	return (
+		<FallbackBlock
+			title={spec.title}
+			altText={altText}
+			bodyLines={[
+				`${spec.scope} ${spec.mapStyle} map`,
+				...spec.regions.map((region) => `${region.label}: ${region.role.replace(/_/g, " ")}`),
+			]}
+		/>
+	);
+}
+
+function ChemistryCellDiagramPdf({
+	spec,
+	altText,
+}: {
+	spec: ChemistryCellDiagramSpec;
+	altText: string;
+}): ReactElement {
+	return (
+		<FallbackBlock
+			title={`${spec.cellType} cell`}
+			altText={altText}
+			bodyLines={[
+				`Anode: ${spec.anode.material} in ${spec.anode.electrolyte} (${spec.anode.polarity})`,
+				`Cathode: ${spec.cathode.material} in ${spec.cathode.electrolyte} (${spec.cathode.polarity})`,
+				`Electron flow: ${spec.electronFlow.replace(/_/g, " ")}`,
+				spec.saltBridge ? `Salt bridge: ${spec.saltBridge}` : "",
+				...spec.labels,
+			].filter(Boolean)}
+		/>
+	);
+}
+
+function PhysicsFieldDiagramPdf({
+	spec,
+	altText,
+}: {
+	spec: PhysicsFieldDiagramSpec;
+	altText: string;
+}): ReactElement {
+	return (
+		<FallbackBlock
+			title={spec.title}
+			altText={altText}
+			bodyLines={[
+				`${spec.fieldType} field with ${spec.fieldLineCount} field lines`,
+				...spec.sources.map((source) => `${source.label}: ${source.kind.replace(/_/g, " ")}`),
+				...spec.labels.map((label) => label.text),
+			]}
+		/>
+	);
+}
+
+function PhysicsWaveDiagramPdf({
+	spec,
+	altText,
+}: {
+	spec: PhysicsWaveDiagramSpec;
+	altText: string;
+}): ReactElement {
+	return (
+		<FallbackBlock
+			title={spec.title}
+			altText={altText}
+			bodyLines={[
+				`${spec.waveType} wave from ${spec.xMin} to ${spec.xMax}`,
+				`Amplitude: ${spec.amplitude}${spec.wavelength ? `, wavelength: ${spec.wavelength}` : ""}`,
+				...spec.markers.map((marker) => `${marker.label} at ${marker.x}`),
+			]}
+		/>
+	);
 }
 
 // ───────────────────────────────────────────────────────────────────────

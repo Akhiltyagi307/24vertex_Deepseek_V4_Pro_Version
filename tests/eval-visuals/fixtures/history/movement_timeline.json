@@ -1,0 +1,30 @@
+{
+  "question_text": "Use the timeline below to identify which event came later.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "First petition",
+    "B": "The final listed stage",
+    "C": "Initial meeting",
+    "D": "Early debate"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The timeline places the mass march after the earlier meeting and petition.",
+    "common_mistakes": [],
+    "related_concept": "Chronology"
+  },
+  "visual": {
+    "caption": "Timeline stimulus for comparing event order.",
+    "altText": "A three-event timeline with an initial meeting, first petition, and later mass march.",
+    "spec": {
+      "kind": "timeline",
+      "title": "Movement sequence",
+      "axisLabel": "Chronology",
+      "events": [
+        { "dateLabel": "Stage 1", "label": "Initial meeting", "description": null, "emphasis": false },
+        { "dateLabel": "Stage 2", "label": "First petition", "description": null, "emphasis": false },
+        { "dateLabel": "Stage 3", "label": "Mass march", "description": "Public action", "emphasis": true }
+      ]
+    }
+  }
+}

@@ -4,8 +4,9 @@
  * concrete shapes to imitate.
  *
  * Curation rules:
- * - Mix `visual: null` with non-null examples — the default is null and the
- *   model needs to see that confirmed in worked examples.
+ * - Mix `visual: null` with non-null examples — shows valid JSON for sparse stems.
+ *   **Note:** the live system prompt now tells the model to **maximize** non-null
+ *   visuals; null rows here are for schema contrast, not a frequency target.
  * - Keep stems short and self-contained; the visual is load-bearing OR the
  *   stem stands alone. Avoid pasting duplicate numerics both in prose and caption
  *   unless the stem instructs reading from the figure (then numbers in **spec must match).
@@ -48,7 +49,7 @@ export type VisualExemplar = {
 	>;
 };
 
-export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
+const BASE_VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	// ───────────────────────────────────────────────────────────────────────
 	// MATHEMATICS
 	// ───────────────────────────────────────────────────────────────────────
@@ -181,7 +182,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 				],
 			},
 		},
-		subjects: ["mathematics", "physics"],
+		subjects: ["mathematics"],
 	},
 	{
 		stem: "In parallelogram $ABCD$ shown, which pair of opposite sides are parallel?",
@@ -522,7 +523,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		stem: "Read off the x-values where y = sin x crosses the x-axis in the interval shown.",
 		topicKeywords: ["trigonometry", "sine graph", "zeros", "roots", "period"],
 		visual: {
-			caption: "Roughly ±2 periods of sine; zeros where the curve cuts the horizontal axis.",
+			caption: "Sine curve shown over approximately two full periods.",
 			altText:
 				"sin(x) on window x≈−6.5 to 6.5, y≈±2; amplitude about 1; trace crosses x-axis at multiples of π (x=−2π, −π, 0, π, 2π within view) turning from negative to positive or vice versa.",
 			spec: {
@@ -533,6 +534,8 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 				yMax: 2,
 				xLabel: "x",
 				yLabel: "y",
+				xTickStep: 1.5708,
+				yTickStep: 0.5,
 				items: [{ expr: "sin(x)", color: "primary", label: "y = sin x" }],
 			},
 		},
@@ -1171,7 +1174,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	},
 	{
 		stem: "The straight-line $x$–$t$ graph describes uniform motion along an axis. What is the speed?",
-		topicKeywords: ["uniform motion", "x t graph slope equals speed"],
+		topicKeywords: ["uniform motion", "x t graph slope equals speed", "position time graph"],
 		visual: {
 			caption: "Position proportional to time (constant slope).",
 			altText:
@@ -1366,7 +1369,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	},
 	{
 		stem: "For wires of the same length and cross-section, which material in the table has the lowest resistance at room temperature?",
-		topicKeywords: ["resistivity conductors", "resistance comparison"],
+		topicKeywords: ["resistivity conductors", "resistance comparison", "specific resistance"],
 		visual: {
 			caption: "Electrical resistivity at ~300 K (order-of-magnitude lesson values).",
 			altText:
@@ -1860,16 +1863,16 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	},
 	{
 		stem: "The ball-and-stick model represents methane. How many hydrogen atoms are bonded to the central carbon?",
-		topicKeywords: ["molecular shape", "tetrahedral", "methane", "3d model"],
+		topicKeywords: ["molecular shape", "tetrahedral", "methane", "structural model"],
 		visual: {
-			caption: "Methane — 3D ball-and-stick rendering.",
+			caption: "Methane structural model (2D depiction of tetrahedral connectivity).",
 			altText:
 				"Central carbon with four identical bonds arranged tetrahedrally toward hydrogen atoms; textbook methane geometry.",
 			spec: {
 				kind: "chemistry_molecule",
 				smiles: "C",
-				display: "3d",
-				label: "CH₄",
+				display: "2d",
+				label: "Methane (CH₄)",
 			},
 		},
 		subjects: ["chemistry", "science"],
@@ -2967,7 +2970,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 					{ expr: "200 - 2 * p", color: "primary", label: "PPF" },
 				],
 				marks: [
-					{ x: 40, y: 80, label: "A" },
+					{ x: 40, y: 70, label: "A" },
 					{ x: 80, y: 40, label: "B" },
 					{ x: 90, y: 120, label: "C" },
 				],
@@ -3020,7 +3023,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 					{ expr: "100 - 2 * p", color: "secondary", label: "MR" },
 					{ expr: "20", color: "muted", label: "MC" },
 				],
-				marks: [{ x: 40, y: 20, label: "MR = MC" }],
+				marks: [{ x: 40, y: 20, label: "Q*", kind: "vertical_line" }],
 			},
 		},
 		subjects: ["economics_statistics"],
@@ -3072,7 +3075,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	// ───────────────────────────────────────────────────────────────────────
 	{
 		stem: "Explain in one sentence why management is considered a multidimensional activity.",
-		topicKeywords: ["management fundamentals", "nature of management"],
+		topicKeywords: ["management fundamentals", "nature of management", "management functions"],
 		visual: null,
 		subjects: ["business_studies"],
 	},
@@ -3545,7 +3548,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	// ───────────────────────────────────────────────────────────────────────
 	{
 		stem: "Rewrite the sentence in the passive voice: Meera is writing a letter.",
-		topicKeywords: ["active passive voice", "grammar transformation"],
+		topicKeywords: ["active passive voice", "grammar transformation", "voice change"],
 		visual: null,
 		subjects: ["english"],
 	},
@@ -3665,7 +3668,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	},
 	{
 		stem: "Read the dialogue and state what Rohan agrees to do by the end of line 6.",
-		topicKeywords: ["spoken english", "dialogue comprehension"],
+		topicKeywords: ["spoken english", "dialogue comprehension", "reading comprehension"],
 		visual: {
 			caption: "Numbered dialogue — club meeting arrangements.",
 			altText:
@@ -3723,7 +3726,7 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 	// ───────────────────────────────────────────────────────────────────────
 	{
 		stem: "Name the process by which green plants prepare their own food using sunlight.",
-		topicKeywords: ["photosynthesis", "nutrition in plants"],
+		topicKeywords: ["photosynthesis", "nutrition in plants", "plant nutrition"],
 		visual: null,
 		subjects: ["science"],
 	},
@@ -3763,6 +3766,624 @@ export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["science"],
 	},
 ];
+
+const ADDED_VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
+	{
+		stem: "In the figure, PA and PB are tangents to a circle with centre O. Which radius is perpendicular to tangent PA at A?",
+		topicKeywords: ["circle theorem", "tangent radius", "perpendicular"],
+		visual: {
+			caption: "Tangents from external point P touch the circle at A and B.",
+			altText:
+				"Circle with centre O, external point P, and two tangents touching at A and B. Radii OA and OB join the centre to points of contact, with a right-angle marker at A between OA and PA.",
+			spec: {
+				kind: "math_geometry",
+				view: { xMin: -7, xMax: 7, yMin: -6, yMax: 8, showGrid: false, showAxes: false },
+				primitives: [
+					{ type: "circle", center: { x: 0, y: 0 }, radius: 3.5, label: null },
+					{ type: "point", at: { x: 0, y: 0 }, label: "O" },
+					{ type: "point", at: { x: -2.2, y: 2.7 }, label: "A" },
+					{ type: "point", at: { x: 2.2, y: 2.7 }, label: "B" },
+					{ type: "point", at: { x: 0, y: 6.2 }, label: "P" },
+					{ type: "segment", from: { x: 0, y: 6.2 }, to: { x: -2.2, y: 2.7 }, label: "PA", dashed: false },
+					{ type: "segment", from: { x: 0, y: 6.2 }, to: { x: 2.2, y: 2.7 }, label: "PB", dashed: false },
+					{ type: "segment", from: { x: 0, y: 0 }, to: { x: -2.2, y: 2.7 }, label: "OA", dashed: false },
+					{ type: "segment", from: { x: 0, y: 0 }, to: { x: 2.2, y: 2.7 }, label: "OB", dashed: false },
+					{
+						type: "angle_marker",
+						vertex: { x: -2.2, y: 2.7 },
+						fromRayPoint: { x: -1.2, y: 1.5 },
+						toRayPoint: { x: -1.1, y: 4.1 },
+						label: "90°",
+					},
+				],
+			},
+		},
+		subjects: ["mathematics"],
+	},
+	{
+		stem: "A 20 m pole casts a 15 m shadow as shown. Find the angle of elevation of the Sun.",
+		topicKeywords: ["height and distance", "trigonometry", "angle of elevation"],
+		visual: {
+			caption: "Right triangle model for height and shadow.",
+			altText:
+				"Vertical pole of 20 m at one end of a 15 m horizontal shadow forms a right triangle. The angle of elevation is marked at the shadow tip.",
+			spec: {
+				kind: "math_geometry",
+				view: { xMin: -1, xMax: 18, yMin: -1, yMax: 23, showGrid: true, showAxes: false },
+				primitives: [
+					{ type: "point", at: { x: 0, y: 0 }, label: "B" },
+					{ type: "point", at: { x: 0, y: 20 }, label: "A" },
+					{ type: "point", at: { x: 15, y: 0 }, label: "C" },
+					{ type: "segment", from: { x: 0, y: 0 }, to: { x: 0, y: 20 }, label: "20 m", dashed: false },
+					{ type: "segment", from: { x: 0, y: 0 }, to: { x: 15, y: 0 }, label: "15 m", dashed: false },
+					{ type: "segment", from: { x: 15, y: 0 }, to: { x: 0, y: 20 }, label: null, dashed: false },
+					{
+						type: "angle_marker",
+						vertex: { x: 15, y: 0 },
+						fromRayPoint: { x: 0, y: 0 },
+						toRayPoint: { x: 0, y: 20 },
+						label: "θ",
+					},
+				],
+			},
+		},
+		subjects: ["mathematics"],
+	},
+	{
+		stem: "From the feasible region shown, identify the corner point where objective Z = 3x + 2y is maximised.",
+		topicKeywords: ["linear programming", "feasible region", "corner point"],
+		visual: {
+			caption: "Feasible region for a two-variable LPP.",
+			altText:
+				"Coordinate plane with three boundary lines and a shaded polygonal feasible region in first quadrant. Corner points are labelled for objective evaluation.",
+			spec: {
+				kind: "math_geometry",
+				view: { xMin: -1, xMax: 10, yMin: -1, yMax: 10, showGrid: true, showAxes: true },
+				primitives: [
+					{ type: "segment", from: { x: 0, y: 8 }, to: { x: 8, y: 0 }, label: "x + y = 8", dashed: false },
+					{ type: "segment", from: { x: 0, y: 6 }, to: { x: 9, y: 0 }, label: "2x + 3y = 18", dashed: false },
+					{ type: "segment", from: { x: 2, y: 0 }, to: { x: 2, y: 8 }, label: "x = 2", dashed: true },
+					{
+						type: "polygon",
+						vertices: [
+							{ x: 2, y: 0 },
+							{ x: 8, y: 0 },
+							{ x: 5.4, y: 2.6 },
+							{ x: 2, y: 4.6 },
+						],
+						label: "Feasible region",
+						filled: true,
+					},
+				],
+			},
+		},
+		subjects: ["mathematics"],
+	},
+	{
+		stem: "In the inclined pulley setup, compare the magnitudes of tension T and component mg sinθ along the slope.",
+		topicKeywords: ["inclined plane", "tension", "free body diagram"],
+		visual: {
+			caption: "Block on incline with tension and weight components.",
+			altText:
+				"Free-body diagram of a block on a rough incline showing tension up the plane, normal reaction perpendicular to plane, and weight downward with component decomposition.",
+			spec: {
+				kind: "physics_diagram",
+				subKind: "free_body",
+				bodyLabel: "m",
+				inclineDeg: 30,
+				forces: [
+					{ name: "T", magnitude: 12, angleDeg: 30 },
+					{ name: "N", magnitude: 17, angleDeg: 120 },
+					{ name: "mg", magnitude: 20, angleDeg: -90 },
+				],
+			},
+		},
+		subjects: ["physics"],
+	},
+	{
+		stem: "Use the RC discharge graph to estimate the time constant τ from the decay pattern.",
+		topicKeywords: ["rc circuit", "discharge", "time constant", "exponential decay"],
+		visual: {
+			caption: "Capacitor voltage during RC discharge.",
+			altText:
+				"Voltage-time plot with exponential decay from initial V0 toward zero; horizontal axis in seconds and vertical axis in volts.",
+			spec: {
+				kind: "math_function_plot",
+				xMin: 0,
+				xMax: 10,
+				yMin: 0,
+				yMax: 12,
+				xLabel: "Time (s)",
+				yLabel: "Voltage (V)",
+				items: [{ expr: "10 * exp(-x / 2)", color: "primary", label: "V(t)" }],
+			},
+		},
+		subjects: ["physics"],
+	},
+	{
+		stem: "In the reversible reaction shown, predict the direction of shift when pressure is increased.",
+		topicKeywords: ["chemical equilibrium", "le chatelier", "reaction conditions"],
+		visual: {
+			caption: "Equilibrium reaction with catalyst and pressure condition.",
+			altText:
+				"Chemical equation with reversible arrow, catalyst note, and pressure/temperature condition written above the arrow.",
+			spec: {
+				kind: "chemistry_reaction",
+				ce: "N2(g) + 3H2(g) <=>[\\text{Fe catalyst}][450^\\circ\\text{C},\\ 200\\ \\text{atm}] 2NH3(g)",
+				label: "Haber process equilibrium",
+			},
+		},
+		subjects: ["chemistry"],
+	},
+	{
+		stem: "Identify oxidizing and reducing agents in the reaction shown.",
+		topicKeywords: ["redox reaction", "oxidation state", "agent identification"],
+		visual: {
+			caption: "Redox equation with ionic states.",
+			altText:
+				"Balanced ionic equation with aqueous and solid states shown to support oxidation-number analysis.",
+			spec: {
+				kind: "chemistry_reaction",
+				ce: "Zn(s) + CuSO4(aq) -> ZnSO4(aq) + Cu(s)",
+				label: "Single-displacement redox",
+			},
+		},
+		subjects: ["chemistry", "science"],
+	},
+	{
+		stem: "The molecule shown has one stereogenic center. Determine whether the shown form is one enantiomer of lactic acid.",
+		topicKeywords: ["stereochemistry", "wedge dash", "enantiomer"],
+		visual: {
+			caption: "2D wedge-dash representation of lactic acid.",
+			altText:
+				"Lactic-acid skeleton with one chiral carbon represented using stereochemical wedge notation in the SMILES mapping.",
+			spec: {
+				kind: "chemistry_molecule",
+				smiles: "C[C@H](O)C(=O)O",
+				display: "2d",
+				label: "Lactic acid stereocentre",
+			},
+		},
+		subjects: ["chemistry"],
+	},
+	{
+		stem: "Record the journal entry for share forfeiture where allotment and first call remain unpaid.",
+		topicKeywords: ["share forfeiture", "journal entry", "company accounts"],
+		visual: {
+			caption: "Journal entry format for share forfeiture.",
+			altText:
+				"Journal table with debit and credit lines for Share Capital, Share Forfeiture, and Calls in Arrears in a forfeiture case.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "journal_entry",
+				rows: [
+					{
+						date: "2026-03-31",
+						particulars: "Share Capital A/c Dr.\n  To Share Forfeiture A/c\n  To Share Allotment A/c\n  To Share First Call A/c",
+						debit: 100000,
+						credit: 100000,
+						narration: "Being shares forfeited on non-payment of allotment and first call.",
+					},
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "Which side of the revaluation account records the increase in value of machinery?",
+		topicKeywords: ["revaluation account", "partnership accounts", "ledger treatment"],
+		visual: {
+			caption: "Revaluation account ledger format.",
+			altText:
+				"T-account style ledger with debit and credit columns for revaluation adjustments during partner admission.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "ledger",
+				ledger: {
+					accountName: "Revaluation A/c",
+					debitSide: [
+						{
+							date: "2026-03-31",
+							particulars: "To Machinery A/c",
+							amount: 40000,
+						},
+					],
+					creditSide: [
+						{
+							date: "2026-03-31",
+							particulars: "By General Reserve A/c",
+							amount: 25000,
+						},
+					],
+				},
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "In the market diagram, identify the segment representing excess supply at the imposed price floor.",
+		topicKeywords: ["price floor", "market intervention", "excess supply"],
+		visual: {
+			caption: "Demand-supply diagram with a binding price floor.",
+			altText:
+				"Demand and supply curves with a horizontal price-floor line above equilibrium, creating a gap between quantity supplied and quantity demanded.",
+			spec: {
+				kind: "economics_curve",
+				xLabel: "Quantity",
+				yLabel: "Price (₹)",
+				xMin: 0,
+				xMax: 120,
+				yMin: 0,
+				yMax: 100,
+				curves: [
+					{ expr: "90 - 0.5 * p", color: "primary", label: "Demand" },
+					{ expr: "0.6 * p + 5", color: "secondary", label: "Supply" },
+					{ expr: "65", color: "muted", label: "Price floor" },
+				],
+				marks: [{ x: 58, y: 65, label: "Excess supply" }],
+			},
+		},
+		subjects: ["economics_statistics"],
+	},
+	{
+		stem: "Use the budget line shown to identify one affordable consumption bundle.",
+		topicKeywords: ["budget line", "consumer choice", "microeconomics"],
+		visual: {
+			caption: "Budget line between two goods with intercepts on both axes.",
+			altText:
+				"Straight downward budget line joining maximum quantities of two goods purchasable with fixed income; axis intercepts marked.",
+			spec: {
+				kind: "economics_curve",
+				xLabel: "Good X (units)",
+				yLabel: "Good Y (units)",
+				xMin: 0,
+				xMax: 60,
+				yMin: 0,
+				yMax: 80,
+				curves: [{ expr: "72 - 1.2 * p", color: "primary", label: "Budget line" }],
+				marks: [{ x: 20, y: 48, label: "Bundle A" }],
+			},
+		},
+		subjects: ["economics_statistics"],
+	},
+	{
+		stem: "Read the factual passage and choose the statement best supported by the data in it.",
+		topicKeywords: ["reading comprehension", "factual passage", "english prose"],
+		visual: {
+			caption: "Factual passage with two short paragraphs.",
+			altText:
+				"Informational prose passage describing urban water usage trends and conservation measures in concise academic style.",
+			spec: {
+				kind: "english_passage",
+				title: "Urban Water Use Snapshot",
+				source: null,
+				lines: [
+					{
+						number: 1,
+						text: "City records show domestic water demand rose by 8% over five years.",
+					},
+					{
+						number: 2,
+						text: "Leakage losses fell after pipeline audits in the same period.",
+					},
+					{
+						number: 3,
+						text: "Households using low-flow fixtures consumed less water per person.",
+					},
+				],
+			},
+		},
+		subjects: ["english"],
+	},
+	{
+		stem: "From the dialogue excerpt, infer the speaker’s attitude in line 3.",
+		topicKeywords: ["dialogue", "tone", "english language"],
+		visual: {
+			caption: "Short dialogue excerpt for tone inference.",
+			altText:
+				"Conversation between two speakers with stage-like line breaks, suitable for tone and intent analysis questions.",
+			spec: {
+				kind: "english_passage",
+				title: "After the Announcement",
+				source: null,
+				lines: [
+					{ number: 1, text: "Riya: You sounded certain this plan would fail." },
+					{
+						number: 2,
+						text: "Kabir: I did, but the numbers changed after the trial run.",
+					},
+					{
+						number: 3,
+						text: "Riya: So now you're cautiously optimistic?",
+					},
+					{
+						number: 4,
+						text: "Kabir: Optimistic, yes—cautious, definitely.",
+					},
+				],
+			},
+		},
+		subjects: ["english"],
+	},
+	{
+		stem: "Classify each organism in the table into vertebrate or invertebrate.",
+		topicKeywords: ["classification", "biology basics", "science table"],
+		visual: {
+			caption: "Classification table for selected organisms.",
+			altText:
+				"Three-column table listing organism name, key trait, and body organization to support vertebrate-invertebrate classification.",
+			spec: {
+				kind: "data_table",
+				caption: "Organism classification",
+				headers: ["Organism", "Key trait", "Group hint"],
+				rows: [
+					[
+						{ value: "Earthworm", bold: false, align: "left" },
+						{ value: "No backbone", bold: false, align: "left" },
+						{ value: "Segmented body", bold: false, align: "left" },
+					],
+					[
+						{ value: "Frog", bold: false, align: "left" },
+						{ value: "Backbone present", bold: false, align: "left" },
+						{ value: "Amphibian", bold: false, align: "left" },
+					],
+					[
+						{ value: "Octopus", bold: false, align: "left" },
+						{ value: "Soft body", bold: false, align: "left" },
+						{ value: "Mollusc", bold: false, align: "left" },
+					],
+				],
+			},
+		},
+		subjects: ["science", "biology"],
+	},
+];
+
+export const VISUAL_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
+	...BASE_VISUAL_EXEMPLARS,
+	...ADDED_VISUAL_EXEMPLARS,
+].map(enrichVisualExemplar);
+
+function enrichVisualExemplar(exemplar: VisualExemplar): VisualExemplar {
+	const visual = exemplar.visual;
+	if (visual == null) return exemplar;
+
+	const tightened = tightenCaption(visual.caption);
+	const spec = enrichSpec(exemplar, visual.spec);
+	return {
+		...exemplar,
+		visual: {
+			...visual,
+			caption: tightened,
+			spec,
+		},
+	};
+}
+
+function enrichSpec(
+	exemplar: VisualExemplar,
+	spec: NonNullable<VisualExemplar["visual"]>["spec"],
+): NonNullable<VisualExemplar["visual"]>["spec"] {
+	switch (spec.kind) {
+		case "math_geometry": {
+			const pointLabelMap = new Map<string, string>();
+			for (const primitive of spec.primitives) {
+				if (primitive.type === "point" && primitive.label) {
+					pointLabelMap.set(coordKey(primitive.at), primitive.label);
+				}
+			}
+			return {
+				...spec,
+				primitives: spec.primitives.map((primitive) => {
+					switch (primitive.type) {
+						case "point":
+							return {
+								...primitive,
+								labelPosition:
+									primitive.labelPosition ?? inferPointLabelPosition(primitive.at, spec.view),
+							};
+						case "segment":
+							return {
+								...primitive,
+								tickMarks: primitive.tickMarks ?? null,
+								arrowEnd: primitive.arrowEnd ?? false,
+							};
+						case "polygon":
+							return {
+								...primitive,
+								vertexLabels:
+									primitive.vertexLabels ??
+									primitive.vertices.map((v) => pointLabelMap.get(coordKey(v)) ?? null),
+							};
+						case "arc":
+							return {
+								...primitive,
+								radiusFraction: primitive.radiusFraction ?? null,
+							};
+						default:
+							return primitive;
+					}
+				}),
+			};
+		}
+		case "math_function_plot":
+			return {
+				...spec,
+				xTickStep: spec.xTickStep ?? autoTickStep(spec.xMin, spec.xMax),
+				yTickStep:
+					spec.yTickStep ??
+					(spec.yMin != null && spec.yMax != null
+						? autoTickStep(spec.yMin, spec.yMax)
+						: null),
+				items: spec.items.map((item) => ({
+					...item,
+					label: item.label ?? humanizeExpr(item.expr),
+				})),
+			};
+		case "number_line":
+			return {
+				...spec,
+				axisLabel: spec.axisLabel ?? "x",
+				minorTickStep:
+					spec.minorTickStep ??
+					(spec.tickStep >= 1 ? spec.tickStep / 2 : null),
+			};
+		case "physics_diagram": {
+			switch (spec.subKind) {
+				case "free_body":
+					return {
+						...spec,
+						inclineLabel:
+							spec.inclineLabel ??
+							(spec.inclineDeg != null ? `${pretty(spec.inclineDeg)}°` : null),
+						surfaceHatched: spec.surfaceHatched ?? (spec.inclineDeg != null),
+						axisLegend: spec.axisLegend ?? true,
+						forces: spec.forces.map((force) => ({
+							...force,
+							unit: force.unit ?? "N",
+							showMagnitude: force.showMagnitude ?? true,
+							componentArrows: force.componentArrows ?? false,
+						})),
+					};
+				case "ray_optics":
+					return {
+						...spec,
+						axisUnit: spec.axisUnit ?? "cm",
+						axisTickStep: spec.axisTickStep ?? autoTickStep(spec.axisMin, spec.axisMax),
+						axisMajorTickStep:
+							spec.axisMajorTickStep ??
+							autoTickStep(spec.axisMin, spec.axisMax) * 2,
+						drawRays: spec.drawRays ?? true,
+						objects: spec.objects.map((obj, idx) => ({
+							...obj,
+							label:
+								obj.label ??
+								(obj.kind === "object" ? `O${idx + 1}` : `I${idx + 1}`),
+						})),
+						lenses: spec.lenses.map((lens) => ({
+							...lens,
+							label: lens.label ?? lensLabel(lens.type),
+						})),
+					};
+				case "circuit":
+					return {
+						...spec,
+						components: spec.components.map((component) => {
+							if (component.type === "battery") {
+								return {
+									...component,
+									polarityMarks: component.polarityMarks ?? true,
+									currentArrow: component.currentArrow ?? false,
+								};
+							}
+							return {
+								...component,
+								currentArrow: component.currentArrow ?? false,
+							};
+						}),
+					};
+				default:
+					return spec;
+			}
+		}
+		case "economics_curve":
+			return {
+				...spec,
+				marks: spec.marks.map((mark) => ({
+					...mark,
+					kind: inferEconomicsMarkKind(exemplar.stem, mark.label),
+				})),
+			};
+		case "chemistry_molecule":
+			return {
+				...spec,
+				display: "2d",
+				label:
+					exemplar.stem.includes("methane") && !spec.label
+						? "Methane (2D structural view)"
+						: spec.label,
+			};
+		default:
+			return spec;
+	}
+}
+
+function tightenCaption(caption: string): string {
+	return caption
+		.replace(/;\s*vertex at[^.]*\./i, ".")
+		.replace(/;\s*root at[^.]*\./i, ".")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function coordKey(point: { x: number; y: number }): string {
+	return `${point.x},${point.y}`;
+}
+
+function inferPointLabelPosition(
+	point: { x: number; y: number },
+	view: { xMin: number; xMax: number; yMin: number; yMax: number },
+): "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" {
+	const xMid = (view.xMin + view.xMax) / 2;
+	const yMid = (view.yMin + view.yMax) / 2;
+	if (point.x >= xMid && point.y >= yMid) return "ne";
+	if (point.x < xMid && point.y >= yMid) return "nw";
+	if (point.x >= xMid && point.y < yMid) return "se";
+	return "sw";
+}
+
+function autoTickStep(min: number, max: number): number {
+	const span = Math.abs(max - min);
+	if (span <= 4) return 0.5;
+	if (span <= 10) return 1;
+	if (span <= 25) return 2;
+	if (span <= 60) return 5;
+	if (span <= 120) return 10;
+	return 20;
+}
+
+function humanizeExpr(expr: string): string {
+	const clean = expr.replace(/\s+/g, " ").trim();
+	return clean.length > 40 ? `${clean.slice(0, 37)}...` : clean;
+}
+
+function lensLabel(
+	type: "concave_mirror" | "convex_mirror" | "concave_lens" | "convex_lens",
+): string {
+	switch (type) {
+		case "convex_lens":
+			return "Convex lens";
+		case "concave_lens":
+			return "Concave lens";
+		case "concave_mirror":
+			return "Concave mirror";
+		case "convex_mirror":
+			return "Convex mirror";
+		default:
+			return type;
+	}
+}
+
+function inferEconomicsMarkKind(
+	stem: string,
+	label: string,
+): "point" | "vertical_line" {
+	const lowerStem = stem.toLowerCase();
+	const lowerLabel = label.toLowerCase();
+	if (
+		lowerStem.includes("quantity") ||
+		lowerStem.includes("where mr intersects mc") ||
+		lowerLabel.includes("q*")
+	) {
+		return "vertical_line";
+	}
+	return "point";
+}
+
+function pretty(n: number): string {
+	if (Number.isInteger(n)) return String(n);
+	return Number(n.toFixed(2)).toString();
+}
 
 function exemplarKindKey(ex: VisualExemplar): string {
 	if (ex.visual === null) return "__null__";
@@ -3886,6 +4507,10 @@ function exemplarKindKey(ex: VisualExemplar): string {
 	return s.kind;
 }
 
+function exemplarPrimaryKind(ex: VisualExemplar): string {
+	return ex.visual?.spec.kind ?? "__null__";
+}
+
 function exemplarMatchesTopicHint(ex: VisualExemplar, hintNorm: string): boolean {
 	const kw = ex.topicKeywords;
 	if (!kw || kw.length === 0 || !hintNorm.trim()) return false;
@@ -3911,10 +4536,10 @@ export type PickExemplarsOptions = {
 };
 
 /**
- * Subset selection: anchor with a null-visual example, then greedily add exemplars
- * maximizing distinct stratification keys (`kind`, physics/chemistry/civic fingerprints,
- * chart/table signatures). Matching-topic hints reorder the candidate pools and break ties so
- * exemplars with overlapping `topicKeywords` surface sooner without sacrificing diversity-first picks.
+ * Subject-scoped subset selection: anchor with a null-visual example, then greedily
+ * add exemplars that maximize visual-kind diversity first (`spec.kind`), followed by
+ * finer variant diversity (`exemplarKindKey`). Matching-topic hints break ties so
+ * chapter-aligned exemplars surface sooner without leaking cross-subject examples.
  */
 export function pickExemplarsForSubject(
 	subjectKey: VisualExemplar["subjects"][number],
@@ -3923,35 +4548,32 @@ export function pickExemplarsForSubject(
 ): ReadonlyArray<VisualExemplar> {
 	const hintNorm = options?.topicHintNorm;
 	const matching = VISUAL_EXEMPLARS.filter((ex) => ex.subjects.includes(subjectKey));
-	const anchor =
-		matching.find((ex) => ex.visual === null) ??
-		VISUAL_EXEMPLARS.find((ex) => ex.visual === null) ??
-		matching[0];
+	const maxPickCount = Math.max(1, limit);
+	const anchor = matching.find((ex) => ex.visual === null) ?? matching[0];
 	if (!anchor) return [];
 
-	const matchingRest = orderPoolForTopicHints(
+	// Keep few-shots subject-locked to avoid cross-discipline leakage in prompts.
+	const orderedPool = orderPoolForTopicHints(
 		matching.filter((ex) => ex !== anchor),
 		hintNorm,
 	);
-	const otherRest = orderPoolForTopicHints(
-		VISUAL_EXEMPLARS.filter((ex) => ex !== anchor && !matching.includes(ex)),
-		hintNorm,
-	);
-	const orderedPool = [...matchingRest, ...otherRest];
 
 	const picked: VisualExemplar[] = [anchor];
-	const seenKinds = new Set<string>([exemplarKindKey(anchor)]);
+	const seenPrimaryKinds = new Set<string>([exemplarPrimaryKind(anchor)]);
+	const seenVariants = new Set<string>([exemplarKindKey(anchor)]);
 
-	while (picked.length < limit && orderedPool.length > 0) {
+	while (picked.length < maxPickCount && orderedPool.length > 0) {
 		let bestIdx = 0;
 		let bestComposite = -1;
 		const h = hintNorm?.trim().toLowerCase() ?? "";
 		for (let i = 0; i < orderedPool.length; i++) {
 			const ex = orderedPool[i]!;
-			const k = exemplarKindKey(ex);
-			const diversity = seenKinds.has(k) ? 0 : 1;
+			const primaryKind = exemplarPrimaryKind(ex);
+			const variantKey = exemplarKindKey(ex);
+			const primaryKindDiversity = seenPrimaryKinds.has(primaryKind) ? 0 : 1;
+			const variantDiversity = seenVariants.has(variantKey) ? 0 : 1;
 			const topicBonus = h && exemplarMatchesTopicHint(ex, h) ? 1 : 0;
-			const composite = diversity * 10 + topicBonus;
+			const composite = primaryKindDiversity * 100 + topicBonus * 10 + variantDiversity * 3;
 			if (composite > bestComposite) {
 				bestComposite = composite;
 				bestIdx = i;
@@ -3959,8 +4581,9 @@ export function pickExemplarsForSubject(
 		}
 		const next = orderedPool.splice(bestIdx, 1)[0]!;
 		picked.push(next);
-		seenKinds.add(exemplarKindKey(next));
+		seenPrimaryKinds.add(exemplarPrimaryKind(next));
+		seenVariants.add(exemplarKindKey(next));
 	}
 
-	return picked.slice(0, limit);
+	return picked.slice(0, maxPickCount);
 }

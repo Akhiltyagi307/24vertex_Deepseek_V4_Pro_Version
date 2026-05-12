@@ -153,6 +153,45 @@ describe("getPracticeGenerationSubjectPreamble", () => {
 		expect(text).toContain("Chunk alignment");
 		expect(text).toContain("strict JSON");
 	});
+
+	it("declares shared Visuals precedence over subject null defaults", () => {
+		const text = getPracticeGenerationSubjectPreamble({ band: "6_10", category: "mathematics" }, {
+			subjectName: "Mathematics",
+			subjectGrade: 10,
+		});
+		expect(text).toContain("If the shared Visuals section is enabled");
+		expect(text).toContain("supersedes any subject-specific default to `visual: null`");
+	});
+
+	it("aligns subject preambles with maximal-visuals routing", () => {
+		const mathMiddle = getPracticeGenerationSubjectPreamble({ band: "6_10", category: "mathematics" }, {
+			subjectName: "Mathematics",
+			subjectGrade: 10,
+		});
+		expect(mathMiddle).not.toContain("Pure algebra, identities, simplification, equation-solving, and proofs use `visual: null`");
+		expect(mathMiddle).toContain("Even algebraic or equation-solving items may use a minimal allowed visual");
+
+		const mathSenior = getPracticeGenerationSubjectPreamble({ band: "11_12", category: "mathematics" }, {
+			subjectName: "Mathematics",
+			subjectGrade: 12,
+		});
+		expect(mathSenior).not.toContain("Pure algebra, identities, integration techniques, matrix arithmetic, and proofs use `visual: null`");
+		expect(mathSenior).toContain("minimal allowed visual");
+
+		const biology = getPracticeGenerationSubjectPreamble({ band: "11_12", category: "biology" }, {
+			subjectName: "Biology",
+			subjectGrade: 12,
+		});
+		expect(biology).not.toContain("keep those items textual (`visual: null`) unless you reframe");
+		expect(biology).toContain("prefer an allowed `data_table` or `statistics_chart`");
+
+		const accountancy = getPracticeGenerationSubjectPreamble({ band: "11_12", category: "accountancy" }, {
+			subjectName: "Accountancy",
+			subjectGrade: 12,
+		});
+		expect(accountancy).not.toContain("Theory items use `visual: null`");
+		expect(accountancy).toContain("Theory items may stay textual");
+	});
 });
 
 describe("senior-secondary (11–12) preamble subject discipline", () => {

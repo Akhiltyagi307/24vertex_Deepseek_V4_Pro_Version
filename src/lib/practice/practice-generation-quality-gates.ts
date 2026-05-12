@@ -26,6 +26,15 @@ export const VISUAL_FIX_ELIGIBLE_GATE_CODES = new Set<PracticeQualityGateFailure
 
 export type EvaluatePracticeGenerationQualityInput = {
 	questions: PracticeGenerationOutput["questions"];
+	/** Number of topic IDs selected/allowed for this generation request. */
+	allowedTopicCount?: number;
+	/**
+	 * In the rebuilt visual pipeline, base drafting emits `visual: null` first
+	 * and a later enrichment/fallback pass attaches visuals. During that
+	 * pre-enrichment phase, stems may intentionally cue a forthcoming passage,
+	 * figure, or table, so this specific gate must be deferred.
+	 */
+	skipMissingVisualGate?: boolean;
 	/** When set with sufficient corpus text, enforces lexical overlap with topic chunks (skipped for `no_context`). */
 	chunkAlignment?: {
 		corpusByTopicId: ReadonlyMap<string, string>;
@@ -276,7 +285,7 @@ export function evaluatePracticeGenerationQuality(input: EvaluatePracticeGenerat
 	}
 	const maxTopicCount = Math.max(...byTopic.values());
 	const maxTopicShare = maxTopicCount / questions.length;
-	if (maxTopicShare > MAX_TOPIC_SHARE) {
+	if ((input.allowedTopicCount ?? Number.POSITIVE_INFINITY) > 1 && maxTopicShare > MAX_TOPIC_SHARE) {
 		return {
 			ok: false,
 			code: "topic_concentration",
@@ -285,8 +294,10 @@ export function evaluatePracticeGenerationQuality(input: EvaluatePracticeGenerat
 		};
 	}
 
-	const missingVisualGate = gateStemReferencesMissingVisual(questions);
-	if (!missingVisualGate.ok) return missingVisualGate;
+	if (input.skipMissingVisualGate !== true) {
+		const missingVisualGate = gateStemReferencesMissingVisual(questions);
+		if (!missingVisualGate.ok) return missingVisualGate;
+	}
 
 	const labelMismatchGate = gateVisualLabelsConsistentWithStem(questions);
 	if (!labelMismatchGate.ok) return labelMismatchGate;

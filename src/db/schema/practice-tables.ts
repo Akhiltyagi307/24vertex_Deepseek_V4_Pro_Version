@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, uuid, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { tests } from "./assessment";
 
@@ -54,5 +54,61 @@ export const practiceAnalyticsEvents = pgTable(
 	(t) => [
 		index("idx_practice_analytics_event_time").on(t.eventName, t.occurredAt),
 		index("idx_practice_analytics_student_time").on(t.studentId, t.occurredAt),
+	],
+);
+
+export const practiceGenerationRuns = pgTable(
+	"practice_generation_runs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		correlationId: uuid("correlation_id").notNull(),
+		studentId: uuid("student_id"),
+		subjectId: uuid("subject_id"),
+		testId: uuid("test_id")
+			.references(() => tests.id, { onDelete: "set null" }),
+		requestMode: text("request_mode").notNull(),
+		configSnapshot: jsonb("config_snapshot").notNull().default({}),
+		status: text("status").notNull().default("running"),
+		failureCode: text("failure_code"),
+		failureMessage: text("failure_message"),
+		totalInputTokens: integer("total_input_tokens").notNull().default(0),
+		totalOutputTokens: integer("total_output_tokens").notNull().default(0),
+		totalAiCalls: integer("total_ai_calls").notNull().default(0),
+		timingsMs: jsonb("timings_ms").notNull().default({}),
+		startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+		finishedAt: timestamp("finished_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		index("idx_practice_generation_runs_student_created").on(t.studentId, t.createdAt),
+		index("idx_practice_generation_runs_test_created").on(t.testId, t.createdAt),
+		index("idx_practice_generation_runs_subject_created").on(t.subjectId, t.createdAt),
+		uniqueIndex("practice_generation_runs_correlation_id_uq").on(t.correlationId),
+	],
+);
+
+export const practiceGenerationSteps = pgTable(
+	"practice_generation_steps",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		runId: uuid("run_id")
+			.notNull()
+			.references(() => practiceGenerationRuns.id, { onDelete: "cascade" }),
+		stepOrder: integer("step_order").notNull(),
+		stepKey: varchar("step_key", { length: 64 }).notNull(),
+		status: text("status").notNull(),
+		model: varchar("model", { length: 64 }),
+		feature: varchar("feature", { length: 64 }),
+		latencyMs: integer("latency_ms"),
+		inputTokens: integer("input_tokens"),
+		outputTokens: integer("output_tokens"),
+		error: text("error"),
+		metadata: jsonb("metadata").notNull().default({}),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		index("idx_practice_generation_steps_run_created").on(t.runId, t.createdAt),
+		index("idx_practice_generation_steps_step_created").on(t.stepKey, t.createdAt),
+		uniqueIndex("idx_practice_generation_steps_run_step_order").on(t.runId, t.stepOrder),
 	],
 );

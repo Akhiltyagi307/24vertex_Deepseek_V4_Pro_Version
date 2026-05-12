@@ -18,9 +18,7 @@ describe("question visual envelope schema", () => {
 			const parsed = questionVisualEnvelopeSchema.safeParse(ex.visual);
 			expect(parsed.success, `Exemplar "${ex.stem}" should parse`).toBe(true);
 			if (!parsed.success) continue;
-			expect(parsed.data.spec.kind).toMatch(
-				/^(math_geometry|math_function_plot|number_line|physics_diagram|chemistry_molecule|chemistry_reaction|accountancy_table|economics_curve|statistics_chart|data_table|india_map|english_passage)$/,
-			);
+			expect((QUESTION_VISUAL_KINDS as readonly string[]).includes(parsed.data.spec.kind)).toBe(true);
 		}
 	});
 

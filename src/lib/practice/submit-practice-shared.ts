@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
-import { notifyTestReportPdfReadyEmails } from "@/lib/notifications/report-ready";
+import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/notifications/report-ready";
 import { gradePracticeTestWithAi, recordGradingFailure, renderAndUploadPracticeReportPdf } from "@/lib/practice/ai-grade-practice-test";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
@@ -324,6 +324,19 @@ export async function executePracticeTestSubmit(
 				{ testId },
 			);
 		} else {
+			try {
+				await notifyTestReportReady({
+					studentId: pdfResult.studentId,
+					testId,
+					subjectName: pdfResult.subjectName,
+					overallPercent: pdfResult.overallPercent,
+					submittedAtIso: pdfResult.submittedAtIso,
+				});
+			} catch (err) {
+				logServerError("executePracticeTestSubmit.fallback_in_app_notify", err, {
+					testId,
+				});
+			}
 			void notifyTestReportPdfReadyEmails({
 				testId,
 				studentId: pdfResult.studentId,

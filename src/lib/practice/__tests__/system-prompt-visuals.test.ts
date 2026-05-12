@@ -84,17 +84,18 @@ describe("system prompt — visuals flag", () => {
 			},
 		});
 		expect(prompt).toContain("Visuals (`visual` field — required");
-		expect(prompt).toContain("T1 — The student CANNOT solve");
+		expect(prompt).toContain("Maximize non-null visuals");
+		expect(prompt).toContain("one non-null visual per question");
 		expect(prompt).toContain("Renderer-specific syntax (HARD)");
 		expect(prompt).toContain("### Caption and altText");
+		expect(prompt).toContain("For minimal supporting visuals");
 		expect(prompt).toContain("Chunk fidelity:");
 		expect(prompt).toContain("prefer_chunk_aligned_items");
 		expect(prompt).toContain("## Examples");
 		expect(prompt).toContain("question_text:");
 		expect(prompt).toContain("horizontal axis");
 		expect(prompt).toContain("no artificial per-test quota");
-		// Hard-gate mirror line should match the discipline phrasing.
-		expect(prompt).toContain("emit `null` UNLESS a load-bearing trigger fires");
+		expect(prompt).toContain("**Maximize non-null visuals** per the Visuals section");
 	});
 
 	it("includes grade band when student_grade is set", () => {
@@ -162,6 +163,40 @@ describe("system prompt — visuals flag", () => {
 		expect(prompt).toContain("journal_entry");
 	});
 
+	it("includes the template policy brief when provided", () => {
+		process.env.PRACTICE_VISUALS = "true";
+		const prompt = buildPracticeGenerationSharedSystemInstructions({
+			...userMessageBaseline,
+			subjectName: "Chemistry",
+			test_parameters: {
+				...userMessageBaseline.test_parameters,
+				visuals_policy: {
+					enabled: true,
+					preferred_kinds: ["chemistry_cell_diagram"] as QuestionVisualKind[],
+					max_non_null_visuals: 10,
+					template_policy: {
+						enabled: true,
+						templates: [
+							{
+								id: "chemistry-galvanic-cell",
+								kind: "chemistry_cell_diagram" as QuestionVisualKind,
+								required_slots: ["anode", "cathode", "electronFlow"],
+								optional_slots: ["saltBridge"],
+								constraints: ["Anode/cathode polarity must match the cell type."],
+							},
+						],
+						prompt_brief:
+							"Visual template engine: choose only from chemistry-galvanic-cell and fill only declared slots.",
+					},
+				},
+			},
+		});
+
+		expect(prompt).toContain("Visual template engine");
+		expect(prompt).toContain("chemistry-galvanic-cell");
+		expect(prompt).toContain("fill only declared slots");
+	});
+
 	it("omits few-shot ## Examples when preferred_kinds is empty (e.g. Biology)", () => {
 		process.env.PRACTICE_VISUALS = "true";
 		const prompt = buildPracticeGenerationSharedSystemInstructions({
@@ -177,6 +212,6 @@ describe("system prompt — visuals flag", () => {
 			},
 		});
 		expect(prompt).toContain("Visuals (`visual` field — required");
-		expect(prompt).not.toContain("## Examples");
+		expect(prompt).not.toContain("## Examples (worked stems with matching visuals)");
 	});
 });

@@ -89,6 +89,14 @@ const VALID_KINDS = new Set([
 	"data_table",
 	"india_map",
 	"english_passage",
+	"biology_diagram",
+	"flowchart",
+	"timeline",
+	"source_extract",
+	"map_visual",
+	"chemistry_cell_diagram",
+	"physics_field_diagram",
+	"physics_wave_diagram",
 ]);
 
 function listSubjects(rootDir: string): string[] {
@@ -201,6 +209,22 @@ function passesRendererPreconditions(visual: { spec: Record<string, unknown> }):
 			return true;
 		case "english_passage":
 			return Array.isArray(spec.lines) && spec.lines.length > 0;
+		case "biology_diagram":
+			return typeof spec.subKind === "string" && Array.isArray(spec.labels) && spec.labels.length > 0;
+		case "flowchart":
+			return Array.isArray(spec.nodes) && spec.nodes.length >= 2 && Array.isArray(spec.edges) && spec.edges.length > 0;
+		case "timeline":
+			return Array.isArray(spec.events) && spec.events.length >= 2;
+		case "source_extract":
+			return Array.isArray(spec.lines) && spec.lines.length > 0;
+		case "map_visual":
+			return Array.isArray(spec.regions) && spec.regions.length > 0;
+		case "chemistry_cell_diagram":
+			return typeof spec.cellType === "string" && typeof spec.anode === "object" && typeof spec.cathode === "object";
+		case "physics_field_diagram":
+			return Array.isArray(spec.sources) && spec.sources.length > 0 && typeof spec.fieldLineCount === "number";
+		case "physics_wave_diagram":
+			return typeof spec.xMin === "number" && typeof spec.xMax === "number" && spec.xMin < spec.xMax;
 		default:
 			return false;
 	}

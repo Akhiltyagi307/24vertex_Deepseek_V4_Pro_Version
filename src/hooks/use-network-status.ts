@@ -1,31 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 /**
  * Tracks `navigator.onLine` plus the `online`/`offline` window events.
- * Returns `true` while offline detection is unavailable (SSR / very old UAs)
- * because optimistic-online matches existing app behavior — we don't want to
- * scare the student with a false "offline" banner during hydration.
+ * Uses `useSyncExternalStore` so the **server snapshot is always online** (`true`).
+ * Without that, SSR assumed online while the client's first paint read
+ * `navigator.onLine === false`, which HydrationErrors the offline badge in the
+ * practice session chrome.
  *
- * Initial value is read in the `useState` initializer so we never
- * synchronously call `setState` inside the effect.
+ * After hydration, the store snaps to real `navigator.onLine` via `getSnapshot`.
  */
+function subscribe(onStoreChange: () => void): () => void {
+	if (typeof window === "undefined") {
+		return () => {};
+	}
+	window.addEventListener("online", onStoreChange);
+	window.addEventListener("offline", onStoreChange);
+	return () => {
+		window.removeEventListener("online", onStoreChange);
+		window.removeEventListener("offline", onStoreChange);
+	};
+}
+
+function getSnapshot(): boolean {
+	return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function getServerSnapshot(): boolean {
+	return true;
+}
+
 export function useNetworkStatus(): boolean {
-	const [isOnline, setIsOnline] = useState<boolean>(() =>
-		typeof navigator === "undefined" ? true : navigator.onLine,
-	);
-
-	useEffect(() => {
-		const setOnline = () => setIsOnline(true);
-		const setOffline = () => setIsOnline(false);
-		window.addEventListener("online", setOnline);
-		window.addEventListener("offline", setOffline);
-		return () => {
-			window.removeEventListener("online", setOnline);
-			window.removeEventListener("offline", setOffline);
-		};
-	}, []);
-
-	return isOnline;
+	return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

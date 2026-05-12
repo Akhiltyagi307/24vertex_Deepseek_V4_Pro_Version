@@ -214,9 +214,22 @@ describe("buildPracticeUserMessage", () => {
 			});
 			expect(physics.test_parameters.visuals_policy).toEqual({
 				enabled: true,
-				preferred_kinds: ["physics_diagram", "math_function_plot", "data_table"],
+				preferred_kinds: ["physics_diagram", "math_geometry", "math_function_plot", "data_table"],
 				max_non_null_visuals: 15,
 			});
+
+			const chemistry = buildPracticeUserMessage({
+				studentGrade: 11,
+				subject: { id: "x", name: "Chemistry" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: TOPICS,
+			});
+			expect(chemistry.test_parameters.visuals_policy.preferred_kinds).toEqual([
+				"chemistry_reaction",
+				"chemistry_molecule",
+				"data_table",
+			]);
 
 			const accountancy = buildPracticeUserMessage({
 				studentGrade: 12,
@@ -279,6 +292,8 @@ describe("buildPracticeUserMessage", () => {
 			});
 			expect(integratedScience.test_parameters.visuals_policy.preferred_kinds).toEqual([
 				"physics_diagram",
+				"math_geometry",
+				"math_function_plot",
 				"chemistry_molecule",
 				"chemistry_reaction",
 				"data_table",
@@ -302,6 +317,44 @@ describe("buildPracticeUserMessage", () => {
 		} finally {
 			if (original === undefined) delete process.env.PRACTICE_VISUALS;
 			else process.env.PRACTICE_VISUALS = original;
+		}
+	});
+
+	it("adds template policy when the visual template engine is enabled", () => {
+		const originalVisuals = process.env.PRACTICE_VISUALS;
+		const originalTemplateEngine = process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE;
+		try {
+			process.env.PRACTICE_VISUALS = "true";
+			process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE = "true";
+			const msg = buildPracticeUserMessage({
+				studentGrade: 12,
+				subject: { id: "x", name: "Chemistry" },
+				difficulty: "medium",
+				timeLimitSeconds: 3600,
+				topics: [
+					{
+						...TOPICS[0]!,
+						topicName: "Electrochemical cells",
+						chapterName: "Electrochemistry",
+						unitName: "Electrochemistry",
+						grade: 12,
+					},
+				],
+			});
+
+			expect(msg.test_parameters.visuals_policy.preferred_kinds[0]).toBe("chemistry_cell_diagram");
+			expect(msg.test_parameters.visuals_policy.template_policy?.enabled).toBe(true);
+			expect(msg.test_parameters.visuals_policy.template_policy?.templates[0]?.id).toBe(
+				"chemistry-galvanic-cell",
+			);
+			expect(msg.test_parameters.visuals_policy.template_policy?.prompt_brief).toContain(
+				"Visual template engine",
+			);
+		} finally {
+			if (originalVisuals === undefined) delete process.env.PRACTICE_VISUALS;
+			else process.env.PRACTICE_VISUALS = originalVisuals;
+			if (originalTemplateEngine === undefined) delete process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE;
+			else process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE = originalTemplateEngine;
 		}
 	});
 

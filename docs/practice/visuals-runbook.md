@@ -6,13 +6,16 @@ rolling back the structured-visual feature.
 
 ## TL;DR
 
-Three env vars, all default off:
+Core env vars:
 
 | Env var | Default | Effect |
 |---|---|---|
 | `PRACTICE_VISUALS` | `false` | Master switch. When false, system prompt forces `visual: null` on every question. |
-| `PRACTICE_VISUAL_VALIDATOR` | `false` | Pass-2 validator (OpenAI Skills + shell tool). Currently a placeholder; flipping is a no-op until the integration lands. |
+| `PRACTICE_VISUAL_TEMPLATE_ENGINE` | `false` | Routes visual kind policy through the typed subject/topic template catalog. Keep off for shadow comparison; flip after eval and renderer checks pass. |
+| `PRACTICE_VISUAL_VALIDATOR` | `false` | Pass-2 deterministic validator pass (schema/semantic/grounding checks) before persistence. |
 | `PRACTICE_VISUAL_VALIDATOR_MODEL` | _(unset)_ | Optional explicit model for Pass 2. Falls back to `getOpenAIPracticeChatModel()`. |
+| `PRACTICE_VISUAL_STEM_GROUNDING` | `off` | Stem↔visual literal grounding mode: `off`, `shadow` (log only), `enforce` (null mismatches). |
+| `PRACTICE_VISUAL_ENRICHMENT_BATCH_SIZE` | `2` | Candidate count per enrichment call (`1..6`). Higher values can improve coverage at higher token cost. |
 
 Always-on knobs (no flag):
 - All 11 renderers ship in the bundle but load via `next/dynamic({ ssr: false })` per renderer file. A math-only session does NOT pull plotly / smiles-drawer / mermaid.
@@ -31,39 +34,71 @@ Always-on knobs (no flag):
    `tests/eval-visuals/fixtures/<subject>/<short_name>.json`.
 3. `pnpm eval:visuals`. If any subject's pass rate is below 90%, **don't flip yet**.
 4. Common fix paths:
-   - **Visual emitted on a non-load-bearing stem** → strengthen the discipline section's T1/T2/T3 wording, or add a null-visual exemplar for that subject in `src/lib/practice/visuals/exemplars.ts`.
-   - **Stem references "the figure" but visual is null** → quality gate already catches this. Failure surfaces in eval as `visual_when_needed`. Fix the per-subject preamble to push the right kind for that topic.
+   - **Visual density is too low** → check `src/lib/practice/generation-prompt-registry.ts` for subject preamble wording that still pushes broad `visual: null` defaults. The shared Visuals section is the source of truth when `preferred_kinds` is non-empty and `max_non_null_visuals` is non-zero.
+   - **Visual is valid but noisy/decorative** → add or move up a cleaner exemplar in `src/lib/practice/visuals/exemplars.ts`, preferably a compact `data_table`, `number_line`, or renderer-specific stimulus that mirrors the subject's expected shape.
+   - **Stem references "the figure" but visual is null** → quality gate already catches this. Failure surfaces in eval as `visual_when_needed`. Fix the per-subject preamble to push the right kind for that topic, or rewrite the stem so it does not imply a missing stimulus.
+   - **Visual label mismatch / caption leaks answer** → keep minimal visuals sparse, remove answer-bearing text from `caption` / `altText`, and ensure every stem label appears in `visual.spec`.
    - **Spec invalid (Zod parse fail)** → check `practice-generation-pipeline.ts` autofix; check schema in `src/lib/practice/visuals/schemas.ts`.
    - **Renders fail** → run `pnpm exec vitest run tests/components/practice/visuals-renderers.test.tsx` against the fixture; check the renderer for the spec's kind.
-   - **Stem refers to "above/below" with no visual** → this is the Goal-A "self-contained stem" check; fix the preamble or the stem itself.
-5. When every subject ≥ 90%, set `PRACTICE_VISUALS=true` in production env. Bump `PRACTICE_PROMPT_REVISION` if you also touched the prompt.
+5. For template-engine rollout, run the same fixtures twice: once with `PRACTICE_VISUAL_TEMPLATE_ENGINE=false` (legacy enrichment) and once with `PRACTICE_VISUAL_TEMPLATE_ENGINE=true` (template policy). Only flip the template engine when every subject stays ≥ 90%.
+6. When every subject ≥ 90%, set `PRACTICE_VISUALS=true` in production env. Set `PRACTICE_VISUAL_TEMPLATE_ENGINE=true` only after the shadow comparison is clean. Bump `PRACTICE_PROMPT_REVISION` if you also touched the prompt.
+
+## Schema additions (2026-05 overhaul)
+
+When validating generated visuals or manually authoring fixtures, these fields are now available and expected in upgraded exemplars:
+
+- `math_geometry`: `point.labelPosition`, `segment.tickMarks`, `segment.arrowEnd`, `polygon.vertexLabels`, `arc.radiusFraction`.
+- `math_function_plot`: `xTickStep`, `yTickStep`.
+- `number_line`: `axisLabel`, `minorTickStep`.
+- `physics_diagram.free_body`: `forces[].unit`, `forces[].showMagnitude`, `forces[].componentArrows`, plus `inclineLabel`, `surfaceHatched`, `axisLegend`.
+- `physics_diagram.ray_optics`: `axisUnit`, `axisTickStep`, `axisMajorTickStep`, `drawRays`, `objects[].label`, `lenses[].label`.
+- `physics_diagram.circuit`: `components[].currentArrow`, `battery.polarityMarks`.
+- `economics_curve`: `marks[].kind` (`point` or `vertical_line`).
+- `chemistry_molecule`: `display` is constrained to `2d` (no `3d` fixture values).
+- Template-engine families: `biology_diagram`, `flowchart`, `timeline`, `source_extract`, `map_visual`, `chemistry_cell_diagram`, `physics_field_diagram`, and `physics_wave_diagram`.
+
+## Manual screenshot checklist (PR verification)
+
+After `pnpm dev` with `PRACTICE_VISUALS=true`, capture at least one screenshot per renderer kind:
+
+- `math_geometry`: labelled points + angle arc + tick-marked segment.
+- `math_function_plot`: multi-item legend visible; tick-steped axes when configured.
+- `number_line`: axis label and minor ticks visible.
+- `physics_diagram/free_body`: force magnitudes+units, axis legend, incline hatch + angle.
+- `physics_diagram/ray_optics`: axis unit labels, focal labels, and ray traces.
+- `physics_diagram/circuit`: synthesized component values, polarity marks, current arrow.
+- `chemistry_molecule` + `chemistry_reaction`: molecule/reaction labels readable.
+- `statistics_chart`: bar value labels, line legend, pie percentages.
+- `economics_curve`: point callout marks and vertical-line marks both represented.
+- `accountancy_table`, `data_table`, `english_passage`, `india_map`: one representative each.
+- Template families: biology pedigree/structure, business flowchart, history timeline, social-science source extract, geography map visual, chemistry cell, physics field lines, and physics wave.
 
 ## Per-subject toggle (when needed)
 
-The current implementation uses a single boolean (`PRACTICE_VISUALS=true|false`) per delivery plan §A1. If a subject is consistently lagging, you have three options:
+The current implementation uses a master boolean (`PRACTICE_VISUALS=true|false`) plus an optional CSV allowlist (`PRACTICE_VISUALS_SUBJECTS=Mathematics,Accountancy`). If a subject is consistently lagging, you have three options:
 
 1. **Stay off everywhere** until that subject clears 90%. (Default.)
-2. **Patch the prompt** to bias that subject toward `visual: null` (so emission never triggers Goal-A failure modes there) without changing other subjects.
-3. **Reverse §A1** and introduce a per-subject env list (`PRACTICE_VISUALS_SUBJECTS=mathematics,accountancy,…`). This is a real code change, not a config flip; document it in a follow-up PR.
+2. **Use `PRACTICE_VISUALS_SUBJECTS`** to roll out only subjects whose renderers and prompts are passing eval.
+3. **Patch the prompt or exemplar mix** for the lagging subject. Keep the shared policy as "maximize faithful non-null visuals"; do not reintroduce broad null defaults except for hard renderer/safety facts.
 
-## Pass 2 (validator) rollout
+## Stem-grounding rollout
 
-Pass 2 is best-effort polish — it never blocks Pass 1 from shipping. Recommended sequencing:
+Use staged rollout for literal grounding so coverage and fidelity stay balanced:
 
-1. Set `PRACTICE_VISUAL_VALIDATOR_MODEL` to your chosen Pass-2 model id.
-2. Wire the placeholder in `src/lib/practice/visuals/run-validator-pass.ts` to the actual `generateText({ model: openai.responses(...), providerOptions: { openai: { tools: [{ type: "shell", environment: { type: "container_auto", skills: VALIDATOR_SKILL_REFS } }] } } })` call (see v2 visuals guide §3.4).
-3. Run `pnpm node scripts/sync-openai-skills.mjs` to verify the lockfile hashes match local files. Re-pin with `SKILLS_LOCK_PIN=true` if needed.
-4. Push to staging with `PRACTICE_VISUAL_VALIDATOR=true` and watch Sentry for `runValidatorPass.invoke` errors. Pass 1 still ships even when Pass 2 throws.
-5. Once stable, flip in production.
+1. Keep `PRACTICE_VISUAL_STEM_GROUNDING=off` while shipping prompt changes.
+2. Move to `shadow` in staging/limited prod and monitor `practice_generation_validator_pass` telemetry (`grounding_mismatched_visuals`).
+3. Move to `enforce` once mismatch rate stabilizes and `pnpm eval:visuals` remains above threshold.
+4. If density drops below target in enforce mode, increase `PRACTICE_VISUAL_ENRICHMENT_BATCH_SIZE` gradually (2 → 3 → 4) and re-run eval.
 
 ## Rollback
 
 In order of preference (least disruptive first):
 
 1. **Flip `PRACTICE_VISUAL_VALIDATOR=false`** — keeps the structured visuals but disables the (optional) Pass-2 polish.
-2. **Flip `PRACTICE_VISUALS=false`** — system prompt forces `visual: null` on every new generation. Existing tests in the DB are unaffected; the renderer continues to serve their stored visuals through the `metadata.visual` read path. Set this when a renderer regression appears or when generation quality drops below threshold.
-3. **Revert the renderer plumbing** — only needed if a renderer crashes the page despite the safe parser. The renderer dispatcher is at `src/components/student/practice/visuals/question-visual.tsx`. Replacing the renderer body with `return null` for the affected kind disables it without touching the schema.
-4. **Revert the schema change** — `src/lib/practice/generation-schema.ts` `visual: questionVisualEnvelopeSchema.nullable()`. Removing the field requires re-deploying generation; legacy `metadata.visual` blobs are ignored by the safe parser, so it's safe.
+2. **Flip `PRACTICE_VISUAL_TEMPLATE_ENGINE=false`** — returns generation to the legacy subject-kind policy while keeping the existing visuals feature enabled.
+3. **Flip `PRACTICE_VISUALS=false`** — system prompt forces `visual: null` on every new generation. Existing tests in the DB are unaffected; the renderer continues to serve their stored visuals through the `metadata.visual` read path. Set this when a renderer regression appears or when generation quality drops below threshold.
+4. **Revert the renderer plumbing** — only needed if a renderer crashes the page despite the safe parser. The renderer dispatcher is at `src/components/student/practice/visuals/question-visual.tsx`. Replacing the renderer body with `return null` for the affected kind disables it without touching the schema.
+5. **Revert the schema change** — `src/lib/practice/generation-schema.ts` `visual: questionVisualEnvelopeSchema.nullable()`. Removing the field requires re-deploying generation; legacy `metadata.visual` blobs are ignored by the safe parser, so it's safe.
 
 ## Telemetry
 

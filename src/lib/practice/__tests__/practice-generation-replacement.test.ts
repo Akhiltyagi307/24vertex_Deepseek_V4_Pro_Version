@@ -52,5 +52,7 @@ describe("replacement prompt builders", () => {
 		expect(text).toContain("math_geometry");
 		expect(text).toContain("[3,7]");
 		expect(text).toContain("(b) set visual to null and rewrite the stem");
+		expect(text).toContain("set `visual: null` only as a last resort");
+		expect(text).not.toContain("A correct question without a visual is ALWAYS preferred");
 	});
 });

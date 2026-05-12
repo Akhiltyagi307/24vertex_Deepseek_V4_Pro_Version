@@ -38,6 +38,10 @@ const MATH_GEOMETRY_PRIMITIVE = z.discriminatedUnion("type", [
 		type: z.literal("point"),
 		at: POINT_2D,
 		label: z.string().max(24).nullable(),
+		labelPosition: z
+			.enum(["n", "s", "e", "w", "ne", "nw", "se", "sw"])
+			.nullable()
+			.optional(),
 	}),
 	z.object({
 		type: z.literal("segment"),
@@ -45,12 +49,19 @@ const MATH_GEOMETRY_PRIMITIVE = z.discriminatedUnion("type", [
 		to: POINT_2D,
 		label: z.string().max(24).nullable(),
 		dashed: z.boolean().nullable(),
+		tickMarks: z.number().int().min(0).max(3).nullable().optional(),
+		arrowEnd: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("polygon"),
 		vertices: z.array(POINT_2D).min(3).max(20),
 		label: z.string().max(24).nullable(),
 		filled: z.boolean().nullable(),
+		vertexLabels: z
+			.array(z.string().max(24).nullable())
+			.max(20)
+			.nullable()
+			.optional(),
 	}),
 	z.object({
 		type: z.literal("vector"),
@@ -80,6 +91,7 @@ const MATH_GEOMETRY_PRIMITIVE = z.discriminatedUnion("type", [
 		minorArc: z.boolean().nullable(),
 		dashed: z.boolean().nullable(),
 		label: z.string().max(24).nullable(),
+		radiusFraction: z.number().min(0).max(1).nullable().optional(),
 	}),
 ]);
 
@@ -117,6 +129,8 @@ const MATH_FUNCTION_PLOT_SPEC = z.object({
 	yMax: z.number().nullable(),
 	xLabel: z.string().max(40).nullable(),
 	yLabel: z.string().max(40).nullable(),
+	xTickStep: z.number().positive().nullable().optional(),
+	yTickStep: z.number().positive().nullable().optional(),
 	items: z.array(MATH_FUNCTION_PLOT_ITEM).min(1).max(4),
 });
 
@@ -143,6 +157,8 @@ const NUMBER_LINE_SPEC = z.object({
 	min: z.number(),
 	max: z.number(),
 	tickStep: z.number().positive(),
+	minorTickStep: z.number().positive().nullable().optional(),
+	axisLabel: z.string().max(24).nullable().optional(),
 	points: z.array(NUMBER_LINE_POINT).max(20),
 	intervals: z.array(NUMBER_LINE_INTERVAL).max(8),
 });
@@ -155,6 +171,9 @@ const FREE_BODY_FORCE = z.object({
 	name: z.string().min(1).max(20),
 	magnitude: z.number().positive(),
 	angleDeg: z.number().min(-360).max(360),
+	unit: z.string().max(6).nullable().optional(),
+	showMagnitude: z.boolean().nullable().optional(),
+	componentArrows: z.boolean().nullable().optional(),
 });
 
 const PHYSICS_FREE_BODY = z.object({
@@ -163,6 +182,9 @@ const PHYSICS_FREE_BODY = z.object({
 	bodyLabel: z.string().min(1).max(40),
 	forces: z.array(FREE_BODY_FORCE).min(1).max(8),
 	inclineDeg: z.number().min(-90).max(90).nullable(),
+	inclineLabel: z.string().max(16).nullable().optional(),
+	surfaceHatched: z.boolean().nullable().optional(),
+	axisLegend: z.boolean().nullable().optional(),
 });
 
 const RAY_OPTICS_OBJECT = z.object({
@@ -170,12 +192,14 @@ const RAY_OPTICS_OBJECT = z.object({
 	x: z.number(),
 	height: z.number(),
 	dashed: z.boolean(),
+	label: z.string().max(16).nullable().optional(),
 });
 
 const RAY_OPTICS_LENS = z.object({
 	type: z.enum(["concave_mirror", "convex_mirror", "concave_lens", "convex_lens"]),
 	x: z.number(),
 	focalLength: z.number().positive(),
+	label: z.string().max(24).nullable().optional(),
 });
 
 const PHYSICS_RAY_OPTICS = z.object({
@@ -183,8 +207,12 @@ const PHYSICS_RAY_OPTICS = z.object({
 	subKind: z.literal("ray_optics"),
 	axisMin: z.number(),
 	axisMax: z.number(),
+	axisUnit: z.string().max(6).nullable().optional(),
+	axisTickStep: z.number().positive().nullable().optional(),
+	axisMajorTickStep: z.number().positive().nullable().optional(),
 	objects: z.array(RAY_OPTICS_OBJECT).min(1).max(4),
 	lenses: z.array(RAY_OPTICS_LENS).min(1).max(2),
+	drawRays: z.boolean().nullable().optional(),
 });
 
 const CIRCUIT_NODE = z.object({
@@ -200,6 +228,8 @@ const CIRCUIT_COMPONENT = z.discriminatedUnion("type", [
 		to: z.string().min(1).max(8),
 		emfVolts: z.number().positive(),
 		label: z.string().max(20).nullable(),
+		polarityMarks: z.boolean().nullable().optional(),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("resistor"),
@@ -207,12 +237,14 @@ const CIRCUIT_COMPONENT = z.discriminatedUnion("type", [
 		to: z.string().min(1).max(8),
 		resistanceOhms: z.number().positive(),
 		label: z.string().max(20).nullable(),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("bulb"),
 		from: z.string().min(1).max(8),
 		to: z.string().min(1).max(8),
 		label: z.string().max(20).nullable(),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("switch"),
@@ -220,23 +252,27 @@ const CIRCUIT_COMPONENT = z.discriminatedUnion("type", [
 		to: z.string().min(1).max(8),
 		closed: z.boolean(),
 		label: z.string().max(20).nullable(),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("ammeter"),
 		from: z.string().min(1).max(8),
 		to: z.string().min(1).max(8),
 		label: z.string().max(20).nullable(),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("voltmeter"),
 		from: z.string().min(1).max(8),
 		to: z.string().min(1).max(8),
 		label: z.string().max(20).nullable(),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 	z.object({
 		type: z.literal("wire"),
 		from: z.string().min(1).max(8),
 		to: z.string().min(1).max(8),
+		currentArrow: z.boolean().nullable().optional(),
 	}),
 ]);
 
@@ -260,7 +296,7 @@ const PHYSICS_DIAGRAM_SPEC = z.discriminatedUnion("subKind", [
 const CHEMISTRY_MOLECULE_SPEC = z.object({
 	kind: z.literal("chemistry_molecule"),
 	smiles: z.string().min(1).max(240),
-	display: z.enum(["2d", "3d"]),
+	display: z.literal("2d").nullable(),
 	label: z.string().max(60).nullable(),
 });
 
@@ -378,6 +414,7 @@ const ECONOMICS_MARK = z.object({
 	x: z.number(),
 	y: z.number(),
 	label: z.string().min(1).max(40),
+	kind: z.enum(["point", "vertical_line"]).nullable().optional(),
 });
 
 const ECONOMICS_CURVE_SPEC = z.object({
@@ -564,6 +601,171 @@ const ENGLISH_PASSAGE_SPEC = z.object({
 });
 
 // ───────────────────────────────────────────────────────────────────────
+// biology_diagram
+// ───────────────────────────────────────────────────────────────────────
+
+const DIAGRAM_LABEL = z.object({
+	id: z.string().min(1).max(24),
+	text: z.string().min(1).max(80),
+	x: z.number().min(0).max(100),
+	y: z.number().min(0).max(100),
+});
+
+const BIOLOGY_DIAGRAM_SPEC = z.object({
+	kind: z.literal("biology_diagram"),
+	subKind: z.enum([
+		"cell",
+		"flower",
+		"human_system",
+		"pedigree",
+		"dna_process",
+		"food_chain",
+		"ecological_pyramid",
+	]),
+	title: z.string().min(1).max(120),
+	labels: z.array(DIAGRAM_LABEL).min(1).max(20),
+	notes: z.array(z.string().min(1).max(120)).max(8),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// flowchart
+// ───────────────────────────────────────────────────────────────────────
+
+const FLOWCHART_NODE = z.object({
+	id: z.string().min(1).max(24),
+	label: z.string().min(1).max(80),
+	detail: z.string().max(140).nullable(),
+	kind: z.enum(["start", "process", "decision", "outcome"]),
+});
+
+const FLOWCHART_EDGE = z.object({
+	from: z.string().min(1).max(24),
+	to: z.string().min(1).max(24),
+	label: z.string().max(60).nullable(),
+});
+
+const FLOWCHART_SPEC = z.object({
+	kind: z.literal("flowchart"),
+	title: z.string().min(1).max(120),
+	nodes: z.array(FLOWCHART_NODE).min(2).max(12),
+	edges: z.array(FLOWCHART_EDGE).min(1).max(16),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// timeline
+// ───────────────────────────────────────────────────────────────────────
+
+const TIMELINE_EVENT = z.object({
+	dateLabel: z.string().min(1).max(40),
+	label: z.string().min(1).max(100),
+	description: z.string().max(180).nullable(),
+	emphasis: z.boolean(),
+});
+
+const TIMELINE_SPEC = z.object({
+	kind: z.literal("timeline"),
+	title: z.string().min(1).max(120),
+	axisLabel: z.string().max(80).nullable(),
+	events: z.array(TIMELINE_EVENT).min(2).max(12),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// source_extract
+// ───────────────────────────────────────────────────────────────────────
+
+const SOURCE_EXTRACT_LINE = z.object({
+	number: z.number().int().positive(),
+	text: z.string().min(1).max(300),
+});
+
+const SOURCE_EXTRACT_SPEC = z.object({
+	kind: z.literal("source_extract"),
+	title: z.string().max(140).nullable(),
+	source: z.string().max(140).nullable(),
+	context: z.string().max(220).nullable(),
+	lines: z.array(SOURCE_EXTRACT_LINE).min(1).max(60),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// map_visual
+// ───────────────────────────────────────────────────────────────────────
+
+const MAP_VISUAL_REGION = z.object({
+	id: z.string().min(1).max(32),
+	label: z.string().min(1).max(80),
+	role: z.enum(["highlight", "label", "route_start", "route_end"]),
+});
+
+const MAP_VISUAL_SPEC = z.object({
+	kind: z.literal("map_visual"),
+	scope: z.enum(["india", "world", "region"]),
+	title: z.string().min(1).max(120),
+	mapStyle: z.enum(["political", "physical", "outline", "thematic"]),
+	regions: z.array(MAP_VISUAL_REGION).min(1).max(16),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// chemistry_cell_diagram
+// ───────────────────────────────────────────────────────────────────────
+
+const CHEMISTRY_CELL_ELECTRODE = z.object({
+	label: z.string().min(1).max(40),
+	material: z.string().min(1).max(40),
+	electrolyte: z.string().min(1).max(60),
+	polarity: z.enum(["positive", "negative", "neutral"]),
+});
+
+const CHEMISTRY_CELL_DIAGRAM_SPEC = z.object({
+	kind: z.literal("chemistry_cell_diagram"),
+	cellType: z.enum(["galvanic", "electrolytic"]),
+	anode: CHEMISTRY_CELL_ELECTRODE,
+	cathode: CHEMISTRY_CELL_ELECTRODE,
+	saltBridge: z.string().max(80).nullable(),
+	electronFlow: z.enum(["anode_to_cathode", "cathode_to_anode", "external_power_source"]),
+	labels: z.array(z.string().min(1).max(80)).max(8),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// physics_field_diagram
+// ───────────────────────────────────────────────────────────────────────
+
+const PHYSICS_FIELD_SOURCE = z.object({
+	label: z.string().min(1).max(40),
+	kind: z.enum(["positive_charge", "negative_charge", "north_pole", "south_pole", "current_wire"]),
+	x: z.number().min(0).max(100),
+	y: z.number().min(0).max(100),
+});
+
+const PHYSICS_FIELD_DIAGRAM_SPEC = z.object({
+	kind: z.literal("physics_field_diagram"),
+	fieldType: z.enum(["electric", "magnetic"]),
+	title: z.string().min(1).max(120),
+	sources: z.array(PHYSICS_FIELD_SOURCE).min(1).max(6),
+	fieldLineCount: z.number().int().min(2).max(16),
+	labels: z.array(DIAGRAM_LABEL).max(12),
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// physics_wave_diagram
+// ───────────────────────────────────────────────────────────────────────
+
+const PHYSICS_WAVE_MARKER = z.object({
+	x: z.number(),
+	label: z.string().min(1).max(40),
+});
+
+const PHYSICS_WAVE_DIAGRAM_SPEC = z.object({
+	kind: z.literal("physics_wave_diagram"),
+	waveType: z.enum(["transverse", "longitudinal", "standing", "interference"]),
+	title: z.string().min(1).max(120),
+	xMin: z.number(),
+	xMax: z.number(),
+	amplitude: z.number().positive(),
+	wavelength: z.number().positive().nullable(),
+	markers: z.array(PHYSICS_WAVE_MARKER).max(8),
+});
+
+// ───────────────────────────────────────────────────────────────────────
 // Top-level union of every spec kind
 //
 // Zod 3 forbids nested discriminated unions, so we use a plain `z.union(...)`
@@ -586,6 +788,14 @@ export const questionVisualSpecSchema = z.union([
 	DATA_TABLE_SPEC,
 	INDIA_MAP_SPEC,
 	ENGLISH_PASSAGE_SPEC,
+	BIOLOGY_DIAGRAM_SPEC,
+	FLOWCHART_SPEC,
+	TIMELINE_SPEC,
+	SOURCE_EXTRACT_SPEC,
+	MAP_VISUAL_SPEC,
+	CHEMISTRY_CELL_DIAGRAM_SPEC,
+	PHYSICS_FIELD_DIAGRAM_SPEC,
+	PHYSICS_WAVE_DIAGRAM_SPEC,
 ]);
 
 export const questionVisualEnvelopeSchema = z
@@ -664,6 +874,26 @@ export const questionVisualEnvelopeSchema = z
 				});
 			}
 		}
+		if (s.kind === "flowchart") {
+			const nodeIds = new Set(s.nodes.map((node) => node.id));
+			for (const edge of s.edges) {
+				if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						message: "flowchart: every edge must reference existing nodes",
+						path: ["spec", "edges"],
+					});
+					break;
+				}
+			}
+		}
+		if (s.kind === "physics_wave_diagram" && s.xMax <= s.xMin) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "physics_wave_diagram: xMax must exceed xMin",
+				path: ["spec"],
+			});
+		}
 	});
 
 export type QuestionVisualEnvelope = z.infer<typeof questionVisualEnvelopeSchema>;
@@ -682,6 +912,14 @@ export type StatisticsChartSpec = z.infer<typeof STATISTICS_CHART_SPEC>;
 export type DataTableSpec = z.infer<typeof DATA_TABLE_SPEC>;
 export type IndiaMapSpec = z.infer<typeof INDIA_MAP_SPEC>;
 export type EnglishPassageSpec = z.infer<typeof ENGLISH_PASSAGE_SPEC>;
+export type BiologyDiagramSpec = z.infer<typeof BIOLOGY_DIAGRAM_SPEC>;
+export type FlowchartSpec = z.infer<typeof FLOWCHART_SPEC>;
+export type TimelineSpec = z.infer<typeof TIMELINE_SPEC>;
+export type SourceExtractSpec = z.infer<typeof SOURCE_EXTRACT_SPEC>;
+export type MapVisualSpec = z.infer<typeof MAP_VISUAL_SPEC>;
+export type ChemistryCellDiagramSpec = z.infer<typeof CHEMISTRY_CELL_DIAGRAM_SPEC>;
+export type PhysicsFieldDiagramSpec = z.infer<typeof PHYSICS_FIELD_DIAGRAM_SPEC>;
+export type PhysicsWaveDiagramSpec = z.infer<typeof PHYSICS_WAVE_DIAGRAM_SPEC>;
 
 /** Stable list of accepted kind discriminators (used by gates and policy). */
 export const QUESTION_VISUAL_KINDS = [
@@ -697,5 +935,13 @@ export const QUESTION_VISUAL_KINDS = [
 	"data_table",
 	"india_map",
 	"english_passage",
+	"biology_diagram",
+	"flowchart",
+	"timeline",
+	"source_extract",
+	"map_visual",
+	"chemistry_cell_diagram",
+	"physics_field_diagram",
+	"physics_wave_diagram",
 ] as const;
 export type QuestionVisualKind = (typeof QUESTION_VISUAL_KINDS)[number];

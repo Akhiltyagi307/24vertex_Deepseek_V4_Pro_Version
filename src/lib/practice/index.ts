@@ -68,8 +68,12 @@ export {
 	summarizeGroupedQuestionTypeCounts,
 	sumGroupedEstimatedSeconds,
 	validateAndStripGeneration,
+	buildPracticeRoundRobinFlatIndexMap,
+	buildPracticeValidationRepairDiagnostics,
 	type PracticeGenerationBucketKey,
 	type PracticeGenerationGroupedOutput,
+	type PracticeRoundRobinFlatIndexMapEntry,
+	type PracticeValidationRepairDiagnostics,
 	type ExpectedQuestionMixCounts,
 	type GeneratedPracticeQuestion,
 	type PracticeGenerationOutput,
@@ -82,3 +86,26 @@ export {
 	type PracticeConfigResolveResult,
 	type PracticeConfigResolveSuccess,
 } from "./resolve-config";
+export {
+	buildPracticeGenerationJobContext,
+	generationJobConfigSnapshot,
+	type PracticeGenerationJobContext,
+	type PracticeGenerationRequestMode,
+} from "./generation-job-context";
+export {
+	buildPracticeEvidenceMap,
+	selectEvidenceByTopicIds,
+	selectEvidenceForFailedIndexes,
+	type PracticeEvidenceMap,
+	type PracticeTopicEvidenceItem,
+	type PracticeTopicEvidenceKind,
+	type PracticeTopicEvidencePack,
+} from "./generation-evidence-pack";
+export {
+	createPracticeGenerationBlueprintSchema,
+	flattenPracticeGenerationBlueprint,
+	validatePracticeGenerationBlueprint,
+	type PracticeBlueprintVisualPolicy,
+	type PracticeGenerationBlueprintGrouped,
+	type PracticeGenerationBlueprintSlot,
+} from "./practice-generation-blueprint-schema";

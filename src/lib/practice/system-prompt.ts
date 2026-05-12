@@ -114,7 +114,7 @@ function buildHardGatesBlock(args: {
 			.join(", ");
 
 	const visualLine = args.visualsEnabled
-		? "- `visual` field: emit `null` UNLESS a load-bearing trigger fires per the Visuals discipline section. If non-null, every label in the stem MUST match the spec. When in doubt, prefer null."
+		? "- `visual` field: **Maximize non-null visuals** per the Visuals section — default to attaching a non-null `visual` on every question when any `preferred_kinds` kind fits; use `null` only in the narrow exceptions listed there. If non-null, every label in the stem MUST match the spec."
 		: "- `visual` field: ALWAYS emit `null` for every question in this generation.";
 
 	let visualExtras = "";
@@ -126,7 +126,7 @@ function buildHardGatesBlock(args: {
 			:	`- \`visuals_policy.preferred_kinds\` is empty for this subject: emit \`visual: null\` on every question.`;
 		const capLine =
 			vp.max_non_null_visuals > 0 ?
-				`- Non-null \`visual\`: no artificial per-test quota — attach wherever T1/T2/T3 applies (see Visuals section); every other question MUST use \`visual: null\`.`
+				`- Non-null \`visual\`: no artificial per-test quota — **aim for one non-null visual on every question** when an allowed kind can faithfully support the item (see Visuals section for the narrow \`null\` exceptions).`
 			:	`- Non-null visuals are disabled (\`max_non_null_visuals\` = 0): emit \`visual: null\` on every question.`;
 		visualExtras = `\n${kindsLine}\n${capLine}`;
 	}
@@ -352,38 +352,58 @@ Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessage
  *
  * Only emitted when `PRACTICE_VISUALS=true`. Tells the model when to attach
  * a non-null `visual` envelope and what each renderer expects. Intentionally
- * verbose — exemplars at the bottom of the prompt do most of the lifting
- * (including NCERT/CBSE-typical and broader international-exam-shaped stimuli),
- * but the rules here cap the failure modes (every-question-gets-a-visual,
- * label drift between stem and spec, syntactically invalid expressions).
+ * verbose — exemplars at the bottom of the prompt show concrete `spec` shapes;
+ * this block biases toward **maximal** visual attachment while preserving
+ * renderer syntax, stem↔spec alignment, and anti-spoiler captions.
  */
 function buildVisualsDisciplineBlock(
 	vp: PracticeUserMessagePayload["test_parameters"]["visuals_policy"],
 ): string {
 	const kindsEcho =
 		vp.preferred_kinds.length > 0 ? vp.preferred_kinds.join(", ") : "— leave every `visual` null —";
+	const templatePolicyBlock =
+		vp.template_policy?.enabled ?
+			`
+### Template policy (deterministic first)
+
+${vp.template_policy.prompt_brief}
+
+- The model may only use template IDs listed above. Do not invent template IDs, visual kinds, node shapes, map scopes, biological structures, chemistry cells, or physics diagrams outside the declared slot contracts.
+- Fill required slots exactly; optional slots are allowed only when they improve the item and remain grounded in the stem/chunks.
+- If no listed template can faithfully represent the item without answer leakage, set \`visual: null\` and write the stem without figure/table/map references.`
+		:	"";
 	return `## Visuals (\`visual\` field — required on every question)
 
 ### Policy (must match \`test_parameters.visuals_policy\`)
 
 - Non-null \`visual.spec.kind\` must be drawn from: ${kindsEcho}.
-- No quota limiting how many questions may use a non-null \`visual\`: every item that satisfies T1/T2/T3 below may carry one; items without those triggers stay \`visual: null\`.
-- Avoid **orphan** diagrams: if you attach a non-null \`visual\`, the stem should reference it ("shown below", "in the table", etc.) or the visual is itself the worksheet layout (accountancy/statistics stimulus).
+- **Maximize non-null visuals:** attach a **non-null** \`visual\` on **as many questions as possible** — treat **one non-null visual per question** as the usual outcome whenever any allowed kind can **faithfully** support the item (pedagogically, representatively, or by showing givens). The \`## Examples\` block includes some \`visual: null\` rows so you see valid JSON; **do not** imitate those nulls as a target frequency — prefer a real stimulus whenever a \`preferred_kinds\` kind fits.
+- No per-test quota limiting how many questions may use a non-null \`visual\` (other than payload \`max_non_null_visuals\` and an empty \`preferred_kinds\` list).
+- Avoid **orphan** diagrams: the stem must cue the figure ("shown below", "use the table", "read the passage", etc.) **or** the visual **is** the worksheet/stimulus (accountancy blocks, data tables, numbered passages).
 
-The default is \`visual: null\`. Emit a non-null visual ONLY when one of these
-load-bearing triggers fires:
+**Use \`visual: null\` when:** \`preferred_kinds\` is empty, \`max_non_null_visuals\` is 0, no allowed kind can represent the item **faithfully** without contradicting \`topic_grounding\`, or you cannot satisfy the renderer HARD rules below. Also use \`null\` for purely abstract or derivation questions where any visual would be a generic placeholder unrelated to the specific question (e.g. a kinetic-theory derivation or a wave equation explanation — a generic sine wave or free-body scaffold adds no learning value there). **Prefer a correct, relevant visual over a forced placeholder.**
+${templatePolicyBlock}
 
-  T1 — The student CANNOT solve the question without seeing the figure.
-       Examples: "in the figure shown", "the circuit below", "the graph above",
-       "the structure of compound X", "given the table".
-  T2 — The expected answer or stimulus has a presentation-style format the
-       student must read OR fill in: journal entry, ledger account, trial
-       balance, balance sheet, P&L, cash book, partition table.
-  T3 — The question requires inference from binned/visualized data: histogram,
-       ogive, scatter, box plot, frequency polygon.
+### Choosing a kind (loose — prefer a visual; mirror \`## Examples\`)
 
-If none of T1/T2/T3 fires, emit \`visual: null\`. Pure algebra, definitions,
-theory recall, and short numerical items NEVER carry a visual.
+Pick the closest exemplar-backed renderer. Non-exhaustive mapping:
+
+- **Mathematics:** shapes, coordinates, constructions, vectors, angles → \`math_geometry\`; graphs and read-offs → \`math_function_plot\`; intervals and inequalities → \`number_line\`. For items that look *text-only* (linear equations, quadratics, sequences, "find x"), still add a **minimal** legitimate visual when possible: e.g. \`number_line\` marking a solution, \`math_function_plot\` when any function is named, or a compact \`data_table\` of coefficients/givens — without spoiling the keyed answer in \`caption\`/\`altText\`.
+- **Physics:** \`physics_diagram\` to match the specific physics sub-topic — never default to \`free_body\` when the question is not about forces on a body:
+  - **Newtonian mechanics / forces** (tension, friction, inclined planes, pulleys, Newton's laws, equilibrium of a point mass): \`physics_diagram/free_body\`.
+  - **Electric circuits** (resistance, EMF, current, Ohm's law, Kirchhoff's laws): \`physics_diagram/circuit\`.
+  - **Optics / ray diagrams** (lens, mirror, refraction, image formation, focal length): \`physics_diagram/ray_optics\`.
+  - **Waves / oscillations / SHM** (wavelength, frequency, amplitude, superposition, interference, beats, resonance, standing waves, simple harmonic motion): \`math_function_plot\` with a sinusoidal expression (\`sin(x)\`, \`cos(x)\`, or a scaled/shifted variant). Do **not** use \`physics_diagram\` for wave or oscillation topics.
+  - **Kinetic theory / thermodynamics / gas laws** (mean free path, rms speed, equipartition, degrees of freedom, Cv/Cp, PV diagrams, Avogadro, ideal gas law): prefer \`math_function_plot\` for a relevant curve (isothermal PV: \`8/x\`) or \`data_table\` to compare gas properties; use \`null\` when no renderer adds clear learning value for an abstract derivation.
+  - **Other physics** (semiconductor, EM induction, nuclear, fluid statics, etc.): \`math_function_plot\` or \`data_table\` when quantitative givens are present; otherwise \`null\`.
+- **Chemistry:** structures → \`chemistry_molecule\`; schemes → \`chemistry_reaction\`.
+- **Accountancy / structured presentations:** \`accountancy_table\` whenever journals, ledgers, trial balances, or statements are natural.
+- **Economics:** intersecting schedules → \`economics_curve\`.
+- **Numeric / categorical / social / business / bio data:** \`statistics_chart\` or \`data_table\` whenever numbers, shares, categories, or trends appear — not only formal histogram or ogive wordings.
+- **Geography (India-centric):** \`india_map\` when states, neighbours, or regions matter; otherwise charts/tables from grounding.
+- **English / reading:** \`english_passage\` with numbered lines when the student reads before answering.
+
+If multiple kinds fit, choose the clearest for the student. **Only** use kinds in \`preferred_kinds\`.
 
 ### Stem ↔ visual single-source-of-truth
 
@@ -395,6 +415,15 @@ If you emit a visual, the stem MUST NOT restate data the visual already carries.
 Every label, letter, number, or unit referenced in the stem MUST appear in the
 spec; every label, letter, number in the spec MUST appear in the stem or be
 clearly secondary (axis ticks, gridlines).
+
+- Treat the generated question payload as canonical: numbers, entities, labels,
+  and units in \`visual.spec\` must come from that question's stem/options.
+  Never copy literals from few-shot examples or unrelated topic chunks.
+
+- For minimal supporting visuals (\`data_table\`, \`number_line\`, small
+  \`math_geometry\`), keep labels sparse: include only the letters, numbers, and
+  units the stem actually references plus unavoidable secondary guides such as
+  axis ticks or gridlines.
 
 ### Caption and altText (student-facing — must not spoil the item)
 
@@ -456,9 +485,7 @@ under the figure) and \`altText\` (richer description for screen readers).
 - \`data_table\`: rows are arrays of cells; each cell has \`value\`, \`bold\`,
   \`align\` ("left" | "center" | "right"). Use this for short stimulus tables
   that don't fit accountancy or statistics shapes.
-- **Geography / Social Science (grades 8–12):** Use \`india_map\` when the stem truly
-  depends on **which states/regions** are shown (boundaries, neighbours, coasts,
-  plateaus). Set \`mapStyle\` to \`political\` (pastel states), \`outline\` (minimal
+- **Geography / Social Science (grades 8–12):** Use \`india_map\` when **location, states, neighbours, coasts, or regional comparison** is part of the item — prefer showing the map whenever it clarifies the stem (not only when the item is unsolvable without it). Set \`mapStyle\` to \`political\` (pastel states), \`outline\` (minimal
   fills, bold borders), or \`physical_palette\` (muted earth-tone fills — not relief).
   Put lowercase ids in \`highlightedStates\` only for regions the stem names or
   contrasts (\`mh\`, \`rj\`, \`tn\`, … — ids match \`@svg-maps/india\`). Also use
@@ -469,7 +496,7 @@ under the figure) and \`altText\` (richer description for screen readers).
   mix), \`data_table\` for short case facts, and \`economics_curve\` when intersecting
   demand/supply or similar curves carry the question; reserve \`math_function_plot\`
   for rare quantitative sketches that are not better as a curve diagram.
-- **Biology:** Use \`data_table\` for experimental tallies, assay summaries, or comparative measurements when the numbers carry the question. Use \`statistics_chart\` (bar, line, histogram, scatter, pie as appropriate) when the item depends on plotted frequencies or measurements. There is **no** dedicated histology / organ / life-cycle diagram renderer in v1 — follow the subject preamble: keep structure-and-localisation items textual unless you use an allowed tabular/chart stimulus.
+- **Biology:** Prefer \`data_table\` or \`statistics_chart\` liberally for tallies, comparative measurements, classifications, population or experimental summaries, and any numeric/categorical stimulus — even when the item could be read as pure recall. There is **no** dedicated histology / organ / life-cycle diagram renderer in v1; use tables or charts (when in \`preferred_kinds\`) rather than leaving \`visual: null\` by default.
 - \`english_passage\`: \`lines[]\` with \`number\` (positive int) and \`text\`.
   Inline \`$...$\` LaTeX is supported in line text.
 - All text labels in any spec are LaTeX-aware — \`$x_0$\`, \`$\\\\theta$\` will
@@ -477,16 +504,16 @@ under the figure) and \`altText\` (richer description for screen readers).
 
 ### Self-check before emit (apply per-question)
 
-1. Does the stem actually require this visual? If unsure → null.
+1. Could any allowed kind add a **faithful** supporting visual? If **yes** → prefer **non-null** (goal: every question).
 2. Does every label in the stem appear in the spec?
 3. Do \`caption\` and \`altText\` explain the stimulus without revealing the keyed answer?
 4. Does the answer key reference the same labels and values as the spec?
 5. For function plots and curves: f(x) defined and finite over the plotted range?
 6. For chemistry: does the SMILES / mhchem string parse?
 
-If any check fails and you cannot fix the spec, set \`visual: null\` and rewrite
-the stem to be self-contained. A correct question without a visual is ALWAYS
-preferred to a wrong or noisy visual.`;
+If checks 2–6 fail and you cannot repair the spec, set \`visual: null\` and rewrite
+the stem to be self-contained. Dropping the visual is a **last resort** after simplifying the spec — a spoiled or invalid visual is never acceptable.
+`;
 }
 
 /** Keys matched with `subjectName.toLowerCase().includes(key)` — put `social science` before `science`. */
@@ -550,7 +577,7 @@ function buildExemplarsBlock(
 			"\nSelected-topic ordering: exemplars whose catalogue keywords overlap the student's chosen topic/chapter titles are listed earlier when possible; still vary supported visual shapes across the test.\n"
 		:	"";
 	return `\n\n## Examples (worked stems with matching visuals)\n\nThe following concrete stem ↔ visual pairs mix Indian-board-typical items and international-exam-shaped graphs (AP, IB, SAT-style where applicable). Imitate the SHAPE — not the
-content — when constructing your own questions; keep notation, currency, and syllabus cues aligned with the student's topic unless the stem explicitly states another convention.
+content — when constructing your own questions; keep notation, currency, and syllabus cues aligned with the student's topic unless the stem explicitly states another convention. **Policy:** this catalogue includes some \`visual: null\` examples for JSON shape — in real generations, **prefer a non-null visual on almost every question** when \`preferred_kinds\` allows (see Visuals section).
 ${topicOrderingNote}
 ${rendered}\n`;
 }

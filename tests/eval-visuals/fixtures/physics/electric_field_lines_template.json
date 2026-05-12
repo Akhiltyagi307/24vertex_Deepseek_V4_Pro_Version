@@ -1,0 +1,33 @@
+{
+  "question_text": "Use the electric field lines shown below to determine the direction of the field near point P.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "From +Q toward -Q",
+    "B": "From -Q toward +Q",
+    "C": "Perpendicular to every field line",
+    "D": "Zero everywhere between the charges"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Electric field direction follows the arrow direction from the positive source toward the negative source.",
+    "common_mistakes": [],
+    "related_concept": "Electric field direction"
+  },
+  "visual": {
+    "caption": "Electric field-line stimulus between opposite charges.",
+    "altText": "A positive charge on the left and negative charge on the right with field lines directed from left to right.",
+    "spec": {
+      "kind": "physics_field_diagram",
+      "fieldType": "electric",
+      "title": "Field between charges",
+      "sources": [
+        { "label": "+Q", "kind": "positive_charge", "x": 25, "y": 50 },
+        { "label": "-Q", "kind": "negative_charge", "x": 75, "y": 50 }
+      ],
+      "fieldLineCount": 6,
+      "labels": [
+        { "id": "p", "text": "P", "x": 50, "y": 35 }
+      ]
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "question_number": 1,
+  "topic_id": "55555555-aaaa-4555-8555-555555555551",
+  "topic_name": "Classification of organisms",
+  "question_text": "From the table shown below, which organism is a vertebrate?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "Earthworm", "B": "Octopus", "C": "Frog", "D": "Hydra" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The table indicates that frog has a backbone and is an amphibian.",
+    "common_mistakes": [],
+    "related_concept": "Vertebrate vs invertebrate"
+  },
+  "estimated_time_seconds": 60,
+  "visual": {
+    "caption": "Classification table for selected organisms.",
+    "altText": "Three-column data table listing organism names, key trait, and group hints to support vertebrate-invertebrate classification.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Organism classification",
+      "headers": ["Organism", "Key trait", "Group hint"],
+      "rows": [
+        [
+          { "value": "Earthworm", "bold": false, "align": "left" },
+          { "value": "No backbone", "bold": false, "align": "left" },
+          { "value": "Annelid", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "Frog", "bold": false, "align": "left" },
+          { "value": "Backbone present", "bold": false, "align": "left" },
+          { "value": "Amphibian", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "Octopus", "bold": false, "align": "left" },
+          { "value": "Soft body", "bold": false, "align": "left" },
+          { "value": "Mollusc", "bold": false, "align": "left" }
+        ]
+      ]
+    }
+  }
+}

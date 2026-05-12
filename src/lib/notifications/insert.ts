@@ -82,6 +82,9 @@ export async function insertInAppNotification(input: InsertInAppInput): Promise<
 				referenceId: input.referenceId ?? null,
 				contextStudentId: input.contextStudentId ?? null,
 			})
+			// Dedup is enforced at the DB layer for report-ready rows via a
+			// partial unique index. `DO NOTHING` keeps retries idempotent.
+			.onConflictDoNothing()
 			.returning({ id: notifications.id });
 		return rows[0]?.id ?? null;
 	} catch (err) {

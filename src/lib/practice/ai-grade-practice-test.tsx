@@ -7,9 +7,7 @@ import { generateObject } from "ai";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { consumeTest } from "@/lib/billing/entitlements";
-// `notifyTestReportReady` previously fired here; it now fires from the email
-// job (run-jobs route) so the in-app bell only lights up when the PDF link
-// is actually retrievable.
+import { notifyTestReportReady } from "@/lib/notifications/report-ready";
 import { getOpenAIChatModel } from "@/lib/env";
 import {
 	buildPracticeGradingSystemPrompt,
@@ -94,6 +92,32 @@ function buildAiFeedback(g: GradedQuestionItem): string {
 		parts.push(`\n\nStep-by-step:\n${g.step_by_step_solution.trim()}`);
 	}
 	return parts.filter(Boolean).join("");
+}
+
+function normalizeGradedChunkIds(
+	part: GradingQuestionInput[],
+	graded: GradedQuestionItem[],
+): { graded: GradedQuestionItem[]; correctionCount: number } {
+	if (graded.length !== part.length) return { graded, correctionCount: 0 };
+
+	const expectedById = new Map(part.map((q) => [q.question_id, q]));
+	const seen = new Set<string>();
+	let correctionCount = 0;
+	const normalized = graded.map((item, index) => {
+		const expected = part[index];
+		const matched = expectedById.get(item.question_id);
+		const idIsUsable = matched && !seen.has(item.question_id) && item.topic_id === matched.topic_id;
+		if (idIsUsable) {
+			seen.add(item.question_id);
+			return item;
+		}
+		if (!expected) return item;
+		correctionCount++;
+		seen.add(expected.question_id);
+		return { ...item, question_id: expected.question_id, topic_id: expected.topic_id };
+	});
+
+	return { graded: normalized, correctionCount };
 }
 
 function defaultStudentAnswerForQuestionType(
@@ -207,7 +231,7 @@ async function runSummaryObject(
 
 /**
  * Loads the submitted practice test, runs full-test AI grading, persists rows, updates trackers,
- * renders PDF, uploads to storage, and sets tests.status = graded.
+ * marks the test graded, and emits the in-app report-ready notification (PDF follows asynchronously).
  *
  * Always uses the service-role client for reads and writes: the grader must read `answer_key` and
  * other tables regardless of the caller’s JWT, and a failed run may leave a `test_reports` failure
@@ -376,7 +400,18 @@ async function gradePracticeTestWithAiInner(
 		const userPrompt = buildPracticeGradingUserPrompt(label, part);
 		try {
 			const { questions: graded } = await runGradingChunk(systemPrompt, userPrompt, part.length, userId);
-			return { ok: true, index: ci, graded, ms: Date.now() - c0 };
+			if (graded.length !== part.length) {
+				throw new Error(`AI grading returned ${graded.length}/${part.length} questions for ${label}.`);
+			}
+			const normalized = normalizeGradedChunkIds(part, graded);
+			if (normalized.correctionCount > 0) {
+				logServerError(
+					"gradePracticeTestWithAi.normalizeGradedChunkIds",
+					`Corrected ${normalized.correctionCount} grading question id(s) by chunk position.`,
+					{ testId, correlationId: ctx.correlationId, chunkIndex: ci },
+				);
+			}
+			return { ok: true, index: ci, graded: normalized.graded, ms: Date.now() - c0 };
 		} catch (error) {
 			return { ok: false, index: ci, error };
 		}
@@ -582,11 +617,9 @@ async function gradePracticeTestWithAiInner(
 
 	trace.timingsMs.testReports = mark();
 
-	// Update performance trackers BEFORE the in-app notification so the student
-	// (and any linked parent) opens a report whose tracker rows are already in
-	// sync with the new scores. Tracker failures are logged but don't fail the
-	// grade — partial data still beats no data, and the test report itself
-	// already carries the per-topic rollup payload.
+	// Update performance trackers BEFORE downstream notifications fan out so the
+	// student (and linked parents) open a report whose tracker rows already match
+	// the new scores.
 	const trackerPayloadItems = topicRollups.map((row) => ({
 		topic_id: row.topic_id,
 		average_score: row.average_score,
@@ -695,12 +728,21 @@ async function gradePracticeTestWithAiInner(
 		});
 	}
 
-	// In-app "report ready" notification fires from the email job AFTER the
-	// PDF render completes (see handleEmailJob in app/api/internal/practice/
-	// run-jobs/route.ts), so the bell only lights up once the PDF link in
-	// the report actually resolves. Test status (`graded`) and tracker rows
-	// are already updated above — the report page is functional via the
-	// realtime poll independent of the bell notification.
+	try {
+		await notifyTestReportReady({
+			studentId: userId,
+			testId,
+			subjectName,
+			overallPercent: Number.isFinite(overallPercent) ? overallPercent : null,
+			submittedAtIso: (testRow.test_date as string | null | undefined) ?? null,
+		});
+	} catch (notifyErr) {
+		logServerError("gradePracticeTestWithAi.notify_report_ready", notifyErr, {
+			testId,
+			jobId: ctx.jobId,
+			correlationId: ctx.correlationId,
+		});
+	}
 
 	trace.ok = true;
 	return { ok: true };
@@ -722,7 +764,14 @@ async function gradePracticeTestWithAiInner(
 }
 
 export type BuildPracticeGradingReportPdfResult =
-	| { ok: true; buffer: Buffer; userId: string; subjectName: string; overallPercent: number | null }
+	| {
+			ok: true;
+			buffer: Buffer;
+			userId: string;
+			subjectName: string;
+			overallPercent: number | null;
+			submittedAtIso: string | null;
+	  }
 	| { ok: false; message: string };
 
 /**
@@ -953,7 +1002,11 @@ export async function buildPracticeGradingReportPdfBuffer(
 		);
 		const buffer = raw instanceof Buffer ? raw : Buffer.from(raw);
 		const overallPercentOut = Number.isFinite(overallPercent) ? overallPercent : null;
-		return { ok: true, buffer, userId, subjectName, overallPercent: overallPercentOut };
+		const submittedAtIso =
+			typeof testRow.test_date === "string" ? testRow.test_date
+			: testRow.test_date != null ? String(testRow.test_date)
+			: null;
+		return { ok: true, buffer, userId, subjectName, overallPercent: overallPercentOut, submittedAtIso };
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : "PDF render failed.";
 		logServerError("buildPracticeGradingReportPdfBuffer.renderToBuffer", e, { testId });
@@ -1021,6 +1074,7 @@ export type RenderAndUploadPracticeReportPdfResult =
 			studentId: string;
 			subjectName: string;
 			overallPercent: number | null;
+			submittedAtIso: string | null;
 	  }
 	| { ok: false; message: string };
 
@@ -1041,6 +1095,7 @@ export async function renderAndUploadPracticeReportPdf(
 		studentId: built.userId,
 		subjectName: built.subjectName,
 		overallPercent: built.overallPercent,
+		submittedAtIso: built.submittedAtIso,
 	};
 }
 

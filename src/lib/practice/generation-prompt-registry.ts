@@ -87,7 +87,7 @@ Concept-check — state, explain, distinguish ideas in the student's own words (
 Application — predict outcomes, interpret an experimental setup, identify the variable being tested, apply a principle to an everyday situation. MCQ + short-answer.
 Reasoning — cause-and-effect chains, justify a phenomenon, evaluate a claim from evidence. Short-answer + long-answer.
 Numerical — Physics-led items (speed, force, current, resistance, work, power) with realistic values and clean answers, plus stoichiometry/concentration where the topic permits. MCQ + FIB + short-answer with working.
-Diagram-linked — for physics topics (circuits, ray optics, force diagrams) emit a \`visual\` (kind: physics_diagram, subKind matching the topic). For chemistry topics (molecular structure, balanced equations) emit \`chemistry_molecule\` or \`chemistry_reaction\`. For biology topics: there is no tissue / organ / life-cycle diagram renderer — keep diagram-only structure items textual unless you supply an allowed table or chart stimulus. When the stem depends on numeric measurements (experiments, counts, ecological summaries), emit \`data_table\` or \`statistics_chart\` per the shared visuals instructions; do NOT describe an imagined figure in prose.
+Diagram-linked — for physics topics, emit \`physics_diagram\` only for circuits, ray optics, and genuine force/free-body diagrams; use \`math_geometry\` for gravitation geometry such as Earth radius/height/depth, escape paths, Moon/Earth comparison, and neutral points between spheres. For chemistry topics (molecular structure, balanced equations) emit \`chemistry_molecule\` or \`chemistry_reaction\`. For biology topics: there is no tissue / organ / life-cycle diagram renderer — prefer an allowed \`data_table\` or \`statistics_chart\` whenever numeric, categorical, experimental, count, or ecology data can faithfully support the item. Purely structural biology items must remain self-contained text if no allowed table/chart stimulus fits; do NOT describe an imagined figure in prose.
 Activity-based or assertion–reason — frame around an NCERT-style activity ("In an activity, a student observes…") or use the standard CBSE assertion–reason four-option set: (a) Both A and R true and R is the correct explanation of A; (b) Both true but R is not; (c) A true, R false; (d) A false, R true.
 
 ## Subject-specific grounding
@@ -165,7 +165,7 @@ Verify the mathematics internally before emitting the item. For coordinate geome
 - Coordinate geometry, transformations, locus, congruence, and triangles with given side lengths SHOULD use \`math_geometry\`.
 - "Sketch", "draw", "plot the graph of", and inflection/extrema items SHOULD use \`math_function_plot\`. Prefer integer-friendly coefficients for legibility.
 - Set / interval / inequality items use \`number_line\`.
-- Pure algebra, identities, simplification, equation-solving, and proofs use \`visual: null\`.
+- Even algebraic or equation-solving items may use a minimal allowed visual when it helps: \`number_line\` for solution sets, \`math_function_plot\` when a function is named, or a compact \`data_table\` for coefficients/givens. Use \`visual: null\` only when no \`preferred_kinds\` entry can faithfully support the item without contradicting grounding or spoiling the answer.
 
 ## Subject-specific grounding
 
@@ -343,7 +343,7 @@ Do not introduce material outside the student's current grade level or chapters 
 
 MCQ — identification tied to process or comparison, crossing/dihybrid reasoning, pathway steps, assertion–reason in standard CBSE four-option format. FIB — one mechanistic or classification answer (e.g., product of a named step, genotype component) with a **non-trivial** keyed string — **not** one-word textbook glossaries or single organelle labels unless the stem forces mechanism. Short-answer (50–80 words) — explanation of a process, structure-with-function justification, genetic/biotech reasoning. Long-answer — multi-step pathways, inheritance problems, biotech workflows, case-based items (100–200 word stimulus + 2–3 sub-parts).
 
-Diagram-based items: there is no biology_diagram renderer for tissues, organs, life cycles, or detailed anatomical plates — keep those items textual (\`visual: null\`) unless you reframe them around an allowed \`data_table\` or \`statistics_chart\` stimulus (experiments, counts, ecological summaries). Do NOT describe an imagined figure in prose; for purely structural questions, rephrase so the stem is self-contained (e.g., "Identify the organelle responsible for ATP synthesis" rather than "In the figure shown, label the organelle that…"). Curated biology illustrations are planned for a later release.
+Diagram-based items: there is no biology_diagram renderer for tissues, organs, life cycles, or detailed anatomical plates — prefer an allowed \`data_table\` or \`statistics_chart\` whenever topic grounding supports experimental outcomes, counts, ecological summaries, measurements, classifications, or comparative data. Do NOT describe an imagined figure in prose; for purely structural questions with no faithful table/chart stimulus, rephrase so the stem is self-contained (e.g., "Identify the organelle responsible for ATP synthesis" rather than "In the figure shown, label the organelle that…"). Curated biology illustrations are planned for a later release.
 
 ## Subject discipline (specific bans)
 
@@ -411,7 +411,7 @@ Sign errors in trigonometry (especially angles in the second/third/fourth quadra
 - Coordinate geometry, conic sections, vector + 3D-geometry diagrams SHOULD use \`math_geometry\`.
 - "Sketch", "plot", inflection / extrema / increasing-decreasing / continuity items SHOULD use \`math_function_plot\`.
 - Set / interval / inequality items use \`number_line\`.
-- Pure algebra, identities, integration techniques, matrix arithmetic, and proofs use \`visual: null\`.
+- Pure algebra, identities, integration techniques, matrix arithmetic, and proofs may still use a minimal allowed visual when it is faithful: \`number_line\` for solution/domain sets, \`math_function_plot\` for named functions or regions, or \`data_table\` for matrices/givens. Use \`visual: null\` only when no \`preferred_kinds\` entry can support the item without contradiction, answer leakage, or invalid renderer syntax.
 
 ## Output formatting
 
@@ -471,7 +471,7 @@ Use accounting standards, definitions, formulas, and named conventions from the 
 ## Accountancy-specific item-writing
 
 - Verify figures balance and entries reconcile before emitting the item.
-- Journalising, posting, trial balance, balance sheet, P&L, cash book, and rectification items MUST emit an \`accountancy_table\` visual showing either the GIVEN stimulus (data the student must work from) OR the BLANK skeleton the student must fill — never both. Theory items use \`visual: null\`.
+- Journalising, posting, trial balance, balance sheet, P&L, cash book, and rectification items MUST emit an \`accountancy_table\` visual showing either the GIVEN stimulus (data the student must work from) OR the BLANK skeleton the student must fill — never both. Theory items may stay textual when a table would be decorative, but use a non-spoiling \`accountancy_table\` or \`data_table\` when a comparison, classification grid, or short case-fact table can support the item faithfully.
 - The \`accountancy_table\` spec carries a \`subKind\` (journal_entry, ledger, trial_balance, balance_sheet, p_and_l, cash_book, rectification) which selects the column shape; pick whichever matches the question. Amounts are plain numbers (15000), no commas, no symbol — the renderer formats as ₹15,000 with Indian-numbering grouping.
 - Present transaction lists, trial balances, and adjustments completely in the visual when one is emitted; if no visual, present them in the stem.
 
@@ -558,7 +558,7 @@ Use formulas, definitions, named policies, and historical references from the ch
 - Verify Statistics computations internally before emitting the item.
 - Choose numbers in Statistics problems so that intermediate steps are clean.
 - Demand–supply, AS–AD, IS–LM, PPF, indifference, and Phillips-curve items MUST emit an \`economics_curve\` visual. Write each \`curves[].expr\` **in terms of \`p\`**, where \`p\` is the **horizontal-axis** variable after plotting (set \`xLabel\` to its meaning — often Quantity in intro micro); the vertical axis is the evaluated value (often Price — set \`yLabel\` accordingly). The renderer substitutes \`p\` → the plotter's internal \`x\`; do **not** pre-substitute. Mark equilibria or key points with the \`marks\` array.
-- Statistics items that require inference from grouped data, distribution shape, or regression direction MUST emit a \`statistics_chart\` (subKind: histogram | bar | line | scatter | pie | frequency_polygon | ogive | box) showing the data the question refers to. For ogive include \`cumulative\` ("less_than" or "more_than"). Computation-only items ("calculate elasticity from Q1, Q2, P1, P2") use \`visual: null\` and present the values inline.
+- Statistics items that require inference from grouped data, distribution shape, or regression direction MUST emit a \`statistics_chart\` (subKind: histogram | bar | line | scatter | pie | frequency_polygon | ogive | box) showing the data the question refers to. For ogive include \`cumulative\` ("less_than" or "more_than"). Tiny computation-only items ("calculate elasticity from Q1, Q2, P1, P2") may stay inline with \`visual: null\` when a table would only duplicate four values, but prefer a compact \`data_table\` when it improves readability without leaking the answer.
 - Generic stimulus tables (e.g., a 6-row class-frequency table feeding a mean / median question) can use \`data_table\` if neither \`accountancy_table\` nor \`statistics_chart\` fits.
 
 ## Economics-specific distractors
@@ -683,7 +683,11 @@ export type PracticeGenerationPreambleContext = {
 /** Appended to every subject preamble so chunk alignment is never dropped in long templates. */
 const CHUNK_ALIGNMENT_FOOTER = `## Chunk alignment
 
-Prioritise scenarios, numeric values, and problem shapes that appear or are implied in \`topic_grounding\` for each item's \`topic_id\`. When \`exercise_chunks\` show a standard diagram or drill pattern, prefer parallel items over generic substitutes. Paraphrase wording; keep content traceable to the supplied chunks and consistent with \`curriculum_hint\` (do not contradict unit/chapter/grade).`;
+Prioritise scenarios, numeric values, and problem shapes that appear or are implied in \`topic_grounding\` for each item's \`topic_id\`. When \`exercise_chunks\` show a standard diagram or drill pattern, prefer parallel items over generic substitutes. Paraphrase wording; keep content traceable to the supplied chunks and consistent with \`curriculum_hint\` (do not contradict unit/chapter/grade).
+
+## Visual precedence
+
+If the shared Visuals section is enabled for this generation (non-empty \`preferred_kinds\` and non-zero \`max_non_null_visuals\`), it supersedes any subject-specific default to \`visual: null\` for broad item classes. Subject preambles still control hard renderer/safety facts, such as no imagined biology organ diagram when no supported renderer exists.`;
 
 /**
  * Subject-specific preamble paragraph(s). Shared JSON contract is appended separately.

@@ -19,13 +19,16 @@ export type ReportReadyEmailParams = {
 	subjectName: string;
 	overallPercent: number | null;
 	testId: string;
+	/** UTC submission label (matches in-app bell), e.g. `12 May 2026`. */
+	submittedLabel?: string | null;
 	/** Supabase storage signed URL; opens PDF without EduAI login. */
 	pdfSignedUrl?: string | null;
 };
 
 export async function sendReportReadyEmail(params: ReportReadyEmailParams): Promise<{ error: string | null }> {
 	const pct = pctLabel(params.overallPercent);
-	const subject = `Your ${params.subjectName} report is ready`;
+	const dateChunk = params.submittedLabel ? ` (${params.submittedLabel})` : "";
+	const subject = `Your ${params.subjectName} report is ready${dateChunk}`;
 	const portalHref = `${getAppUrl()}/student/reports?test=${encodeURIComponent(params.testId)}`;
 	const pdfUrl = params.pdfSignedUrl?.trim() || null;
 
@@ -48,7 +51,10 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 	}
 
 	const html = renderEmailShell({
-		preheader: pct ? `${pct} on your ${params.subjectName} report — open it now.` : `Your ${params.subjectName} report is ready.`,
+		preheader:
+			pct ?
+				`${pct} on your ${params.subjectName} report${dateChunk} — open it now.`
+			:	`Your ${params.subjectName} report is ready${dateChunk}.`,
 		greeting: `Hi ${studentName},`,
 		title: subject,
 		paragraphs,
@@ -73,6 +79,7 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 			subject_name: params.subjectName,
 			overall_percent: pct ?? "",
 			test_id: params.testId,
+			submitted_label: params.submittedLabel ?? "",
 			report_href: portalHref,
 			pdf_href: pdfUrl ?? "",
 		},
@@ -88,6 +95,7 @@ export type ParentPortalReportReadyEmailParams = {
 	subjectName: string;
 	overallPercent: number | null;
 	testId: string;
+	submittedLabel?: string | null;
 	pdfSignedUrl?: string | null;
 };
 
@@ -96,7 +104,8 @@ export async function sendParentPortalReportReadyEmail(
 	params: ParentPortalReportReadyEmailParams,
 ): Promise<{ error: string | null }> {
 	const pct = pctLabel(params.overallPercent);
-	const subject = `${params.childDisplayName} — ${params.subjectName} report ready`;
+	const dateChunk = params.submittedLabel ? ` (${params.submittedLabel})` : "";
+	const subject = `${params.childDisplayName} — ${params.subjectName} report ready${dateChunk}`;
 	const portalHref = `${getAppUrl()}/parent/open-report?student=${encodeURIComponent(params.studentId)}&test=${encodeURIComponent(params.testId)}`;
 	const pdfUrl = params.pdfSignedUrl?.trim() || null;
 
@@ -118,7 +127,10 @@ export async function sendParentPortalReportReadyEmail(
 	}
 
 	const html = renderEmailShell({
-		preheader: pct ? `${params.childDisplayName} scored ${pct} on ${params.subjectName}.` : `${params.childDisplayName}'s ${params.subjectName} report is ready.`,
+		preheader:
+			pct ?
+				`${params.childDisplayName} scored ${pct} on ${params.subjectName}${dateChunk}.`
+			:	`${params.childDisplayName}'s ${params.subjectName} report is ready${dateChunk}.`,
 		greeting: `Hi ${parentName},`,
 		title: subject,
 		paragraphs,
@@ -146,6 +158,7 @@ export async function sendParentPortalReportReadyEmail(
 			overall_percent: pct ?? "",
 			student_id: params.studentId,
 			test_id: params.testId,
+			submitted_label: params.submittedLabel ?? "",
 			report_href: portalHref,
 			pdf_href: pdfUrl ?? "",
 		},

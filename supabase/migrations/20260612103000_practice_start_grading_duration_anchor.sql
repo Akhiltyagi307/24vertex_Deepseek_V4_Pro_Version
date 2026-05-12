@@ -16,7 +16,7 @@ RETURNS TABLE (
 	status TEXT,
 	duration_seconds INT,
 	time_limit_seconds INT,
-	started_at TIMESTAMP WITHOUT TIME ZONE
+	started_at TIMESTAMP WITH TIME ZONE
 )
 LANGUAGE plpgsql
 SECURITY DEFINER

@@ -17,7 +17,13 @@ export type GeneratedForDedup = {
 
 export async function embedQuestionTexts(
 	texts: string[],
-	opts?: { userId?: string | null },
+	opts?: {
+		userId?: string | null;
+		generationRunId?: string | null;
+		correlationId?: string | null;
+		testId?: string | null;
+		stepKey?: string | null;
+	},
 ): Promise<number[][]> {
 	if (texts.length === 0) return [];
 	const t0 = Date.now();
@@ -35,6 +41,10 @@ export async function embedQuestionTexts(
 		feature: "embeddings.dedup",
 		model: EMBEDDING_MODEL_ID,
 		userId: opts?.userId ?? null,
+		generationRunId: opts?.generationRunId ?? null,
+		correlationId: opts?.correlationId ?? null,
+		testId: opts?.testId ?? null,
+		stepKey: opts?.stepKey ?? "dedup_embeddings",
 		inputTokens: approxTokens,
 		outputTokens: 0,
 		latencyMs: Date.now() - t0,

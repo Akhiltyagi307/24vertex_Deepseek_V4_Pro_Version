@@ -12,12 +12,31 @@ export type RecordAiCallInput = {
 	model: string;
 	userId?: string | null;
 	promptId?: string | null;
+	generationRunId?: string | null;
+	correlationId?: string | null;
+	testId?: string | null;
+	stepKey?: string | null;
 	inputTokens: number;
 	outputTokens: number;
 	latencyMs: number;
 	status: "ok" | "error";
 	error?: string | null;
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function asUuidOrNull(v: string | null | undefined): string | null {
+	if (!v) return null;
+	const t = v.trim();
+	return UUID_RE.test(t) ? t : null;
+}
+
+function asStepKeyOrNull(v: string | null | undefined): string | null {
+	if (!v) return null;
+	const t = v.trim();
+	if (!t) return null;
+	return t.slice(0, 64);
+}
 
 /**
  * Inserts a row into `ai_calls` (append-only). Never throws — failures go to Sentry.
@@ -37,7 +56,11 @@ export async function recordAiCall(input: RecordAiCallInput): Promise<void> {
 			feature: input.feature,
 			model: input.model,
 			userId: input.userId ?? null,
-			promptId: input.promptId ?? null,
+			promptId: asUuidOrNull(input.promptId),
+			generationRunId: asUuidOrNull(input.generationRunId),
+			correlationId: asUuidOrNull(input.correlationId),
+			testId: asUuidOrNull(input.testId),
+			stepKey: asStepKeyOrNull(input.stepKey),
 			inputTokens: input.inputTokens,
 			outputTokens: input.outputTokens,
 			latencyMs: input.latencyMs,

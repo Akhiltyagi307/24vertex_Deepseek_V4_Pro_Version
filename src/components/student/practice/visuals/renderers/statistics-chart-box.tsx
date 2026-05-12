@@ -8,6 +8,7 @@ import * as React from "react";
 import PlotlyImport from "plotly.js-dist-min";
 
 import type { StatisticsChartSpec } from "@/lib/practice/visuals/types";
+import { ChartAxisLatexLayout, visualMathNeedsKatex } from "../visual-math-text";
 
 type PlotlyApi = {
 	newPlot: (
@@ -33,6 +34,8 @@ export function StatisticsChartBox({
 	spec: Extract<StatisticsChartSpec, { subKind: "box" }>;
 }): React.ReactElement {
 	const ref = React.useRef<HTMLDivElement | null>(null);
+	const xMath = visualMathNeedsKatex(spec.xLabel);
+	const yMath = visualMathNeedsKatex(spec.yLabel);
 
 	React.useEffect(() => {
 		const el = ref.current;
@@ -50,8 +53,8 @@ export function StatisticsChartBox({
 			width: 480,
 			height: 280,
 			margin: { l: 60, r: 16, t: 16, b: 48 },
-			xaxis: { title: { text: spec.xLabel } },
-			yaxis: { title: { text: spec.yLabel } },
+			xaxis: { title: { text: xMath ? "" : spec.xLabel } },
+			yaxis: { title: { text: yMath ? "" : spec.yLabel } },
 			showlegend: false,
 		};
 		void Plotly.newPlot(el, data, layout, {
@@ -61,7 +64,13 @@ export function StatisticsChartBox({
 		return () => {
 			Plotly.purge(el);
 		};
+		// Axis titles omit raw strings when labels need KaTeX in the surrounding layout.
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- imperative Plotly chart keyed on full spec snapshot
 	}, [spec]);
 
-	return <div ref={ref} className="w-full max-w-[480px]" />;
+	return (
+		<ChartAxisLatexLayout xLabel={xMath ? spec.xLabel : null} yLabel={yMath ? spec.yLabel : null}>
+			<div ref={ref} className="h-[280px] w-full" />
+		</ChartAxisLatexLayout>
+	);
 }

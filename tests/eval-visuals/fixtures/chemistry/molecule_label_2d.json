@@ -1,0 +1,26 @@
+{
+  "question_number": 1,
+  "topic_id": "33333333-aaaa-4333-8333-333333333331",
+  "topic_name": "Organic chemistry",
+  "question_text": "The molecule shown below is methane. How many hydrogen atoms are attached to carbon?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "2", "B": "3", "C": "4", "D": "5" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Methane has molecular formula CH4.",
+    "common_mistakes": [],
+    "related_concept": "Molecular formula"
+  },
+  "estimated_time_seconds": 60,
+  "visual": {
+    "caption": "2D structural representation of methane.",
+    "altText": "SMILES-based molecule rendering with a label beneath reading Methane (CH4).",
+    "spec": {
+      "kind": "chemistry_molecule",
+      "smiles": "C",
+      "display": "2d",
+      "label": "Methane (CH4)"
+    }
+  }
+}

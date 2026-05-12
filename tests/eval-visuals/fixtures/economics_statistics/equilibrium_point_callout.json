@@ -1,0 +1,36 @@
+{
+  "question_number": 1,
+  "topic_id": "44444444-aaaa-4444-8444-444444444441",
+  "topic_name": "Market equilibrium",
+  "question_text": "Use the market diagram shown below to identify the equilibrium point label.",
+  "question_type": "multiple_choice",
+  "difficulty_level": "easy",
+  "options": { "A": "A", "B": "E", "C": "Q*", "D": "P*" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The marked intersection point is labelled E.",
+    "common_mistakes": [],
+    "related_concept": "Demand and supply intersection"
+  },
+  "estimated_time_seconds": 75,
+  "visual": {
+    "caption": "Demand and supply curves with a labelled equilibrium point.",
+    "altText": "Downward demand curve and upward supply curve intersect at a point callout labelled E in the first quadrant.",
+    "spec": {
+      "kind": "economics_curve",
+      "xLabel": "Quantity",
+      "yLabel": "Price",
+      "xMin": 0,
+      "xMax": 120,
+      "yMin": 0,
+      "yMax": 100,
+      "curves": [
+        { "expr": "80 - 0.4 * p", "color": "primary", "label": "Demand" },
+        { "expr": "0.5 * p", "color": "secondary", "label": "Supply" }
+      ],
+      "marks": [
+        { "x": 88.89, "y": 44.44, "label": "E", "kind": "point" }
+      ]
+    }
+  }
+}

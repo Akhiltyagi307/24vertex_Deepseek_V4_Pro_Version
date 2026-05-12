@@ -298,12 +298,8 @@ function regexEscape(s: string): string {
 /** Wait for generation overlay ready dialog or a blocking error alert on the wizard. */
 async function waitForGenerationOutcome(page: import("@playwright/test").Page, timeoutMs: number): Promise<void> {
 	const readyDialog = page.getByRole("dialog", { name: /Your test is ready/i });
-	const somethingWrong = page
-		.getByRole("alert")
-		.filter({ has: page.getByRole("heading", { name: /Something went wrong/i }) });
-	const checkStep = page
-		.getByRole("alert")
-		.filter({ has: page.getByRole("heading", { name: /Check this step/i }) });
+	const somethingWrong = page.getByRole("alert").filter({ hasText: /Something went wrong/i });
+	const checkStep = page.getByRole("alert").filter({ hasText: /Check this step/i });
 
 	const winner = readyDialog.or(somethingWrong).or(checkStep);
 	await expect(winner.first()).toBeVisible({ timeout: timeoutMs });
@@ -344,14 +340,29 @@ async function runSingleSubjectPracticeFlow(
 
 	console.log(`[practice-full-subjects] ▶ SLOT ${slotIndex + 1} — ${subj.name} (${subj.id})`);
 
-	const shuffled = shuffle(subj.trackers);
+	const allTopicIds = [...new Set(subj.trackers.map((p) => p.topic_id))];
+	const allLabelMap = await fetchTopicLabels(request, allTopicIds);
+	const labelCounts = new Map<string, number>();
+	for (const id of allTopicIds) {
+		const label = allLabelMap.get(id) ?? id;
+		labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+	}
+	const selectableTrackers = subj.trackers.filter((tracker) => {
+		const label = allLabelMap.get(tracker.topic_id) ?? tracker.topic_id;
+		return (labelCounts.get(label) ?? 0) === 1;
+	});
+	const trackerPool = selectableTrackers.length > 0 ? selectableTrackers : subj.trackers;
+	if (selectableTrackers.length < subj.trackers.length) {
+		warns.push(`Skipped ${subj.trackers.length - selectableTrackers.length} ambiguous duplicate-label topics.`);
+	}
+
+	const shuffled = shuffle(trackerPool);
 	const nPick = randomIntInclusive(1, Math.min(4, shuffled.length));
 	const picked = shuffled.slice(0, nPick);
 	const topicIds = [...new Set(picked.map((p) => p.topic_id))];
 	const trackerIds = [...new Set(picked.map((p) => p.id))];
 
-	const labelMap = await fetchTopicLabels(request, topicIds);
-	const pickedTopicLabels = topicIds.map((id) => labelMap.get(id) ?? id);
+	const pickedTopicLabels = topicIds.map((id) => allLabelMap.get(id) ?? id);
 
 	const beforeMap = await fetchTopicSnapshots(request, userId, topicIds);
 

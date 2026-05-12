@@ -27,12 +27,12 @@ export function EnglishPassage({
 		<div className="w-full max-w-[640px]">
 			{spec.title ? (
 				<div className="text-foreground mb-1 text-center text-sm font-semibold">
-					{spec.title}
+					<LatexText text={spec.title} className="justify-center text-center" />
 				</div>
 			) : null}
 			{spec.source ? (
 				<div className="text-muted-foreground mb-2 text-center text-xs italic">
-					{spec.source}
+					<LatexText text={spec.source} className="justify-center text-center" />
 				</div>
 			) : null}
 			<div className="flex flex-col gap-1 text-foreground text-sm leading-relaxed">
