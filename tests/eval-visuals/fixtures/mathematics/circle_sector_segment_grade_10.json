@@ -1,0 +1,28 @@
+{
+  "question_text": "In the figure below, a sector of a circle of radius 6 cm is shown with a central angle of 60°. What is the area of the sector? (Use π = 3.14)",
+  "question_type": "multiple_choice",
+  "options": { "A": "6.28 cm²", "B": "12.56 cm²", "C": "18.84 cm²", "D": "37.68 cm²" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Area = (θ/360) × π r² = (60/360) × 3.14 × 36 = (1/6) × 113.04 ≈ 18.84 cm².",
+    "common_mistakes": [],
+    "related_concept": "Area of a sector of a circle"
+  },
+  "visual": {
+    "caption": "Circle sector with central angle.",
+    "altText": "Circle centred at O with two radii drawn at an angle of sixty degrees, forming a shaded sector. The radius of the circle is six centimetres.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -7, "xMax": 7, "yMin": -7, "yMax": 7, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "circle", "center": { "x": 0, "y": 0 }, "radius": 6, "label": null },
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "O", "labelPosition": "sw" },
+        { "type": "point", "at": { "x": 6, "y": 0 }, "label": "A", "labelPosition": "e" },
+        { "type": "point", "at": { "x": 3, "y": 5.196 }, "label": "B", "labelPosition": "ne" },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 6, "y": 0 }, "label": null, "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 3, "y": 5.196 }, "label": null, "dashed": false },
+        { "type": "arc", "center": { "x": 0, "y": 0 }, "radius": 6, "startAngleDeg": 0, "endAngleDeg": 60, "minorArc": true, "dashed": false, "label": "60°" }
+      ]
+    }
+  }
+}

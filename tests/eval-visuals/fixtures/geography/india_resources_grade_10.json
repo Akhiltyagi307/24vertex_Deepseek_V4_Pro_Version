@@ -1,0 +1,20 @@
+{
+  "question_text": "Use the India map shown below highlighting a region known for one specific soil type. The highlighted region is mainly associated with which soil?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Alluvial soil", "B": "Black soil", "C": "Laterite soil", "D": "Arid soil" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The Deccan trap region in the highlighted states is the principal area of black (regur) soil cover.",
+    "common_mistakes": [],
+    "related_concept": "Soil types of India"
+  },
+  "visual": {
+    "caption": "Indian states highlighted for one resource.",
+    "altText": "Political outline of India with a contiguous group of states shaded across the western and central plateau region.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "political",
+      "highlightedStates": ["mh", "gj", "mp"]
+    }
+  }
+}

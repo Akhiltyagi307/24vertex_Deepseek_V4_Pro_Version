@@ -1,0 +1,24 @@
+{
+  "question_text": "Refer to the pie chart shown below of GDP share by sector in India for 2017–18. Which sector contributes the largest share?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Primary", "B": "Secondary", "C": "Tertiary", "D": "All three equal" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Services / tertiary sector contributes the largest single share of India's GDP, consistent with the chart proportions.",
+    "common_mistakes": [],
+    "related_concept": "Tertiary sector contribution"
+  },
+  "visual": {
+    "caption": "GDP share by sector 2017–18.",
+    "altText": "Pie chart divided into three slices representing the three sectors of the Indian economy, with values summing to approximately one hundred percent.",
+    "spec": {
+      "kind": "statistics_chart",
+      "subKind": "pie",
+      "slices": [
+        { "label": "Primary", "value": 16 },
+        { "label": "Secondary", "value": 30 },
+        { "label": "Tertiary", "value": 54 }
+      ]
+    }
+  }
+}

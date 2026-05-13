@@ -1,0 +1,29 @@
+{
+  "question_text": "Using the less-than ogive in the graph below built from a grouped frequency distribution of marks scored, estimate the median class.",
+  "question_type": "multiple_choice",
+  "options": { "A": "0–10", "B": "10–20", "C": "20–30", "D": "30–40" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The median corresponds to the class containing n/2 cumulative frequency, which on the ogive lands in the 20–30 interval.",
+    "common_mistakes": [],
+    "related_concept": "Median from a cumulative frequency curve"
+  },
+  "visual": {
+    "caption": "Less-than ogive of student marks.",
+    "altText": "Cumulative-frequency curve plotted against marks. The horizontal axis shows upper class boundaries from ten to fifty and the vertical axis shows cumulative frequency rising from three to forty.",
+    "spec": {
+      "kind": "statistics_chart",
+      "subKind": "ogive",
+      "xLabel": "Marks (upper limit)",
+      "yLabel": "Cumulative frequency",
+      "cumulative": "less_than",
+      "bins": [
+        { "label": "0-10", "frequency": 3 },
+        { "label": "10-20", "frequency": 8 },
+        { "label": "20-30", "frequency": 14 },
+        { "label": "30-40", "frequency": 9 },
+        { "label": "40-50", "frequency": 6 }
+      ]
+    }
+  }
+}

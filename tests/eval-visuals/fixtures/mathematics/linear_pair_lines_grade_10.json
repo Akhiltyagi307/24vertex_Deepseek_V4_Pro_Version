@@ -1,0 +1,33 @@
+{
+  "question_text": "Use the graph below showing the pair of linear equations. What does the geometric relationship between the lines indicate about the system?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "The system has a unique solution",
+    "B": "The system has no solution",
+    "C": "The system has infinitely many solutions",
+    "D": "Cannot be determined from the graph"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The two lines meet at a single point, so the pair of linear equations has exactly one common solution.",
+    "common_mistakes": [],
+    "related_concept": "Graphical method of solution of a pair of linear equations"
+  },
+  "visual": {
+    "caption": "Two straight lines on the same axes.",
+    "altText": "Cartesian plane with two distinct straight lines plotted between x equals zero and x equals six. One line has a positive slope and the other has a negative slope.",
+    "spec": {
+      "kind": "math_function_plot",
+      "xMin": 0,
+      "xMax": 6,
+      "yMin": 0,
+      "yMax": 8,
+      "xLabel": "x",
+      "yLabel": "y",
+      "items": [
+        { "expr": "x + 1", "color": "primary", "label": "y = x + 1" },
+        { "expr": "7 - x", "color": "secondary", "label": "y = 7 − x" }
+      ]
+    }
+  }
+}

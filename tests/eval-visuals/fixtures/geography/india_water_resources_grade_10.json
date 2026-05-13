@@ -1,0 +1,20 @@
+{
+  "question_text": "Refer to the India map shown below highlighting the basin of a major river. The highlighted river system is the:",
+  "question_type": "multiple_choice",
+  "options": { "A": "Indus", "B": "Ganga", "C": "Narmada", "D": "Krishna" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The highlighted states span the central peninsular basin, which the river referred to flows through from east to west.",
+    "common_mistakes": [],
+    "related_concept": "Major Indian rivers and basins"
+  },
+  "visual": {
+    "caption": "Highlighted states along a river basin.",
+    "altText": "Political outline of India with three west-central states shaded continuously along a peninsular drainage corridor.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "political",
+      "highlightedStates": ["mp", "mh", "gj"]
+    }
+  }
+}

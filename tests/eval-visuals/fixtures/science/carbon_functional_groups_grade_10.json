@@ -1,0 +1,21 @@
+{
+  "question_text": "Examine the structure of the molecule shown below (CH₃COOH). Which functional group does the highlighted side carry?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Alcohol", "B": "Aldehyde", "C": "Ketone", "D": "Carboxylic acid" },
+  "answer_key": {
+    "correct_answer": "D",
+    "explanation": "The −COOH group of ethanoic acid is the carboxylic-acid functional group.",
+    "common_mistakes": [],
+    "related_concept": "Functional groups in carbon compounds"
+  },
+  "visual": {
+    "caption": "Structural formula of an organic compound.",
+    "altText": "Two-dimensional structural depiction of a four-atom organic molecule built around carbon, with bonds to additional oxygen and hydrogen positions.",
+    "spec": {
+      "kind": "chemistry_molecule",
+      "smiles": "CC(=O)O",
+      "display": "2d",
+      "label": "Ethanoic acid"
+    }
+  }
+}

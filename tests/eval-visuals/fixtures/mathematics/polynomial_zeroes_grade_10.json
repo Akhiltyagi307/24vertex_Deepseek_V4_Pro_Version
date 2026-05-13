@@ -1,0 +1,27 @@
+{
+  "question_text": "The graph below shows the polynomial y = x² − 5x + 6 over its real-root range. How many real zeroes does the polynomial have?",
+  "question_type": "multiple_choice",
+  "options": { "A": "0", "B": "1", "C": "2", "D": "More than 2" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The parabola crosses the x-axis at two distinct points, so the polynomial has two real zeroes.",
+    "common_mistakes": [],
+    "related_concept": "Geometrical meaning of the zeroes of a polynomial"
+  },
+  "visual": {
+    "caption": "Quadratic curve crossing the x-axis.",
+    "altText": "Upward parabola y equals x squared minus five x plus six plotted on a Cartesian plane from x equals zero to x equals five. The vertical axis ranges from about minus one to four.",
+    "spec": {
+      "kind": "math_function_plot",
+      "xMin": 0,
+      "xMax": 5,
+      "yMin": -1,
+      "yMax": 4,
+      "xLabel": "x",
+      "yLabel": "y",
+      "items": [
+        { "expr": "x^2 - 5*x + 6", "color": "primary", "label": "y = x² − 5x + 6" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "question_text": "Examine the flowchart shown below depicting the three tiers of government in India. Which subjects fall under the legislative authority of the middle tier?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Defence and foreign affairs",
+    "B": "Police and public health",
+    "C": "Currency and citizenship",
+    "D": "Municipal sanitation only"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "Subjects of regional importance such as police and public health appear in the State List, handled by the state government tier.",
+    "common_mistakes": [],
+    "related_concept": "Subjects in the State List under Indian federalism"
+  },
+  "visual": {
+    "caption": "Tiers of government in India.",
+    "altText": "Top-down flowchart with a single root node branching into two child nodes, which in turn each branch into local-government leaves.",
+    "spec": {
+      "kind": "flowchart",
+      "title": "Three-tier government in India",
+      "nodes": [
+        { "id": "root", "label": "Union of India", "detail": null, "kind": "start" },
+        { "id": "mid", "label": "State tier", "detail": null, "kind": "process" },
+        { "id": "local1", "label": "Panchayat", "detail": null, "kind": "outcome" },
+        { "id": "local2", "label": "Municipality", "detail": null, "kind": "outcome" }
+      ],
+      "edges": [
+        { "from": "root", "to": "mid", "label": null },
+        { "from": "mid", "to": "local1", "label": null },
+        { "from": "mid", "to": "local2", "label": null }
+      ]
+    }
+  }
+}

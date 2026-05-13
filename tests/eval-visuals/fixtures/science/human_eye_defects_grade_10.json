@@ -1,0 +1,30 @@
+{
+  "question_text": "An optician prescribes a corrective lens of power −2.0 D for a patient whose ray-optics setup is shown below. What is the focal length of the prescribed lens?",
+  "question_type": "multiple_choice",
+  "options": { "A": "−0.5 m", "B": "0.5 m", "C": "−2.0 m", "D": "2.0 m" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Focal length f = 1 / P. With P = −2.0 D the focal length is −0.5 m. The negative sign tells us the lens is diverging.",
+    "common_mistakes": [],
+    "related_concept": "Power and focal length of a corrective lens"
+  },
+  "visual": {
+    "caption": "Corrective lens before the eye.",
+    "altText": "Principal axis with a single distant object on the far left and a corrective lens placed between the object and a stylised eye on the right.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "ray_optics",
+      "axisMin": -50,
+      "axisMax": 20,
+      "axisUnit": "cm",
+      "axisTickStep": 10,
+      "objects": [
+        { "kind": "object", "x": -40, "height": 6, "dashed": false, "label": "Distant object" }
+      ],
+      "lenses": [
+        { "type": "concave_lens", "x": 0, "focalLength": 25, "label": "Corrective lens" }
+      ],
+      "drawRays": false
+    }
+  }
+}

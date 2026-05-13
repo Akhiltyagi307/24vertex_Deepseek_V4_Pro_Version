@@ -1,0 +1,47 @@
+{
+  "question_text": "Use the pH table shown below. Which of the listed substances is most strongly acidic?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Lemon juice", "B": "Milk", "C": "Baking soda solution", "D": "Soap solution" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The lower the pH the more acidic the substance; lemon juice has the lowest pH in the table.",
+    "common_mistakes": [],
+    "related_concept": "pH scale and acidity"
+  },
+  "visual": {
+    "caption": "pH values of common substances.",
+    "altText": "Reference table listing four common household substances next to their approximate pH values across acidic, neutral, and basic regions.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "pH of common substances",
+      "headers": ["Substance", "pH", "Region"],
+      "rows": [
+        [
+          { "value": "Lemon juice", "bold": false, "align": "left" },
+          { "value": "2.2", "bold": false, "align": "center" },
+          { "value": "Acidic", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "Milk", "bold": false, "align": "left" },
+          { "value": "6.6", "bold": false, "align": "center" },
+          { "value": "Acidic", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "Pure water", "bold": false, "align": "left" },
+          { "value": "7.0", "bold": false, "align": "center" },
+          { "value": "Neutral", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "Baking soda solution", "bold": false, "align": "left" },
+          { "value": "8.3", "bold": false, "align": "center" },
+          { "value": "Basic", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "Soap solution", "bold": false, "align": "left" },
+          { "value": "10.0", "bold": false, "align": "center" },
+          { "value": "Basic", "bold": false, "align": "left" }
+        ]
+      ]
+    }
+  }
+}

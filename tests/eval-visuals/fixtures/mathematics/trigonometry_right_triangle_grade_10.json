@@ -1,0 +1,29 @@
+{
+  "question_text": "In the right triangle in the figure below, the angle at vertex A is θ. What is the value of sin θ?",
+  "question_type": "multiple_choice",
+  "options": { "A": "3/5", "B": "4/5", "C": "3/4", "D": "5/3" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "sin θ is the ratio of the side opposite the angle to the hypotenuse, which is 3/5 from the labelled sides.",
+    "common_mistakes": [],
+    "related_concept": "Trigonometric ratios in a right triangle"
+  },
+  "visual": {
+    "caption": "Right triangle with angle marker.",
+    "altText": "Right triangle A B C with vertex A at the origin, B above and C to the right. The angle θ is marked at A. The side opposite θ measures three units, the adjacent side measures four units, and the hypotenuse measures five units.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 6, "yMin": -1, "yMax": 5, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "A", "labelPosition": "sw" },
+        { "type": "point", "at": { "x": 4, "y": 0 }, "label": "C", "labelPosition": "se" },
+        { "type": "point", "at": { "x": 4, "y": 3 }, "label": "B", "labelPosition": "ne" },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 4, "y": 0 }, "label": "4", "dashed": false },
+        { "type": "segment", "from": { "x": 4, "y": 0 }, "to": { "x": 4, "y": 3 }, "label": "3", "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 4, "y": 3 }, "label": "5", "dashed": false },
+        { "type": "angle_marker", "vertex": { "x": 0, "y": 0 }, "fromRayPoint": { "x": 1, "y": 0 }, "toRayPoint": { "x": 0.8, "y": 0.6 }, "label": "θ" },
+        { "type": "angle_marker", "vertex": { "x": 4, "y": 0 }, "fromRayPoint": { "x": 3, "y": 0 }, "toRayPoint": { "x": 4, "y": 1 }, "label": null }
+      ]
+    }
+  }
+}

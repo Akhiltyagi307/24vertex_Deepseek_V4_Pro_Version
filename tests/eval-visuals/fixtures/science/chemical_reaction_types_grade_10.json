@@ -1,0 +1,25 @@
+{
+  "question_text": "The balanced chemical equation below is shown. Classify the reaction.",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Combination reaction",
+    "B": "Decomposition reaction",
+    "C": "Displacement reaction",
+    "D": "Double-displacement reaction"
+  },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Zinc, a more reactive metal, displaces copper from copper sulphate solution. This is a single-displacement reaction.",
+    "common_mistakes": [],
+    "related_concept": "Types of chemical reactions"
+  },
+  "visual": {
+    "caption": "Balanced equation with state symbols.",
+    "altText": "Zinc solid plus aqueous copper sulphate yields aqueous zinc sulphate plus copper solid, with explicit state labels on each species.",
+    "spec": {
+      "kind": "chemistry_reaction",
+      "ce": "Zn(s) + CuSO_4(aq) -> ZnSO_4(aq) + Cu(s)",
+      "label": "Reaction at room temperature"
+    }
+  }
+}

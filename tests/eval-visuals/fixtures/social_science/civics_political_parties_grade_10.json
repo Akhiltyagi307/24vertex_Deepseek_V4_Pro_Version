@@ -1,0 +1,47 @@
+{
+  "question_text": "Refer to the comparison table shown below of Indian political parties. Based on the criteria listed, party W is best classified as:",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "National party",
+    "B": "State party",
+    "C": "Unrecognised party",
+    "D": "Alliance only"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The Election Commission grants 'national party' status to parties with a presence in multiple states and a sufficient vote share, which matches Party W's row.",
+    "common_mistakes": [],
+    "related_concept": "Recognition of national parties"
+  },
+  "visual": {
+    "caption": "Indian parties recognition criteria.",
+    "altText": "Three-column table listing four parties along with their state presence and vote-share criteria recognised by the Election Commission.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Party recognition criteria",
+      "headers": ["Party", "Presence in states", "Lok Sabha vote share"],
+      "rows": [
+        [
+          { "value": "Party W", "bold": false, "align": "left" },
+          { "value": "18 states", "bold": false, "align": "center" },
+          { "value": "6.1%", "bold": false, "align": "center" }
+        ],
+        [
+          { "value": "Party X", "bold": false, "align": "left" },
+          { "value": "2 states", "bold": false, "align": "center" },
+          { "value": "1.4%", "bold": false, "align": "center" }
+        ],
+        [
+          { "value": "Party Y", "bold": false, "align": "left" },
+          { "value": "1 state", "bold": false, "align": "center" },
+          { "value": "8.0% in that state", "bold": false, "align": "center" }
+        ],
+        [
+          { "value": "Party Z", "bold": false, "align": "left" },
+          { "value": "5 states", "bold": false, "align": "center" },
+          { "value": "0.4%", "bold": false, "align": "center" }
+        ]
+      ]
+    }
+  }
+}

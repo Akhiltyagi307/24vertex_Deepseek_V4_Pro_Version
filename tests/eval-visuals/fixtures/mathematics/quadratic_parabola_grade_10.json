@@ -1,0 +1,32 @@
+{
+  "question_text": "In the graph below of y = x² − 4x + 4, what is the nature of the roots of the corresponding quadratic equation?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Two distinct real roots",
+    "B": "Two equal real roots",
+    "C": "No real roots",
+    "D": "One real and one imaginary root"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The parabola touches the x-axis at exactly one point, indicating the discriminant is zero and the roots are equal.",
+    "common_mistakes": [],
+    "related_concept": "Nature of roots from the discriminant"
+  },
+  "visual": {
+    "caption": "Quadratic function on a plane.",
+    "altText": "Upward-opening parabola y equals x squared minus four x plus four plotted from x equals zero to x equals four with vertical range from about minus zero point five to five.",
+    "spec": {
+      "kind": "math_function_plot",
+      "xMin": 0,
+      "xMax": 4,
+      "yMin": -0.5,
+      "yMax": 5,
+      "xLabel": "x",
+      "yLabel": "y",
+      "items": [
+        { "expr": "x^2 - 4*x + 4", "color": "primary", "label": "y = x² − 4x + 4" }
+      ]
+    }
+  }
+}

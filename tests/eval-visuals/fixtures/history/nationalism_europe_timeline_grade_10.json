@@ -1,0 +1,32 @@
+{
+  "question_text": "Use the timeline shown below of nineteenth-century European nationalism. Which event came immediately after the Congress of Vienna?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Storming of the Bastille",
+    "B": "July Revolution (1830)",
+    "C": "Unification of Italy",
+    "D": "Treaty of Frankfurt"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "After the Congress of Vienna in 1815, the next major nationalist upheaval was the July Revolution in France in 1830.",
+    "common_mistakes": [],
+    "related_concept": "Nineteenth-century European chronology"
+  },
+  "visual": {
+    "caption": "European nationalism milestones.",
+    "altText": "Linear timeline marking five major political milestones in nineteenth-century Europe in chronological order from left to right.",
+    "spec": {
+      "kind": "timeline",
+      "title": "Rise of nationalism in Europe (1789–1871)",
+      "axisLabel": "Year",
+      "events": [
+        { "dateLabel": "1789", "label": "French Revolution begins", "description": null, "emphasis": false },
+        { "dateLabel": "1815", "label": "Congress of Vienna", "description": null, "emphasis": true },
+        { "dateLabel": "1830", "label": "Event four", "description": null, "emphasis": false },
+        { "dateLabel": "1848", "label": "Revolutions across Europe", "description": null, "emphasis": false },
+        { "dateLabel": "1871", "label": "Unification of Germany", "description": null, "emphasis": false }
+      ]
+    }
+  }
+}

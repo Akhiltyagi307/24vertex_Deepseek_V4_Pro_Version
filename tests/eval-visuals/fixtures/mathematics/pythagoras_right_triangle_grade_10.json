@@ -1,0 +1,28 @@
+{
+  "question_text": "Using the right triangle in the figure below, what is the length of the hypotenuse AC?",
+  "question_type": "multiple_choice",
+  "options": { "A": "5 cm", "B": "7 cm", "C": "10 cm", "D": "12 cm" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "By the Pythagoras theorem, AC² = AB² + BC² = 3² + 4² = 25, so AC = 5.",
+    "common_mistakes": [],
+    "related_concept": "Pythagoras theorem"
+  },
+  "visual": {
+    "caption": "Right triangle with two legs labelled.",
+    "altText": "Right triangle A B C with the right angle at B. Leg A B is labelled three centimetres and leg B C is labelled four centimetres; the hypotenuse A C is unlabelled.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 6, "yMin": -1, "yMax": 5, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "B", "labelPosition": "sw" },
+        { "type": "point", "at": { "x": 4, "y": 0 }, "label": "C", "labelPosition": "se" },
+        { "type": "point", "at": { "x": 0, "y": 3 }, "label": "A", "labelPosition": "nw" },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 4, "y": 0 }, "label": "4 cm", "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 0, "y": 3 }, "label": "3 cm", "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 3 }, "to": { "x": 4, "y": 0 }, "label": null, "dashed": false },
+        { "type": "angle_marker", "vertex": { "x": 0, "y": 0 }, "fromRayPoint": { "x": 1, "y": 0 }, "toRayPoint": { "x": 0, "y": 1 }, "label": null }
+      ]
+    }
+  }
+}

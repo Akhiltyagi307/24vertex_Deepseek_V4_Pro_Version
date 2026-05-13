@@ -1,0 +1,29 @@
+{
+  "question_text": "In the figure below, PT is a tangent to the circle with centre O at the point of contact T. If OT = 5 cm and OP = 13 cm, find the length of PT.",
+  "question_type": "multiple_choice",
+  "options": { "A": "8 cm", "B": "12 cm", "C": "18 cm", "D": "169 cm" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "OT is perpendicular to PT at the point of contact, so PT² = OP² − OT² = 169 − 25 = 144, giving PT = 12 cm.",
+    "common_mistakes": [],
+    "related_concept": "Tangent perpendicular to radius at point of contact"
+  },
+  "visual": {
+    "caption": "Circle with external point and tangent.",
+    "altText": "Circle centred at O with radius five units. A tangent line from external point P touches the circle at T, and the radius O T is drawn. The right angle between O T and P T is shown by a small square at T.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -2, "xMax": 16, "yMin": -8, "yMax": 8, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "circle", "center": { "x": 0, "y": 0 }, "radius": 5, "label": null },
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "O", "labelPosition": "w" },
+        { "type": "point", "at": { "x": 13, "y": 0 }, "label": "P", "labelPosition": "e" },
+        { "type": "point", "at": { "x": 1.92, "y": 4.62 }, "label": "T", "labelPosition": "n" },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 1.92, "y": 4.62 }, "label": null, "dashed": false },
+        { "type": "segment", "from": { "x": 1.92, "y": 4.62 }, "to": { "x": 13, "y": 0 }, "label": null, "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 13, "y": 0 }, "label": null, "dashed": true },
+        { "type": "angle_marker", "vertex": { "x": 1.92, "y": 4.62 }, "fromRayPoint": { "x": 0.96, "y": 2.31 }, "toRayPoint": { "x": 7.46, "y": 2.31 }, "label": null }
+      ]
+    }
+  }
+}

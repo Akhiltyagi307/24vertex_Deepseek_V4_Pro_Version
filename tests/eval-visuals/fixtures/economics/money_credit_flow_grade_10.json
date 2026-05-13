@@ -1,0 +1,41 @@
+{
+  "question_text": "Examine the flowchart shown below of credit sources in India. Which branch typically charges the highest rate of interest to small borrowers?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Banks",
+    "B": "Cooperative societies",
+    "C": "Self-help groups",
+    "D": "Moneylenders"
+  },
+  "answer_key": {
+    "correct_answer": "D",
+    "explanation": "Informal-sector moneylenders generally charge a higher rate of interest than the supervised formal credit channels.",
+    "common_mistakes": [],
+    "related_concept": "Formal versus informal credit"
+  },
+  "visual": {
+    "caption": "Credit sources flowchart.",
+    "altText": "Top-down chart with a root node labelled Sources of Credit branching into two intermediate nodes — Formal and Informal — each leading to two leaf categories.",
+    "spec": {
+      "kind": "flowchart",
+      "title": "Sources of credit in India",
+      "nodes": [
+        { "id": "root", "label": "Sources of Credit", "detail": null, "kind": "start" },
+        { "id": "f", "label": "Formal sector", "detail": null, "kind": "process" },
+        { "id": "i", "label": "Informal sector", "detail": null, "kind": "process" },
+        { "id": "f1", "label": "Banks", "detail": null, "kind": "outcome" },
+        { "id": "f2", "label": "Cooperative societies", "detail": null, "kind": "outcome" },
+        { "id": "i1", "label": "Moneylenders", "detail": null, "kind": "outcome" },
+        { "id": "i2", "label": "Traders and friends", "detail": null, "kind": "outcome" }
+      ],
+      "edges": [
+        { "from": "root", "to": "f", "label": null },
+        { "from": "root", "to": "i", "label": null },
+        { "from": "f", "to": "f1", "label": null },
+        { "from": "f", "to": "f2", "label": null },
+        { "from": "i", "to": "i1", "label": null },
+        { "from": "i", "to": "i2", "label": null }
+      ]
+    }
+  }
+}

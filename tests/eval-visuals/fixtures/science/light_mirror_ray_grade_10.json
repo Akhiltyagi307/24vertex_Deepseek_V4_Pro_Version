@@ -1,0 +1,35 @@
+{
+  "question_text": "Use the ray-optics setup shown below. An object is placed in front of a concave mirror at a distance greater than its centre of curvature. The image produced is best described as:",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Between F and C, real and inverted, diminished",
+    "B": "Beyond C, real and enlarged",
+    "C": "At infinity",
+    "D": "Behind the mirror, virtual and erect"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "For a concave mirror, an object placed beyond C forms a real, inverted, diminished image between F and C — students must recall this rule; the diagram only fixes the setup.",
+    "common_mistakes": [],
+    "related_concept": "Image formation by spherical mirrors"
+  },
+  "visual": {
+    "caption": "Object before a concave mirror.",
+    "altText": "Principal axis with a single upright object placed at a distance of thirty centimetres in front of a concave mirror of focal length ten centimetres.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "ray_optics",
+      "axisMin": -40,
+      "axisMax": 5,
+      "axisUnit": "cm",
+      "axisTickStep": 5,
+      "objects": [
+        { "kind": "object", "x": -30, "height": 4, "dashed": false, "label": "Object" }
+      ],
+      "lenses": [
+        { "type": "concave_mirror", "x": 0, "focalLength": 10, "label": "Concave mirror" }
+      ],
+      "drawRays": false
+    }
+  }
+}

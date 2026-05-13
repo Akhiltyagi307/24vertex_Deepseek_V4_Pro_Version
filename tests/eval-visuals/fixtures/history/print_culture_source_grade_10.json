@@ -1,0 +1,31 @@
+{
+  "question_text": "Read the source extract shown below from a sixteenth-century European text. What was the writer's chief argument about the new technology?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "It would democratise ideas and weaken authority",
+    "B": "It would only entertain wealthy patrons",
+    "C": "It would replace handwriting in noble households",
+    "D": "It would not reach beyond city walls"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The author claims the press could spread radical ideas widely, undermining the established authority of the Church.",
+    "common_mistakes": [],
+    "related_concept": "Print Revolution and its impact"
+  },
+  "visual": {
+    "caption": "Sixteenth-century commentary on print.",
+    "altText": "Numbered three-line extract from a sixteenth-century source describing the social impact of a new technology.",
+    "spec": {
+      "kind": "source_extract",
+      "title": "Voices of the print revolution",
+      "source": "Adapted from a sixteenth-century European text",
+      "context": "A commentator writes about a recently invented technology and its likely social effect.",
+      "lines": [
+        { "number": 1, "text": "The mechanical art now permits a single book to be copied many times in a short interval." },
+        { "number": 2, "text": "Even the unlettered townspeople may soon read what was once reserved for the cloister." },
+        { "number": 3, "text": "Those who guarded the older learning may find their pulpits less heeded than before." }
+      ]
+    }
+  }
+}

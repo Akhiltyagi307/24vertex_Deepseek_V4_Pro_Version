@@ -1,0 +1,52 @@
+{
+  "question_text": "Using the partial reactivity-series table shown below, which metal will displace iron from a solution of iron sulphate?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Copper", "B": "Silver", "C": "Zinc", "D": "Gold" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Zinc is above iron in the reactivity series, so it can displace iron from its salt solution; copper, silver, and gold are below iron.",
+    "common_mistakes": [],
+    "related_concept": "Reactivity series and displacement"
+  },
+  "visual": {
+    "caption": "Partial metal reactivity series.",
+    "altText": "Table listing six common metals from most reactive at the top to least reactive at the bottom, with potassium, sodium, zinc, iron, copper, and silver in that order.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Selected metals by decreasing reactivity",
+      "headers": ["Rank", "Metal", "Reactivity"],
+      "rows": [
+        [
+          { "value": "1", "bold": false, "align": "center" },
+          { "value": "Potassium", "bold": false, "align": "left" },
+          { "value": "Most reactive", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "2", "bold": false, "align": "center" },
+          { "value": "Sodium", "bold": false, "align": "left" },
+          { "value": "Very reactive", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "3", "bold": false, "align": "center" },
+          { "value": "Zinc", "bold": false, "align": "left" },
+          { "value": "Moderately reactive", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "4", "bold": false, "align": "center" },
+          { "value": "Iron", "bold": false, "align": "left" },
+          { "value": "Moderately reactive", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "5", "bold": false, "align": "center" },
+          { "value": "Copper", "bold": false, "align": "left" },
+          { "value": "Low reactivity", "bold": false, "align": "left" }
+        ],
+        [
+          { "value": "6", "bold": false, "align": "center" },
+          { "value": "Silver", "bold": false, "align": "left" },
+          { "value": "Least reactive listed", "bold": false, "align": "left" }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "question_text": "Use the flowchart shown below comparing two country power-sharing arrangements. Which model corresponds to majoritarian rule that ignored linguistic minority demands?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Country X model",
+    "B": "Country Y model",
+    "C": "Both equally",
+    "D": "Neither"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "Country Y followed a majoritarian path that excluded its largest linguistic minority, leading to long civil conflict.",
+    "common_mistakes": [],
+    "related_concept": "Accommodation versus majoritarianism"
+  },
+  "visual": {
+    "caption": "Two power-sharing approaches.",
+    "altText": "Two parallel branches in a flowchart, one labelled Country X leading to a stable outcome and one labelled Country Y leading to a contested outcome.",
+    "spec": {
+      "kind": "flowchart",
+      "title": "Power-sharing in two countries",
+      "nodes": [
+        { "id": "x1", "label": "Country X assembly", "detail": null, "kind": "start" },
+        { "id": "x2", "label": "Equal representation by group", "detail": null, "kind": "process" },
+        { "id": "x3", "label": "Stable accommodation", "detail": null, "kind": "outcome" },
+        { "id": "y1", "label": "Country Y assembly", "detail": null, "kind": "start" },
+        { "id": "y2", "label": "Majority rules", "detail": null, "kind": "process" },
+        { "id": "y3", "label": "Long political conflict", "detail": null, "kind": "outcome" }
+      ],
+      "edges": [
+        { "from": "x1", "to": "x2", "label": null },
+        { "from": "x2", "to": "x3", "label": null },
+        { "from": "y1", "to": "y2", "label": null },
+        { "from": "y2", "to": "y3", "label": null }
+      ]
+    }
+  }
+}

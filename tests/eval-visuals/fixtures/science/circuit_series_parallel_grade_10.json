@@ -1,0 +1,32 @@
+{
+  "question_text": "In the circuit shown below, two resistors of 6 Ω and 3 Ω are connected in parallel across a 6 V battery. What is the total current drawn from the battery?",
+  "question_type": "multiple_choice",
+  "options": { "A": "1 A", "B": "2 A", "C": "3 A", "D": "9 A" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Parallel combination R = (6×3)/(6+3) = 2 Ω; total current = V/R = 6/2 = 3 A.",
+    "common_mistakes": [],
+    "related_concept": "Parallel resistor combinations"
+  },
+  "visual": {
+    "caption": "Two resistors in parallel.",
+    "altText": "Closed loop with battery on the left branch and two resistors connected between nodes b and c in parallel. An ammeter is on the wire returning to the battery.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "circuit",
+      "nodes": [
+        { "id": "a", "x": 0, "y": 0 },
+        { "id": "b", "x": 4, "y": 0 },
+        { "id": "c", "x": 4, "y": 3 },
+        { "id": "d", "x": 0, "y": 3 }
+      ],
+      "components": [
+        { "type": "battery", "from": "a", "to": "d", "emfVolts": 6, "label": null, "polarityMarks": true, "currentArrow": true },
+        { "type": "resistor", "from": "b", "to": "c", "resistanceOhms": 6, "label": "R₁", "currentArrow": false },
+        { "type": "resistor", "from": "b", "to": "c", "resistanceOhms": 3, "label": "R₂", "currentArrow": false },
+        { "type": "ammeter", "from": "d", "to": "c", "label": null, "currentArrow": true },
+        { "type": "wire", "from": "a", "to": "b", "currentArrow": true }
+      ]
+    }
+  }
+}

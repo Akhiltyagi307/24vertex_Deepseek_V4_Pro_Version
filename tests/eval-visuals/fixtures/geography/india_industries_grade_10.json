@@ -1,0 +1,25 @@
+{
+  "question_text": "Examine the India map shown below highlighting a textile-industry concentration. Which traditional industry is being indicated?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Cotton textile industry",
+    "B": "Sugar industry",
+    "C": "Iron and steel industry",
+    "D": "Petrochemical industry"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The highlighted western belt centred around Mumbai, Ahmedabad and Surat is India's principal cotton-textile producing region.",
+    "common_mistakes": [],
+    "related_concept": "Manufacturing industry locations"
+  },
+  "visual": {
+    "caption": "Western industrial belt highlighted.",
+    "altText": "Political outline of India with two western states shaded together as a manufacturing-belt cluster.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "political",
+      "highlightedStates": ["mh", "gj"]
+    }
+  }
+}

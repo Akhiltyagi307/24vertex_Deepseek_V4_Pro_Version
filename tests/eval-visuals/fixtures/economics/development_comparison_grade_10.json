@@ -1,0 +1,46 @@
+{
+  "question_text": "Use the development-indicators table shown below comparing four South Asian countries. Which country has the highest human development on the HDI rank measure?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Country P", "B": "Country Q", "C": "Country R", "D": "Country S" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "A lower numerical HDI rank indicates higher human development. Country Q has the lowest (best) HDI rank in the table.",
+    "common_mistakes": [],
+    "related_concept": "Human Development Index"
+  },
+  "visual": {
+    "caption": "South Asian development comparison.",
+    "altText": "Three-column comparison table listing four countries with per-capita income, life expectancy, and HDI rank values.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Selected development indicators",
+      "headers": ["Country", "Per-capita income (USD)", "Life expectancy (years)", "HDI rank"],
+      "rows": [
+        [
+          { "value": "Country P", "bold": false, "align": "left" },
+          { "value": "2100", "bold": false, "align": "center" },
+          { "value": "70.0", "bold": false, "align": "center" },
+          { "value": "132", "bold": false, "align": "center" }
+        ],
+        [
+          { "value": "Country Q", "bold": false, "align": "left" },
+          { "value": "4100", "bold": false, "align": "center" },
+          { "value": "77.0", "bold": false, "align": "center" },
+          { "value": "73", "bold": false, "align": "center" }
+        ],
+        [
+          { "value": "Country R", "bold": false, "align": "left" },
+          { "value": "1600", "bold": false, "align": "center" },
+          { "value": "67.0", "bold": false, "align": "center" },
+          { "value": "154", "bold": false, "align": "center" }
+        ],
+        [
+          { "value": "Country S", "bold": false, "align": "left" },
+          { "value": "2500", "bold": false, "align": "center" },
+          { "value": "73.0", "bold": false, "align": "center" },
+          { "value": "129", "bold": false, "align": "center" }
+        ]
+      ]
+    }
+  }
+}

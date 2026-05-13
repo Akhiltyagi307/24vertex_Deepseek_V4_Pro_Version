@@ -1,0 +1,32 @@
+{
+  "question_text": "Refer to the timeline shown below of the Indian nationalist movement. Which mass campaign followed immediately after the Rowlatt Act protests?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Champaran Satyagraha",
+    "B": "Non-Cooperation Movement",
+    "C": "Civil Disobedience Movement",
+    "D": "Quit India Movement"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "After the 1919 Rowlatt Act and Jallianwala Bagh, Gandhi launched the Non-Cooperation Movement in 1920–22.",
+    "common_mistakes": [],
+    "related_concept": "Phases of the Indian freedom struggle"
+  },
+  "visual": {
+    "caption": "Indian freedom-struggle milestones.",
+    "altText": "Linear chronology of five turning points in the Indian nationalist movement plotted from 1915 to 1942 in left-to-right order.",
+    "spec": {
+      "kind": "timeline",
+      "title": "Nationalism in India (1915–1942)",
+      "axisLabel": "Year",
+      "events": [
+        { "dateLabel": "1917", "label": "Champaran Satyagraha", "description": null, "emphasis": false },
+        { "dateLabel": "1919", "label": "Rowlatt Act and Jallianwala Bagh", "description": null, "emphasis": true },
+        { "dateLabel": "1920", "label": "Event three", "description": null, "emphasis": false },
+        { "dateLabel": "1930", "label": "Dandi March and Civil Disobedience", "description": null, "emphasis": false },
+        { "dateLabel": "1942", "label": "Quit India Movement", "description": null, "emphasis": false }
+      ]
+    }
+  }
+}

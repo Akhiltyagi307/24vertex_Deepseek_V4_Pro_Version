@@ -1,0 +1,20 @@
+{
+  "question_text": "Use the India map shown below. The highlighted eastern belt is the principal producer of which mineral?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Bauxite", "B": "Iron ore", "C": "Manganese", "D": "Mica" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The Singhbhum-Bonai belt across the eastern states is the leading iron-ore producing region of India.",
+    "common_mistakes": [],
+    "related_concept": "Iron-ore producing belts of India"
+  },
+  "visual": {
+    "caption": "Eastern Indian mineral belt highlighted.",
+    "altText": "Political outline of India with three contiguous eastern states shaded as a mining belt across the plateau.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "political",
+      "highlightedStates": ["jh", "or", "ct"]
+    }
+  }
+}

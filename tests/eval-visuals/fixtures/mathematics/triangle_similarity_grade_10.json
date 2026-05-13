@@ -1,0 +1,35 @@
+{
+  "question_text": "In the figure below, DE is parallel to BC. By the Basic Proportionality Theorem, which of the following is true?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "AD/DB = AE/EC",
+    "B": "AD/AB = BC/EC",
+    "C": "AD/DB = BC/DE",
+    "D": "AD·EC = DB·BC"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "When a line is drawn parallel to one side of a triangle, it divides the other two sides in the same ratio.",
+    "common_mistakes": [],
+    "related_concept": "Basic Proportionality Theorem"
+  },
+  "visual": {
+    "caption": "Triangle with line parallel to one side.",
+    "altText": "Triangle A B C with vertex A at the top. A dashed segment D E is drawn parallel to base B C, with D on side A B and E on side A C.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 7, "yMin": -1, "yMax": 7, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "point", "at": { "x": 3, "y": 6 }, "label": "A", "labelPosition": "n" },
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "B", "labelPosition": "sw" },
+        { "type": "point", "at": { "x": 6, "y": 0 }, "label": "C", "labelPosition": "se" },
+        { "type": "point", "at": { "x": 2, "y": 4 }, "label": "D", "labelPosition": "w" },
+        { "type": "point", "at": { "x": 4, "y": 4 }, "label": "E", "labelPosition": "e" },
+        { "type": "segment", "from": { "x": 3, "y": 6 }, "to": { "x": 0, "y": 0 }, "label": null, "dashed": false },
+        { "type": "segment", "from": { "x": 3, "y": 6 }, "to": { "x": 6, "y": 0 }, "label": null, "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 6, "y": 0 }, "label": "BC", "dashed": false },
+        { "type": "segment", "from": { "x": 2, "y": 4 }, "to": { "x": 4, "y": 4 }, "label": "DE", "dashed": true }
+      ]
+    }
+  }
+}

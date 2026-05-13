@@ -1,0 +1,30 @@
+{
+  "question_text": "Use the field-line diagram shown below for a current-carrying straight conductor seen from above. The direction of the magnetic field lines tells you the current is flowing:",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Out of the page",
+    "B": "Into the page",
+    "C": "From left to right",
+    "D": "From right to left"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Using the right-hand thumb rule, anticlockwise field lines around the wire correspond to a current directed out of the page.",
+    "common_mistakes": [],
+    "related_concept": "Right-hand thumb rule"
+  },
+  "visual": {
+    "caption": "Field lines around a wire.",
+    "altText": "Concentric circular field lines drawn around a single point representing a straight current-carrying conductor seen end-on.",
+    "spec": {
+      "kind": "physics_field_diagram",
+      "fieldType": "magnetic",
+      "title": "Field around a current-carrying conductor",
+      "sources": [
+        { "label": "Current wire", "kind": "current_wire", "x": 50, "y": 50 }
+      ],
+      "fieldLineCount": 4,
+      "labels": []
+    }
+  }
+}

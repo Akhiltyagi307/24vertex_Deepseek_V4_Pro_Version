@@ -1,0 +1,25 @@
+{
+  "question_text": "In the India map shown below, the highlighted states are linked by which major national transport corridor?",
+  "question_type": "multiple_choice",
+  "options": {
+    "A": "Golden Quadrilateral",
+    "B": "Konkan Railway",
+    "C": "East-West Corridor",
+    "D": "North-South Corridor"
+  },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The corridor connecting Delhi, Mumbai, Chennai, and Kolkata via four-lane / six-lane highways is the Golden Quadrilateral.",
+    "common_mistakes": [],
+    "related_concept": "National highway corridors"
+  },
+  "visual": {
+    "caption": "Four-metro corridor states highlighted.",
+    "altText": "Political outline of India with four geographically distant states shaded — one in the north, one in the west, one in the south, and one in the east.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "political",
+      "highlightedStates": ["dl", "mh", "tn", "wb"]
+    }
+  }
+}
