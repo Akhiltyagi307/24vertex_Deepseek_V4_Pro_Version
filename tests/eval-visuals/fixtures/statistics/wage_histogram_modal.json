@@ -1,0 +1,38 @@
+{
+	"question_number": 1,
+	"topic_id": "77777777-7777-4777-8777-777777777777",
+	"topic_name": "Presentation of Data",
+	"question_text": "The histogram below shows the distribution of daily wages for 40 workers. Read the modal class from the histogram.",
+	"question_type": "multiple_choice",
+	"difficulty_level": "easy",
+	"options": {
+		"A": "100–200",
+		"B": "200–300",
+		"C": "300–400",
+		"D": "400–500"
+	},
+	"answer_key": {
+		"correct_answer": "C",
+		"explanation": "The modal class is the class with the highest frequency. From the histogram, 300–400 has frequency 15, the tallest bar.",
+		"common_mistakes": ["Confusing modal class with median class."],
+		"related_concept": "Modal class for grouped data"
+	},
+	"estimated_time_seconds": 60,
+	"visual": {
+		"caption": "Histogram of daily wages (n = 40)",
+		"altText": "Histogram with five bars; the third bar from the left is the tallest and the leftmost and rightmost bars are the shortest of equal height.",
+		"spec": {
+			"kind": "statistics_chart",
+			"subKind": "histogram",
+			"xLabel": "Daily wage (₹)",
+			"yLabel": "Number of workers",
+			"bins": [
+				{ "label": "100–200", "frequency": 5 },
+				{ "label": "200–300", "frequency": 8 },
+				{ "label": "300–400", "frequency": 15 },
+				{ "label": "400–500", "frequency": 7 },
+				{ "label": "500–600", "frequency": 5 }
+			]
+		}
+	}
+}

@@ -1,0 +1,36 @@
+{
+	"question_number": 1,
+	"topic_id": "44444444-4444-4444-8444-444444444444",
+	"topic_name": "Trial Balance and Rectification of Errors",
+	"question_text": "The trial balance as on 31 March 2026 is shown below. Calculate the total of the debit side and state whether the trial balance agrees.",
+	"question_type": "multiple_choice",
+	"difficulty_level": "medium",
+	"options": {
+		"A": "1,50,000 — agrees",
+		"B": "1,50,000 — does not agree",
+		"C": "1,30,000 — agrees",
+		"D": "1,30,000 — does not agree"
+	},
+	"answer_key": {
+		"correct_answer": "A",
+		"explanation": "Debit-side total = Furniture 40,000 + Cash 35,000 + Purchases 75,000 = 1,50,000. Credit-side total = Capital 1,00,000 + Sales 50,000 = 1,50,000. The trial balance agrees.",
+		"common_mistakes": ["Forgetting to include Cash on the debit side.", "Adding only two of the three debit balances."],
+		"related_concept": "Trial Balance preparation"
+	},
+	"estimated_time_seconds": 90,
+	"visual": {
+		"caption": "Trial Balance as on 31 March 2026 (totals not shown)",
+		"altText": "Five-row trial balance. Capital 100,000 on credit. Furniture 40,000 on debit. Cash 35,000 on debit. Sales 50,000 on credit. Purchases 75,000 on debit. Totals are not yet computed.",
+		"spec": {
+			"kind": "accountancy_table",
+			"subKind": "trial_balance",
+			"rows": [
+				{ "particulars": "Capital", "debit": null, "credit": 100000 },
+				{ "particulars": "Furniture", "debit": 40000, "credit": null },
+				{ "particulars": "Cash", "debit": 35000, "credit": null },
+				{ "particulars": "Sales", "debit": null, "credit": 50000 },
+				{ "particulars": "Purchases", "debit": 75000, "credit": null }
+			]
+		}
+	}
+}

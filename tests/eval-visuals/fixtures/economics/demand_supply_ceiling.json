@@ -1,0 +1,39 @@
+{
+	"question_number": 1,
+	"topic_id": "55555555-5555-4555-8555-555555555555",
+	"topic_name": "Market Equilibrium",
+	"question_text": "The demand curve P = 100 − Q and supply curve P = Q for a normal good are shown below. If the government imposes a price ceiling of ₹30, will there be a shortage or a surplus?",
+	"question_type": "multiple_choice",
+	"difficulty_level": "medium",
+	"options": {
+		"A": "Shortage of 40 units",
+		"B": "Surplus of 40 units",
+		"C": "Shortage of 20 units",
+		"D": "Equilibrium is unaffected"
+	},
+	"answer_key": {
+		"correct_answer": "A",
+		"explanation": "At P = 30, quantity demanded = 100 − 30 = 70, quantity supplied = 30. Demand exceeds supply by 40, so there is a shortage of 40 units.",
+		"common_mistakes": ["Misreading the ceiling as a floor.", "Subtracting on the wrong curve."],
+		"related_concept": "Price ceiling, shortage / surplus"
+	},
+	"estimated_time_seconds": 90,
+	"visual": {
+		"caption": "Demand and supply curves for a normal good",
+		"altText": "A demand curve sloping down from (0, 100) to (100, 0) intersects a supply curve sloping up from (0, 0) to (100, 100). The intersection point is unlabelled.",
+		"spec": {
+			"kind": "economics_curve",
+			"xLabel": "Quantity",
+			"yLabel": "Price",
+			"xMin": 0,
+			"xMax": 100,
+			"yMin": 0,
+			"yMax": 100,
+			"curves": [
+				{ "expr": "100 - x", "color": "primary", "label": "Demand" },
+				{ "expr": "x", "color": "secondary", "label": "Supply" }
+			],
+			"marks": []
+		}
+	}
+}

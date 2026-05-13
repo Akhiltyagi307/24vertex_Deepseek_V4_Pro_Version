@@ -1,0 +1,47 @@
+{
+	"question_number": 1,
+	"topic_id": "33333333-3333-4333-8333-333333333333",
+	"topic_name": "Principles of Inheritance and Variation",
+	"question_text": "The Punnett-square outcomes for the cross Tt × Tt are shown below. If 240 offspring are produced, how many are expected to be tall?",
+	"question_type": "multiple_choice",
+	"difficulty_level": "easy",
+	"options": {
+		"A": "60 tall",
+		"B": "120 tall",
+		"C": "180 tall",
+		"D": "240 tall"
+	},
+	"answer_key": {
+		"correct_answer": "C",
+		"explanation": "The Tt × Tt cross yields a 3:1 phenotypic ratio (Tall:Short). With 240 offspring, 3/4 are expected to be tall: 240 × 3/4 = 180.",
+		"common_mistakes": ["Confusing 1:2:1 genotype ratio with 3:1 phenotype ratio."],
+		"related_concept": "Monohybrid cross — law of segregation"
+	},
+	"estimated_time_seconds": 60,
+	"visual": {
+		"caption": "Punnett-square outcomes for Tt × Tt",
+		"altText": "Three-row table showing genotype TT (Tall, ratio 1), Tt (Tall, ratio 2), and tt (Short, ratio 1).",
+		"spec": {
+			"kind": "data_table",
+			"caption": "F1 outcomes for the cross Tt × Tt",
+			"headers": ["Genotype", "Phenotype", "Ratio"],
+			"rows": [
+				[
+					{ "value": "TT", "bold": false, "align": "left" },
+					{ "value": "Tall", "bold": false, "align": "left" },
+					{ "value": "1", "bold": false, "align": "right" }
+				],
+				[
+					{ "value": "Tt", "bold": false, "align": "left" },
+					{ "value": "Tall", "bold": false, "align": "left" },
+					{ "value": "2", "bold": false, "align": "right" }
+				],
+				[
+					{ "value": "tt", "bold": false, "align": "left" },
+					{ "value": "Short", "bold": false, "align": "left" },
+					{ "value": "1", "bold": false, "align": "right" }
+				]
+			]
+		}
+	}
+}

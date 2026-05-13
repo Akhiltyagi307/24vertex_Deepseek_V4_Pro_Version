@@ -1,0 +1,38 @@
+{
+	"question_number": 1,
+	"topic_id": "66666666-6666-4666-8666-666666666666",
+	"topic_name": "Marketing",
+	"question_text": "The chart below shows the smartphone market share for five brands in India. From the chart, what is the combined share of the top three brands?",
+	"question_type": "multiple_choice",
+	"difficulty_level": "easy",
+	"options": {
+		"A": "60%",
+		"B": "62%",
+		"C": "68%",
+		"D": "72%"
+	},
+	"answer_key": {
+		"correct_answer": "C",
+		"explanation": "Top three are Brand A (28%), Brand B (22%), Brand C (18%). Sum = 28 + 22 + 18 = 68%.",
+		"common_mistakes": ["Including 'Others' as a single brand.", "Adding Brand D instead of Brand C."],
+		"related_concept": "Reading categorical bar chart"
+	},
+	"estimated_time_seconds": 60,
+	"visual": {
+		"caption": "Indian smartphone market share by brand",
+		"altText": "Bar chart with five bars: Brand A 28 percent, Brand B 22 percent, Brand C 18 percent, Brand D 12 percent, Others 20 percent.",
+		"spec": {
+			"kind": "statistics_chart",
+			"subKind": "bar",
+			"xLabel": "Brand",
+			"yLabel": "Market share (%)",
+			"data": [
+				{ "label": "Brand A", "value": 28 },
+				{ "label": "Brand B", "value": 22 },
+				{ "label": "Brand C", "value": 18 },
+				{ "label": "Brand D", "value": 12 },
+				{ "label": "Others", "value": 20 }
+			]
+		}
+	}
+}

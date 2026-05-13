@@ -1,0 +1,40 @@
+{
+	"question_number": 1,
+	"topic_id": "88888888-8888-4888-8888-888888888888",
+	"topic_name": "Reading Skills",
+	"question_text": "Read the passage shown below and identify the central theme.",
+	"question_type": "multiple_choice",
+	"difficulty_level": "easy",
+	"options": {
+		"A": "The dangers of solitude",
+		"B": "The necessity of friendship in a good life",
+		"C": "The pursuit of wealth and power",
+		"D": "The pursuit of pleasure"
+	},
+	"answer_key": {
+		"correct_answer": "B",
+		"explanation": "The passage opens with 'Friendship is one of the things most necessary for life' and argues that even those with wealth and power need friends. The central theme is the necessity of friendship.",
+		"common_mistakes": ["Picking C because wealth and power are mentioned — they are mentioned as a counterpoint, not the theme."],
+		"related_concept": "Identifying central theme in a passage"
+	},
+	"estimated_time_seconds": 90,
+	"visual": {
+		"caption": "Passage on friendship",
+		"altText": "An eight-line numbered passage adapted from Aristotle's Nicomachean Ethics on the necessity of friendship.",
+		"spec": {
+			"kind": "english_passage",
+			"title": "On Friendship",
+			"source": "Aristotle, Nicomachean Ethics (excerpt)",
+			"lines": [
+				{ "number": 1, "text": "Friendship is one of the things most necessary for life," },
+				{ "number": 2, "text": "for without friends no one would choose to live," },
+				{ "number": 3, "text": "even if he had all other goods." },
+				{ "number": 4, "text": "Indeed, the rich and those in possession of authority and power" },
+				{ "number": 5, "text": "are thought to need friends most of all," },
+				{ "number": 6, "text": "for what is the use of such prosperity" },
+				{ "number": 7, "text": "without the opportunity of beneficence," },
+				{ "number": 8, "text": "which is exercised chiefly and in its most laudable form towards friends?" }
+			]
+		}
+	}
+}

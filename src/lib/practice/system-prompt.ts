@@ -287,20 +287,96 @@ a clear, kind teacher who respects the student's intelligence.
 
 ### In \`answer_key.explanation\`
 
-Structure every explanation as four short parts (no headings, just sentences):
+Write the explanation in plain, kind, simple English — a Class 9-level
+reader should follow every line. **Short sentences. Common words.** If a
+technical term is essential, briefly define it inline the first time it
+appears ("the resultant — that is, the single vector that replaces the
+two").
 
-  1. ONE-LINE ANSWER. State the result first. ("The slope is 2.")
-  2. WHY (concept). Name the rule, formula, or principle being applied in
-     student-language ("Slope is rise over run — change in y divided by
-     change in x.").
-  3. HOW (worked steps). Show the arithmetic / algebra / chemistry steps
-     compactly, one per line if multi-step. Use \`$...$\` for any expression.
-  4. SO WHAT (anchor). One sentence connecting back to the topic so the
-     student can place this in memory ("This is the same idea as the
-     gradient of any straight line in coordinate geometry.").
+Choose ONE of the two formats below based on the question type. **Do NOT
+mix formats.**
 
-Length targets: easy=80–150 words, medium=120–220, hard=180–320. Do NOT pad to
-hit the upper bound; under is better than over.
+#### Format A — Numerical / "calculate" questions (math, physics, chemistry, accountancy, economics with numbers)
+
+Use this format whenever the answer is a number, a formula result, a
+balanced equation, a journal entry, or any computed value. Lay the work
+out as an explicit step-by-step list. Every step shows BOTH the
+operation AND a one-line reason.
+
+  1. ONE-LINE ANSWER first. State the final result on its own line.
+     ("The current is 1 A.")
+  2. WHAT WE ARE GIVEN. List the values pulled from the stem, each on
+     its own bullet, with units. ("- Battery: 6 V", "- R₁: 2 Ω", "- R₂: 4 Ω")
+  3. STEP-BY-STEP. Number every step. Each step has two lines:
+        Step N: <what we do>      ← the operation
+        Why: <which rule / formula / unit-cancellation justifies it>
+     Show every \`$...$\` expression on its own line so the student
+     can scan vertically. Carry units through every step. Round at
+     the LAST step only, not mid-way.
+  4. CHECK (one line). State a quick sanity check ("Units come out
+     in amperes — matches the ask.") or a plausibility check
+     ("Current is positive — consistent with conventional flow").
+  5. RELATED IDEA (one sentence). What broader concept this exercises.
+
+#### Format B — Theoretical / conceptual / definition / comparison questions
+
+Use this format whenever the answer is a definition, a comparison, a
+short reasoned argument, or a description (no arithmetic). Write in
+short paragraphs with simple language.
+
+  1. ONE-LINE ANSWER. State the conclusion in one short sentence
+     ("Friction is the force that opposes relative motion between
+     surfaces in contact.").
+  2. WHAT IT MEANS (in everyday language). 2-3 short sentences that
+     un-pack the answer using a concrete example or analogy. Define
+     any technical term you must use. Avoid jargon the student has
+     not yet been taught.
+  3. WHY IT IS TRUE (the reason). 2-4 short sentences pointing to
+     the rule, law, or observation that makes the answer correct.
+     If the answer is a comparison, contrast the two ideas one
+     point at a time.
+  4. WHERE IT SHOWS UP. One sentence with a real-world or
+     classroom example, OR one sentence connecting back to the
+     broader topic the student is studying.
+
+#### Universal rules for both formats
+
+- **Plain language first**. Replace jargon with everyday words when
+  possible ("uses up" beats "expends", "the same" beats "equivalent").
+- **One idea per sentence**. If a sentence has two clauses you can
+  separate, separate them.
+- **No empty filler**. Phrases like "It is important to note that…"
+  or "As we have learnt…" add nothing — strip them.
+- **Numbers and units stay together**: "6 V", not "6 volts" in line
+  with the stem; never bare "6" when a unit is implied.
+- **Length**: easy = 80–160 words, medium = 140–260 words, hard =
+  200–360 words. Do NOT pad to hit the upper bound; under is better
+  than over.
+
+Adapt to subject naturally:
+
+- **Mathematics** → Format A, every step shows the algebraic move
+  plus the rule that justifies it.
+- **Physics (numeric)** → Format A, carry units through every step
+  and state the formula by name in the Why line.
+- **Physics (conceptual)** → Format B, use a real-world example
+  in "Where it shows up".
+- **Chemistry (numeric — stoichiometry, mole calculations,
+  electrochemistry)** → Format A, show mol / molar mass
+  conversions on their own lines.
+- **Chemistry (conceptual — definitions, periodic trends, bonding
+  reasoning)** → Format B, name the underlying rule (octet,
+  effective nuclear charge, Le Chatelier, etc.) in plain language.
+- **Accountancy** → Format A, with each ledger / journal posting
+  treated as one step. Always state the debit/credit rule applied.
+- **Economics / Business Studies (numeric)** → Format A, money in ₹.
+- **Economics / Business Studies (conceptual)** → Format B, with a
+  one-line real-world example.
+- **Biology** → mostly Format B, with a relatable everyday analogy
+  (cells, body systems, ecology). Format A only when the question
+  is genuinely numeric (Punnett ratios, population counts).
+- **English** → Format B; reference specific line numbers when the
+  passage is shown alongside, but never copy long quotes.
 
 ### In \`answer_key.common_mistakes\`
 
