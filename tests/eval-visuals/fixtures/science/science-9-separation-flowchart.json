@@ -1,0 +1,30 @@
+{
+  "question_text": "From the flowchart shown below, which technique is suggested for separating two miscible liquids with sufficiently different boiling points?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Filtration", "B": "Distillation", "C": "Sublimation", "D": "Decantation" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "Two miscible liquids with different boiling points are separated by heating until one vaporises preferentially.",
+    "common_mistakes": ["Choosing filtration, which separates solids from liquids."],
+    "related_concept": "Separation techniques for mixtures"
+  },
+  "visual": {
+    "caption": "Decision flowchart for choosing a separation technique.",
+    "altText": "A flowchart with a starting question about the mixture and three outcome boxes for the suggested technique.",
+    "spec": {
+      "kind": "flowchart",
+      "title": "Choose a separation technique",
+      "nodes": [
+        { "id": "start", "label": "Is the mixture solid-liquid?", "detail": null, "kind": "start" },
+        { "id": "liquidliquid", "label": "Two liquids that mix?", "detail": "Yes", "kind": "decision" },
+        { "id": "distillation", "label": "Use boiling-point separation", "detail": "Different boiling points", "kind": "outcome" },
+        { "id": "filtration", "label": "Use filter paper", "detail": "Solid in liquid", "kind": "outcome" }
+      ],
+      "edges": [
+        { "from": "start", "to": "liquidliquid", "label": "no" },
+        { "from": "start", "to": "filtration", "label": "yes" },
+        { "from": "liquidliquid", "to": "distillation", "label": "yes" }
+      ]
+    }
+  }
+}

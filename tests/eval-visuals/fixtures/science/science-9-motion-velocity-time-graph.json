@@ -1,0 +1,27 @@
+{
+  "question_text": "Use the velocity-time graph shown below. What type of motion does the object undergo during the interval shown?",
+  "question_type": "multiple_choice",
+  "options": { "A": "At rest", "B": "Uniform velocity", "C": "Uniform acceleration", "D": "Free fall" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Velocity increases linearly with time, so acceleration is constant and the motion is uniformly accelerated.",
+    "common_mistakes": ["Reading the line as uniform velocity."],
+    "related_concept": "Interpreting velocity-time graphs"
+  },
+  "visual": {
+    "caption": "Velocity-time graph for a moving object.",
+    "altText": "A straight line rising from the origin on a velocity-time coordinate grid with time on the horizontal axis.",
+    "spec": {
+      "kind": "math_function_plot",
+      "xMin": 0,
+      "xMax": 10,
+      "yMin": 0,
+      "yMax": 20,
+      "xLabel": "Time (s)",
+      "yLabel": "Velocity (m/s)",
+      "items": [
+        { "expr": "2*x", "color": "primary", "label": "v(t)" }
+      ]
+    }
+  }
+}

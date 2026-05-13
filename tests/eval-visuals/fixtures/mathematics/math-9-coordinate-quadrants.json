@@ -1,0 +1,22 @@
+{
+  "question_text": "In the figure shown below, which quadrant contains the point P?",
+  "question_type": "multiple_choice",
+  "options": { "A": "I", "B": "II", "C": "III", "D": "IV" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The point P has negative abscissa and positive ordinate, placing it in the second quadrant.",
+    "common_mistakes": ["Confusing the second and third quadrants when the y-coordinate is positive."],
+    "related_concept": "Quadrants in the Cartesian plane"
+  },
+  "visual": {
+    "caption": "Cartesian plane with point P plotted.",
+    "altText": "A coordinate plane with x and y axes labelled and a single point P plotted with negative x and positive y.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -5, "xMax": 5, "yMin": -5, "yMax": 5, "showGrid": true, "showAxes": true },
+      "primitives": [
+        { "type": "point", "at": { "x": -3, "y": 2 }, "label": "P" }
+      ]
+    }
+  }
+}

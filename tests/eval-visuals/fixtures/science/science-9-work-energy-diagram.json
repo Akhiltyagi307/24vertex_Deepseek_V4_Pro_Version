@@ -1,0 +1,28 @@
+{
+  "question_text": "In the diagram shown below, a person pushes a box. The applied force is horizontal and points east while the displacement is upward. What is the sign of the work done by the applied force?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Positive", "B": "Negative", "C": "Zero", "D": "Cannot decide" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "When the force is perpendicular to the displacement, the work done by that force is zero.",
+    "common_mistakes": ["Assuming non-zero work whenever a force is applied."],
+    "related_concept": "Work done by a force"
+  },
+  "visual": {
+    "caption": "Force and displacement arrows on a box.",
+    "altText": "A box with one horizontal arrow representing applied force and a separate vertical arrow representing displacement direction.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "free_body",
+      "bodyLabel": "Box",
+      "inclineDeg": 0,
+      "inclineLabel": "ground",
+      "surfaceHatched": true,
+      "axisLegend": true,
+      "forces": [
+        { "name": "F", "magnitude": 8, "angleDeg": 0, "unit": "N", "showMagnitude": false, "componentArrows": false },
+        { "name": "displacement", "magnitude": 3, "angleDeg": 90, "unit": "m", "showMagnitude": false, "componentArrows": false }
+      ]
+    }
+  }
+}

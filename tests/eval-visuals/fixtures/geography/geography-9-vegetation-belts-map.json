@@ -1,0 +1,20 @@
+{
+  "question_text": "Use the map shown below. The shaded region of India supports which type of natural vegetation?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Thorn forests", "B": "Tropical evergreen forests", "C": "Tundra", "D": "Mangrove" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The shaded area lies in arid western India, which supports xerophytic thorn vegetation.",
+    "common_mistakes": ["Selecting mangrove which grows in coastal delta regions."],
+    "related_concept": "Natural vegetation belts of India"
+  },
+  "visual": {
+    "caption": "India outline with vegetation belt shaded.",
+    "altText": "A political outline of India with the western arid states shaded for the question.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "outline",
+      "highlightedStates": ["rajasthan", "gujarat"]
+    }
+  }
+}

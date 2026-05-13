@@ -1,0 +1,25 @@
+{
+  "question_text": "In the figure shown below, ABCD is a parallelogram with both diagonals drawn. The diagonals intersect at O. Which property is illustrated?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Diagonals are equal", "B": "Diagonals bisect each other", "C": "All sides equal", "D": "All angles right" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "In any parallelogram, the diagonals bisect each other at their intersection point.",
+    "common_mistakes": ["Choosing 'diagonals are equal', which holds only in a rectangle."],
+    "related_concept": "Properties of a parallelogram"
+  },
+  "visual": {
+    "caption": "Parallelogram with both diagonals drawn.",
+    "altText": "A four-sided figure with labelled vertices A, B, C, D and two diagonals meeting at an interior point O.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 7, "yMin": -1, "yMax": 5, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "polygon", "vertices": [{ "x": 0, "y": 0 }, { "x": 4, "y": 0 }, { "x": 6, "y": 3 }, { "x": 2, "y": 3 }], "label": "ABCD" },
+        { "type": "segment", "from": { "x": 0, "y": 0 }, "to": { "x": 6, "y": 3 }, "label": null, "dashed": true },
+        { "type": "segment", "from": { "x": 4, "y": 0 }, "to": { "x": 2, "y": 3 }, "label": null, "dashed": true },
+        { "type": "point", "at": { "x": 3, "y": 1.5 }, "label": "O" }
+      ]
+    }
+  }
+}

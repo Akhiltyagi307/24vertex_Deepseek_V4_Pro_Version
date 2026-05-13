@@ -1,0 +1,25 @@
+{
+  "question_text": "Use the figure shown below. The triangle has sides 13 cm, 14 cm, and 15 cm. Which value is the semi-perimeter used in Heron's formula?",
+  "question_type": "multiple_choice",
+  "options": { "A": "14", "B": "21", "C": "28", "D": "42" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The semi-perimeter is half the sum of the sides: (13 + 14 + 15) / 2 = 21.",
+    "common_mistakes": ["Forgetting to halve the perimeter."],
+    "related_concept": "Heron's formula and semi-perimeter"
+  },
+  "visual": {
+    "caption": "Triangle with three labelled sides.",
+    "altText": "A scalene triangle drawn with three sides labelled by their lengths in centimetres.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 8, "yMin": -1, "yMax": 6, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "polygon", "vertices": [{ "x": 0, "y": 0 }, { "x": 7, "y": 0 }, { "x": 2, "y": 5 }], "label": "△" },
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "A" },
+        { "type": "point", "at": { "x": 7, "y": 0 }, "label": "B" },
+        { "type": "point", "at": { "x": 2, "y": 5 }, "label": "C" }
+      ]
+    }
+  }
+}

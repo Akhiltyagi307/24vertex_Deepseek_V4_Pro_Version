@@ -1,0 +1,27 @@
+{
+  "question_text": "From the graph shown below, how many real zeros does the polynomial have?",
+  "question_type": "multiple_choice",
+  "options": { "A": "0", "B": "1", "C": "2", "D": "3" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The curve crosses the x-axis at two distinct points, so the polynomial has two real zeros.",
+    "common_mistakes": ["Counting turning points instead of x-intercepts."],
+    "related_concept": "Zeros of a polynomial"
+  },
+  "visual": {
+    "caption": "Polynomial curve on the coordinate plane.",
+    "altText": "A continuous curve drawn from negative to positive x values, crossing the horizontal axis at two separate places.",
+    "spec": {
+      "kind": "math_function_plot",
+      "xMin": -3,
+      "xMax": 3,
+      "yMin": -4,
+      "yMax": 4,
+      "xLabel": "x",
+      "yLabel": "p(x)",
+      "items": [
+        { "expr": "x^2 - 1", "color": "primary", "label": "p(x)" }
+      ]
+    }
+  }
+}

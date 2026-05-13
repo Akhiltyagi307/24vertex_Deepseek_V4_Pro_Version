@@ -1,0 +1,27 @@
+{
+  "question_text": "Use the graph shown below. The line represents the equation 2x + y = 4. At which value of x does the line cross the x-axis?",
+  "question_type": "multiple_choice",
+  "options": { "A": "0", "B": "1", "C": "2", "D": "4" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Setting y = 0 in 2x + y = 4 gives x = 2, so the x-intercept is at (2, 0).",
+    "common_mistakes": ["Reading the y-intercept instead of the x-intercept."],
+    "related_concept": "Graph of a linear equation in two variables"
+  },
+  "visual": {
+    "caption": "Straight line on the coordinate plane.",
+    "altText": "A straight line drawn from upper left to lower right on a coordinate grid, crossing both axes.",
+    "spec": {
+      "kind": "math_function_plot",
+      "xMin": -1,
+      "xMax": 4,
+      "yMin": -1,
+      "yMax": 5,
+      "xLabel": "x",
+      "yLabel": "y",
+      "items": [
+        { "expr": "4 - 2*x", "color": "primary", "label": "2x + y = 4" }
+      ]
+    }
+  }
+}

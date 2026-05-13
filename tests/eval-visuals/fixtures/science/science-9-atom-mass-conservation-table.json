@@ -1,0 +1,26 @@
+{
+  "question_text": "From the table shown below tracking masses of reactants and products, what should be the mass of product Z so the law of conservation of mass holds?",
+  "question_type": "multiple_choice",
+  "options": { "A": "2 g", "B": "4 g", "C": "6 g", "D": "8 g" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Total reactant mass equals total product mass. With reactants summing to 10 g and the other product 4 g, Z must be 6 g.",
+    "common_mistakes": ["Subtracting only one reactant."],
+    "related_concept": "Law of conservation of mass"
+  },
+  "visual": {
+    "caption": "Reactant and product mass record.",
+    "altText": "A two-column table listing the mass in grams of each reactant and each product participating in the reaction.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Reaction mass record",
+      "headers": ["Species", "Mass (g)"],
+      "rows": [
+        [ { "value": "Reactant X", "bold": false, "align": "left" }, { "value": "4", "bold": false, "align": "right" } ],
+        [ { "value": "Reactant Y", "bold": false, "align": "left" }, { "value": "6", "bold": false, "align": "right" } ],
+        [ { "value": "Product W", "bold": false, "align": "left" }, { "value": "4", "bold": false, "align": "right" } ],
+        [ { "value": "Product Z", "bold": false, "align": "left" }, { "value": "?", "bold": false, "align": "right" } ]
+      ]
+    }
+  }
+}

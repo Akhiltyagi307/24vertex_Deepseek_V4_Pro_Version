@@ -1,0 +1,20 @@
+{
+  "question_text": "On the map shown below, the highlighted region of India represents which physiographic division?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Northern Plains", "B": "Himalayas", "C": "Peninsular Plateau", "D": "Coastal Plains" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The highlighted band runs across the northern arc of the country, which is the Himalayan division.",
+    "common_mistakes": ["Confusing Himalayas with Northern Plains directly to the south."],
+    "related_concept": "Major physiographic divisions of India"
+  },
+  "visual": {
+    "caption": "India outline with one region shaded.",
+    "altText": "A political outline of India with one northern band shaded for the question.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "outline",
+      "highlightedStates": ["jammu-kashmir", "himachal-pradesh", "uttarakhand", "sikkim", "arunachal-pradesh"]
+    }
+  }
+}

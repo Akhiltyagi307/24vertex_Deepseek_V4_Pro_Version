@@ -1,0 +1,27 @@
+{
+  "question_text": "From the diagram shown below of a plant cell, which labelled organelle is the site of photosynthesis?",
+  "question_type": "multiple_choice",
+  "options": { "A": "P", "B": "Q", "C": "R", "D": "S" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The disc-shaped organelle Q is the chloroplast, which carries out photosynthesis.",
+    "common_mistakes": ["Confusing chloroplast with mitochondrion."],
+    "related_concept": "Cell organelles and their functions"
+  },
+  "visual": {
+    "caption": "Plant cell with labelled organelles.",
+    "altText": "A cell cross-section drawing with four organelles tagged by single-letter labels at distinct positions.",
+    "spec": {
+      "kind": "biology_diagram",
+      "subKind": "cell",
+      "title": "Plant cell",
+      "labels": [
+        { "id": "p", "text": "P", "x": 20, "y": 30 },
+        { "id": "q", "text": "Q", "x": 60, "y": 30 },
+        { "id": "r", "text": "R", "x": 40, "y": 70 },
+        { "id": "s", "text": "S", "x": 80, "y": 70 }
+      ],
+      "notes": ["Labels mark four organelles inside the cell."]
+    }
+  }
+}

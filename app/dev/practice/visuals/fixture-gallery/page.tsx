@@ -25,7 +25,9 @@ type FixtureRecord = {
 	questionText: string;
 	correctAnswer: string | null;
 	envelope: QuestionVisualEnvelope;
+	isGrade9: boolean;
 	isGrade10: boolean;
+	parseError: string | null;
 };
 
 const FIXTURES_DIR = path.resolve(process.cwd(), "tests", "eval-visuals", "fixtures");
@@ -56,8 +58,8 @@ function loadFixtures(): FixtureRecord[] {
 					answer_key?: { correct_answer?: unknown } | null;
 					visual?: unknown;
 				};
+				if (raw.visual == null) continue;
 				const parsed = questionVisualEnvelopeSchema.safeParse(raw.visual);
-				if (!parsed.success) continue;
 				out.push({
 					subject,
 					fileName,
@@ -66,8 +68,10 @@ function loadFixtures(): FixtureRecord[] {
 						raw.answer_key && typeof raw.answer_key.correct_answer === "string" ?
 							raw.answer_key.correct_answer
 						:	null,
-					envelope: parsed.data,
-					isGrade10: fileName.endsWith("_grade_10.json"),
+					envelope: parsed.success ? parsed.data : (raw.visual as QuestionVisualEnvelope),
+					isGrade9: /(^|[-_])9([-_]|$)/.test(fileName.replace(/\.json$/, "")) || fileName.endsWith("_grade_9.json"),
+					isGrade10: fileName.endsWith("_grade_10.json") || /-10-/.test(fileName),
+					parseError: parsed.success ? null : parsed.error.message,
 				});
 			} catch {
 				// Skip unparseable fixtures silently — eval:visuals will flag them.
@@ -87,6 +91,7 @@ export default function FixtureGalleryPage(): React.ReactElement {
 		(acc[f.subject] ??= []).push(f);
 		return acc;
 	}, {});
+	const grade9Count = fixtures.filter((f) => f.isGrade9).length;
 	const grade10Count = fixtures.filter((f) => f.isGrade10).length;
 
 	return (
@@ -105,7 +110,8 @@ export default function FixtureGalleryPage(): React.ReactElement {
 				</p>
 				<p className="mt-2 text-sm text-muted-foreground">
 					Fixtures loaded: <strong>{fixtures.length}</strong> — of which{" "}
-					<strong>{grade10Count}</strong> are new Grade 10.
+					<strong>{grade9Count}</strong> are Grade 9 and{" "}
+					<strong>{grade10Count}</strong> are Grade 10.
 				</p>
 				<p className="mt-2 text-sm text-muted-foreground">
 					Metadata view:{" "}
@@ -137,6 +143,11 @@ export default function FixtureGalleryPage(): React.ReactElement {
 										<code className="text-xs text-muted-foreground">
 											{f.subject}/{f.fileName}
 										</code>
+										{f.isGrade9 && (
+											<span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs text-primary">
+												new · Grade 9
+											</span>
+										)}
 										{f.isGrade10 && (
 											<span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs text-primary">
 												new · Grade 10
@@ -153,6 +164,16 @@ export default function FixtureGalleryPage(): React.ReactElement {
 									</div>
 									{f.questionText && (
 										<p className="mb-2 text-sm">{f.questionText}</p>
+									)}
+									{f.parseError && (
+										<details className="mb-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+											<summary className="cursor-pointer">
+												Strict schema mismatch (renderer still attempts)
+											</summary>
+											<pre className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-tight">
+												{f.parseError}
+											</pre>
+										</details>
 									)}
 									<QuestionVisual visual={f.envelope} />
 								</li>

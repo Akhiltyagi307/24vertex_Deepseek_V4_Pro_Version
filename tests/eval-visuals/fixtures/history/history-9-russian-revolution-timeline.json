@@ -1,0 +1,26 @@
+{
+  "question_text": "Use the timeline shown below of the Russian Revolution. Which event preceded the October Revolution?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Formation of the USSR", "B": "February Revolution", "C": "Civil War", "D": "Death of Lenin" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The Tsar abdicated in February 1917, several months before the October Revolution of the same year.",
+    "common_mistakes": ["Treating the USSR formation as preceding the revolutions."],
+    "related_concept": "Sequence of the Russian Revolution"
+  },
+  "visual": {
+    "caption": "Russian Revolution event sequence.",
+    "altText": "A four-event horizontal timeline running across 1905 to 1924 with dated event labels.",
+    "spec": {
+      "kind": "timeline",
+      "title": "Russian Revolution",
+      "axisLabel": "Year",
+      "events": [
+        { "dateLabel": "1905", "label": "Bloody Sunday", "description": null, "emphasis": false },
+        { "dateLabel": "Feb 1917", "label": "February Revolution", "description": null, "emphasis": false },
+        { "dateLabel": "Oct 1917", "label": "October Revolution", "description": null, "emphasis": true },
+        { "dateLabel": "1922", "label": "Formation of the USSR", "description": null, "emphasis": false }
+      ]
+    }
+  }
+}

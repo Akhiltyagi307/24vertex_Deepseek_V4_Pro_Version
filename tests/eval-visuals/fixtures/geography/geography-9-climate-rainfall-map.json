@@ -1,0 +1,20 @@
+{
+  "question_text": "On the map shown below, the shaded coastal belt receives the heaviest rainfall during the south-west monsoon. Which region is highlighted?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Eastern coast", "B": "Western Ghats and adjoining coast", "C": "Thar Desert", "D": "Deccan rain shadow" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The shaded belt runs along the western edge of the peninsula, capturing the moist winds from the Arabian Sea.",
+    "common_mistakes": ["Confusing the windward and leeward sides of the Ghats."],
+    "related_concept": "South-west monsoon rainfall distribution"
+  },
+  "visual": {
+    "caption": "India outline with rainfall belt shaded.",
+    "altText": "A political outline of India with a narrow western coastal strip shaded for the question.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "outline",
+      "highlightedStates": ["maharashtra", "goa", "karnataka", "kerala"]
+    }
+  }
+}

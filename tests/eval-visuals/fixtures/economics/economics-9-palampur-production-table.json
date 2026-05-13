@@ -1,0 +1,25 @@
+{
+  "question_text": "From the table shown below describing village Palampur, what is the area of irrigated cultivated land?",
+  "question_type": "multiple_choice",
+  "options": { "A": "26 hectares", "B": "100 hectares", "C": "200 hectares", "D": "300 hectares" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The row for irrigated cultivated land lists 200 hectares.",
+    "common_mistakes": ["Confusing irrigated with non-irrigated cultivated land."],
+    "related_concept": "Factors of production in Palampur"
+  },
+  "visual": {
+    "caption": "Land-use summary for Palampur.",
+    "altText": "A two-column table listing the area in hectares for each land-use category in the village.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Palampur land use",
+      "headers": ["Land-use category", "Area (hectares)"],
+      "rows": [
+        [ { "value": "Cultivated land (irrigated)", "bold": false, "align": "left" }, { "value": "200", "bold": false, "align": "right" } ],
+        [ { "value": "Cultivated land (unirrigated)", "bold": false, "align": "left" }, { "value": "100", "bold": false, "align": "right" } ],
+        [ { "value": "Dwellings, roads, ponds, grazing", "bold": false, "align": "left" }, { "value": "26", "bold": false, "align": "right" } ]
+      ]
+    }
+  }
+}

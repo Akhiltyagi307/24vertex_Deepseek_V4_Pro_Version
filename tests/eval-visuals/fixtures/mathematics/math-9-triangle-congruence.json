@@ -1,0 +1,23 @@
+{
+  "question_text": "Observe the two triangles shown below. Equal sides and included angle are marked. By which congruence criterion are the two triangles congruent?",
+  "question_type": "multiple_choice",
+  "options": { "A": "SSS", "B": "SAS", "C": "ASA", "D": "RHS" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "Two pairs of sides and the included angle between them are marked equal, which matches the side-angle-side criterion.",
+    "common_mistakes": ["Choosing SSS without checking that the equal angle is included."],
+    "related_concept": "Congruence criteria for triangles"
+  },
+  "visual": {
+    "caption": "Two triangles with congruence marks.",
+    "altText": "Two triangles drawn side by side with tick marks indicating two pairs of equal sides and an arc indicating one pair of equal included angles.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 9, "yMin": -1, "yMax": 5, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "polygon", "vertices": [{ "x": 0, "y": 0 }, { "x": 3, "y": 0 }, { "x": 1, "y": 3 }], "label": "△ABC" },
+        { "type": "polygon", "vertices": [{ "x": 5, "y": 0 }, { "x": 8, "y": 0 }, { "x": 6, "y": 3 }], "label": "△DEF" }
+      ]
+    }
+  }
+}

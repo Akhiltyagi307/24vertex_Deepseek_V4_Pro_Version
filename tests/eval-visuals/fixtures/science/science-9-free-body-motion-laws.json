@@ -1,0 +1,29 @@
+{
+  "question_text": "In the free-body diagram shown below, the only horizontal force on the block is the applied force. If the block accelerates to the right, which choice describes the net horizontal force?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Zero", "B": "Equal to weight", "C": "Equal to the applied force", "D": "Equal to normal" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "Weight and normal cancel vertically. With only one horizontal force, the net horizontal force is the applied force itself.",
+    "common_mistakes": ["Including weight in the horizontal balance."],
+    "related_concept": "Newton's second law"
+  },
+  "visual": {
+    "caption": "Free-body diagram of a sliding block.",
+    "altText": "A block on a flat surface with three arrows showing the weight, the normal reaction, and a single horizontal applied force.",
+    "spec": {
+      "kind": "physics_diagram",
+      "subKind": "free_body",
+      "bodyLabel": "Block",
+      "inclineDeg": 0,
+      "inclineLabel": "ground",
+      "surfaceHatched": true,
+      "axisLegend": true,
+      "forces": [
+        { "name": "F", "magnitude": 10, "angleDeg": 0, "unit": "N", "showMagnitude": false, "componentArrows": false },
+        { "name": "N", "magnitude": 5, "angleDeg": 90, "unit": "N", "showMagnitude": false, "componentArrows": false },
+        { "name": "mg", "magnitude": 5, "angleDeg": -90, "unit": "N", "showMagnitude": false, "componentArrows": false }
+      ]
+    }
+  }
+}

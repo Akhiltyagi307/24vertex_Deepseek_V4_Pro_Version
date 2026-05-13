@@ -1,0 +1,27 @@
+{
+  "question_text": "Read the passage given below. Which statement best captures the narrator's attitude towards books?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Books are obsolete", "B": "Books are deeply valued", "C": "Books bore children", "D": "Books are forbidden" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The narrator describes books with wonder and longing, showing a strong appreciation for them.",
+    "common_mistakes": ["Confusing the narrator's nostalgia with rejection."],
+    "related_concept": "Identifying a narrator's attitude in prose"
+  },
+  "visual": {
+    "caption": "Numbered passage from a Beehive prose chapter.",
+    "altText": "A five-line numbered passage describing a child encountering an old printed book for the first time.",
+    "spec": {
+      "kind": "english_passage",
+      "title": "On Old Books",
+      "source": "Adapted from a Beehive prose chapter",
+      "lines": [
+        { "number": 1, "text": "She opened the book and turned the pages." },
+        { "number": 2, "text": "The pages were yellow and crinkly," },
+        { "number": 3, "text": "and it was awfully funny to read words that stood still" },
+        { "number": 4, "text": "instead of moving the way they were supposed to —" },
+        { "number": 5, "text": "on a screen, you know." }
+      ]
+    }
+  }
+}

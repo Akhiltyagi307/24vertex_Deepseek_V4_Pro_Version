@@ -1,0 +1,26 @@
+{
+  "question_text": "In the figure shown below, lines AB and CD are parallel and EF is a transversal. If the angle marked at point E is 120 degrees, what is the corresponding angle at point F?",
+  "question_type": "multiple_choice",
+  "options": { "A": "30", "B": "60", "C": "90", "D": "120" },
+  "answer_key": {
+    "correct_answer": "D",
+    "explanation": "Corresponding angles formed by a transversal with two parallel lines are equal, so the angle at F is also 120 degrees.",
+    "common_mistakes": ["Subtracting from 180 instead of recognising corresponding angles."],
+    "related_concept": "Parallel lines cut by a transversal"
+  },
+  "visual": {
+    "caption": "Two parallel lines crossed by a transversal.",
+    "altText": "Two horizontal parallel segments labelled AB and CD with a slanted transversal labelled EF intersecting both, and angle marks at the intersection points.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -1, "xMax": 7, "yMin": -1, "yMax": 5, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "segment", "from": { "x": 0, "y": 3 }, "to": { "x": 6, "y": 3 }, "label": "AB", "dashed": false },
+        { "type": "segment", "from": { "x": 0, "y": 1 }, "to": { "x": 6, "y": 1 }, "label": "CD", "dashed": false },
+        { "type": "segment", "from": { "x": 1, "y": 0 }, "to": { "x": 5, "y": 4 }, "label": "EF", "dashed": false },
+        { "type": "point", "at": { "x": 4, "y": 3 }, "label": "E" },
+        { "type": "point", "at": { "x": 2, "y": 1 }, "label": "F" }
+      ]
+    }
+  }
+}

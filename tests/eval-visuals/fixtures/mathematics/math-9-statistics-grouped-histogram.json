@@ -1,0 +1,27 @@
+{
+  "question_text": "From the histogram shown below, identify the class interval with the highest frequency.",
+  "question_type": "multiple_choice",
+  "options": { "A": "0-10", "B": "10-20", "C": "20-30", "D": "30-40" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The tallest bar on the histogram lies over the third interval.",
+    "common_mistakes": ["Reading the cumulative frequency instead of the class frequency."],
+    "related_concept": "Modal class from a grouped-frequency histogram"
+  },
+  "visual": {
+    "caption": "Grouped-frequency histogram for marks.",
+    "altText": "A histogram with four bars of varying heights; the third bar from the left is the tallest.",
+    "spec": {
+      "kind": "statistics_chart",
+      "subKind": "histogram",
+      "xLabel": "Marks",
+      "yLabel": "Number of students",
+      "bins": [
+        { "label": "0-10", "frequency": 4 },
+        { "label": "10-20", "frequency": 7 },
+        { "label": "20-30", "frequency": 12 },
+        { "label": "30-40", "frequency": 5 }
+      ]
+    }
+  }
+}

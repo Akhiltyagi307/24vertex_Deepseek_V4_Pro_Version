@@ -1,0 +1,26 @@
+{
+  "question_text": "From the timeline shown below of the French Revolution, which event came earliest in the sequence?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Storming of the Bastille", "B": "Declaration of the Rights of Man", "C": "Execution of Louis XVI", "D": "Reign of Terror" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "The Bastille was stormed in July 1789 before the Declaration was adopted and before later events.",
+    "common_mistakes": ["Placing the Declaration before the Bastille."],
+    "related_concept": "Chronology of the French Revolution"
+  },
+  "visual": {
+    "caption": "French Revolution event sequence.",
+    "altText": "A four-event horizontal timeline running from 1789 to 1794 with dated event labels.",
+    "spec": {
+      "kind": "timeline",
+      "title": "French Revolution",
+      "axisLabel": "Year",
+      "events": [
+        { "dateLabel": "Jul 1789", "label": "Storming of the Bastille", "description": null, "emphasis": false },
+        { "dateLabel": "Aug 1789", "label": "Declaration of the Rights of Man", "description": null, "emphasis": false },
+        { "dateLabel": "Jan 1793", "label": "Execution of Louis XVI", "description": null, "emphasis": false },
+        { "dateLabel": "1793-1794", "label": "Reign of Terror", "description": "Period of mass executions", "emphasis": true }
+      ]
+    }
+  }
+}

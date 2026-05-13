@@ -1,0 +1,27 @@
+{
+  "question_text": "In the circle shown below with centre O, chord AB subtends an angle of 100 degrees at the centre. What is the angle subtended by the same chord at a point on the major arc?",
+  "question_type": "multiple_choice",
+  "options": { "A": "30", "B": "40", "C": "50", "D": "60" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The angle subtended at the centre is twice the angle subtended at any point on the major arc, so the answer is half of 100.",
+    "common_mistakes": ["Doubling instead of halving the central angle."],
+    "related_concept": "Angle subtended by a chord at the centre and at the circumference"
+  },
+  "visual": {
+    "caption": "Circle with chord AB and centre O.",
+    "altText": "A circle with labelled centre O, a chord AB drawn across the lower half, and a point P marked on the upper arc.",
+    "spec": {
+      "kind": "math_geometry",
+      "view": { "xMin": -4, "xMax": 4, "yMin": -4, "yMax": 4, "showGrid": false, "showAxes": false },
+      "primitives": [
+        { "type": "circle", "center": { "x": 0, "y": 0 }, "radius": 3, "label": null },
+        { "type": "point", "at": { "x": 0, "y": 0 }, "label": "O" },
+        { "type": "point", "at": { "x": -2.5, "y": -1.5 }, "label": "A" },
+        { "type": "point", "at": { "x": 2.5, "y": -1.5 }, "label": "B" },
+        { "type": "point", "at": { "x": 0, "y": 3 }, "label": "P" },
+        { "type": "segment", "from": { "x": -2.5, "y": -1.5 }, "to": { "x": 2.5, "y": -1.5 }, "label": "chord", "dashed": false }
+      ]
+    }
+  }
+}

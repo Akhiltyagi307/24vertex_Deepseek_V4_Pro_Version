@@ -1,0 +1,27 @@
+{
+  "question_text": "From the bar chart shown below of India's poverty ratio across years, in which year was poverty the lowest?",
+  "question_type": "multiple_choice",
+  "options": { "A": "1973", "B": "1993", "C": "2004", "D": "2011" },
+  "answer_key": {
+    "correct_answer": "D",
+    "explanation": "The shortest bar in the chart corresponds to the most recent year.",
+    "common_mistakes": ["Picking the earliest year as the lowest."],
+    "related_concept": "Decline in poverty ratio over time"
+  },
+  "visual": {
+    "caption": "Poverty ratio bar chart for India.",
+    "altText": "A vertical bar chart with four bars whose heights decrease from left to right across decades.",
+    "spec": {
+      "kind": "statistics_chart",
+      "subKind": "bar",
+      "xLabel": "Year",
+      "yLabel": "Poverty ratio (percent)",
+      "bins": [
+        { "label": "1973", "frequency": 55 },
+        { "label": "1993", "frequency": 36 },
+        { "label": "2004", "frequency": 27 },
+        { "label": "2011", "frequency": 21 }
+      ]
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "question_text": "From the wave diagram shown below of a sound wave, identify the property labelled at marker M.",
+  "question_type": "multiple_choice",
+  "options": { "A": "Wavelength", "B": "Amplitude", "C": "Time period", "D": "Frequency" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Marker M spans one full compression-to-compression distance, which is the wavelength.",
+    "common_mistakes": ["Confusing wavelength with amplitude."],
+    "related_concept": "Properties of a longitudinal sound wave"
+  },
+  "visual": {
+    "caption": "Sound wave with property marker.",
+    "altText": "A longitudinal wave sketch with one labelled marker spanning the distance between two consecutive compressions.",
+    "spec": {
+      "kind": "physics_wave_diagram",
+      "waveType": "longitudinal",
+      "title": "Sound wave",
+      "xMin": 0,
+      "xMax": 12,
+      "amplitude": 1,
+      "wavelength": 4,
+      "markers": [
+        { "x": 2, "label": "M-start" },
+        { "x": 6, "label": "M-end" }
+      ]
+    }
+  }
+}

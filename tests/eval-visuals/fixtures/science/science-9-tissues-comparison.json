@@ -1,0 +1,27 @@
+{
+  "question_text": "From the diagram shown below comparing plant tissues, which labelled region is the parenchyma?",
+  "question_type": "multiple_choice",
+  "options": { "A": "L1", "B": "L2", "C": "L3", "D": "L4" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "L1 is the thin-walled, loosely packed region typical of parenchyma.",
+    "common_mistakes": ["Confusing parenchyma with collenchyma at corners."],
+    "related_concept": "Plant tissues (parenchyma, collenchyma, sclerenchyma)"
+  },
+  "visual": {
+    "caption": "Plant tissue regions labelled for identification.",
+    "altText": "A stem cross-section drawing with four labelled regions showing different cell wall thicknesses and arrangements.",
+    "spec": {
+      "kind": "biology_diagram",
+      "subKind": "cell",
+      "title": "Plant tissue panel",
+      "labels": [
+        { "id": "l1", "text": "L1", "x": 25, "y": 25 },
+        { "id": "l2", "text": "L2", "x": 70, "y": 25 },
+        { "id": "l3", "text": "L3", "x": 25, "y": 70 },
+        { "id": "l4", "text": "L4", "x": 70, "y": 70 }
+      ],
+      "notes": ["Each label marks a different tissue region in the panel."]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "question_text": "From the table shown below of electron shell distributions, identify the element whose K and L shells are full but M shell holds only one electron.",
+  "question_type": "multiple_choice",
+  "options": { "A": "Helium", "B": "Neon", "C": "Sodium", "D": "Argon" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "K = 2 and L = 8 fill those shells; one electron in M gives atomic number 11.",
+    "common_mistakes": ["Confusing sodium with neon when both have a filled L shell."],
+    "related_concept": "Electron distribution in shells (2n^2 rule)"
+  },
+  "visual": {
+    "caption": "Electron shell distribution lookup.",
+    "altText": "A table listing several elements and the number of electrons in each of the K, L, and M shells for that element.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Shell distribution",
+      "headers": ["Element", "K", "L", "M"],
+      "rows": [
+        [ { "value": "Helium", "bold": false, "align": "left" }, { "value": "2", "bold": false, "align": "right" }, { "value": "0", "bold": false, "align": "right" }, { "value": "0", "bold": false, "align": "right" } ],
+        [ { "value": "Neon", "bold": false, "align": "left" }, { "value": "2", "bold": false, "align": "right" }, { "value": "8", "bold": false, "align": "right" }, { "value": "0", "bold": false, "align": "right" } ],
+        [ { "value": "Sodium", "bold": false, "align": "left" }, { "value": "2", "bold": false, "align": "right" }, { "value": "8", "bold": false, "align": "right" }, { "value": "1", "bold": false, "align": "right" } ],
+        [ { "value": "Argon", "bold": false, "align": "left" }, { "value": "2", "bold": false, "align": "right" }, { "value": "8", "bold": false, "align": "right" }, { "value": "8", "bold": false, "align": "right" } ]
+      ]
+    }
+  }
+}

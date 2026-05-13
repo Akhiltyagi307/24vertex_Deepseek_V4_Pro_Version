@@ -1,0 +1,26 @@
+{
+  "question_text": "Read the passage given below. What emotion does the child seem to feel as the procession moves on without him?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Joy", "B": "Curiosity", "C": "Fear", "D": "Boredom" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The narrator describes the child as suddenly lost, looking around for parents who are no longer in sight.",
+    "common_mistakes": ["Reading the wonder of the fair as joy rather than fear."],
+    "related_concept": "Inferring emotion from a narrative extract"
+  },
+  "visual": {
+    "caption": "Numbered extract from a Moments short story.",
+    "altText": "A four-line numbered passage from a short story describing a child separated from his parents at a fair.",
+    "spec": {
+      "kind": "english_passage",
+      "title": "Lost at the fair",
+      "source": "Adapted from a Moments short story",
+      "lines": [
+        { "number": 1, "text": "The procession moved on but the child stood still." },
+        { "number": 2, "text": "There were men on horses, kings and dancers in the parade," },
+        { "number": 3, "text": "but the child saw none of them now —" },
+        { "number": 4, "text": "his parents were nowhere in the crowd." }
+      ]
+    }
+  }
+}

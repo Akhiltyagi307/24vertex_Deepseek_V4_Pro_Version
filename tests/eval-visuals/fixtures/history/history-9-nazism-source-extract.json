@@ -1,0 +1,26 @@
+{
+  "question_text": "Read the source extract shown below. The extract most directly reflects which idea?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Pacifist diplomacy", "B": "Territorial expansion as a national right", "C": "Free trade union activism", "D": "Restoration of monarchy" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The author argues that nations must acquire territory by strength, reflecting an expansionist worldview.",
+    "common_mistakes": ["Choosing pacifism despite the extract's emphasis on conquest."],
+    "related_concept": "Nazi worldview on Lebensraum"
+  },
+  "visual": {
+    "caption": "Source extract for interpretation.",
+    "altText": "A three-line numbered source extract attributed to an unnamed political pamphlet, with each line on a separate row.",
+    "spec": {
+      "kind": "source_extract",
+      "title": "Political pamphlet",
+      "source": "Adapted for assessment",
+      "context": "Read the lines before answering.",
+      "lines": [
+        { "number": 1, "text": "The earth is not allotted to anyone, nor is it presented as a gift." },
+        { "number": 2, "text": "It is given to peoples who have the courage to take it," },
+        { "number": 3, "text": "and the strength to hold what they have taken." }
+      ]
+    }
+  }
+}

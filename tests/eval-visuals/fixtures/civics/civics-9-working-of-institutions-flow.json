@@ -1,0 +1,30 @@
+{
+  "question_text": "From the flowchart shown below of the working of Indian government institutions, which body finally implements a policy decision?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Parliament", "B": "Supreme Court", "C": "Cabinet and officials", "D": "Election Commission" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "After the decision is taken by the political executive, the cabinet and government officials implement it.",
+    "common_mistakes": ["Choosing Parliament, which legislates but does not implement."],
+    "related_concept": "Working of Indian institutions"
+  },
+  "visual": {
+    "caption": "Institutional decision flow in India.",
+    "altText": "A flowchart with four boxes connected by arrows showing the path from legislative debate to enforcement.",
+    "spec": {
+      "kind": "flowchart",
+      "title": "Working of institutions",
+      "nodes": [
+        { "id": "parliament", "label": "Parliament debates the law", "detail": null, "kind": "start" },
+        { "id": "executive", "label": "Political executive decides", "detail": null, "kind": "process" },
+        { "id": "officials", "label": "Cabinet and officials implement", "detail": null, "kind": "outcome" },
+        { "id": "court", "label": "Judiciary reviews if challenged", "detail": null, "kind": "decision" }
+      ],
+      "edges": [
+        { "from": "parliament", "to": "executive", "label": null },
+        { "from": "executive", "to": "officials", "label": null },
+        { "from": "officials", "to": "court", "label": "if challenged" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "question_text": "From the table shown below of Bengal rice availability, in which year did total availability fall most sharply compared to the previous year?",
+  "question_type": "multiple_choice",
+  "options": { "A": "1939", "B": "1940", "C": "1941", "D": "1943" },
+  "answer_key": {
+    "correct_answer": "C",
+    "explanation": "The row for that year shows the largest drop in total availability versus the previous year's figure.",
+    "common_mistakes": ["Looking at production alone instead of total availability."],
+    "related_concept": "Food availability and the Bengal famine"
+  },
+  "visual": {
+    "caption": "Bengal rice availability record.",
+    "altText": "A four-column table listing yearly production, imports, exports, and total availability in lakh tonnes.",
+    "spec": {
+      "kind": "data_table",
+      "caption": "Bengal rice (lakh tonnes)",
+      "headers": ["Year", "Production", "Imports", "Total availability"],
+      "rows": [
+        [ { "value": "1938", "bold": false, "align": "left" }, { "value": "85", "bold": false, "align": "right" }, { "value": "0", "bold": false, "align": "right" }, { "value": "85", "bold": false, "align": "right" } ],
+        [ { "value": "1939", "bold": false, "align": "left" }, { "value": "79", "bold": false, "align": "right" }, { "value": "4", "bold": false, "align": "right" }, { "value": "83", "bold": false, "align": "right" } ],
+        [ { "value": "1940", "bold": false, "align": "left" }, { "value": "82", "bold": false, "align": "right" }, { "value": "3", "bold": false, "align": "right" }, { "value": "85", "bold": false, "align": "right" } ],
+        [ { "value": "1941", "bold": false, "align": "left" }, { "value": "68", "bold": false, "align": "right" }, { "value": "2", "bold": false, "align": "right" }, { "value": "70", "bold": false, "align": "right" } ],
+        [ { "value": "1943", "bold": false, "align": "left" }, { "value": "76", "bold": false, "align": "right" }, { "value": "3", "bold": false, "align": "right" }, { "value": "79", "bold": false, "align": "right" } ]
+      ]
+    }
+  }
+}

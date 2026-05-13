@@ -1,0 +1,20 @@
+{
+  "question_text": "Use the map shown below. The shaded states lie within the basin of which Himalayan river?",
+  "question_type": "multiple_choice",
+  "options": { "A": "Indus", "B": "Ganga", "C": "Brahmaputra", "D": "Godavari" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "The basin spans the central northern plains crossing several states from west to east.",
+    "common_mistakes": ["Choosing Indus for the central basin region."],
+    "related_concept": "Major river basins of India"
+  },
+  "visual": {
+    "caption": "India outline with basin states shaded.",
+    "altText": "A political outline of India with a band of states across the northern plains shaded for the question.",
+    "spec": {
+      "kind": "india_map",
+      "mapStyle": "outline",
+      "highlightedStates": ["uttarakhand", "uttar-pradesh", "bihar", "jharkhand", "west-bengal"]
+    }
+  }
+}
