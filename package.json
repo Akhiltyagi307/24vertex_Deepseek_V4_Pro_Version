@@ -35,6 +35,8 @@
     "preview:emails": "NODE_OPTIONS=\"--require ./scripts/_preview-cjs-loader.cjs\" tsx scripts/preview-emails.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:sync:topic-context-chunks": "node scripts/sync-topic-context-chunks.mjs",
+    "db:sync:topics": "node scripts/sync-topics.mjs",
     "db:repair-profile-prefs": "node scripts/repair-drifted-profile-prefs.mjs",
     "db:repair-profiles-pdr": "node scripts/repair-profiles-pdr-columns.mjs",
     "db:reconcile-migration-ledger": "node -r dotenv/config scripts/reconcile-supabase-migration-ledger.mjs dotenv_config_path=.env.local",

@@ -683,7 +683,7 @@ export type PracticeGenerationPreambleContext = {
 /** Appended to every subject preamble so chunk alignment is never dropped in long templates. */
 const CHUNK_ALIGNMENT_FOOTER = `## Chunk alignment
 
-Prioritise scenarios, numeric values, and problem shapes that appear or are implied in \`topic_grounding\` for each item's \`topic_id\`. When \`exercise_chunks\` show a standard diagram or drill pattern, prefer parallel items over generic substitutes. Paraphrase wording; keep content traceable to the supplied chunks and consistent with \`curriculum_hint\` (do not contradict unit/chapter/grade).
+Prioritise scenarios, numeric values, and problem shapes that appear or are implied in \`topic_grounding\` for each item's \`topic_id\`. When \`exercise_chunks\` or \`question_bank_chunks\` show a standard diagram or drill pattern, prefer parallel items over generic substitutes. Paraphrase wording; keep content traceable to the supplied chunks and consistent with \`curriculum_hint\` (do not contradict unit/chapter/grade).
 
 ## Visual precedence
 

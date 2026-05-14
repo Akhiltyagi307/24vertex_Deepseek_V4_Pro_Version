@@ -19,6 +19,10 @@ function line(text: string, source: string | null = null): PracticeTopicChunkLin
 	return { text, source_ref: source };
 }
 
+function fixedRandom(value: number): () => number {
+	return () => value;
+}
+
 describe("sortRawChunksByTopicThenCreated", () => {
 	it("orders by topicOrder then created_at ascending within a topic", () => {
 		const tid = T1;
@@ -45,10 +49,14 @@ describe("sortRawChunksByTopicThenCreated", () => {
 
 describe("applyTopicContextLimits", () => {
 	it("splits by max chunks per topic", () => {
-		const raw = new Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>();
+		const raw = new Map<
+			string,
+			{ context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[]; questionBank: PracticeTopicChunkLine[] }
+		>();
 		raw.set(T1, {
 			context: Array.from({ length: 20 }, (_, i) => line(`c${i}`)),
 			exercise: [],
+			questionBank: [],
 		});
 		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1], {
 			...TOPIC_CONTEXT_DEFAULT_LIMITS,
@@ -64,6 +72,7 @@ describe("applyTopicContextLimits", () => {
 		raw.set(T1, {
 			context: [line("ab"), line("cd"), line("ef")],
 			exercise: [],
+			questionBank: [],
 		});
 		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1], {
 			...TOPIC_CONTEXT_DEFAULT_LIMITS,
@@ -76,8 +85,8 @@ describe("applyTopicContextLimits", () => {
 
 	it("trims globally from last topic in order", () => {
 		const raw = new Map();
-		raw.set(T1, { context: [line("aaaa")], exercise: [] });
-		raw.set(T2, { context: [line("bbbb")], exercise: [] });
+		raw.set(T1, { context: [line("aaaa")], exercise: [], questionBank: [] });
+		raw.set(T2, { context: [line("bbbb")], exercise: [], questionBank: [] });
 		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1, T2], {
 			...TOPIC_CONTEXT_DEFAULT_LIMITS,
 			maxContextChunksPerTopic: 5,
@@ -86,6 +95,41 @@ describe("applyTopicContextLimits", () => {
 		});
 		expect(byTopic.get(T1)!.context).toHaveLength(1);
 		expect(byTopic.get(T2)!.context).toHaveLength(0);
+		expect(truncated).toBe(true);
+	});
+
+	it("randomizes exercise and question-bank chunks before applying per-topic caps", () => {
+		const raw = new Map<
+			string,
+			{ context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[]; questionBank: PracticeTopicChunkLine[] }
+		>();
+		raw.set(T1, {
+			context: [line("ctx0"), line("ctx1"), line("ctx2")],
+			exercise: [line("ex0"), line("ex1"), line("ex2"), line("ex3")],
+			questionBank: Array.from({ length: 7 }, (_, i) => line(`qb${i}`)),
+		});
+
+		const { byTopic, truncated } = applyTopicContextLimits(
+			raw,
+			[T1],
+			{
+				...TOPIC_CONTEXT_DEFAULT_LIMITS,
+				maxExerciseChunksPerTopic: 2,
+				maxQuestionBankChunksPerTopic: 5,
+				maxContextCharsPerTopic: 1_000_000,
+				maxExerciseCharsPerTopic: 1_000_000,
+				maxQuestionBankCharsPerTopic: 1_000_000,
+				maxTotalContextChars: 1_000_000,
+				maxTotalExerciseChars: 1_000_000,
+				maxTotalQuestionBankChars: 1_000_000,
+			},
+			{ random: fixedRandom(0) },
+		);
+
+		const pack = byTopic.get(T1)!;
+		expect(pack.context.map((c) => c.text)).toEqual(["ctx0", "ctx1", "ctx2"]);
+		expect(pack.exercise.map((c) => c.text)).toEqual(["ex1", "ex2"]);
+		expect(pack.questionBank.map((c) => c.text)).toEqual(["qb1", "qb2", "qb3", "qb4", "qb5"]);
 		expect(truncated).toBe(true);
 	});
 });
@@ -110,14 +154,23 @@ describe("buildPracticeUserMessage with preFetchedTopicContext", () => {
 	it("merges pre-fetched chunks by topic_id", () => {
 		const pre: PreFetchedTopicContext = {
 			byTopic: new Map([
-				[T1, { context: [line("ctx1", "p.1")], exercise: [line("ex1", "q.2")] }],
+				[
+					T1,
+					{
+						context: [line("ctx1", "p.1")],
+						exercise: [line("ex1", "q.2")],
+						questionBank: [line("qb1", "bank.1")],
+					},
+				],
 			]),
 			meta: {
 				topic_count: 1,
 				context_chunk_count: 1,
 				exercise_chunk_count: 1,
+				question_bank_chunk_count: 1,
 				context_char_total: 4,
 				exercise_char_total: 3,
+				question_bank_char_total: 3,
 				truncated: false,
 			},
 		};
@@ -131,6 +184,8 @@ describe("buildPracticeUserMessage with preFetchedTopicContext", () => {
 		});
 		expect(msg.topic_grounding[0]!.content_chunks).toEqual([{ text: "ctx1", source_ref: "p.1" }]);
 		expect(msg.topic_grounding[0]!.exercise_chunks).toEqual([{ text: "ex1", source_ref: "q.2" }]);
+		expect(msg.topic_grounding[0]!.question_bank_chunks).toEqual([{ text: "qb1", source_ref: "bank.1" }]);
 		expect(msg.grounding_meta.context_chunk_count).toBe(1);
+		expect(msg.grounding_meta.question_bank_chunk_count).toBe(1);
 	});
 });

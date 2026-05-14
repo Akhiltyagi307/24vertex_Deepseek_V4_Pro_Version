@@ -795,7 +795,13 @@ async function runPracticeGenerationAfterResolveCore(
 	});
 
 	const gmeta = preFetchedTopicContext.meta;
-	if (!gmeta.fetch_error && gmeta.topic_count > 0 && gmeta.context_chunk_count === 0 && gmeta.exercise_chunk_count === 0) {
+	if (
+		!gmeta.fetch_error &&
+		gmeta.topic_count > 0 &&
+		gmeta.context_chunk_count === 0 &&
+		gmeta.exercise_chunk_count === 0 &&
+		gmeta.question_bank_chunk_count === 0
+	) {
 		void recordPracticeEvent(
 			supabase,
 			"practice_topic_context_empty",
@@ -816,6 +822,7 @@ async function runPracticeGenerationAfterResolveCore(
 				context_quality: gmeta.context_quality,
 				context_chunks: gmeta.context_chunk_count,
 				exercise_chunks: gmeta.exercise_chunk_count,
+				question_bank_chunks: gmeta.question_bank_chunk_count,
 				correlation_id: correlationId,
 				generation_run_id: generationRunId,
 			},

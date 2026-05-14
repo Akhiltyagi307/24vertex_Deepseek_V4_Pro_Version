@@ -1,7 +1,7 @@
 import type { PracticeGenerationOutput } from "./generation-schema";
 import type { PracticeTopicGrounding } from "./user-message";
 
-export type PracticeTopicEvidenceKind = "content" | "exercise";
+export type PracticeTopicEvidenceKind = "content" | "exercise" | "question_bank";
 
 export type PracticeTopicEvidenceItem = {
 	ref: string;
@@ -49,10 +49,11 @@ function clampEvidenceItems(
 
 export function buildPracticeEvidenceMap(
 	topicGrounding: PracticeTopicGrounding[],
-	limits: { maxContentPerTopic?: number; maxExercisePerTopic?: number } = {},
+	limits: { maxContentPerTopic?: number; maxExercisePerTopic?: number; maxQuestionBankPerTopic?: number } = {},
 ): PracticeEvidenceMap {
 	const maxContent = limits.maxContentPerTopic ?? 4;
 	const maxExercise = limits.maxExercisePerTopic ?? 3;
+	const maxQuestionBank = limits.maxQuestionBankPerTopic ?? 3;
 	const map: PracticeEvidenceMap = new Map();
 
 	for (const topic of topicGrounding) {
@@ -68,6 +69,12 @@ export function buildPracticeEvidenceMap(
 			topic.topic_id,
 			Math.max(0, maxExercise),
 		);
+		const questionBankItems = clampEvidenceItems(
+			topic.question_bank_chunks,
+			"question_bank",
+			topic.topic_id,
+			Math.max(0, maxQuestionBank),
+		);
 		map.set(topic.topic_id, {
 			topic_id: topic.topic_id,
 			topic_name: topic.topic_name,
@@ -76,7 +83,7 @@ export function buildPracticeEvidenceMap(
 				chapter_name: topic.curriculum_hint.chapter_name,
 				grade: topic.curriculum_hint.grade,
 			},
-			items: [...contentItems, ...exerciseItems],
+			items: [...contentItems, ...exerciseItems, ...questionBankItems],
 		});
 	}
 	return map;

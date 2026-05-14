@@ -60,8 +60,10 @@ export type PracticeGroundingMeta = {
 	topic_count: number;
 	context_chunk_count: number;
 	exercise_chunk_count: number;
+	question_bank_chunk_count: number;
 	context_char_total: number;
 	exercise_char_total: number;
+	question_bank_char_total: number;
 	truncated: boolean;
 	fetch_error?: string;
 	/**
@@ -77,7 +79,10 @@ export type PracticeGroundingMeta = {
 export type PracticeGroundingMetaForModel = Omit<PracticeGroundingMeta, "fetch_error">;
 
 export type PreFetchedTopicContext = {
-	byTopic: Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>;
+	byTopic: Map<
+		string,
+		{ context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[]; questionBank: PracticeTopicChunkLine[] }
+	>;
 	meta: PracticeGroundingMeta;
 };
 
@@ -87,6 +92,7 @@ export type PracticeTopicGrounding = {
 	curriculum_hint: { unit_name: string; chapter_name: string; grade: number };
 	content_chunks: PracticeTopicChunkLine[];
 	exercise_chunks: PracticeTopicChunkLine[];
+	question_bank_chunks: PracticeTopicChunkLine[];
 };
 
 /**
@@ -225,16 +231,18 @@ function defaultGroundingMeta(topicCount: number): PracticeGroundingMeta {
 		topic_count: topicCount,
 		context_chunk_count: 0,
 		exercise_chunk_count: 0,
+		question_bank_chunk_count: 0,
 		context_char_total: 0,
 		exercise_char_total: 0,
+		question_bank_char_total: 0,
 		truncated: false,
 		context_quality: topicCount === 0 ? "ok" : "no_context",
 	};
 }
 
 const CONTEXT_QUALITY_INSTRUCTION: Record<NonNullable<PracticeGroundingMeta["context_quality"]>, string> = {
-	ok: "Curriculum context is available for the selected topics. Ground items in `topic_grounding.content_chunks` and `topic_grounding.exercise_chunks` where it materially helps.",
-	low_context: "Several selected topics have empty `content_chunks` and `exercise_chunks`. For those topics, stick to NCERT-style outcomes implied by `curriculum_hint` and AVOID inventing specific named examples, dates, or formulae you cannot verify.",
+	ok: "Curriculum/question-bank context is available for the selected topics. Ground items in `topic_grounding.content_chunks`, `topic_grounding.exercise_chunks`, and `topic_grounding.question_bank_chunks` where it materially helps.",
+	low_context: "Several selected topics have empty `content_chunks`, `exercise_chunks`, and `question_bank_chunks`. For those topics, stick to NCERT-style outcomes implied by `curriculum_hint` and AVOID inventing specific named examples, dates, or formulae you cannot verify.",
 	no_context: "ALL selected topics have empty grounding chunks. You are working from `curriculum_hint` only — keep questions at conceptual / definition level and AVOID specific case studies, named experiments, or numeric data that depend on a textbook source. If a question can't be written safely, prefer a simpler conceptual variant.",
 };
 
@@ -340,7 +348,7 @@ export function buildPracticeUserMessage(input: {
 	const pre = input.preFetchedTopicContext;
 
 	const topic_grounding: PracticeTopicGrounding[] = input.topics.map((t) => {
-		const pack = pre?.byTopic.get(t.topicId) ?? { context: [], exercise: [] };
+		const pack = pre?.byTopic.get(t.topicId) ?? { context: [], exercise: [], questionBank: [] };
 		return {
 			topic_id: t.topicId,
 			topic_name: t.topicName,
@@ -351,6 +359,7 @@ export function buildPracticeUserMessage(input: {
 			},
 			content_chunks: pack.context,
 			exercise_chunks: pack.exercise,
+			question_bank_chunks: pack.questionBank,
 		};
 	});
 
@@ -358,7 +367,10 @@ export function buildPracticeUserMessage(input: {
 	const contextQualityKey = grounding_meta.context_quality ?? "ok";
 	const contextQualityInstruction = CONTEXT_QUALITY_INSTRUCTION[contextQualityKey];
 	const hasTopicChunks =
-		(grounding_meta.context_chunk_count ?? 0) + (grounding_meta.exercise_chunk_count ?? 0) > 0;
+		(grounding_meta.context_chunk_count ?? 0) +
+			(grounding_meta.exercise_chunk_count ?? 0) +
+			(grounding_meta.question_bank_chunk_count ?? 0) >
+		0;
 
 	const focusArea = input.focusArea ?? "all";
 	const focusAreaInstruction = FOCUS_AREA_INSTRUCTION[focusArea];
@@ -485,7 +497,7 @@ export function toPracticeUserMessageForModel(payload: PracticeUserMessagePayloa
 }
 
 /**
- * Strip empty arrays inside `topic_grounding[].content_chunks`/`exercise_chunks`
+ * Strip empty arrays inside `topic_grounding[].content_chunks`/`exercise_chunks`/`question_bank_chunks`
  * and any per-topic null fields before sending to the model. This keeps the
  * server-stored payload identical (DB still gets the full shape via
  * `stringifyPracticeUserMessage`) but trims tokens on the model-bound copy.
@@ -502,6 +514,7 @@ export function compactPayloadForModel(payload: PracticeUserMessageForModel): Pr
 		};
 		if (topic.content_chunks.length > 0) out.content_chunks = topic.content_chunks;
 		if (topic.exercise_chunks.length > 0) out.exercise_chunks = topic.exercise_chunks;
+		if (topic.question_bank_chunks.length > 0) out.question_bank_chunks = topic.question_bank_chunks;
 		return out as PracticeTopicGrounding;
 	});
 	clone.topics = clone.topics.map((t) => {

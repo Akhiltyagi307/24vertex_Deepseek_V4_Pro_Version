@@ -15,19 +15,31 @@ import type { PracticeGroundingMeta, PracticeTopicChunkLine, PreFetchedTopicCont
 export const TOPIC_CONTEXT_DEFAULT_LIMITS = {
 	maxContextChunksPerTopic: 33,
 	maxExerciseChunksPerTopic: 28,
+	maxQuestionBankChunksPerTopic: 5,
 	maxContextCharsPerTopic: 16_500,
 	maxExerciseCharsPerTopic: 13_200,
+	maxQuestionBankCharsPerTopic: 12_000,
 	maxTotalContextChars: 88_000,
 	maxTotalExerciseChars: 66_000,
+	maxTotalQuestionBankChars: 40_000,
 } as const;
 
 export type TopicContextLimits = {
 	maxContextChunksPerTopic: number;
 	maxExerciseChunksPerTopic: number;
+	maxQuestionBankChunksPerTopic: number;
 	maxContextCharsPerTopic: number;
 	maxExerciseCharsPerTopic: number;
+	maxQuestionBankCharsPerTopic: number;
 	maxTotalContextChars: number;
 	maxTotalExerciseChars: number;
+	maxTotalQuestionBankChars: number;
+};
+
+type TopicChunkBuckets = {
+	context: PracticeTopicChunkLine[];
+	exercise: PracticeTopicChunkLine[];
+	questionBank: PracticeTopicChunkLine[];
 };
 
 const DEFAULT_LIMITS: TopicContextLimits = { ...TOPIC_CONTEXT_DEFAULT_LIMITS };
@@ -58,6 +70,11 @@ export function getTopicContextLimitsFromEnv(): TopicContextLimits {
 			DEFAULT_LIMITS.maxExerciseChunksPerTopic,
 			10_000,
 		),
+		maxQuestionBankChunksPerTopic: parseEnvPositiveInt(
+			"PRACTICE_TOPIC_CONTEXT_MAX_QUESTION_BANK_CHUNKS_PER_TOPIC",
+			DEFAULT_LIMITS.maxQuestionBankChunksPerTopic,
+			10_000,
+		),
 		maxContextCharsPerTopic: parseEnvPositiveInt(
 			"PRACTICE_TOPIC_CONTEXT_MAX_CONTEXT_CHARS_PER_TOPIC",
 			DEFAULT_LIMITS.maxContextCharsPerTopic,
@@ -68,6 +85,11 @@ export function getTopicContextLimitsFromEnv(): TopicContextLimits {
 			DEFAULT_LIMITS.maxExerciseCharsPerTopic,
 			ENV_LIMIT_CEILING,
 		),
+		maxQuestionBankCharsPerTopic: parseEnvPositiveInt(
+			"PRACTICE_TOPIC_CONTEXT_MAX_QUESTION_BANK_CHARS_PER_TOPIC",
+			DEFAULT_LIMITS.maxQuestionBankCharsPerTopic,
+			ENV_LIMIT_CEILING,
+		),
 		maxTotalContextChars: parseEnvPositiveInt(
 			"PRACTICE_TOPIC_CONTEXT_MAX_TOTAL_CONTEXT_CHARS",
 			DEFAULT_LIMITS.maxTotalContextChars,
@@ -76,6 +98,11 @@ export function getTopicContextLimitsFromEnv(): TopicContextLimits {
 		maxTotalExerciseChars: parseEnvPositiveInt(
 			"PRACTICE_TOPIC_CONTEXT_MAX_TOTAL_EXERCISE_CHARS",
 			DEFAULT_LIMITS.maxTotalExerciseChars,
+			ENV_LIMIT_CEILING,
+		),
+		maxTotalQuestionBankChars: parseEnvPositiveInt(
+			"PRACTICE_TOPIC_CONTEXT_MAX_TOTAL_QUESTION_BANK_CHARS",
+			DEFAULT_LIMITS.maxTotalQuestionBankChars,
 			ENV_LIMIT_CEILING,
 		),
 	};
@@ -115,21 +142,36 @@ function charSum(lines: PracticeTopicChunkLine[]): number {
 	return lines.reduce((a, c) => a + c.text.length, 0);
 }
 
+function shuffleCopy<T>(arr: T[], random: () => number): T[] {
+	const out = [...arr];
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = Math.floor(random() * (i + 1));
+		[out[i], out[j]] = [out[j]!, out[i]!];
+	}
+	return out;
+}
+
 /**
  * Per-topic cap (chunk count + char budget), then global char trim by dropping
  * from the end of the last topics (canonical order preserved for remaining chunks).
  * Exported for unit tests.
  */
 export function applyTopicContextLimits(
-	raw: Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>,
+	raw: Map<string, TopicChunkBuckets>,
 	topicOrder: string[],
 	limits: TopicContextLimits = DEFAULT_LIMITS,
-): { byTopic: Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>; truncated: boolean } {
-	const byTopic = new Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>();
+	options: { random?: () => number } = {},
+): { byTopic: Map<string, TopicChunkBuckets>; truncated: boolean } {
+	const byTopic = new Map<string, TopicChunkBuckets>();
+	const random = options.random ?? Math.random;
 
 	for (const tid of topicOrder) {
-		const b = raw.get(tid) ?? { context: [], exercise: [] };
-		byTopic.set(tid, { context: [...b.context], exercise: [...b.exercise] });
+		const b = raw.get(tid) ?? { context: [], exercise: [], questionBank: [] };
+		byTopic.set(tid, {
+			context: [...b.context],
+			exercise: shuffleCopy(b.exercise, random),
+			questionBank: shuffleCopy(b.questionBank, random),
+		});
 	}
 
 	let truncated = false;
@@ -160,9 +202,14 @@ export function applyTopicContextLimits(
 
 		b.context = capList(b.context, limits.maxContextChunksPerTopic, limits.maxContextCharsPerTopic);
 		b.exercise = capList(b.exercise, limits.maxExerciseChunksPerTopic, limits.maxExerciseCharsPerTopic);
+		b.questionBank = capList(
+			b.questionBank,
+			limits.maxQuestionBankChunksPerTopic,
+			limits.maxQuestionBankCharsPerTopic,
+		);
 	}
 
-	const trimGlobal = (kind: "context" | "exercise", maxGlobal: number) => {
+	const trimGlobal = (kind: keyof TopicChunkBuckets, maxGlobal: number) => {
 		let total = 0;
 		for (const tid of topicOrder) {
 			const b = byTopic.get(tid);
@@ -184,29 +231,34 @@ export function applyTopicContextLimits(
 
 	trimGlobal("context", limits.maxTotalContextChars);
 	trimGlobal("exercise", limits.maxTotalExerciseChars);
+	trimGlobal("questionBank", limits.maxTotalQuestionBankChars);
 
 	return { byTopic, truncated };
 }
 
 function buildMeta(
-	byTopic: Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>,
+	byTopic: Map<string, TopicChunkBuckets>,
 	topicOrder: string[],
 	truncated: boolean,
 	fetchError?: string,
 ): PracticeGroundingMeta {
 	let contextChunkCount = 0;
 	let exerciseChunkCount = 0;
+	let questionBankChunkCount = 0;
 	let contextCharTotal = 0;
 	let exerciseCharTotal = 0;
+	let questionBankCharTotal = 0;
 	let topicsWithAnyChunk = 0;
 	for (const tid of topicOrder) {
 		const b = byTopic.get(tid);
 		if (!b) continue;
 		contextChunkCount += b.context.length;
 		exerciseChunkCount += b.exercise.length;
+		questionBankChunkCount += b.questionBank.length;
 		contextCharTotal += charSum(b.context);
 		exerciseCharTotal += charSum(b.exercise);
-		if (b.context.length > 0 || b.exercise.length > 0) topicsWithAnyChunk++;
+		questionBankCharTotal += charSum(b.questionBank);
+		if (b.context.length > 0 || b.exercise.length > 0 || b.questionBank.length > 0) topicsWithAnyChunk++;
 	}
 	const totalTopics = topicOrder.length;
 	const context_quality: PracticeGroundingMeta["context_quality"] =
@@ -218,8 +270,10 @@ function buildMeta(
 		topic_count: totalTopics,
 		context_chunk_count: contextChunkCount,
 		exercise_chunk_count: exerciseChunkCount,
+		question_bank_chunk_count: questionBankChunkCount,
 		context_char_total: contextCharTotal,
 		exercise_char_total: exerciseCharTotal,
+		question_bank_char_total: questionBankCharTotal,
 		truncated,
 		context_quality,
 		...(fetchError ? { fetch_error: fetchError } : {}),
@@ -236,15 +290,17 @@ export function logPracticeTopicContextStats(meta: PracticeGroundingMeta, contex
 			topic_count: meta.topic_count,
 			context_chunks: meta.context_chunk_count,
 			exercise_chunks: meta.exercise_chunk_count,
+			question_bank_chunks: meta.question_bank_chunk_count,
 			context_chars: meta.context_char_total,
 			exercise_chars: meta.exercise_char_total,
+			question_bank_chars: meta.question_bank_char_total,
 			truncated: meta.truncated,
 			fetch_error: meta.fetch_error ?? null,
 		});
 		return;
 	}
 	console.info(
-		`[${context}] topic_count=${meta.topic_count} context_chunks=${meta.context_chunk_count} exercise_chunks=${meta.exercise_chunk_count} context_chars=${meta.context_char_total} exercise_chars=${meta.exercise_char_total} truncated=${meta.truncated}`,
+		`[${context}] topic_count=${meta.topic_count} context_chunks=${meta.context_chunk_count} exercise_chunks=${meta.exercise_chunk_count} question_bank_chunks=${meta.question_bank_chunk_count} context_chars=${meta.context_char_total} exercise_chars=${meta.exercise_char_total} question_bank_chars=${meta.question_bank_char_total} truncated=${meta.truncated}`,
 	);
 }
 
@@ -266,8 +322,10 @@ export async function fetchTopicContextChunksByTopicIds(
 				topic_count: 0,
 				context_chunk_count: 0,
 				exercise_chunk_count: 0,
+				question_bank_chunk_count: 0,
 				context_char_total: 0,
 				exercise_char_total: 0,
+				question_bank_char_total: 0,
 				truncated: false,
 			},
 		};
@@ -289,8 +347,10 @@ export async function fetchTopicContextChunksByTopicIds(
 				topic_count: topicOrder.length,
 				context_chunk_count: 0,
 				exercise_chunk_count: 0,
+				question_bank_chunk_count: 0,
 				context_char_total: 0,
 				exercise_char_total: 0,
+				question_bank_char_total: 0,
 				truncated: false,
 				fetch_error: "query_failed",
 			},
@@ -299,10 +359,10 @@ export async function fetchTopicContextChunksByTopicIds(
 
 	const orderedRows = sortRawChunksByTopicThenCreated((data ?? []) as RawChunk[], topicOrder);
 
-	const raw = new Map<string, { context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[] }>();
+	const raw = new Map<string, TopicChunkBuckets>();
 
 	for (const tid of topicOrder) {
-		raw.set(tid, { context: [], exercise: [] });
+		raw.set(tid, { context: [], exercise: [], questionBank: [] });
 	}
 
 	for (const row of orderedRows) {
@@ -313,6 +373,8 @@ export async function fetchTopicContextChunksByTopicIds(
 			bucket.context.push(line);
 		} else if (row.chunk_type === "exercise") {
 			bucket.exercise.push(line);
+		} else if (row.chunk_type === "question_bank") {
+			bucket.questionBank.push(line);
 		}
 	}
 

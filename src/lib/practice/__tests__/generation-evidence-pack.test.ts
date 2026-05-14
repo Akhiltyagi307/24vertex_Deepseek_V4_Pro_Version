@@ -18,6 +18,7 @@ const TOPIC_GROUNDING: PracticeTopicGrounding[] = [
 			{ text: "Check solution by substitution.", source_ref: "c2" },
 		],
 		exercise_chunks: [{ text: "2x + 3 = 11", source_ref: "e1" }],
+		question_bank_chunks: [{ text: "If 3x - 4 = 8, find x.", source_ref: "qb1" }],
 	},
 	{
 		topic_id: "22222222-2222-2222-2222-222222222222",
@@ -25,6 +26,7 @@ const TOPIC_GROUNDING: PracticeTopicGrounding[] = [
 		curriculum_hint: { unit_name: "Geometry", chapter_name: "Triangles", grade: 9 },
 		content_chunks: [{ text: "Angles in a triangle sum to 180 degrees.", source_ref: "c3" }],
 		exercise_chunks: [],
+		question_bank_chunks: [],
 	},
 ];
 
@@ -36,6 +38,7 @@ describe("generation-evidence-pack", () => {
 			"11111111-1111-1111-1111-111111111111:content:0",
 			"11111111-1111-1111-1111-111111111111:content:1",
 			"11111111-1111-1111-1111-111111111111:exercise:0",
+			"11111111-1111-1111-1111-111111111111:question_bank:0",
 		]);
 	});
 

@@ -404,11 +404,14 @@ export function buildTopicCorpusMap(
 		topic_id: string;
 		content_chunks: ReadonlyArray<{ text: string }>;
 		exercise_chunks: ReadonlyArray<{ text: string }>;
+		question_bank_chunks?: ReadonlyArray<{ text: string }>;
 	}>,
 ): Map<string, string> {
 	const m = new Map<string, string>();
 	for (const t of topicGrounding) {
-		const parts = [...t.content_chunks, ...t.exercise_chunks].map((c) => c.text).join("\n");
+		const parts = [...t.content_chunks, ...t.exercise_chunks, ...(t.question_bank_chunks ?? [])]
+			.map((c) => c.text)
+			.join("\n");
 		m.set(t.topic_id, parts);
 	}
 	return m;

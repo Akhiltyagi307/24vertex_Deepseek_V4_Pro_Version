@@ -405,10 +405,11 @@ ${visualsBlock}
 For each topic, treat the two chunk arrays as a pair with distinct jobs:
 - \`content_chunks\` — NCERT-style explanatory passages. Use them to decide WHAT to ask (concepts, definitions, processes, formulae, named entities).
 - \`exercise_chunks\` — NCERT-style end-of-chapter questions. Use them to decide HOW to ask (register, cadence, command verbs, scaffolding, format conventions).
+- \`question_bank_chunks\` — external practice-bank items. Use them to diversify problem shapes and difficulty, but do not treat their metadata or wording as NCERT source truth.
 
 Rules:
-1. Style imitation. Match the register, cadence, and command-verb family of \`exercise_chunks\` for that topic. The test should sound like the same chapter — paraphrase sentences; do not paste a full chunk line-for-line.
-2. Traceability. Each question must be justifiable from that \`topic_id\`'s \`content_chunks\` / \`exercise_chunks\` when they are non-empty — same concepts, vocabulary tier, and (where chunks give them) numbers and diagram types.
+1. Style imitation. Match the register, cadence, and command-verb family of \`exercise_chunks\` and \`question_bank_chunks\` for that topic. The test should sound like the same chapter — paraphrase sentences; do not paste a full chunk line-for-line.
+2. Traceability. Each question must be justifiable from that \`topic_id\`'s \`content_chunks\` / \`exercise_chunks\` / \`question_bank_chunks\` when they are non-empty — same concepts, vocabulary tier, and (where chunks give them) numbers and diagram types.
 3. Per-topic loyalty. In multi-topic tests, take cues for each item from THAT item's own topic chunks, not from a dominant topic.
 4. Do not import chunk noise. Silently correct typos, OCR artefacts, and stray captions. Imitate intent and register, not accidents.
 5. When \`grounding_meta.context_quality\` is \`low_context\` or \`no_context\`, stay at the conceptual / definition level for affected topics; do not invent specific named examples, dates, formulae, or numeric constants you cannot verify. Still do not contradict \`curriculum_hint\` (unit/chapter/grade).

@@ -36,6 +36,16 @@ env.local
 # Supabase CLI local cache (e.g. version pins); not part of migrations
 supabase/.temp/
 
+# Ad-hoc topic sync tooling output (local only)
+.topic-sync-out/
+.topic-sync-chunks/
+.topic-sync-work/
+.cursor-topic-sync-*.sql
+.topic-sync-chunk.sql
+.topic-sync-upsert-*.sql
+.topic-sync-mcp-arg-*.json
+mcp-payload-*.json
+
 # TypeScript / tooling caches
 *.tsbuildinfo
 .eslintcache

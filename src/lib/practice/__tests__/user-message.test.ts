@@ -173,16 +173,19 @@ describe("buildPracticeUserMessage", () => {
 					{
 						context: [{ text: "Newton's laws describe inertia and force pairs.", source_ref: null }],
 						exercise: [],
+						questionBank: [],
 					},
 				],
-				[TOPICS[1]!.topicId, { context: [], exercise: [] }],
+				[TOPICS[1]!.topicId, { context: [], exercise: [], questionBank: [] }],
 			]),
 			meta: {
 				topic_count: 2,
 				context_chunk_count: 1,
 				exercise_chunk_count: 0,
+				question_bank_chunk_count: 0,
 				context_char_total: 50,
 				exercise_char_total: 0,
+				question_bank_char_total: 0,
 				truncated: false,
 				context_quality: "ok",
 			},
@@ -195,6 +198,50 @@ describe("buildPracticeUserMessage", () => {
 			topics: TOPICS,
 			preFetchedTopicContext: preFetched,
 		});
+		expect(msg.test_parameters.grounding_policy).toEqual({
+			mode: "chunk_aligned",
+			prefer_chunk_aligned_items: true,
+		});
+	});
+
+	it("sets grounding_policy to chunk_aligned when only question-bank chunks exist", () => {
+		const preFetched: PreFetchedTopicContext = {
+			byTopic: new Map([
+				[
+					TOPICS[0]!.topicId,
+					{
+						context: [],
+						exercise: [],
+						questionBank: [{ text: "Solve: 2x + 5 = 17.", source_ref: "bank.1" }],
+					},
+				],
+				[TOPICS[1]!.topicId, { context: [], exercise: [], questionBank: [] }],
+			]),
+			meta: {
+				topic_count: 2,
+				context_chunk_count: 0,
+				exercise_chunk_count: 0,
+				question_bank_chunk_count: 1,
+				context_char_total: 0,
+				exercise_char_total: 0,
+				question_bank_char_total: 18,
+				truncated: false,
+				context_quality: "ok",
+			},
+		};
+
+		const msg = buildPracticeUserMessage({
+			studentGrade: 10,
+			subject: { id: "x", name: "Mathematics" },
+			difficulty: "medium",
+			timeLimitSeconds: 3600,
+			topics: TOPICS,
+			preFetchedTopicContext: preFetched,
+		});
+
+		expect(msg.topic_grounding[0]!.question_bank_chunks).toEqual([
+			{ text: "Solve: 2x + 5 = 17.", source_ref: "bank.1" },
+		]);
 		expect(msg.test_parameters.grounding_policy).toEqual({
 			mode: "chunk_aligned",
 			prefer_chunk_aligned_items: true,
@@ -409,6 +456,7 @@ describe("buildPracticeUserMessage", () => {
 		// Empty content_chunks / exercise_chunks arrays are stripped to save tokens.
 		expect(compact).not.toContain("\"content_chunks\":[]");
 		expect(compact).not.toContain("\"exercise_chunks\":[]");
+		expect(compact).not.toContain("\"question_bank_chunks\":[]");
 	});
 
 	it("strips fetch_error from model-facing JSON", () => {
@@ -424,8 +472,10 @@ describe("buildPracticeUserMessage", () => {
 					topic_count: 2,
 					context_chunk_count: 0,
 					exercise_chunk_count: 0,
+					question_bank_chunk_count: 0,
 					context_char_total: 0,
 					exercise_char_total: 0,
+					question_bank_char_total: 0,
 					truncated: false,
 					fetch_error: "query_failed",
 				},
