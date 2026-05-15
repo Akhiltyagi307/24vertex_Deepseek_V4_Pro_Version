@@ -1,19 +1,21 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { profiles } from "@/db/schema/profiles";
 import { insertInAppNotification } from "@/lib/notifications/insert";
 
+/**
+ * Flip `profiles.is_verified` for a teacher via `admin_set_teacher_verified`,
+ * which sets `eduai.bypass_profile_update_guard` and updates in one server-side
+ * call so transaction poolers cannot lose the session flag between statements.
+ */
 export async function setTeacherVerified(teacherId: string, verified: boolean): Promise<boolean> {
-	const rows = await db
-		.update(profiles)
-		.set({ isVerified: verified, updatedAt: new Date() })
-		.where(eq(profiles.id, teacherId))
-		.returning({ id: profiles.id, role: profiles.role });
-	const r = rows[0];
-	return Boolean(r && r.role === "teacher");
+	const rows = await db.execute(
+		sql`select public.admin_set_teacher_verified(${teacherId}::uuid, ${verified}) as ok`,
+	);
+	const row = rows[0] as { ok: boolean } | undefined;
+	return Boolean(row?.ok);
 }
 
 export async function insertTeacherWelcomeNotification(teacherId: string, title: string, body: string): Promise<void> {

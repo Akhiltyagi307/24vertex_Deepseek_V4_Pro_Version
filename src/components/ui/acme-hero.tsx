@@ -93,10 +93,14 @@ export function AcmeHero() {
                 />
               ) : (
                 <div
-                  className="h-5 w-9 shrink-0 rounded-full bg-muted/70"
+                  className="relative flex h-5 w-9 shrink-0 items-center justify-center rounded-full bg-background/85 p-0.5 shadow-sm dark:bg-foreground/22"
                   aria-busy="true"
                   aria-label="Loading theme toggle"
-                />
+                >
+                  <span className="flex size-4 items-center justify-center rounded-full bg-background text-foreground shadow-sm [&_svg]:size-3">
+                    <SunIcon aria-hidden />
+                  </span>
+                </div>
               )}
             </div>
             <Separator orientation="vertical" className="bg-border h-7 medium:h-8" />
@@ -164,14 +168,17 @@ export function AcmeHero() {
         <section className="w-full overflow-x-hidden py-16 medium:py-24 xl:py-28">
           <motion.div
             className="mx-auto flex w-full max-w-5xl flex-col items-center px-4 medium:px-6"
-            initial={{ opacity: 0, y: 14 }}
+            // `initial={false}` keeps SSR + no-JS first paint readable. Opacity-0 `initial`
+            // left the hero blank whenever hydration/chunks failed (same window as a “missing”
+            // theme toggle that never reaches `mounted`).
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="flex w-full flex-col items-center gap-8 text-center medium:gap-10 medium:gap-11">
               <motion.div
                 className="mx-auto flex w-full max-w-4xl justify-center px-0.5"
-                initial={{ opacity: 0, y: -6 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
               >
@@ -198,7 +205,7 @@ export function AcmeHero() {
               </motion.div>
               <motion.h1
                 className="mx-auto w-full max-w-4xl text-center text-pretty text-4xl font-medium leading-[1.08] tracking-tight text-foreground medium:text-6xl medium:leading-[1.06] medium:text-7xl medium:leading-[1.05]"
-                initial={{ opacity: 0, y: 14 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
@@ -210,7 +217,7 @@ export function AcmeHero() {
               </motion.h1>
               <motion.p
                 className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-2.5 text-center text-[0.9375rem] leading-relaxed text-muted-foreground medium:gap-3 medium:text-lg medium:leading-[1.65] medium:text-[1.0625rem]"
-                initial={{ opacity: 0, y: 12 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.18, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
@@ -227,7 +234,7 @@ export function AcmeHero() {
                   "flex w-full max-w-4xl flex-col items-center medium:flex-row medium:items-center medium:justify-center",
                   LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
                 )}
-                initial={{ opacity: 0, y: 12 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.24, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
@@ -245,7 +252,7 @@ export function AcmeHero() {
 
           <motion.div
             className="relative left-1/2 mt-14 w-screen max-w-[100vw] -translate-x-1/2 medium:mt-16"
-            initial={{ opacity: 0, y: 10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.32, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           >

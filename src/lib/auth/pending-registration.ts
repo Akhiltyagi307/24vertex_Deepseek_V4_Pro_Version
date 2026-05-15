@@ -2,9 +2,9 @@ import "server-only";
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { z } from "zod";
+
 import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
 import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
-import { getProfile } from "@/lib/auth/routing";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { classifyLinkParentRpc } from "@/lib/auth/link-parent-rpc-errors";
 import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
@@ -15,7 +15,19 @@ import {
 import {
 	parentRegistrationPayloadSchema,
 	studentProfileBodySchema,
+	teacherRegistrationPayloadSchema,
+	toTeacherIndiaPhoneE164,
 } from "@/lib/validations/auth";
+import { sendTeacherPendingApprovalEmail } from "@/lib/email/teacher-pending-approval-email";
+
+export type ConsumePendingRegistrationOptions = {
+	/**
+	 * User from Session right after PKCE `exchangeCodeForSession` or `verifyOtp`. Some callers see
+	 * `getUser()` omit `email` or pending-registration `user_metadata` briefly; merging fixes false
+	 * email-mismatch failures (same user id).
+	 */
+	sessionUserHandshake?: User | null;
+};
 
 const pendingEnvelopeSchema = z.discriminatedUnion("role", [
 	z.object({
@@ -28,12 +40,19 @@ const pendingEnvelopeSchema = z.discriminatedUnion("role", [
 		role: z.literal("parent"),
 		payload: parentRegistrationPayloadSchema,
 	}),
+	z.object({
+		version: z.literal(1),
+		role: z.literal("teacher"),
+		payload: teacherRegistrationPayloadSchema,
+	}),
 ]);
 
 export type ConsumePendingRegistrationResult =
 	| "completed_profile"
 	| "no_pending"
 	| "failed"
+	/** Phone in pending payload / metadata does not satisfy DB (+91 ten digits); user should re-register. */
+	| "failed_teacher_phone_rpc"
 	| "failed_unsupported_teacher_signup"
 	| "failed_parent_email_mismatch"
 	| "failed_student_not_found"
@@ -134,6 +153,9 @@ function parsePendingEnvelopeFromUser(user: User): PendingParseResult {
 			})
 			.safeParse(json);
 		if (roleProbe.success && roleProbe.data.role === "teacher") {
+			// Metadata has role=teacher but fails the current teacher payload schema
+			// (old format missing phone, or corrupted data). Surface as unsupported so
+			// the callback shows a clear retry message rather than a generic error.
 			return { status: "unsupported_teacher_signup" };
 		}
 		// If we stored a string, a bad payload is likely real corruption — surface the error flow.
@@ -143,22 +165,145 @@ function parsePendingEnvelopeFromUser(user: User): PendingParseResult {
 	return { status: "ok", envelope: parsed.data };
 }
 
+function normalizeEmailCompare(raw: string | undefined): string {
+	if (!raw || typeof raw !== "string") return "";
+	return raw.normalize("NFKC").trim().toLowerCase();
+}
+
+function handshakeEmail(u: Pick<User, "email"> | null | undefined): string | null {
+	const normalized = normalizeEmailCompare(u?.email ?? "");
+	return normalized !== "" ? normalized : null;
+}
+
+/**
+ * Supabase sometimes omits `user.email` on the first `getUser()` after PKCE exchange; `identities`
+ * still carries the confirmed address. Used so teacher (and other) pending registration can complete.
+ */
+function primaryAuthEmailComparable(user: User): string {
+	const direct = normalizeEmailCompare(user.email);
+	if (direct) return direct;
+	const identities = user.identities;
+	if (!Array.isArray(identities)) return "";
+	for (const row of identities) {
+		if (!row || typeof row !== "object") continue;
+		const idData = (row as { identity_data?: { email?: string } }).identity_data;
+		const em = normalizeEmailCompare(idData?.email);
+		if (em) return em;
+	}
+	return "";
+}
+
+/**
+ * Prefer `email` and pending-registration metadata from the handshake Session user when present
+ * and the refreshed API user lacks them (common right after PKCE exchange in App Router SSR).
+ */
+function mergeUserFromHandshake(apiUser: User, handshake?: User | null): User {
+	if (!handshake?.id) {
+		return apiUser;
+	}
+	// Allow merge when the server user object is missing `id` (rare mocks / transient SSR),
+	// or when ids match — never merge cross-account.
+	if (apiUser.id != null && handshake.id !== apiUser.id) {
+		return apiUser;
+	}
+
+	let merged = apiUser;
+
+	if (!handshakeEmail(apiUser) && handshakeEmail(handshake)) {
+		merged = { ...merged, email: handshake.email };
+	}
+
+	const key = EDUAI_PENDING_REGISTRATION_META_KEY;
+	const apiMeta = merged.user_metadata?.[key];
+	const handshakeMeta = handshake.user_metadata?.[key];
+	if (apiMeta == null && handshakeMeta != null) {
+		merged = {
+			...merged,
+			user_metadata: {
+				...(merged.user_metadata ?? {}),
+				[key]: handshakeMeta,
+			},
+		};
+	}
+
+	if (
+		(!merged.identities || merged.identities.length === 0) &&
+		handshake.identities &&
+		handshake.identities.length > 0
+	) {
+		merged = { ...merged, identities: handshake.identities };
+	}
+
+	return merged;
+}
+
+async function fetchProfileForSessionUser(
+	supabase: SupabaseClient,
+	userId: string,
+): Promise<{ id: string; role: string } | null> {
+	const { data, error } = await supabase
+		.from("profiles")
+		.select("id, role")
+		.eq("id", userId)
+		.maybeSingle();
+	if (error) {
+		logSupabaseError("consumePendingRegistration.profiles.maybeSingle", error, { userId });
+		return null;
+	}
+	if (!data?.id || !data.role) return null;
+	return { id: data.id as string, role: data.role as string };
+}
+
+function foldPendingUserHints(
+	base: User,
+	hints: readonly (User | null | undefined)[],
+): User {
+	let u = base;
+	for (const h of hints) {
+		u = mergeUserFromHandshake(u, h);
+	}
+	return u;
+}
+
 /**
  * After email confirmation, the session exists but profile RPCs never ran (no session at submit time).
  * Completes registration from user metadata, then caller should sign out and send user to /login.
  */
 export async function consumePendingRegistration(
 	supabase: SupabaseClient,
+	options?: ConsumePendingRegistrationOptions | null,
 ): Promise<ConsumePendingRegistrationResult> {
+	const handshake = options?.sessionUserHandshake ?? null;
 	const {
-		data: { user },
+		data: { user: apiUser },
 		error: userError,
 	} = await supabase.auth.getUser();
-	if (userError || !user) {
+	const {
+		data: { session },
+		error: sessionError,
+	} = await supabase.auth.getSession();
+
+	if (sessionError) {
+		logSupabaseError("consumePendingRegistration.getSession", sessionError);
+	}
+
+	const sessionUser = session?.user ?? null;
+
+	const seed = apiUser ?? sessionUser ?? handshake;
+	let user =
+		seed != null ?
+			foldPendingUserHints(seed, [handshake, sessionUser, apiUser])
+		: handshake?.id ? foldPendingUserHints(handshake, [handshake])
+		: null;
+
+	if (userError && !user) {
+		return "no_pending";
+	}
+	if (!user) {
 		return "no_pending";
 	}
 
-	const profile = await getProfile();
+	const profile = user.id ? await fetchProfileForSessionUser(supabase, user.id) : null;
 	const pending = parsePendingEnvelopeFromUser(user);
 
 	if (pending.status === "failed") {
@@ -173,16 +318,11 @@ export async function consumePendingRegistration(
 	}
 
 	const envelope = pending.envelope;
-	const authEmail = user.email?.trim().toLowerCase() ?? "";
-	const pendingEmail = envelope.payload.email.trim().toLowerCase();
-	// Both emails MUST be present and match. The previous version skipped the
-	// equality check when `authEmail` was empty (a PKCE-exchange quirk on some
-	// clients). That made the registration step open: a session whose
-	// `user.email` was momentarily blank could complete profile creation under
-	// a pendingEmail belonging to someone else's signup. Refusing is safe — a
-	// retry after the session refreshes restores `user.email` and proceeds
-	// normally; logSupabaseError tags the case so we can spot legitimate
-	// stuck users in production.
+	const authEmail = primaryAuthEmailComparable(user);
+	const pendingEmail = normalizeEmailCompare(envelope.payload.email);
+	// Both emails MUST be present and match. We merge `email` from the PKCE/OTP
+	// handshake when `getUser()` omits it briefly; if still empty or mismatched,
+	// refuse (prevents completing someone else's pending payload).
 	if (!authEmail || !pendingEmail || authEmail !== pendingEmail) {
 		logSupabaseError(
 			"consumePendingRegistration.email_mismatch",
@@ -205,6 +345,10 @@ export async function consumePendingRegistration(
 			}
 			return "failed";
 		}
+		if (envelope.role === "teacher") {
+			// Profile already created (auto-confirm path ran first, or callback retry).
+			return profile.role === "teacher" ? "no_pending" : "failed";
+		}
 		// envelope.role === "parent"
 		if (profile.role !== "parent") {
 			return "failed";
@@ -213,7 +357,7 @@ export async function consumePendingRegistration(
 		return linkPendingParentToStudent(supabase, user.id, v.studentLinkCode);
 	}
 
-	// No profile row yet — create then link (or register student).
+	// No profile row yet — create then link (or register student/teacher).
 	if (envelope.role === "student") {
 		const v = envelope.payload;
 		const streamVal = v.grade >= 11 && v.grade <= 12 ? (v.stream ?? null) : null;
@@ -234,6 +378,36 @@ export async function consumePendingRegistration(
 			logSupabaseError("consumePendingRegistration.register_student", rpcError);
 			return "failed";
 		}
+		return "completed_profile";
+	}
+
+	if (envelope.role === "teacher") {
+		const v = envelope.payload;
+		const phoneRpc = toTeacherIndiaPhoneE164(String(v.phone)) ?? String(v.phone);
+		const { error: rpcError } = await supabase.rpc("register_teacher", {
+			p_full_name: v.fullName,
+			p_school_name: v.schoolName ?? null,
+			p_phone: phoneRpc,
+		});
+		if (rpcError) {
+			if (/profile already exists/i.test(rpcError.message)) {
+				return "no_pending";
+			}
+			if (/phone must be/i.test(rpcError.message)) {
+				logSupabaseError("consumePendingRegistration.register_teacher_phone", rpcError, {
+					userId: user.id,
+				});
+				return "failed_teacher_phone_rpc";
+			}
+			logSupabaseError("consumePendingRegistration.register_teacher", rpcError);
+			return "failed";
+		}
+		// Fire-and-forget: email failure must not block profile creation.
+		// sendHtmlEmailLogged deduplicates via dedupKey so both the callback path and
+		// the direct-session path (auto-confirm) can call this without sending twice.
+		void sendTeacherPendingApprovalEmail(v.email, v.fullName, {
+			dedupKey: `teacher-pending-approval:${user.id}`,
+		});
 		return "completed_profile";
 	}
 

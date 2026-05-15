@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
 	BarChart3,
 	BookOpen,
+	Building2,
 	ChevronDown,
 	ClipboardCheck,
 	CreditCard,
@@ -50,6 +51,12 @@ const groups: SidebarGroup[] = [
 			{ href: "/admin/users/teachers", label: "Teachers" },
 			{ href: "/admin/users/teachers/approval-queue", label: "Teacher approvals" },
 		],
+	},
+	{
+		id: "organizations",
+		label: "Organizations",
+		icon: Building2,
+		items: [{ href: "/admin/organizations", label: "Schools & tuition centers" }],
 	},
 	{
 		id: "curriculum",

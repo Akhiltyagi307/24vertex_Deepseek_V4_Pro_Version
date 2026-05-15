@@ -3,13 +3,11 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import * as Sentry from "@sentry/nextjs";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { clientIpFromHeaders } from "@/lib/admin/api-request-meta";
 import { verifyAdminJwt } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
-import { isAdminIpAllowed } from "@/lib/admin/ip-allowlist";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { db } from "@/db";
 import { adminSessions } from "@/db/schema/admin-sessions";
@@ -104,9 +102,6 @@ export async function requireAdminApi(): Promise<{ jti: string; sessionId: strin
 	const payload = await verifyAdminJwt(token);
 	if (!payload) {
 		return NextResponse.json({ error: "Unauthorized", code: "admin_invalid_token" }, { status: 401, headers: adminHeaders() });
-	}
-	if (!isAdminIpAllowed(clientIpFromHeaders(await headers()))) {
-		return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403, headers: adminHeaders() });
 	}
 
 	// Cache fast-path: if we verified this jti in the last 10s, skip the DB

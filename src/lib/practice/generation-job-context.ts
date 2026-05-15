@@ -5,7 +5,7 @@ import type { FinalizePracticeConfigInput } from "./schemas";
 import type { PracticeUserMessagePayload } from "./user-message";
 import type { QuestionVisualKind } from "./visuals/types";
 
-export type PracticeGenerationRequestMode = "server_action" | "stream";
+export type PracticeGenerationRequestMode = "server_action" | "stream" | "assignment_worker";
 
 export type PracticeGenerationJobContext = {
 	correlationId: string;

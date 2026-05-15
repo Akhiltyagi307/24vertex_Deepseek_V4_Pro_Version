@@ -13,12 +13,22 @@ afterEach(() => {
 });
 
 describe("getAppUrl", () => {
-	it("falls back to localhost during development", () => {
+	it("falls back to 127.0.0.1 during development (matches next-dev bind)", () => {
 		vi.stubEnv("NODE_ENV", "development");
 		vi.stubEnv("VERCEL_ENV", undefined);
 		vi.stubEnv("NEXT_PUBLIC_APP_URL", undefined);
+		vi.stubEnv("PORT", undefined);
 
-		expect(getAppUrl()).toBe("http://localhost:3001");
+		expect(getAppUrl()).toBe("http://127.0.0.1:3001");
+	});
+
+	it("uses PORT for dev fallback when set", () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("VERCEL_ENV", undefined);
+		vi.stubEnv("NEXT_PUBLIC_APP_URL", undefined);
+		vi.stubEnv("PORT", "3005");
+
+		expect(getAppUrl()).toBe("http://127.0.0.1:3005");
 	});
 
 	it("normalizes a configured URL", () => {

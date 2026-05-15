@@ -9,10 +9,12 @@ import {
 	text,
 	timestamp,
 	unique,
+	uniqueIndex,
 	uuid,
 	varchar,
 	vector,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { subjects, topics } from "./academic";
 
@@ -73,6 +75,7 @@ export const tests = pgTable(
 		isPaused: boolean("is_paused").notNull().default(false),
 		/** Count of admin timer extensions (audit). */
 		adminExtensions: integer("admin_extensions").notNull().default(0),
+		assignmentSubmissionId: uuid("assignment_submission_id"),
 		deviceFingerprint: varchar("device_fingerprint", { length: 64 }),
 		lastIp: varchar("last_ip", { length: 45 }),
 		tabBlurCount: integer("tab_blur_count").notNull().default(0),
@@ -85,6 +88,9 @@ export const tests = pgTable(
 		index("idx_tests_student").on(t.studentId),
 		index("idx_tests_status").on(t.status),
 		index("idx_tests_type").on(t.testType),
+		uniqueIndex("idx_tests_assignment_submission_uq")
+			.on(t.assignmentSubmissionId)
+			.where(sql`${t.assignmentSubmissionId} IS NOT NULL`),
 		index("idx_tests_status_updated").on(t.status, t.updatedAt),
 	],
 );

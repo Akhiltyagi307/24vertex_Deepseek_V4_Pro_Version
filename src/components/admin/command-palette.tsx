@@ -4,6 +4,7 @@ import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,6 +14,7 @@ import {
 	type CommandPaletteAction,
 	type CommandPaletteConfirmFetchAction,
 } from "@/lib/admin/command-palette-registry";
+import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
 import { cn } from "@/lib/utils";
 
 const RECENT_KEY = "admin_cmdk_recent_v1";
@@ -304,11 +306,10 @@ export function AdminCommandPalette({
 												headers: { "Content-Type": "application/json" },
 											});
 											if (!res.ok) {
-												const j = (await res.json().catch(() => ({}))) as { error?: string };
-												window.alert(j.error ?? res.statusText);
+												toast.error(await adminHttpErrorMessage(res, "Action failed"));
 											}
 										} catch {
-											window.alert("Network error");
+											toast.error("Network error");
 										}
 									}}
 								>

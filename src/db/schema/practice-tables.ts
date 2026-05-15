@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uuid, varchar, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, jsonb, pgTable, text, timestamp, uuid, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { tests } from "./assessment";
 
@@ -21,9 +22,9 @@ export const practiceJobs = pgTable(
 		id: uuid("id").defaultRandom().primaryKey(),
 		jobType: text("job_type").notNull(),
 		testId: uuid("test_id")
-			.notNull()
 			.references(() => tests.id, { onDelete: "cascade" }),
 		studentId: uuid("student_id").notNull(),
+		assignmentSubmissionId: uuid("assignment_submission_id"),
 		status: text("status").notNull().default("pending"),
 		attempts: integer("attempts").notNull().default(0),
 		maxAttempts: integer("max_attempts").notNull().default(3),
@@ -39,6 +40,15 @@ export const practiceJobs = pgTable(
 		index("idx_practice_jobs_status_run_after").on(t.status, t.runAfter),
 		index("idx_practice_jobs_test").on(t.testId),
 		index("idx_practice_jobs_student").on(t.studentId, t.createdAt),
+		index("idx_practice_jobs_assignment_submission").on(t.assignmentSubmissionId),
+		uniqueIndex("practice_jobs_assignment_generate_active_uq")
+			.on(t.assignmentSubmissionId)
+			.where(sql`${t.jobType} = 'assign_generate_test' AND ${t.status} IN ('pending', 'running')`),
+		check(
+			"practice_jobs_required_ids_check",
+			sql`(${t.jobType} = 'assign_generate_test' AND ${t.testId} IS NULL AND ${t.assignmentSubmissionId} IS NOT NULL)
+				OR (${t.jobType} <> 'assign_generate_test' AND ${t.testId} IS NOT NULL AND ${t.assignmentSubmissionId} IS NULL)`,
+		),
 	],
 );
 

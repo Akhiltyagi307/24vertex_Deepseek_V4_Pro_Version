@@ -264,6 +264,8 @@ interface SmoothTabProps {
   panelClassName?: string;
   /** Tab bar above or below the panel. Default keeps the KokonutUI bottom toolbar layout. */
   tabListPosition?: "top" | "bottom";
+  /** Bump `token` to programmatically switch to `tabId` when it exists in `items`. */
+  activateTabRequest?: { token: number; tabId: string } | null;
 }
 
 const slideVariants: Variants = {
@@ -313,6 +315,7 @@ export default function SmoothTab({
   persistContentPanels = false,
   panelClassName,
   tabListPosition = "bottom",
+  activateTabRequest = null,
 }: SmoothTabProps) {
   const [selected, setSelected] = React.useState<string>(defaultTabId);
   const [direction, setDirection] = React.useState(0);
@@ -321,6 +324,16 @@ export default function SmoothTab({
   // Reference for the selected button
   const buttonRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map());
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!activateTabRequest) return;
+    const tabId = activateTabRequest.tabId;
+    const idx = items.findIndex((item) => item.id === tabId);
+    if (idx === -1) return;
+    setDirection(1);
+    setSelected(tabId);
+    onChange?.(tabId);
+  }, [activateTabRequest?.token, activateTabRequest?.tabId, items, onChange]);
 
   // Update dimensions whenever selected tab changes or on mount
   React.useLayoutEffect(() => {

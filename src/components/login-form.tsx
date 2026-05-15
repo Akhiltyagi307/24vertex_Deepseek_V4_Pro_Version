@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { postAuthPathFromProfile } from "@/lib/auth/post-auth-path";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -30,10 +31,21 @@ type Props = {
 	callbackError?: string;
 	/** Set after email confirmation + profile creation — user should sign in with password. */
 	emailVerified?: boolean;
+	/**
+	 * Educator login: same shell as students, with teacher signup link and educator marketing column
+	 * (see `AuthStudioCardGate`). Post-auth routing still uses `profiles.role` / `is_verified`.
+	 */
+	variant?: "default" | "educator";
 	className?: string;
 } & Omit<React.ComponentProps<"form">, "onSubmit">;
 
-export function LoginForm({ callbackError, emailVerified, className, ...props }: Props) {
+export function LoginForm({
+	callbackError,
+	emailVerified,
+	variant = "default",
+	className,
+	...props
+}: Props) {
 	const [error, setError] = useState<string | null>(null);
 	const [pending, setPending] = useState(false);
 
@@ -59,7 +71,7 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 		const password = String(fd.get("password") ?? "");
 
 		const supabase = createClient();
-		const { error: signInError } = await supabase.auth.signInWithPassword({
+		const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
 			email,
 			password,
 		});
@@ -70,9 +82,28 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 			return;
 		}
 
-		// Full navigation so the root proxy refreshes cookies before RSC runs (avoids a stale
-		// server action reading no session right after signInWithPassword).
-		window.location.assign("/");
+		const userId = signInData.user?.id;
+		if (!userId) {
+			window.location.replace("/");
+			return;
+		}
+
+		const { error: profileError, data: profileRow } = await supabase
+			.from("profiles")
+			.select("role, is_verified")
+			.eq("id", userId)
+			.maybeSingle();
+
+		if (profileError) {
+			// Prefer a single server-driven hop if the profile read fails (rare).
+			window.location.replace("/");
+			return;
+		}
+
+		const destination = postAuthPathFromProfile(
+			profileRow ? { role: profileRow.role, is_verified: profileRow.is_verified } : null,
+		);
+		window.location.replace(destination);
 	}
 
 	return (
@@ -137,15 +168,37 @@ export function LoginForm({ callbackError, emailVerified, className, ...props }:
 						{pending ? "Signing in…" : "Log in"}
 					</Button>
 				</Field>
-				<FieldDescription className="text-center text-sm text-muted-foreground">
-					No account yet?{" "}
-					<Link
-						href="/signup/role-picker"
-						className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
-					>
-						Sign up
-					</Link>
-				</FieldDescription>
+				<div className="space-y-2 text-center text-sm text-muted-foreground">
+					<FieldDescription className="text-center text-sm text-muted-foreground">
+						No account yet?{" "}
+						<Link
+							href={variant === "educator" ? "/signup/teacher" : "/signup/role-picker"}
+							className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
+						>
+							Sign up
+						</Link>
+					</FieldDescription>
+					{variant === "educator" ?
+						<FieldDescription>
+							Student or parent?{" "}
+							<Link
+								href="/login"
+								className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
+							>
+								Log in here
+							</Link>
+						</FieldDescription>
+					:	<FieldDescription>
+							Educator?{" "}
+							<Link
+								href="/login/educator"
+								className="font-medium text-foreground underline underline-offset-4 hover:text-foreground"
+							>
+								Log in as an educator
+							</Link>
+						</FieldDescription>
+					}
+				</div>
 			</FieldGroup>
 		</form>
 	);

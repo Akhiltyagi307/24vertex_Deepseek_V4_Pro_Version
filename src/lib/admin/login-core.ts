@@ -18,7 +18,6 @@ import {
 } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
-import { isAdminIpAllowed } from "@/lib/admin/ip-allowlist";
 import {
 	clearAdminLoginFailures,
 	isAdminLoginBlocked,
@@ -32,7 +31,17 @@ export type AdminLoginResult =
 	| { ok: true; token: string }
 	| { ok: false; status: number; code: string; message: string };
 
-/** Which proxy headers were present (not values) — helps debug allowlist vs missing X-Forwarded-For. */
+/** Leading BOM / trailing CRLF from “copy line from .env” breaks bcrypt/plain compares unless trimmed. */
+function normalizeAdminLoginEmailInput(raw: string): string {
+	return raw.replace(/^\uFEFF/, "").trim();
+}
+
+/** Preserve intentional leading spaces; strip BOM + trailing whitespace editors append when copying env lines. */
+function normalizeAdminLoginPasswordInput(raw: string): string {
+	return raw.replace(/^\uFEFF/, "").trimEnd();
+}
+
+/** Which proxy headers were present (not values) — helps debug resolved client IP in admin login. */
 function adminLoginProxyHeaderHints(request: NextRequest): Record<string, boolean> {
 	const h = request.headers;
 	return {
@@ -63,7 +72,7 @@ function reportAdminLoginRejected(
 			...adminLoginProxyHeaderHints(request),
 		});
 		const level =
-			params.code === "ip_not_allowed" || params.code === "rate_limited" ? "warning"
+			params.code === "rate_limited" ? "warning"
 			: params.code === "internal_error" || params.code === "db_at_capacity" ? "error"
 			: "info";
 		Sentry.captureMessage(`admin_login:${params.code}`, {
@@ -74,33 +83,21 @@ function reportAdminLoginRejected(
 }
 
 export async function performAdminLogin(request: NextRequest, input: { email: string; password: string; totp?: string }): Promise<AdminLoginResult> {
+	const emailNorm = normalizeAdminLoginEmailInput(input.email);
+	const passwordNorm = normalizeAdminLoginPasswordInput(input.password);
+	const totpNorm =
+		typeof input.totp === "string" && input.totp.trim().length > 0 ? input.totp.trim() : undefined;
+
 	const ip = clientIpFromRequest(request);
 	const ipInet = clientIpForPostgresInet(ip);
 	const ua = request.headers.get("user-agent") ?? "";
-
-	if (!isAdminIpAllowed(ip)) {
-		await writeAdminAction({
-			action: "login_failed",
-			ipAddress: ipInet,
-			userAgent: ua,
-			payload: { reason: "ip_not_allowed" },
-		});
-		reportAdminLoginRejected(request, { code: "ip_not_allowed", status: 403, ip });
-		return {
-			ok: false,
-			status: 403,
-			code: "ip_not_allowed",
-			message:
-				"Admin sign-in is blocked: your IP is not on ADMIN_IP_ALLOWLIST, or your public IP changed (e.g. different Wi-Fi).",
-		};
-	}
 
 	if (await isAdminLoginBlocked(ip)) {
 		reportAdminLoginRejected(request, { code: "rate_limited", status: 429, ip });
 		return { ok: false, status: 429, code: "rate_limited", message: "Too many attempts" };
 	}
 
-	if (!verifyAdminEmail(input.email)) {
+	if (!verifyAdminEmail(emailNorm)) {
 		await recordAdminLoginFailure(ip);
 		await writeAdminAction({
 			action: "login_failed",
@@ -117,7 +114,7 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 		};
 	}
 
-	const passwordOk = await verifyAdminPassword(input.password);
+	const passwordOk = await verifyAdminPassword(passwordNorm);
 	if (!passwordOk) {
 		await recordAdminLoginFailure(ip);
 		await writeAdminAction({
@@ -139,7 +136,7 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 	const totpRequired = await isAdminTotpRequired();
 	const secretConfigured = Boolean(process.env.ADMIN_TOTP_SECRET?.trim());
 	if (totpRequired) {
-		if (!input.totp?.trim() || !verifyAdminTotpIfConfigured(input.totp)) {
+		if (!totpNorm || !verifyAdminTotpIfConfigured(totpNorm)) {
 			await recordAdminLoginFailure(ip);
 			await writeAdminAction({
 				action: "login_failed",
@@ -148,9 +145,15 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 				payload: { reason: "totp_failed" },
 			});
 			reportAdminLoginRejected(request, { code: "totp_failed", status: 401, ip });
-			return { ok: false, status: 401, code: "unauthorized", message: "Invalid credentials" };
+			return {
+				ok: false,
+				status: 401,
+				code: "unauthorized",
+				message:
+					"Authenticator code did not verify against ADMIN_TOTP_SECRET (wrong code or clock drift). If DB flag ADMIN_TOTP_REQUIRED is false, clear this field unless you intend to use 2FA.",
+			};
 		}
-	} else if (secretConfigured && input.totp?.trim() && !verifyAdminTotpIfConfigured(input.totp)) {
+	} else if (secretConfigured && totpNorm && !verifyAdminTotpIfConfigured(totpNorm)) {
 		await recordAdminLoginFailure(ip);
 		await writeAdminAction({
 			action: "login_failed",
@@ -159,7 +162,13 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 			payload: { reason: "totp_failed" },
 		});
 		reportAdminLoginRejected(request, { code: "totp_failed", status: 401, ip });
-		return { ok: false, status: 401, code: "unauthorized", message: "Invalid credentials" };
+		return {
+			ok: false,
+			status: 401,
+			code: "unauthorized",
+			message:
+				"Authenticator code did not verify against ADMIN_TOTP_SECRET (wrong code or clock drift). If DB flag ADMIN_TOTP_REQUIRED is false, clear this field unless you intend to use 2FA.",
+		};
 	}
 
 	try {
@@ -171,7 +180,7 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 			jwtId: jti,
 			ipAddress: ipInet,
 			userAgent: ua || null,
-			totpUsed: Boolean(input.totp?.trim() && secretConfigured),
+			totpUsed: Boolean(totpNorm && secretConfigured),
 		});
 
 		await clearAdminLoginFailures(ip);
@@ -179,7 +188,7 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 			action: "login",
 			ipAddress: ipInet,
 			userAgent: ua || null,
-			totpUsed: Boolean(input.totp?.trim() && secretConfigured),
+			totpUsed: Boolean(totpNorm && secretConfigured),
 			payload: {},
 		});
 

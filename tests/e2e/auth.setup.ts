@@ -46,8 +46,7 @@ setup("authenticate", async ({ page }) => {
 	]);
 	expect(authRes.status(), "Supabase Auth must accept these credentials").toBe(200);
 
-	// `signInWithPassword` triggers `window.location.assign("/")`. From there,
-	// `app/page.tsx` redirects to the role-resolved post-auth path.
+	// One navigation: login resolves role on the client, then `window.location.replace(destination)`.
 	await page.waitForURL((url) => !/\/login/.test(url.pathname), { timeout: 15_000 });
 
 	// Persist storage state so subsequent test projects can load it directly.

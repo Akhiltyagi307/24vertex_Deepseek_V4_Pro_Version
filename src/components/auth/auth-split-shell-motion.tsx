@@ -35,12 +35,13 @@ export function AuthSplitShellMotion({ logo, children }: AuthSplitShellMotionPro
 			>
 				<div className="pointer-events-auto w-fit max-w-full">{logo}</div>
 			</div>
-			<div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
+			<div className="pointer-events-none flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
 				<div
 					className={cn(
 						enter,
 						authHitMax,
-						"pointer-events-auto flex max-h-full min-w-0 w-full shrink-0 flex-col overflow-y-auto",
+						// Explicit max height avoids `max-h-full` resolving to 0 in some flex chains (form column vanishes).
+						"pointer-events-auto flex min-h-0 min-w-0 w-full max-h-[min(92dvh,44rem)] flex-col overflow-y-auto",
 						"pb-6 pt-0 motion-safe:delay-75 medium:pb-10 medium:pt-1",
 					)}
 				>

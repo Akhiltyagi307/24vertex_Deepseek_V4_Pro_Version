@@ -6,13 +6,14 @@ import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 import { profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { assignmentConfigSchema } from "@/lib/assignments/schemas";
 
 export type AdminAssignmentListRow = {
 	id: string;
 	title: string;
 	teacher_id: string;
 	teacher_name: string | null;
-	subject_id: string;
+	subject_id: string | null;
 	subject_name: string | null;
 	status: string | null;
 	due_date: string | null;
@@ -48,15 +49,13 @@ export async function adminListAssignments(input: {
 			title: assignments.title,
 			teacherId: assignments.teacherId,
 			teacherName: profiles.fullName,
-			subjectId: assignments.subjectId,
-			subjectName: subjects.name,
+			config: assignments.config,
 			status: assignments.status,
-			dueDate: assignments.dueDate,
+			dueAt: assignments.dueAt,
 			updatedAt: assignments.updatedAt,
 			createdAt: assignments.createdAt,
 		})
 		.from(assignments)
-		.leftJoin(subjects, eq(assignments.subjectId, subjects.id))
 		.leftJoin(profiles, eq(assignments.teacherId, profiles.id))
 		.where(whereClause)
 		.orderBy(desc(assignments.updatedAt))
@@ -78,19 +77,37 @@ export async function adminListAssignments(input: {
 
 	const countMap = new Map<string, number>(counts.map((r) => [r.assignmentId, Number(r.n)]));
 
-	const rows: AdminAssignmentListRow[] = raw.map((r) => ({
-		id: r.id,
-		title: r.title,
-		teacher_id: r.teacherId,
-		teacher_name: r.teacherName ?? null,
-		subject_id: r.subjectId,
-		subject_name: r.subjectName ?? null,
-		status: r.status ?? null,
-		due_date: r.dueDate instanceof Date ? r.dueDate.toISOString() : (r.dueDate ?? null),
-		submissions_count: countMap.get(r.id) ?? 0,
-		updated_at: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updatedAt ?? null),
-		created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : (r.createdAt ?? null),
-	}));
+	const configByAssignment = new Map(
+		raw.map((r) => [r.id, assignmentConfigSchema.safeParse(r.config)]),
+	);
+	const subjectIds = [
+		...new Set(
+			[...configByAssignment.values()].flatMap((result) => (result.success ? [result.data.subject_id] : [])),
+		),
+	];
+	const subjectRows =
+		subjectIds.length > 0 ?
+			await db.select({ id: subjects.id, name: subjects.name }).from(subjects).where(inArray(subjects.id, subjectIds))
+		:	[];
+	const subjectMap = new Map(subjectRows.map((r) => [r.id, r.name]));
+
+	const rows: AdminAssignmentListRow[] = raw.map((r) => {
+		const config = configByAssignment.get(r.id);
+		const subjectId = config?.success ? config.data.subject_id : null;
+		return {
+			id: r.id,
+			title: r.title,
+			teacher_id: r.teacherId,
+			teacher_name: r.teacherName ?? null,
+			subject_id: subjectId,
+			subject_name: subjectId ? (subjectMap.get(subjectId) ?? null) : null,
+			status: r.status ?? null,
+			due_date: r.dueAt instanceof Date ? r.dueAt.toISOString() : (r.dueAt ?? null),
+			submissions_count: countMap.get(r.id) ?? 0,
+			updated_at: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updatedAt ?? null),
+			created_at: r.createdAt instanceof Date ? r.createdAt.toISOString() : (r.createdAt ?? null),
+		};
+	});
 
 	return { rows, total: Number(total) || 0 };
 }
@@ -102,19 +119,13 @@ export type AdminAssignmentDetail = {
 	assignment_type: string | null;
 	teacher_id: string;
 	teacher_name: string | null;
-	subject_id: string;
+	subject_id: string | null;
 	subject_name: string | null;
-	unit_name: string | null;
 	topic_ids: string[];
 	difficulty: string | null;
 	question_count: number | null;
 	time_limit_seconds: number | null;
-	target_grades: number[];
-	target_sections: string[];
-	target_student_ids: string[];
 	due_date: string | null;
-	late_submission_policy: string | null;
-	late_penalty_percent: number | null;
 	instructions: string | null;
 	status: string | null;
 	created_at: string | null;
@@ -146,11 +157,9 @@ export async function adminGetAssignmentDetail(id: string): Promise<AdminAssignm
 		.select({
 			a: assignments,
 			teacherName: profiles.fullName,
-			subjectName: subjects.name,
 		})
 		.from(assignments)
 		.leftJoin(profiles, eq(assignments.teacherId, profiles.id))
-		.leftJoin(subjects, eq(assignments.subjectId, subjects.id))
 		.where(eq(assignments.id, id))
 		.limit(1);
 
@@ -158,26 +167,26 @@ export async function adminGetAssignmentDetail(id: string): Promise<AdminAssignm
 	if (!row) return null;
 
 	const a = row.a;
+	const config = assignmentConfigSchema.safeParse(a.config);
+	const subjectId = config.success ? config.data.subject_id : null;
+	const [subjectRow] =
+		subjectId ?
+			await db.select({ name: subjects.name }).from(subjects).where(eq(subjects.id, subjectId)).limit(1)
+		:	[];
 	const detail: AdminAssignmentDetail = {
 		id: a.id,
 		title: a.title,
-		description: a.description ?? null,
-		assignment_type: a.assignmentType ?? null,
+		description: null,
+		assignment_type: a.assignmentKind ?? null,
 		teacher_id: a.teacherId,
 		teacher_name: row.teacherName ?? null,
-		subject_id: a.subjectId,
-		subject_name: row.subjectName ?? null,
-		unit_name: a.unitName ?? null,
-		topic_ids: a.topicIds ?? [],
-		difficulty: a.difficulty ?? null,
-		question_count: a.questionCount ?? null,
-		time_limit_seconds: a.timeLimitSeconds ?? null,
-		target_grades: a.targetGrades ?? [],
-		target_sections: a.targetSections ?? [],
-		target_student_ids: a.targetStudentIds ?? [],
-		due_date: a.dueDate instanceof Date ? a.dueDate.toISOString() : (a.dueDate ?? null),
-		late_submission_policy: a.lateSubmissionPolicy ?? null,
-		late_penalty_percent: a.latePenaltyPercent ?? null,
+		subject_id: subjectId,
+		subject_name: subjectRow?.name ?? null,
+		topic_ids: config.success ? config.data.topic_ids : [],
+		difficulty: config.success ? config.data.difficulty : null,
+		question_count: config.success ? config.data.question_count : null,
+		time_limit_seconds: config.success ? config.data.time_limit_seconds : null,
+		due_date: a.dueAt instanceof Date ? a.dueAt.toISOString() : (a.dueAt ?? null),
 		instructions: a.instructions ?? null,
 		status: a.status ?? null,
 		created_at: a.createdAt instanceof Date ? a.createdAt.toISOString() : (a.createdAt ?? null),
@@ -189,7 +198,7 @@ export async function adminGetAssignmentDetail(id: string): Promise<AdminAssignm
 			id: assignmentSubmissions.id,
 			studentId: assignmentSubmissions.studentId,
 			studentName: profiles.fullName,
-			status: assignmentSubmissions.status,
+			status: assignmentSubmissions.lifecycleStatus,
 			score: assignmentSubmissions.score,
 			isLate: assignmentSubmissions.isLate,
 			testId: assignmentSubmissions.testId,

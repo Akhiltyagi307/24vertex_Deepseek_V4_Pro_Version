@@ -40,6 +40,11 @@ export const ADMIN_ACTIONS = {
 	TEACHER_REJECT: "teacher_reject",
 	TEACHER_REQUEST_INFO: "teacher_request_info",
 
+	// Organizations
+	ORGANIZATION_CREATE: "organization_create",
+	ORGANIZATION_UPDATE: "organization_update",
+	ORGANIZATION_SOFT_DELETE: "organization_soft_delete",
+
 	// Subjects
 	SUBJECT_CREATE: "subject_create",
 	SUBJECT_UPDATE: "subject_update",

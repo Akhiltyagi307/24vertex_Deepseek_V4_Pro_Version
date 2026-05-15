@@ -28,7 +28,18 @@ export type NotificationCategory =
 	| "account_password_changed"
 	| "account_email_changed"
 	| "parent_linked_student"
-	| "parent_child_link_confirmed";
+	| "parent_child_link_confirmed"
+	| "student_organization_linked"
+	| "student_organization_unlinked"
+	| "student_organization_deactivated"
+	| "teacher_organization_joined"
+	| "teacher_organization_left"
+	| "teacher_organization_deactivated"
+	| "teacher_linked_student"
+	| "teacher_student_link_confirmed"
+	| "assignment_published"
+	| "assignment_materialized"
+	| "assignment_graded";
 
 /** Shape passed to UI components when rendering a notification row. */
 export type NotificationListItem = {
@@ -102,15 +113,44 @@ export function deriveCta(
 		};
 	}
 	if (
+		typeof row.category === "string" &&
+		(row.category === "assignment_published" ||
+			row.category === "assignment_materialized" ||
+			row.category === "assignment_graded")
+	) {
+		return {
+			label: row.category === "assignment_graded" ? "View assignment" : "Open assignments",
+			href: portal === "parent" ? "/parent/assignments" : "/student/assignments",
+			variant: "primary",
+		};
+	}
+	if (
 		row.type === "system" &&
 		typeof row.category === "string" &&
 		(row.category === "account_password_changed" ||
 			row.category === "account_email_changed" ||
-			row.category === "parent_linked_student")
+			row.category === "parent_linked_student" ||
+			row.category === "student_organization_linked" ||
+			row.category === "student_organization_unlinked" ||
+			row.category === "student_organization_deactivated" ||
+			row.category === "teacher_linked_student")
 	) {
 		return {
 			label: portal === "parent" ? "Account" : "Account settings",
 			href: portal === "parent" ? "/parent/settings" : "/student/settings",
+			variant: "secondary",
+		};
+	}
+	if (
+		row.type === "system" &&
+		(row.category === "teacher_organization_joined" ||
+			row.category === "teacher_organization_left" ||
+			row.category === "teacher_organization_deactivated" ||
+			row.category === "teacher_student_link_confirmed")
+	) {
+		return {
+			label: "Teacher settings",
+			href: "/teacher/settings",
 			variant: "secondary",
 		};
 	}

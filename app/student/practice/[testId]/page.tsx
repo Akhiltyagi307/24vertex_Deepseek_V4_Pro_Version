@@ -9,7 +9,7 @@ import {
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
-import { logServerError } from "@/lib/server/log-supabase-error";
+import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 
 	const { data: test, error: tErr } = await supabase
 		.from("tests")
-		.select("id, student_id, subject_id, status, time_limit_seconds, started_at, last_ip")
+		.select("id, student_id, subject_id, status, time_limit_seconds, started_at, last_ip, assignment_submission_id")
 		.eq("id", testId)
 		.maybeSingle();
 
@@ -92,6 +92,16 @@ export default async function PracticeSessionPage({ params }: PageProps) {
 			.eq("id", testId)
 			.eq("student_id", user.id)
 			.is("started_at", null);
+		if (test.assignment_submission_id) {
+			const { error: progressError } = await supabase.rpc("assignment_mark_submission_in_progress", {
+				p_test_id: testId,
+			});
+			if (progressError) {
+				logSupabaseError("StudentPracticePage.assignment_mark_submission_in_progress", progressError, {
+					testId,
+				});
+			}
+		}
 	} else if (!test.last_ip && clientIp) {
 		await supabase
 			.from("tests")

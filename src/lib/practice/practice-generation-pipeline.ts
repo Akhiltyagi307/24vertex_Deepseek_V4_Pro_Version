@@ -89,6 +89,7 @@ import {
 	finishGenerationRun,
 	startGenerationRun,
 	updateGenerationRunConfigSnapshot,
+	type PracticeGenerationRequestMode,
 	type PracticeGenerationStepStatus,
 } from "@/lib/practice/generation-telemetry";
 import { finalizePracticeConfigSchema, type FinalizePracticeConfigInput } from "@/lib/practice/schemas";
@@ -127,10 +128,21 @@ function wait(ms: number): Promise<void> {
 
 export type RunGenerationPipelineOptions = {
 	useStreamObject: boolean;
+	requestMode?: PracticeGenerationRequestMode;
+	recordGenerateClicked?: boolean;
 	/** Fires for each partial object when `useStreamObject` is true. */
 	onPartialObject?: (partial: unknown) => void;
 	/** Cancel the OpenAI HTTP call (and downstream model retries) when fired. */
 	abortSignal?: AbortSignal;
+	/** Override persistence for trusted server-side flows such as educator-assigned tests. */
+	persistGeneratedTest?: (input: {
+		subjectId: string;
+		difficulty: string;
+		durationSeconds: number;
+		questionCount: number;
+		questionMix: unknown;
+		questions: unknown;
+	}) => Promise<{ data: string | null; error: PracticePersistRpcError | null }>;
 };
 
 /**
@@ -691,7 +703,7 @@ async function runPracticeGenerationAfterResolveCore(
 	let generationCallCount = 0;
 	let repairCallCount = 0;
 	let succeededOnCall: number | null = null;
-	const requestMode = opts.useStreamObject ? "stream" : "server_action";
+	const requestMode = opts.requestMode ?? (opts.useStreamObject ? "stream" : "server_action");
 	const generationRunId: string | null = await startGenerationRun({
 		correlationId,
 		studentId: resolved.userId,
@@ -739,20 +751,22 @@ async function runPracticeGenerationAfterResolveCore(
 		});
 	};
 
-	void recordPracticeEvent(
-		supabase,
-		"practice_generate_clicked",
-		{
-			subject_id: parsed.subjectId,
-			difficulty: parsed.difficulty,
-			duration_seconds: parsed.durationSeconds,
-			question_count: getPracticeQuestionPlan(parsed.durationSeconds).total,
-			topic_count: resolved.canonicalTopics.length,
-			correlation_id: correlationId,
-			generation_run_id: generationRunId,
-		},
-		{ studentId: resolved.userId },
-	);
+	if (opts.recordGenerateClicked !== false) {
+		void recordPracticeEvent(
+			supabase,
+			"practice_generate_clicked",
+			{
+				subject_id: parsed.subjectId,
+				difficulty: parsed.difficulty,
+				duration_seconds: parsed.durationSeconds,
+				question_count: getPracticeQuestionPlan(parsed.durationSeconds).total,
+				topic_count: resolved.canonicalTopics.length,
+				correlation_id: correlationId,
+				generation_run_id: generationRunId,
+			},
+			{ studentId: resolved.userId },
+		);
+	}
 
 	const { subjectId, difficulty, durationSeconds } = parsed;
 	// Mathematics subjects collapse to all-MCQ regardless of duration mix —
@@ -1833,14 +1847,24 @@ ${JSON.stringify(blueprintSlots)}`;
 	let rpcAttempts = 0;
 	for (let attempt = 1; attempt <= PRACTICE_PERSIST_MAX_ATTEMPTS; attempt++) {
 		rpcAttempts = attempt;
-		const result = await supabase.rpc("practice_generate_test", {
-			p_subject_id: subjectId,
-			p_difficulty: difficulty,
-			p_duration_seconds: durationSeconds,
-			p_question_count: totalQ,
-			p_question_mix: questionMixJson,
-			p_questions: questionsPayload,
-		});
+		const result =
+			opts.persistGeneratedTest ?
+				await opts.persistGeneratedTest({
+					subjectId,
+					difficulty,
+					durationSeconds,
+					questionCount: totalQ,
+					questionMix: questionMixJson,
+					questions: questionsPayload,
+				})
+			:	await supabase.rpc("practice_generate_test", {
+					p_subject_id: subjectId,
+					p_difficulty: difficulty,
+					p_duration_seconds: durationSeconds,
+					p_question_count: totalQ,
+					p_question_mix: questionMixJson,
+					p_questions: questionsPayload,
+				});
 		newTestId = result.data;
 		rpcErr = result.error;
 		if (!rpcErr && newTestId) break;

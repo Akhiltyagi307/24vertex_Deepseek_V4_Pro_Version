@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { triggerPracticeWorkerInBackground } from "@/lib/admin/practice-worker-trigger";
+import { computeAssignedGradingRunAfter } from "@/lib/assignments/schemas";
 import { getOpenAIChatModel } from "@/lib/env";
 import { practiceGenerationOutputSchema, validateAndStripGeneration } from "@/lib/practice";
 import { consumeAdaptiveFollowupsRateLimit } from "@/lib/practice/practice-rate-limit";
@@ -198,13 +199,24 @@ export async function submitPracticeTest(
 	}
 
 	const row = rows[0]!;
+	const { data: testMeta } = await supabase
+		.from("tests")
+		.select("assignment_submission_id")
+		.eq("id", row.test_id)
+		.eq("student_id", user.id)
+		.maybeSingle();
+	const isAssignedTest = Boolean(testMeta?.assignment_submission_id);
+	const gradeRunAfter =
+		isAssignedTest ?
+			computeAssignedGradingRunAfter(new Date(), user.id).toISOString()
+		:	new Date().toISOString();
 
 	// Enqueue grade job.
 	const { error: enqErr } = await supabase.rpc("practice_enqueue_job", {
 		p_job_type: "grade",
 		p_test_id: row.test_id,
 		p_payload: {},
-		p_run_after: new Date().toISOString(),
+		p_run_after: gradeRunAfter,
 	});
 	if (enqErr) {
 		logSupabaseError("submitPracticeTest.practice_enqueue_job", enqErr, {
@@ -213,6 +225,26 @@ export async function submitPracticeTest(
 		});
 		await restorePracticeTestStatus(supabase, row.test_id, "in_progress", user.id);
 		return { ok: false, message: friendlyDbError("submit") };
+	}
+
+	if (isAssignedTest && typeof testMeta?.assignment_submission_id === "string") {
+		const admin = createServiceRoleClient();
+		const submittedAt = new Date().toISOString();
+		const { error: submissionErr } = await admin
+			.from("assignment_submissions")
+			.update({
+				lifecycle_status: "grading",
+				submitted_at: submittedAt,
+				updated_at: submittedAt,
+			})
+			.eq("id", testMeta.assignment_submission_id)
+			.eq("student_id", user.id);
+		if (submissionErr) {
+			logSupabaseError("submitPracticeTest.assignment_submissions.update", submissionErr, {
+				testId: row.test_id,
+				assignmentSubmissionId: testMeta.assignment_submission_id,
+			});
+		}
 	}
 
 	void triggerPracticeWorkerInBackground()

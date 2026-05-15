@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 /**
  * Best-effort client IP from proxy / platform headers. Matches login + RSC + API checks.
  * Prefer `x-forwarded-for` (first hop); then `x-real-ip`, Vercel, Cloudflare; else `0.0.0.0`
- * so allowlist logic matches between Route Handlers and `headers()` in Server Components.
+ * when headers are absent so audit logging uses the same convention everywhere.
  */
 export function clientIpFromHeaders(h: Headers): string {
 	const xff = h.get("x-forwarded-for");

@@ -1,0 +1,34 @@
+import { redirect } from "next/navigation";
+
+import { AssignmentsKanban } from "@/components/assignments/assignments-kanban";
+import { listStudentAssignments } from "@/lib/assignments/queries";
+import { getServerUser } from "@/lib/auth/get-server-user";
+import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
+import { assertParentActiveLink } from "@/lib/parent/linked-children";
+
+export const dynamic = "force-dynamic";
+
+export default async function ParentAssignmentsPage() {
+	const user = await getServerUser();
+	if (!user) redirect("/login");
+
+	const activeStudentId = await getParentActiveStudentIdFromCookie();
+	if (!activeStudentId) redirect("/parent/select-student");
+
+	const linked = await assertParentActiveLink(user.id, activeStudentId);
+	if (!linked) redirect("/parent/select-student");
+
+	const assignments = await listStudentAssignments(activeStudentId);
+
+	return (
+		<div className="mx-auto w-full max-w-7xl space-y-6 py-6">
+			<div className="space-y-1">
+				<h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
+				<p className="text-sm text-muted-foreground">
+					Follow your child’s teacher-assigned practice tests from “to do” through graded.
+				</p>
+			</div>
+			<AssignmentsKanban assignments={assignments} portal="parent" />
+		</div>
+	);
+}

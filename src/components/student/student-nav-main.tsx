@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
 	BellIcon,
+	ClipboardListIcon,
 	CreditCardIcon,
 	FileBarChartIcon,
 	LayoutDashboardIcon,
@@ -38,6 +39,7 @@ const primaryItems: NavItem[] = [
 ];
 
 const progressItems: NavItem[] = [
+	{ title: "Assignments", href: "/student/assignments", icon: ClipboardListIcon },
 	{ title: "Performance", href: "/student/performance", icon: TrendingUpIcon },
 	{ title: "Reports", href: "/student/reports", icon: FileBarChartIcon },
 ];

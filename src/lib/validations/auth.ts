@@ -98,23 +98,54 @@ export const parentSignupSchema = parentRegistrationPayloadSchema.extend({
 	password: z.string().min(8),
 });
 
-export const teacherSignupSchema = z.object({
+/** Indian teacher mobile: exactly 10 digits, normalized to E.164 +91XXXXXXXXXX. */
+export function toTeacherIndiaPhoneE164(raw: string): string | null {
+	const compact = raw.trim().replace(/\s/g, "");
+	if (/^\+91\d{10}$/.test(compact)) return compact;
+	let digits = raw.replace(/\D/g, "");
+	if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+	if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+	if (/^\d{10}$/.test(digits)) return `+91${digits}`;
+	return null;
+}
+
+/** Teacher pending registration + signup (class assignments removed; school ID linking is a later phase). */
+export const teacherRegistrationPayloadSchema = z.object({
 	email: z.string().email(),
-	password: z.string().min(8),
 	fullName: z.string().min(1).max(200),
-	schoolName: z.string().min(1).max(300),
-	assignments: z
-		.array(
-			z.object({
-				grade: z.coerce.number().int().min(6).max(12),
-				section: z.string().trim().min(1).max(5),
-				subjectId: z.string().uuid(),
-			}),
-		)
-		.min(1),
+	phone: z
+		.string()
+		.min(1, "Enter your mobile number.")
+		.refine((s) => toTeacherIndiaPhoneE164(s) !== null, { message: "Enter exactly 10 digits." })
+		.transform((s) => toTeacherIndiaPhoneE164(s)!),
+	schoolName: z
+		.string()
+		.max(300)
+		.nullish()
+		.transform((s) => {
+			if (s == null) return null;
+			const t = s.trim();
+			return t === "" ? null : t;
+		}),
+});
+
+export const teacherSignupSchema = teacherRegistrationPayloadSchema.extend({
+	password: z.string().min(8),
 });
 
 const studentLinkCodePattern = /^[A-Za-z]{2}\d{4}$/;
+
+/** Independent teachers link students via six-character link code only (`link_teacher_to_student`). */
+export const linkTeacherStudentSchema = z.object({
+	studentId: z
+		.string()
+		.trim()
+		.min(1)
+		.refine((s) => studentLinkCodePattern.test(s), {
+			message: "Enter the student's six-character link code from Profile (e.g. AB1234).",
+		})
+		.transform((s) => s.toUpperCase()),
+});
 
 export const linkParentSchema = z.object({
 	studentId: z
@@ -169,6 +200,25 @@ export const studentProfileUpdateSchema = z
 			ctx.addIssue({ code: "custom", message: "Invalid avatar URL", path: ["avatarUrl"] });
 		}
 	});
+
+/** Teacher self-service profile on `/teacher/settings` (matches guarded columns policy). */
+export const teacherProfileUpdateSchema = z
+	.object({
+		fullName: z.string().min(1).max(200),
+		avatarUrl: z.string().max(2000).transform(trimToNull),
+		phone: z.string().max(32).transform(trimToNull),
+	})
+	.superRefine((data, ctx) => {
+		if (data.avatarUrl !== null && !z.string().url().safeParse(data.avatarUrl).success) {
+			ctx.addIssue({ code: "custom", message: "Invalid avatar URL", path: ["avatarUrl"] });
+		}
+	});
+
+/** Org teachers choose roster filters on `/teacher/settings`. */
+export const teacherTeachingFocusSchema = z.object({
+	grade: z.coerce.number().int().min(6).max(12),
+	subjectId: z.string().uuid(),
+});
 
 /** Student change-password flow (client-side with Supabase Auth). */
 export const studentChangePasswordSchema = z

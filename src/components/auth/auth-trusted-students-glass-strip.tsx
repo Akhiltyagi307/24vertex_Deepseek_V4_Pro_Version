@@ -26,15 +26,26 @@ type AuthTrustedStudentsGlassStripProps = {
 	prominence?: "default" | "hero";
 	/** `frost` matches auth testimonial card; `soft` is a lighter muted panel (e.g. landing hero). */
 	surface?: "frost" | "soft";
+	/** Social proof line under educator vs student auth panels. */
+	trustKind?: "students" | "educators";
 };
 
 export function AuthTrustedStudentsGlassStrip({
 	className,
 	prominence = "default",
 	surface = "frost",
+	trustKind = "students",
 }: AuthTrustedStudentsGlassStripProps) {
 	const hero = prominence === "hero";
 	const panelShell = surface === "frost" ? AUTH_FROST_GLASS : AUTH_SOFT_PANEL;
+	const trustLine =
+		trustKind === "educators" ?
+			"Designed with teachers, tutors, and school teams"
+		:	"Trusted by 40K+ students";
+	const avatarAria =
+		trustKind === "educators" ?
+			"Example educator avatars; illustrative only"
+		:	"Example student avatars; illustrative only";
 
 	return (
 		<div
@@ -49,7 +60,7 @@ export function AuthTrustedStudentsGlassStrip({
 			<AvatarGroup
 				className={cn("grayscale", hero ? "-space-x-2.5 medium:-space-x-3" : "-space-x-3")}
 				role="group"
-				aria-label="Example student avatars; illustrative only"
+				aria-label={avatarAria}
 			>
 				<Avatar size="lg">
 					<AvatarImage src="https://github.com/shadcn.png" alt="" />
@@ -79,7 +90,7 @@ export function AuthTrustedStudentsGlassStrip({
 						: "text-xs font-medium tracking-[-0.01em] text-muted-foreground",
 				)}
 			>
-				Trusted by 40K+ students
+				{trustLine}
 			</p>
 		</div>
 	);

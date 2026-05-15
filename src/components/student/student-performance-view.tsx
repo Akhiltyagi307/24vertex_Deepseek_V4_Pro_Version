@@ -90,6 +90,8 @@ export type StudentPerformanceViewProps = {
 	portalBasePath?: string;
 	/** Read-only: hide practice CTAs and use performance URLs only. */
 	parentViewer?: boolean;
+	/** Back-target when `parentViewer` (default `/parent/dashboard`). */
+	viewerOverviewHref?: string;
 };
 
 function useStaggerVariants() {
@@ -307,12 +309,14 @@ export function StudentPerformanceView({
 	trackerNeedsHydration = false,
 	portalBasePath = "/student",
 	parentViewer = false,
+	viewerOverviewHref,
 }: StudentPerformanceViewProps) {
 	const { container, item } = useStaggerVariants();
 	const { variants: pageVariants } = usePageTransitionVariants();
 	const reduceMotion = useReducedMotion();
 	const router = useRouter();
 	const allowPractice = !parentViewer;
+	const overviewHref = parentViewer ? (viewerOverviewHref ?? "/parent/dashboard") : "/student/settings";
 	const practiceOpts = React.useMemo(() => ({ basePath: portalBasePath, allowPractice }), [portalBasePath, allowPractice]);
 
 	const subjectOptions = React.useMemo(
@@ -454,7 +458,7 @@ export function StudentPerformanceView({
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<Button render={<Link href={parentViewer ? "/parent/dashboard" : "/student/settings"} />}>
+						<Button render={<Link href={overviewHref} />}>
 							{parentViewer ? "Back to overview" : "Open settings"}
 						</Button>
 					</CardContent>

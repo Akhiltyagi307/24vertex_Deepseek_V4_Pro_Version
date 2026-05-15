@@ -27,6 +27,8 @@ import { studentChangePasswordSchema } from "@/lib/validations/auth";
 
 type Props = {
 	loginEmail: string;
+	/** Prefix for input ids (default `student`). Use `teacher` on educator settings to avoid duplicate DOM ids. */
+	fieldIdPrefix?: string;
 };
 
 /**
@@ -35,7 +37,7 @@ type Props = {
  * notification audit via `recordPasswordChangedAction`. Local state stays scoped
  * to this component so the parent form's `useActionState` is not entangled.
  */
-export function PasswordChangeForm({ loginEmail }: Props) {
+export function PasswordChangeForm({ loginEmail, fieldIdPrefix = "student" }: Props) {
 	const [pwCurrent, setPwCurrent] = useState("");
 	const [pwNew, setPwNew] = useState("");
 	const [pwConfirm, setPwConfirm] = useState("");
@@ -117,12 +119,12 @@ export function PasswordChangeForm({ loginEmail }: Props) {
 					) : null}
 					<FieldGroup className="gap-6">
 						<Field>
-							<FieldLabel className="text-base" htmlFor="studentCurrentPassword">
+							<FieldLabel className="text-base" htmlFor={`${fieldIdPrefix}CurrentPassword`}>
 								Current password
 							</FieldLabel>
 							<FieldContent>
 								<Input
-									id="studentCurrentPassword"
+									id={`${fieldIdPrefix}CurrentPassword`}
 									type="password"
 									className={panelRaisedInputClass}
 									autoComplete="current-password"
@@ -132,12 +134,12 @@ export function PasswordChangeForm({ loginEmail }: Props) {
 							</FieldContent>
 						</Field>
 						<Field>
-							<FieldLabel className="text-base" htmlFor="studentNewPassword">
+							<FieldLabel className="text-base" htmlFor={`${fieldIdPrefix}NewPassword`}>
 								New password
 							</FieldLabel>
 							<FieldContent>
 								<Input
-									id="studentNewPassword"
+									id={`${fieldIdPrefix}NewPassword`}
 									type="password"
 									className={panelRaisedInputClass}
 									autoComplete="new-password"
@@ -150,12 +152,12 @@ export function PasswordChangeForm({ loginEmail }: Props) {
 							</FieldContent>
 						</Field>
 						<Field>
-							<FieldLabel className="text-base" htmlFor="studentConfirmPassword">
+							<FieldLabel className="text-base" htmlFor={`${fieldIdPrefix}ConfirmPassword`}>
 								Confirm password
 							</FieldLabel>
 							<FieldContent>
 								<Input
-									id="studentConfirmPassword"
+									id={`${fieldIdPrefix}ConfirmPassword`}
 									type="password"
 									className={panelRaisedInputClass}
 									autoComplete="new-password"

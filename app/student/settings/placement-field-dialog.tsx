@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { updateStudentSchoolPlacement } from "./actions";
-import { panelRaisedInputClass, placementSelectClass } from "./_settings-form-styles";
+import { panelRaisedInputClass } from "./_settings-form-styles";
 import type { StudentProfileSettingsRow } from "./student-profile-settings-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -344,9 +345,8 @@ export function PlacementFieldDialog({
 								<label htmlFor={`${titleId}-grade`} className="text-foreground/70 text-sm font-medium">
 									Grade
 								</label>
-								<select
+								<NativeSelect
 									id={`${titleId}-grade`}
-									className={placementSelectClass}
 									value={gradeDraft}
 									onChange={(e) => {
 										const n = Number(e.target.value);
@@ -370,7 +370,7 @@ export function PlacementFieldDialog({
 											{g}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 							</div>
 							{gradeDialogSenior ? (
 								<>
@@ -381,9 +381,8 @@ export function PlacementFieldDialog({
 										>
 											Stream
 										</label>
-										<select
+										<NativeSelect
 											id={`${titleId}-grade-stream`}
-											className={placementSelectClass}
 											value={streamDraft}
 											onChange={(e) => {
 												const v = e.target.value;
@@ -398,7 +397,7 @@ export function PlacementFieldDialog({
 													{o.label}
 												</option>
 											))}
-										</select>
+										</NativeSelect>
 									</div>
 									<div className="flex flex-col gap-2">
 										<label
@@ -407,9 +406,8 @@ export function PlacementFieldDialog({
 										>
 											Elective (optional)
 										</label>
-										<select
+										<NativeSelect
 											id={`${titleId}-grade-elective`}
-											className={placementSelectClass}
 											value={gradeDialogElectiveValue}
 											onChange={(e) => setElectiveDraft(e.target.value)}
 											disabled={!streamDraft.trim()}
@@ -420,7 +418,7 @@ export function PlacementFieldDialog({
 													{el.name}
 												</option>
 											))}
-										</select>
+										</NativeSelect>
 										{!streamDraft.trim() ? (
 											<p className="text-muted-foreground text-xs leading-relaxed">
 												Choose a stream first to see electives for this grade.
@@ -454,9 +452,8 @@ export function PlacementFieldDialog({
 							<label htmlFor={`${titleId}-stream`} className="text-foreground/70 text-sm font-medium">
 								Stream
 							</label>
-							<select
+							<NativeSelect
 								id={`${titleId}-stream`}
-								className={placementSelectClass}
 								value={streamDraft}
 								onChange={(e) => setStreamDraft(e.target.value)}
 							>
@@ -466,7 +463,7 @@ export function PlacementFieldDialog({
 										{o.label}
 									</option>
 								))}
-							</select>
+							</NativeSelect>
 						</div>
 					) : null}
 
@@ -475,9 +472,8 @@ export function PlacementFieldDialog({
 							<label htmlFor={`${titleId}-elective`} className="text-foreground/70 text-sm font-medium">
 								Elective
 							</label>
-							<select
+							<NativeSelect
 								id={`${titleId}-elective`}
-								className={placementSelectClass}
 								value={effectiveElectiveDraft}
 								onChange={(e) => setElectiveDraft(e.target.value)}
 							>
@@ -487,7 +483,7 @@ export function PlacementFieldDialog({
 										{e.name}
 									</option>
 								))}
-							</select>
+							</NativeSelect>
 						</div>
 					) : null}
 

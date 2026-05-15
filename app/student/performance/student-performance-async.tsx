@@ -10,6 +10,8 @@ type Props = {
 	subjectFromUrl: string | null;
 	portalBasePath?: string;
 	parentViewer?: boolean;
+	/** When `parentViewer`, defaults to `/parent/dashboard` — teachers override with `/teacher/student-performance`. */
+	viewerOverviewHref?: string;
 };
 
 /** Streamed under <Suspense> so the shell renders before this query block resolves. */
@@ -19,6 +21,7 @@ export async function StudentPerformanceAsync({
 	subjectFromUrl,
 	portalBasePath,
 	parentViewer,
+	viewerOverviewHref,
 }: Props) {
 	const supabase = await createClient();
 
@@ -34,9 +37,10 @@ export async function StudentPerformanceAsync({
 			subjectFromUrl={subjectFromUrl}
 			enrolledSubjectCards={enrolledSubjectCards}
 			profileGrade={profileRow.grade ?? null}
-			trackerNeedsHydration={trackerNeedsHydration}
+			trackerNeedsHydration={parentViewer ? false : trackerNeedsHydration}
 			portalBasePath={portalBasePath}
 			parentViewer={parentViewer}
+			viewerOverviewHref={viewerOverviewHref}
 		/>
 	);
 }

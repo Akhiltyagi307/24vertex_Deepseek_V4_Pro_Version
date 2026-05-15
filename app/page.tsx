@@ -11,7 +11,11 @@ export default async function HomePage() {
 	const user = await getServerUser();
 	if (user) {
 		const path = await resolvePostAuthPath();
-		redirect(path);
+		// `resolvePostAuthPath` sends legacy `profiles.role === "admin"` users to "/".
+		// Redirecting "/" → "/" would loop; show marketing for that case instead.
+		if (path !== "/") {
+			redirect(path);
+		}
 	}
 
 	return (

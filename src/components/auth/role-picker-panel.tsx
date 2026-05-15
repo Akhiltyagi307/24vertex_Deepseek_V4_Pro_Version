@@ -34,7 +34,7 @@ export function RolePickerPanel({ isCompletingProfile }: RolePickerPanelProps) {
 					>
 						{isCompletingProfile
 							? "You are signed in but still need a profile. Choose how you will use the product."
-							: "Choose student or parent to create your account, then sign in whenever you need it."}
+							: "Choose student, parent, or educator to create your account, then sign in whenever you need it."}
 					</p>
 				</div>
 				<div className="flex flex-col gap-3">
@@ -49,6 +49,12 @@ export function RolePickerPanel({ isCompletingProfile }: RolePickerPanelProps) {
 						className={cn(linkClass, "min-h-11 py-2.5 text-base font-semibold", itemEnter, "motion-safe:delay-150")}
 					>
 						Parent
+					</Link>
+					<Link
+						href="/signup/teacher"
+						className={cn(linkClass, "min-h-11 py-2.5 text-base font-semibold", itemEnter, "motion-safe:delay-200")}
+					>
+						Educator
 					</Link>
 				</div>
 			</FieldGroup>

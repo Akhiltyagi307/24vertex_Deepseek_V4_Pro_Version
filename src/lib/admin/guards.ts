@@ -3,19 +3,17 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import * as Sentry from "@sentry/nextjs";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { clientIpFromHeaders } from "@/lib/admin/api-request-meta";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 import { verifyAdminJwt } from "@/lib/admin/auth";
-import { isAdminIpAllowed } from "@/lib/admin/ip-allowlist";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { db } from "@/db";
 import { adminSessions } from "@/db/schema/admin-sessions";
 
 /**
- * Server Components / Server Actions: require valid admin JWT, Redis version, non-revoked session, optional IP allowlist.
+ * Server Components / Server Actions: require valid admin JWT, Redis version, non-revoked session.
  */
 export async function requireAdmin(): Promise<void> {
 	const jar = await cookies();
@@ -25,11 +23,6 @@ export async function requireAdmin(): Promise<void> {
 	}
 	const payload = await verifyAdminJwt(token);
 	if (!payload) {
-		redirect("/admin/login");
-	}
-
-	const h = await headers();
-	if (!isAdminIpAllowed(clientIpFromHeaders(h))) {
 		redirect("/admin/login");
 	}
 

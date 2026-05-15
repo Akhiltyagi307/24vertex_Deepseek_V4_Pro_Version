@@ -51,7 +51,11 @@ export function getAppUrl(): string {
 		if (isProductionDeployment()) {
 			throw new Error("Missing NEXT_PUBLIC_APP_URL");
 		}
-		return "http://localhost:3001";
+		// Align with `scripts/next-dev.mjs` (`next dev -H 127.0.0.1`): the dev server
+		// listens on IPv4 loopback. Using `localhost` here splits auth cookies from
+		// browsers that open `http://127.0.0.1:PORT` (different host-only cookie jars).
+		const port = readTrimmedEnv("PORT") || "3001";
+		return `http://127.0.0.1:${port}`;
 	}
 	const appUrl = parseHttpUrl(configured, "NEXT_PUBLIC_APP_URL");
 	if (isProductionDeployment() && isLoopbackHost(new URL(appUrl).hostname)) {

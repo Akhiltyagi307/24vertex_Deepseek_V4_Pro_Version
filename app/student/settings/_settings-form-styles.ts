@@ -17,7 +17,8 @@ export const panelRaisedInputClass = cn(
 
 export const accountReadonlyInputClass = panelRaisedInputClass;
 
+/** Native `<select>` on raised panels; pair with `NativeSelect` for a chevron (no OS arrow under `appearance-none`). */
 export const placementSelectClass = cn(
 	panelRaisedInputClass,
-	"w-full cursor-pointer appearance-none bg-[length:1rem] bg-[right_0.65rem_center] bg-no-repeat pr-10",
+	"w-full cursor-pointer appearance-none pr-10",
 );

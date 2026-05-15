@@ -11,6 +11,7 @@ import type { AppProfileRow } from "@/lib/auth/cached-profile";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getNotificationPrefs } from "@/lib/notifications/prefs";
+import { listCatalogOrganizations } from "@/lib/organizations/queries";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
 import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { createClient } from "@/lib/supabase/server";
@@ -30,6 +31,7 @@ function appProfileToSettingsRow(row: AppProfileRow): StudentProfileSettingsRow 
 		school_name: row.school_name,
 		parent_name: row.parent_name,
 		parent_email: row.parent_email,
+		organization_id: row.organization_id,
 		avatar_url: row.avatar_url,
 		phone: row.phone,
 		is_verified: row.is_verified,
@@ -66,6 +68,7 @@ export default async function StudentSettingsPage() {
 		.filter((s: ResolvedSubjectForSettings) => Boolean(s.id && s.name));
 
 	const prefs = await getNotificationPrefs(user.id);
+	const organizations = await listCatalogOrganizations();
 	const initialNotificationPrefs = {
 		enableInApp: prefs.enableInApp,
 		enableEmail: prefs.enableEmail,
@@ -98,6 +101,7 @@ export default async function StudentSettingsPage() {
 								electiveSubjectName={electiveSubjectName}
 								resolvedSubjects={resolvedSubjects}
 								subjectsLoadError={subjectResult.loadError}
+								organizations={organizations}
 								initialNotificationPrefs={initialNotificationPrefs}
 								saveNotificationPreferences={updateNotificationPreferences}
 							/>

@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { subjects } from "./academic";
+import { organizations } from "./organizations";
 
 export const profiles = pgTable(
 	"profiles",
@@ -31,6 +32,11 @@ export const profiles = pgTable(
 		website: varchar("website", { length: 500 }),
 		subjectsTaught: uuid("subjects_taught").array(),
 		avatarUrl: text("avatar_url"),
+		teacherRosterGrade: integer("teacher_roster_grade"),
+		teacherRosterSubjectId: uuid("teacher_roster_subject_id").references(() => subjects.id, {
+			onDelete: "set null",
+		}),
+		organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
 		isVerified: boolean("is_verified").default(false),
 		lastActiveAt: timestamp("last_active_at"),
 		isSuspended: boolean("is_suspended").notNull().default(false),
@@ -44,6 +50,7 @@ export const profiles = pgTable(
 		index("idx_profiles_role").on(t.role),
 		index("idx_profiles_grade_section").on(t.grade, t.section),
 		index("idx_profiles_stream").on(t.stream),
+		index("idx_profiles_organization").on(t.organizationId),
 	],
 );
 

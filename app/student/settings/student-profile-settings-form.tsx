@@ -2,6 +2,7 @@
 
 import {
 	Bell,
+	Building2,
 	CheckIcon,
 	CopyIcon,
 	GraduationCap,
@@ -15,7 +16,9 @@ import {
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 
 import {
+	updateStudentOrganization,
 	updateStudentProfile,
+	type UpdateStudentOrganizationState,
 	type UpdateStudentProfileState,
 } from "./actions";
 import { NotificationPreferencesForm } from "./notification-preferences-form";
@@ -63,6 +66,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatDateLongStyleInAppTimeZone } from "@/lib/datetime/app-timezone";
+import type { SerializedOrganization } from "@/lib/organizations/schemas";
 
 export type ResolvedSubjectForSettings = {
 	id: string;
@@ -82,6 +86,7 @@ export type StudentProfileSettingsRow = {
 	parent_email: string | null;
 	avatar_url: string | null;
 	phone: string | null;
+	organization_id: string | null;
 	is_verified: boolean | null;
 	created_at: string;
 };
@@ -295,6 +300,7 @@ export function StudentProfileSettingsForm({
 	electiveSubjectName,
 	resolvedSubjects = [],
 	subjectsLoadError = null,
+	organizations = [],
 	initialNotificationPrefs,
 	saveNotificationPreferences,
 }: {
@@ -304,6 +310,7 @@ export function StudentProfileSettingsForm({
 	electiveSubjectName: string | null;
 	resolvedSubjects?: ResolvedSubjectForSettings[];
 	subjectsLoadError?: string | null;
+	organizations?: SerializedOrganization[];
 	initialNotificationPrefs: NotificationPreferencesInitial;
 	saveNotificationPreferences: (
 		input: NotificationPreferencesInput,
@@ -313,11 +320,16 @@ export function StudentProfileSettingsForm({
 		updateStudentProfile,
 		undefined,
 	);
+	const [organizationState, organizationFormAction] = useActionState<
+		UpdateStudentOrganizationState | undefined,
+		FormData
+	>(updateStudentOrganization, undefined);
 	const [copied, setCopied] = useState(false);
 	const [placementField, setPlacementField] = useState<PlacementField | null>(null);
 	const feedbackRef = useRef<HTMLDivElement | null>(null);
 
 	const shareText = profile.student_link_code ?? profile.id;
+	const currentOrganization = organizations.find((org) => org.id === profile.organization_id) ?? null;
 
 	useEffect(() => {
 		if (state?.error || state?.success) {
@@ -462,6 +474,71 @@ export function StudentProfileSettingsForm({
 		</div>
 	);
 
+	const organizationPanel = (
+		<div className={settingsNestedWellClass}>
+			<div className="flex flex-col gap-4 medium:flex-row medium:items-start medium:justify-between">
+				<div className="min-w-0">
+					<div className="flex items-center gap-2">
+						<Building2 className="size-4 text-muted-foreground" aria-hidden />
+						<p className="text-foreground text-sm font-semibold">School or tuition center</p>
+					</div>
+					<p className="mt-2 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
+						Connect your account to an approved organization when your school or tuition center asks you to.
+						You can unlink anytime without losing independent tutor links.
+					</p>
+				</div>
+				<div className="shrink-0 rounded-lg border border-border/80 bg-muted/30 px-3 py-2 text-sm">
+					{currentOrganization ? currentOrganization.name : "Not connected"}
+				</div>
+			</div>
+			<div className="mt-4 grid gap-3 medium:grid-cols-[1fr_auto_auto] medium:items-end">
+				<div className="space-y-2">
+					<label htmlFor="organizationId" className="text-sm font-medium text-foreground/80">
+						Choose organization
+					</label>
+					<select
+						id="organizationId"
+						name="organizationId"
+						defaultValue={profile.organization_id ?? ""}
+						className={cn(
+							panelRaisedInputClass,
+							"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
+						)}
+					>
+						<option value="">No organization</option>
+						{organizations.map((org) => (
+							<option key={org.id} value={org.id}>
+								{org.name} ({org.type_label})
+							</option>
+						))}
+					</select>
+				</div>
+				<Button type="submit" formAction={organizationFormAction} variant="outline">
+					Save organization
+				</Button>
+				<Button
+					type="submit"
+					formAction={organizationFormAction}
+					name="organizationId"
+					value=""
+					variant="ghost"
+				>
+					Unlink
+				</Button>
+			</div>
+			{organizationState?.error ? (
+				<p className="mt-3 text-destructive text-sm leading-relaxed" role="alert">
+					{organizationState.error}
+				</p>
+			) : null}
+			{organizationState?.success ? (
+				<p className="mt-3 text-sm text-foreground/80" role="status">
+					Organization updated.
+				</p>
+			) : null}
+		</div>
+	);
+
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-8">
 			<PlacementFieldDialog
@@ -533,6 +610,7 @@ export function StudentProfileSettingsForm({
 										</p>
 									</div>
 									{accountDetails}
+									{organizationPanel}
 									{subjectsPanel}
 									{linkCodePanel}
 								</div>

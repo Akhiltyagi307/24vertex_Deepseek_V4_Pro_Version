@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { postAuthPathFromProfile } from "@/lib/auth/post-auth-path";
 
 export type ProfileRow = {
 	id: string;
@@ -28,23 +29,7 @@ export async function resolvePostAuthPath(): Promise<string> {
 	}
 
 	const profile = await getProfile();
-	if (!profile) {
-		return "/signup/role-picker";
-	}
-
-	if (profile.role === "student") {
-		// Profile row is already loaded via {@link getProfile} / {@link getCachedAppProfileRow}.
-		return "/student/dashboard";
-	}
-	if (profile.role === "parent") {
-		return "/parent/select-student";
-	}
-	if (profile.role === "teacher") {
-		return profile.is_verified ? "/teacher/dashboard" : "/teacher/pending";
-	}
-	if (profile.role === "admin") {
-		return "/";
-	}
-
-	return "/";
+	return postAuthPathFromProfile(
+		profile ? { role: profile.role, is_verified: profile.is_verified } : null,
+	);
 }

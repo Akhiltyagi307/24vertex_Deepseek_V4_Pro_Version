@@ -1,4 +1,6 @@
 import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/notifications/report-ready";
+import { notifyAssignmentGraded } from "@/lib/notifications/assignment-events";
+import { materializeAssignedPracticeTest } from "@/lib/admin/assignment-generation";
 import {
 	gradePracticeTestWithAi,
 	recordGradingFailure,
@@ -34,6 +36,8 @@ function perJobTimeoutMs(jobType: ClaimedJob["job_type"]): number {
 			return 75_000;
 		case "tracker_update":
 			return 90_000;
+		case "assign_generate_test":
+			return 180_000;
 		default:
 			return 90_000;
 	}
@@ -65,9 +69,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number, jobType: string): Promi
 
 type ClaimedJob = {
 	id: string;
-	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update";
-	test_id: string;
+	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update" | "assign_generate_test";
+	test_id: string | null;
 	student_id: string;
+	assignment_submission_id?: string | null;
 	attempts: number;
 	max_attempts: number;
 	payload: Record<string, unknown>;
@@ -105,14 +110,39 @@ async function markJobFailure(job: ClaimedJob, message: string) {
 	if (error) {
 		throw new Error(error.message ?? "Could not reschedule the practice job.");
 	}
+	if (isDead && job.job_type === "assign_generate_test") {
+		const submissionId =
+			job.assignment_submission_id ??
+			(typeof job.payload?.assignment_submission_id === "string" ? job.payload.assignment_submission_id : null);
+		if (submissionId) {
+			const { error: submissionError } = await admin
+				.from("assignment_submissions")
+				.update({
+					lifecycle_status: "failed_generation",
+					error: message.slice(0, 2000),
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", submissionId)
+				.in("lifecycle_status", ["pending_materialize", "failed_generation"]);
+			if (submissionError) {
+				logSupabaseError("markJobFailure.assignment_generation_dead", submissionError, {
+					jobId: job.id,
+					assignmentSubmissionId: submissionId,
+				});
+			}
+		}
+	}
 }
 
 async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false; message: string }> {
+	if (!job.test_id) {
+		return { ok: false, message: "Grade job missing test_id." };
+	}
 	const admin = createServiceRoleClient();
 
 	const { data: testRow, error: testErr } = await admin
 		.from("tests")
-		.select("id, student_id, subject_id, duration_seconds, time_limit_seconds, status")
+		.select("id, student_id, subject_id, duration_seconds, time_limit_seconds, status, assignment_submission_id")
 		.eq("id", job.test_id)
 		.maybeSingle();
 	if (testErr || !testRow) {
@@ -141,6 +171,22 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 			.from("tests")
 			.update({ status: "grading_failed", updated_at: new Date().toISOString() })
 			.eq("id", job.test_id);
+		if (typeof testRow.assignment_submission_id === "string" && testRow.assignment_submission_id) {
+			const { error: submissionErr } = await admin
+				.from("assignment_submissions")
+				.update({
+					lifecycle_status: "grading_failed",
+					error: result.message.slice(0, 2000),
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", testRow.assignment_submission_id);
+			if (submissionErr) {
+				logSupabaseError("handleGradeJob.assignment_submission_grading_failed", submissionErr, {
+					testId: job.test_id,
+					assignmentSubmissionId: testRow.assignment_submission_id,
+				});
+			}
+		}
 		await recordGradingFailure(admin, job.student_id, job.test_id, result.message);
 		void recordPracticeEvent(
 			admin,
@@ -157,6 +203,59 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 		{ test_id: job.test_id },
 		{ studentId: job.student_id },
 	);
+
+	if (typeof testRow.assignment_submission_id === "string" && testRow.assignment_submission_id) {
+		const { data: gradedTest, error: gradedTestErr } = await admin
+			.from("tests")
+			.select("total_score")
+			.eq("id", job.test_id)
+			.maybeSingle();
+		if (gradedTestErr) {
+			logSupabaseError("handleGradeJob.tests.score_read", gradedTestErr, {
+				testId: job.test_id,
+			});
+		}
+		const { error: submissionUpdateErr } = await admin
+			.from("assignment_submissions")
+			.update({
+				lifecycle_status: "graded",
+				graded_at: new Date().toISOString(),
+				score: gradedTest?.total_score ?? null,
+				updated_at: new Date().toISOString(),
+			})
+			.eq("id", testRow.assignment_submission_id);
+		if (submissionUpdateErr) {
+			logSupabaseError("handleGradeJob.assignment_submissions.update", submissionUpdateErr, {
+				testId: job.test_id,
+				assignmentSubmissionId: testRow.assignment_submission_id,
+			});
+		}
+		const { data: assignmentRow, error: assignmentRowErr } = await admin
+			.from("assignment_submissions")
+			.select("assignment_id, assignments(title)")
+			.eq("id", testRow.assignment_submission_id)
+			.maybeSingle();
+		if (assignmentRowErr) {
+			logSupabaseError("handleGradeJob.assignment_submissions.assignment_read", assignmentRowErr, {
+				testId: job.test_id,
+				assignmentSubmissionId: testRow.assignment_submission_id,
+			});
+		} else {
+			await notifyAssignmentGraded({
+				assignmentId: (assignmentRow?.assignment_id as string | undefined) ?? "",
+				submissionId: testRow.assignment_submission_id,
+				studentId: job.student_id,
+				title:
+					typeof assignmentRow?.assignments === "object" &&
+					assignmentRow.assignments !== null &&
+					"title" in assignmentRow.assignments &&
+					typeof assignmentRow.assignments.title === "string" ?
+						assignmentRow.assignments.title
+					:	"Practice assignment",
+				score: gradedTest?.total_score ?? null,
+			});
+		}
+	}
 
 	// Queue the PDF render as a follow-up job so grading isn't blocked by it.
 	const { error: enqueueError } = await admin.rpc("practice_enqueue_job", {
@@ -228,6 +327,9 @@ async function handleGradeJob(job: ClaimedJob): Promise<{ ok: true } | { ok: fal
 async function handleTrackerUpdateJob(
 	job: ClaimedJob,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+	if (!job.test_id) {
+		return { ok: false, message: "Tracker update job missing test_id." };
+	}
 	const admin = createServiceRoleClient();
 	const payload = job.payload as {
 		student_id?: string;
@@ -262,6 +364,9 @@ async function handleTrackerUpdateJob(
 }
 
 async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false; message: string }> {
+	if (!job.test_id) {
+		return { ok: false, message: "PDF job missing test_id." };
+	}
 	const result = await renderAndUploadPracticeReportPdf(job.test_id);
 	if (!result.ok) {
 		return { ok: false, message: result.message };
@@ -338,6 +443,9 @@ async function handlePdfJob(job: ClaimedJob): Promise<{ ok: true } | { ok: false
 async function handleEmailJob(
 	job: ClaimedJob,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+	if (!job.test_id) {
+		return { ok: false, message: "Email job missing test_id." };
+	}
 	const payload = job.payload as {
 		student_id?: string;
 		subject_name?: string;
@@ -405,6 +513,20 @@ async function handleEmailJob(
 	return { ok: false, message: result.reason };
 }
 
+async function handleAssignGenerateTestJob(
+	job: ClaimedJob,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const submissionId =
+		job.assignment_submission_id ??
+		(typeof job.payload?.assignment_submission_id === "string" ? job.payload.assignment_submission_id : null);
+	if (!submissionId) {
+		return { ok: false, message: "Assignment generation job missing assignment_submission_id." };
+	}
+	const result = await materializeAssignedPracticeTest(submissionId);
+	if (!result.ok) return result;
+	return { ok: true };
+}
+
 async function runPracticeJobs(request: Request): Promise<Response> {
 	const url = new URL(request.url);
 	const parsedLimit = Number.parseInt(
@@ -438,7 +560,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 
 	const { data: jobs, error } = await admin.rpc("practice_claim_jobs", {
 		p_worker_id: workerId,
-		p_job_types: ["grade", "pdf", "email", "tracker_update"],
+		p_job_types: ["grade", "pdf", "email", "tracker_update", "assign_generate_test"],
 		p_limit: limit,
 	});
 
@@ -457,6 +579,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 				: job.job_type === "pdf" ? handlePdfJob(job)
 				: job.job_type === "email" ? handleEmailJob(job)
 				: job.job_type === "tracker_update" ? handleTrackerUpdateJob(job)
+				: job.job_type === "assign_generate_test" ? handleAssignGenerateTestJob(job)
 				: Promise.resolve({ ok: false as const, message: `Unsupported job_type ${job.job_type}` });
 
 			// Per-job timeout: a stuck AI call cannot block the whole worker

@@ -53,7 +53,7 @@ export default async function AdminAssignmentDetailPage({ params }: { params: Pr
 							<span
 								className={cn(
 									"inline-flex rounded px-1.5 py-0.5 text-xs",
-									a.status === "active" ?
+									a.status === "published" ?
 										"bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100"
 									: a.status === "archived" ?
 										"bg-muted text-muted-foreground"
@@ -98,29 +98,6 @@ export default async function AdminAssignmentDetailPage({ params }: { params: Pr
 					<div>
 						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Due</dt>
 						<dd className="mt-0.5 font-mono text-xs">{fmtDate(a.due_date)}</dd>
-					</div>
-					<div>
-						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Late policy</dt>
-						<dd className="mt-0.5">
-							{a.late_submission_policy ?? "—"}
-							{a.late_penalty_percent != null && a.late_penalty_percent > 0 ? ` · -${a.late_penalty_percent}%` : ""}
-						</dd>
-					</div>
-					<div>
-						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Target grades</dt>
-						<dd className="mt-0.5">{a.target_grades.length > 0 ? a.target_grades.join(", ") : "—"}</dd>
-					</div>
-					<div>
-						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Target sections</dt>
-						<dd className="mt-0.5">{a.target_sections.length > 0 ? a.target_sections.join(", ") : "—"}</dd>
-					</div>
-					<div>
-						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Direct targets</dt>
-						<dd className="mt-0.5 tabular-nums">{a.target_student_ids.length}</dd>
-					</div>
-					<div>
-						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Unit</dt>
-						<dd className="mt-0.5">{a.unit_name ?? "—"}</dd>
 					</div>
 					<div>
 						<dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Topics</dt>

@@ -6,13 +6,14 @@ import "server-only";
  * outside this repo — see PRODUCT.md.
  */
 
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 import { notifications } from "@/db/schema/comms-audit";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { assignmentConfigSchema } from "@/lib/assignments/schemas";
 
 /** Single-line preview for L2 tables (notifications, long titles). */
 export function truncateForAdminPreview(text: string, maxLen: number): string {
@@ -54,28 +55,35 @@ export async function adminListAssignmentSubmissionsForStudent(
 			submissionId: assignmentSubmissions.id,
 			assignmentId: assignments.id,
 			title: assignments.title,
-			subjectName: subjects.name,
-			status: assignmentSubmissions.status,
+			config: assignments.config,
+			status: assignmentSubmissions.lifecycleStatus,
 			score: assignmentSubmissions.score,
 			isLate: assignmentSubmissions.isLate,
 			submittedAt: assignmentSubmissions.submittedAt,
 			testId: assignmentSubmissions.testId,
 			updatedAt: assignmentSubmissions.updatedAt,
-			dueDate: assignments.dueDate,
+			dueDate: assignments.dueAt,
 		})
 		.from(assignmentSubmissions)
 		.innerJoin(assignments, eq(assignmentSubmissions.assignmentId, assignments.id))
-		.innerJoin(subjects, eq(assignments.subjectId, subjects.id))
 		.where(whereSql)
 		.orderBy(desc(assignmentSubmissions.updatedAt))
 		.limit(ps)
 		.offset(offset);
 
-	const rows: AdminUserAssignmentSubmissionRow[] = raw.map((r) => ({
+	const configs = raw.map((r) => assignmentConfigSchema.safeParse(r.config));
+	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
+	const subjectRows =
+		subjectIds.length > 0 ?
+			await db.select({ id: subjects.id, name: subjects.name }).from(subjects).where(inArray(subjects.id, subjectIds))
+		:	[];
+	const subjectMap = new Map(subjectRows.map((r) => [r.id, r.name]));
+
+	const rows: AdminUserAssignmentSubmissionRow[] = raw.map((r, index) => ({
 		submission_id: r.submissionId,
 		assignment_id: r.assignmentId,
 		assignment_title: r.title,
-		subject_name: r.subjectName,
+		subject_name: configs[index]?.success ? (subjectMap.get(configs[index].data.subject_id) ?? null) : null,
 		status: r.status,
 		score: r.score != null ? String(r.score) : null,
 		is_late: r.isLate,
@@ -175,23 +183,30 @@ export async function adminListAssignmentsForTeacher(
 			id: assignments.id,
 			title: assignments.title,
 			status: assignments.status,
-			dueDate: assignments.dueDate,
-			subjectName: subjects.name,
+			dueDate: assignments.dueAt,
+			config: assignments.config,
 			updatedAt: assignments.updatedAt,
 		})
 		.from(assignments)
-		.innerJoin(subjects, eq(assignments.subjectId, subjects.id))
 		.where(whereSql)
 		.orderBy(desc(assignments.updatedAt))
 		.limit(ps)
 		.offset(offset);
 
-	const rows: AdminTeacherAssignmentRow[] = raw.map((r) => ({
+	const configs = raw.map((r) => assignmentConfigSchema.safeParse(r.config));
+	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
+	const subjectRows =
+		subjectIds.length > 0 ?
+			await db.select({ id: subjects.id, name: subjects.name }).from(subjects).where(inArray(subjects.id, subjectIds))
+		:	[];
+	const subjectMap = new Map(subjectRows.map((r) => [r.id, r.name]));
+
+	const rows: AdminTeacherAssignmentRow[] = raw.map((r, index) => ({
 		id: r.id,
 		title: r.title,
 		status: r.status,
 		due_date: r.dueDate instanceof Date ? r.dueDate.toISOString() : (r.dueDate ?? null),
-		subject_name: r.subjectName,
+		subject_name: configs[index]?.success ? (subjectMap.get(configs[index].data.subject_id) ?? null) : null,
 		updated_at: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updatedAt ?? null),
 	}));
 

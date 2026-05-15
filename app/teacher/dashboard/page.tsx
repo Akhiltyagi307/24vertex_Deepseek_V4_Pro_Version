@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2Icon, LifeBuoyIcon, ShieldCheckIcon } from "lucide-react";
 
 import { getProfile } from "@/lib/auth/routing";
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	getActiveTeacherOrganizationSnapshot,
+	listActiveTeacherLinkedStudentProfiles,
+} from "@/lib/organizations/queries";
 
 export default async function TeacherDashboardPage() {
 	const profile = await getProfile();
@@ -12,62 +13,86 @@ export default async function TeacherDashboardPage() {
 		redirect("/teacher/pending");
 	}
 
+	const activeOrganization = await getActiveTeacherOrganizationSnapshot(profile.id);
+	const linkCodeStudents = activeOrganization
+		? []
+		: await listActiveTeacherLinkedStudentProfiles(profile.id);
+
 	return (
-		<div className="w-full min-w-0 space-y-8">
-			<div className="flex items-center justify-between gap-4">
-				<div className="space-y-1">
-					<h1 className="text-2xl font-semibold tracking-tight">Teacher account</h1>
-					<p className="text-sm text-muted-foreground">
-						Your account is verified and ready for the teacher workspace on this deployment.
-					</p>
-				</div>
-				<SignOutButton />
+		<div className="w-full min-w-0 space-y-8 py-6">
+			<div className="space-y-1">
+				<h1 className="text-2xl font-semibold tracking-tight">Teacher dashboard</h1>
+				<p className="text-sm text-muted-foreground">
+					{activeOrganization ? (
+						<>
+							Your roster appears under <span className="text-foreground">Link Student</span> once grade and subject are
+							saved in Account settings. Open <span className="text-foreground">Student performance</span> to browse
+							learners and topic mastery (same view families see).
+						</>
+					) : (
+						<>
+							Use Account settings to join an institution, or open <span className="text-foreground">Link Student</span>{" "}
+							(or the Linked students tab there) to see learners connected with a link code.{" "}
+							<span className="text-foreground">Student performance</span> lists linked learners for analytics.
+						</>
+					)}
+				</p>
 			</div>
 
-			<div className="grid gap-4 medium:grid-cols-3">
-				<Card className="shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Verification</CardDescription>
-						<CardTitle className="flex items-center gap-2 text-base">
-							<ShieldCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400" />
-							Approved
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="text-sm text-muted-foreground">
-						Your school has verified this teacher account.
-					</CardContent>
-				</Card>
-
-				<Card className="shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Account status</CardDescription>
-						<CardTitle className="flex items-center gap-2 text-base">
-							<CheckCircle2Icon className="size-4 text-emerald-600 dark:text-emerald-400" />
-							Active
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="text-sm text-muted-foreground">
-						You can keep using this login as teacher tools are enabled for your deployment.
-					</CardContent>
-				</Card>
-
-				<Card className="shadow-none">
-					<CardHeader className="pb-2">
-						<CardDescription>Need help?</CardDescription>
-						<CardTitle className="flex items-center gap-2 text-base">
-							<LifeBuoyIcon className="size-4 text-muted-foreground" />
-							Support
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="text-sm text-muted-foreground">
-						If something looks wrong with your account, contact your school administrator or EduAI support.
-					</CardContent>
-				</Card>
+			<div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-8 py-16 text-center">
+				<p className="text-sm font-medium text-foreground">
+					{activeOrganization
+						? "Configure your roster filters"
+						: linkCodeStudents.length > 0
+							? `${linkCodeStudents.length} linked student${linkCodeStudents.length === 1 ? "" : "s"}`
+							: "No linked students yet"}
+				</p>
+				<p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+					{activeOrganization ? (
+						<>
+							In Account settings, choose the grade and subject you teach at{" "}
+							<span className="text-foreground">{activeOrganization.name}</span>, then open Link Student to view learners.
+						</>
+					) : linkCodeStudents.length > 0 ? (
+						<>
+							Names below match your active link-code connections. Open{" "}
+							<Link href="/teacher/students" className="text-foreground underline underline-offset-4">
+								Link Student
+							</Link>{" "}
+							to add or remove access.
+						</>
+					) : (
+						<>
+							From Link Student, add learners with their six-character link codes — available only while you&apos;re not
+							connected to an organization.
+						</>
+					)}
+				</p>
+				{!activeOrganization && linkCodeStudents.length > 0 ? (
+					<ul className="mx-auto mt-6 max-w-md divide-y divide-border rounded-lg border border-border/80 text-left text-sm">
+						{linkCodeStudents.map((s) => (
+							<li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2.5">
+								<span className="font-medium">{s.fullName}</span>
+								<span className="font-mono text-muted-foreground text-xs tabular-nums">
+									{s.studentLinkCode ?? "—"}
+								</span>
+							</li>
+						))}
+					</ul>
+				) : null}
 			</div>
 
 			<p className="text-sm">
-				<Link href="/" className="underline underline-offset-4">
-					Home
+				<Link href="/teacher/students" className="underline underline-offset-4">
+					Open Link Student
+				</Link>
+				{" · "}
+				<Link href="/teacher/student-performance" className="underline underline-offset-4">
+					Student performance
+				</Link>
+				{" · "}
+				<Link href="/teacher/settings" className="underline underline-offset-4">
+					Account settings
 				</Link>
 			</p>
 		</div>

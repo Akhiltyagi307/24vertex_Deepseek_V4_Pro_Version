@@ -68,7 +68,7 @@ export default async function AdminAssignmentsListPage({
 						className="w-40 rounded-md border border-border bg-background px-2 py-1 text-sm"
 					>
 						<option value="">All</option>
-						<option value="active">active</option>
+						<option value="published">published</option>
 						<option value="archived">archived</option>
 						<option value="draft">draft</option>
 					</select>
@@ -161,7 +161,7 @@ export default async function AdminAssignmentsListPage({
 										<span
 											className={cn(
 												"rounded px-1.5 py-0.5 text-xs",
-												r.status === "active" ?
+												r.status === "published" ?
 													"bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100"
 												: r.status === "archived" ?
 													"bg-muted text-muted-foreground"

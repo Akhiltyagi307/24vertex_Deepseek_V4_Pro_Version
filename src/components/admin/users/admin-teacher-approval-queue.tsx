@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { AdminExportButton } from "@/components/admin/data-table/export-button";
 import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { Button } from "@/components/ui/button";
+import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
-type Row = { id: string; email: string | null; full_name: string; school_name: string | null; created_at: string | null };
+type Row = {
+	id: string;
+	email: string | null;
+	full_name: string;
+	phone: string | null;
+	school_name: string | null;
+	created_at: string | null;
+};
 
 export function AdminTeacherApprovalQueue() {
 	const [rows, setRows] = useState<Row[]>([]);
@@ -32,10 +41,14 @@ export function AdminTeacherApprovalQueue() {
 		setBusy(id);
 		try {
 			const res = await fetch(`/api/admin/teachers/${id}/approve`, { method: "POST", credentials: "include" });
-			if (!res.ok) throw new Error(await res.text());
+			if (!res.ok) {
+				toast.error(await adminHttpErrorMessage(res, "Could not approve this teacher"));
+				return;
+			}
+			toast.success("Teacher approved.");
 			await load();
-		} catch (e) {
-			alert(e instanceof Error ? e.message : "Failed");
+		} catch {
+			toast.error("Network error — try again.");
 		} finally {
 			setBusy(null);
 		}
@@ -52,10 +65,14 @@ export function AdminTeacherApprovalQueue() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ reason }),
 			});
-			if (!res.ok) throw new Error(await res.text());
+			if (!res.ok) {
+				toast.error(await adminHttpErrorMessage(res, "Could not reject this teacher"));
+				return;
+			}
+			toast.success("Teacher rejected.");
 			await load();
-		} catch (e) {
-			alert(e instanceof Error ? e.message : "Failed");
+		} catch {
+			toast.error("Network error — try again.");
 		} finally {
 			setBusy(null);
 		}
@@ -74,10 +91,14 @@ export function AdminTeacherApprovalQueue() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ questions }),
 			});
-			if (!res.ok) throw new Error(await res.text());
+			if (!res.ok) {
+				toast.error(await adminHttpErrorMessage(res, "Could not send request"));
+				return;
+			}
+			toast.success("Request sent to teacher.");
 			await load();
-		} catch (e) {
-			alert(e instanceof Error ? e.message : "Failed");
+		} catch {
+			toast.error("Network error — try again.");
 		} finally {
 			setBusy(null);
 		}
@@ -87,6 +108,7 @@ export function AdminTeacherApprovalQueue() {
 		id: r.id,
 		email: r.email ?? "",
 		full_name: r.full_name,
+		phone: r.phone ?? "",
 		school_name: r.school_name ?? "",
 		created_at: r.created_at ?? "",
 	}));
@@ -98,7 +120,7 @@ export function AdminTeacherApprovalQueue() {
 					<AdminSavedViews listId={ADMIN_LIST_ID.teacherApprovals} />
 					<AdminExportButton
 						filenameBase="teacher-approvals"
-						headers={["id", "email", "full_name", "school_name", "created_at"]}
+						headers={["id", "email", "phone", "full_name", "school_name", "created_at"]}
 						rows={[]}
 						disabled
 					/>
@@ -115,7 +137,7 @@ export function AdminTeacherApprovalQueue() {
 					<AdminSavedViews listId={ADMIN_LIST_ID.teacherApprovals} />
 					<AdminExportButton
 						filenameBase="teacher-approvals"
-						headers={["id", "email", "full_name", "school_name", "created_at"]}
+						headers={["id", "email", "phone", "full_name", "school_name", "created_at"]}
 						rows={[]}
 						disabled
 					/>
@@ -131,7 +153,7 @@ export function AdminTeacherApprovalQueue() {
 				<AdminSavedViews listId={ADMIN_LIST_ID.teacherApprovals} />
 				<AdminExportButton
 					filenameBase="teacher-approvals"
-					headers={["id", "email", "full_name", "school_name", "created_at"]}
+					headers={["id", "email", "phone", "full_name", "school_name", "created_at"]}
 					rows={exportRows}
 				/>
 			</div>
@@ -140,6 +162,7 @@ export function AdminTeacherApprovalQueue() {
 					<div>
 						<p className="font-medium">{r.full_name}</p>
 						<p className="text-sm text-muted-foreground">{r.email ?? "—"}</p>
+						<p className="text-sm text-muted-foreground">{r.phone ?? "—"}</p>
 						<p className="text-xs text-muted-foreground">{r.school_name ?? "School not set"}</p>
 					</div>
 					<div className="flex flex-wrap gap-2">
