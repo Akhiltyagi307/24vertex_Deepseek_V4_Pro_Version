@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { updateStudentSchoolPlacement } from "./actions";
-import { panelRaisedInputClass } from "./_settings-form-styles";
+import { panelRaisedInputClass, settingsCtaButtonClass } from "./_settings-form-styles";
 import type { StudentProfileSettingsRow } from "./student-profile-settings-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -510,12 +510,23 @@ export function PlacementFieldDialog({
 						</p>
 					) : null}
 
-					<div className="flex justify-end gap-2 border-border border-t pt-2">
-						<Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+					<div className="flex flex-col-reverse justify-end gap-2 border-border border-t pt-2 medium:flex-row">
+						<Button
+							type="button"
+							variant="outline"
+							className={cn(settingsCtaButtonClass, "medium:w-auto")}
+							onClick={onClose}
+							disabled={pending}
+						>
 							{showSave ? "Cancel" : "Close"}
 						</Button>
 						{showSave ? (
-							<Button type="button" onClick={() => void handleSaveField()} disabled={pending}>
+							<Button
+								type="button"
+								className={cn(settingsCtaButtonClass, "medium:w-auto")}
+								onClick={() => void handleSaveField()}
+								disabled={pending}
+							>
 								{pending ? "Saving…" : "Save"}
 							</Button>
 						) : null}

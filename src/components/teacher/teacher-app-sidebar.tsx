@@ -33,9 +33,7 @@ export function TeacherAppSidebar({
 	const { state, isMobile } = useSidebar();
 	const collapsedDesktop = state === "collapsed" && !isMobile;
 	const homeTooltip = collapsedDesktop ? `EduAI · ${contextLabel}` : undefined;
-	const homeAriaLabel = collapsedDesktop
-		? `EduAI, ${contextLabel}. Teacher dashboard.`
-		: undefined;
+	const homeAriaLabel = collapsedDesktop ? `EduAI, ${contextLabel}. Dashboard.` : undefined;
 
 	return (
 		<Sidebar collapsible="icon" className="!top-12 h-auto">

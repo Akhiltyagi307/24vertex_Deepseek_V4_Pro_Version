@@ -16,7 +16,12 @@ import {
 } from "./actions";
 import { TeacherOrgStudentsTab } from "./teacher-org-students-tab";
 import { TeacherIndependentStudentsPanel } from "../students/independent-students-panel";
-import { panelRaisedInputClass, tabAccentClass } from "@/app/student/settings/_settings-form-styles";
+import {
+	panelRaisedInputClass,
+	settingsCtaButtonClass,
+	settingsCtaButtonWidthClass,
+	tabAccentClass,
+} from "@/app/student/settings/_settings-form-styles";
 import { PasswordChangeForm } from "@/app/student/settings/password-change-form";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { LoginEmailChangeForm } from "@/components/auth/login-email-change-form";
@@ -49,6 +54,8 @@ import { cn } from "@/lib/utils";
 
 const tabPanelClassName =
 	"min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm medium:px-8 medium:py-8 dark:border-border dark:bg-muted/20";
+
+const settingsPrimarySubmitClass = cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0");
 
 export type TeacherAccountProfile = {
 	full_name: string;
@@ -171,7 +178,7 @@ export function TeacherAccountSettingsForm({
 							<p className="mt-1 font-medium">{activeOrganization.name}</p>
 							<p className="text-sm text-muted-foreground">{activeOrganization.type_label}</p>
 						</div>
-						<Button type="submit" variant="outline">
+						<Button type="submit" variant="outline" className={settingsPrimarySubmitClass}>
 							Leave organization
 						</Button>
 					</form>
@@ -205,7 +212,11 @@ export function TeacherAccountSettingsForm({
 								case-sensitive.
 							</p>
 						</div>
-						<SubmitButton label="Join organization" pendingLabel="Joining..." />
+						<SubmitButton
+							label="Join organization"
+							pendingLabel="Joining..."
+							className={settingsPrimarySubmitClass}
+						/>
 					</form>
 				)}
 			</div>
@@ -271,6 +282,7 @@ export function TeacherAccountSettingsForm({
 					label="Save teaching filters"
 					pendingLabel="Saving…"
 					disabled={subjectsForGrade.length === 0}
+					className={settingsPrimarySubmitClass}
 				/>
 			</form>
 		);
@@ -333,7 +345,7 @@ export function TeacherAccountSettingsForm({
 							</FieldSet>
 						</CardContent>
 					</Card>
-					<SubmitButton label="Save profile" pendingLabel="Saving…" />
+					<SubmitButton label="Save profile" pendingLabel="Saving…" className={settingsPrimarySubmitClass} />
 				</form>
 			),
 		},
@@ -342,7 +354,14 @@ export function TeacherAccountSettingsForm({
 			title: "Login email",
 			icon: Mail,
 			color: tabAccentClass,
-			content: <LoginEmailChangeForm currentEmail={loginEmail} inputIdPrefix="teacherLoginEmail" variant="embedded" />,
+			content: (
+				<LoginEmailChangeForm
+					currentEmail={loginEmail}
+					inputIdPrefix="teacherLoginEmail"
+					variant="embedded"
+					ctaButtonClassName={settingsPrimarySubmitClass}
+				/>
+			),
 		},
 		{
 			id: "password",

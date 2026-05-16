@@ -17,16 +17,18 @@ export function TeacherPerformanceDirectoryPanel({
 	subjectsCatalog,
 	initialRows,
 	filterOptions,
+	initialSubjectId = "all",
 }: {
 	workspaceDescription: string;
 	subjectsCatalog: SubjectCatalogRow[];
 	initialRows: TeacherPerformanceStudentRow[];
 	filterOptions: { grades: number[]; sections: string[] };
+	initialSubjectId?: string | "all";
 }) {
 	const [rows, setRows] = useState<TeacherPerformanceStudentRow[]>(initialRows);
 	const [grade, setGrade] = useState<number | "all">("all");
 	const [section, setSection] = useState<string | "all">("all");
-	const [subjectId, setSubjectId] = useState<string | "all">("all");
+	const [subjectId, setSubjectId] = useState<string | "all">(initialSubjectId);
 	const [error, setError] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
 	const skipInitialFetch = useRef(true);
@@ -118,6 +120,7 @@ export function TeacherPerformanceDirectoryPanel({
 							<div className="flex w-[min(14rem,calc(100vw-2.75rem))] shrink-0 flex-col gap-1.5">
 								<span className="text-foreground text-xs font-medium">Grade</span>
 								<ReportsPillSelect
+									fullWidth
 									menuTitle="Grade"
 									ariaLabel="Filter students by grade"
 									icon={GraduationCap}
@@ -126,13 +129,14 @@ export function TeacherPerformanceDirectoryPanel({
 										{ value: "", label: "All grades" },
 										...gradeOptions.map((g) => ({ value: String(g), label: `Grade ${g}` })),
 									]}
-									className="w-full min-w-0 max-w-none shadow-none"
+									className="shadow-none"
 									onValueChange={handleGradeChange}
 								/>
 							</div>
 							<div className="flex w-[min(14rem,calc(100vw-2.75rem))] shrink-0 flex-col gap-1.5">
 								<span className="text-foreground text-xs font-medium">Section</span>
 								<ReportsPillSelect
+									fullWidth
 									menuTitle="Section"
 									ariaLabel="Filter students by section"
 									icon={Layers2}
@@ -141,13 +145,14 @@ export function TeacherPerformanceDirectoryPanel({
 										{ value: "", label: "All sections" },
 										...filterOptions.sections.map((s) => ({ value: s, label: s })),
 									]}
-									className="w-full min-w-0 max-w-none shadow-none"
+									className="shadow-none"
 									onValueChange={(v) => setSection(v === "" ? "all" : v)}
 								/>
 							</div>
 							<div className="flex min-w-[min(14rem,calc(100vw-2.75rem))] max-w-[min(20rem,85vw)] shrink-0 flex-col gap-1.5">
 								<span className="text-foreground text-xs font-medium">Subject</span>
 								<ReportsPillSelect
+									fullWidth
 									menuTitle="Subject"
 									ariaLabel="Filter students by subject"
 									icon={Library}
@@ -159,7 +164,7 @@ export function TeacherPerformanceDirectoryPanel({
 											label: `${s.name} (Gr. ${s.grade})`,
 										})),
 									]}
-									className="w-full min-w-0 max-w-none shadow-none"
+									className="shadow-none"
 									onValueChange={(v) => setSubjectId(v === "" ? "all" : v)}
 								/>
 							</div>

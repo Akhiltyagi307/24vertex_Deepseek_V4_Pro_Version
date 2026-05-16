@@ -60,7 +60,7 @@ export default async function TeacherStudentPerformanceDetailPage({ params, sear
 	const displayName = formatPersonDisplayName(row.full_name ?? "") || "Student";
 
 	return (
-		<div className="mx-auto w-full max-w-6xl px-4 py-4 md:px-6 md:py-6">
+		<div className="w-full min-w-0 py-4 medium:py-6">
 			<p className="mb-4 text-muted-foreground text-sm">
 				<Link href="/teacher/student-performance" className="underline underline-offset-4 hover:text-foreground">
 					Student performance

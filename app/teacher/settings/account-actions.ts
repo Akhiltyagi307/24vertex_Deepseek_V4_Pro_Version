@@ -135,5 +135,6 @@ export async function updateTeacherTeachingFocus(
 	revalidatePath("/teacher/settings");
 	revalidatePath("/teacher/students");
 	revalidatePath("/teacher/student-performance");
+	revalidatePath("/teacher/topic-performance");
 	return { success: true };
 }

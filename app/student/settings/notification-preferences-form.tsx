@@ -9,6 +9,7 @@ import type {
 	NotificationPreferencesInput,
 	NotificationPreferencesState,
 } from "./notification-preferences-types";
+import { settingsCtaButtonClass, settingsCtaButtonWidthClass } from "./_settings-form-styles";
 import AnimatedToggle from "@/components/smoothui/animated-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -167,8 +168,11 @@ export function NotificationPreferencesForm({
 				</p>
 				<Button
 					type={isSettingsTab ? "button" : "submit"}
-					size={isSettingsTab ? "lg" : "default"}
-					className={cn(isSettingsTab && "h-11 w-full text-base medium:w-auto")}
+					className={
+						isSettingsTab ?
+							cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")
+						:	undefined
+					}
 					disabled={pending}
 					onClick={isSettingsTab ? () => save() : undefined}
 				>

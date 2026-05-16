@@ -23,7 +23,9 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 
 	const teacherOrg = await getActiveTeacherOrganizationSnapshot(row.id);
 	const organizationName =
-		teacherOrg?.name?.trim() || row.school_name?.trim() || "Your workspace";
+		teacherOrg != null
+			? teacherOrg.name?.trim() || row.school_name?.trim() || "Your workspace"
+			: null;
 	const displayName = formatPersonDisplayName(row.full_name ?? "") || "Teacher";
 	const contextLabel = teacherOrg?.type_label ?? "Teacher";
 

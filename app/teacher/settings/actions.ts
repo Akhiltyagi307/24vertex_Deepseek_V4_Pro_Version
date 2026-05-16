@@ -138,6 +138,7 @@ export async function joinTeacherOrganization(
 	revalidatePath("/teacher", "layout");
 	revalidatePath("/teacher/settings");
 	revalidatePath("/teacher/student-performance");
+	revalidatePath("/teacher/topic-performance");
 	return { success: true };
 }
 
@@ -182,6 +183,7 @@ export async function leaveTeacherOrganization(
 	revalidatePath("/teacher", "layout");
 	revalidatePath("/teacher/settings");
 	revalidatePath("/teacher/student-performance");
+	revalidatePath("/teacher/topic-performance");
 	return { success: true };
 }
 
@@ -238,6 +240,7 @@ export async function linkTeacherToStudent(
 	revalidatePath("/teacher/students");
 	revalidatePath("/teacher/settings");
 	revalidatePath("/teacher/student-performance");
+	revalidatePath("/teacher/topic-performance");
 	return { success: true };
 }
 
@@ -270,5 +273,6 @@ export async function unlinkTeacherFromStudent(
 	revalidatePath("/teacher/students");
 	revalidatePath("/teacher/settings");
 	revalidatePath("/teacher/student-performance");
+	revalidatePath("/teacher/topic-performance");
 	return { success: true };
 }

@@ -3,7 +3,14 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardListIcon, LayoutDashboardIcon, LineChartIcon, SettingsIcon, UsersRoundIcon } from "lucide-react";
+import {
+	ClipboardListIcon,
+	LayoutDashboardIcon,
+	LineChartIcon,
+	ListTree,
+	SettingsIcon,
+	UsersRoundIcon,
+} from "lucide-react";
 
 import {
 	SidebarGroup,
@@ -24,6 +31,7 @@ const primaryItems: NavItem[] = [
 	{ title: "Link Student", href: "/teacher/students", icon: UsersRoundIcon },
 	{ title: "Assignments", href: "/teacher/assignments", icon: ClipboardListIcon },
 	{ title: "Student performance", href: "/teacher/student-performance", icon: LineChartIcon },
+	{ title: "Topic performance", href: "/teacher/topic-performance", icon: ListTree },
 	{ title: "Settings", href: "/teacher/settings", icon: SettingsIcon },
 ];
 

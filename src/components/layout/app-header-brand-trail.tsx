@@ -32,7 +32,8 @@ export function HeaderBreadcrumbSlash() {
 export type HeaderPortal = "student" | "parent";
 
 export type AppHeaderBrandTrailProps = {
-	organizationName?: string;
+	/** When omitted or blank, the organization segment (school icon + divider) is hidden. */
+	organizationName?: string | null;
 	userDisplayName?: string;
 	shareableId?: string | null;
 	/** Affects copy and aria for the shareable ID control. */
@@ -42,12 +43,15 @@ export type AppHeaderBrandTrailProps = {
 };
 
 export function AppHeaderBrandTrail({
-	organizationName = "EduAI",
+	organizationName,
 	userDisplayName = "Student",
 	shareableId = null,
 	headerPortal = "student",
 	omitLogo = false,
 }: AppHeaderBrandTrailProps) {
+	const orgLabel = organizationName?.trim() ?? "";
+	const showOrganizationSegment = orgLabel.length > 0;
+
 	return (
 		<nav
 			aria-label="App context"
@@ -66,15 +70,19 @@ export function AppHeaderBrandTrail({
 					<HeaderBreadcrumbSlash />
 				</>
 			)}
-			<div className="flex min-w-0 items-center gap-2">
-				<SchoolIcon
-					className={brandTrailIconClass}
-					strokeWidth={2}
-					aria-hidden
-				/>
-				<span className={trailTextClass}>{organizationName}</span>
-			</div>
-			<HeaderBreadcrumbSlash />
+			{showOrganizationSegment ? (
+				<>
+					<div className="flex min-w-0 items-center gap-2">
+						<SchoolIcon
+							className={brandTrailIconClass}
+							strokeWidth={2}
+							aria-hidden
+						/>
+						<span className={trailTextClass}>{orgLabel}</span>
+					</div>
+					<HeaderBreadcrumbSlash />
+				</>
+			) : null}
 			<div className="flex min-w-0 items-center gap-2">
 				<UserRoundIcon
 					className={brandTrailIconClass}

@@ -4,7 +4,7 @@ import { CheckIcon } from "lucide-react";
 import { useState } from "react";
 
 import { recordPasswordChangedAction } from "./account-security-actions";
-import { panelRaisedInputClass } from "./_settings-form-styles";
+import { panelRaisedInputClass, settingsCtaButtonClass, settingsCtaButtonWidthClass } from "./_settings-form-styles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { studentChangePasswordSchema } from "@/lib/validations/auth";
 
@@ -169,8 +170,11 @@ export function PasswordChangeForm({ loginEmail, fieldIdPrefix = "student" }: Pr
 					</FieldGroup>
 					<Button
 						type="button"
-						className="mt-6 h-11 w-full text-base medium:w-auto"
-						size="lg"
+						className={cn(
+							settingsCtaButtonClass,
+							settingsCtaButtonWidthClass,
+							"mt-6 shrink-0",
+						)}
 						disabled={pwPending}
 						onClick={() => void handleChangePassword()}
 					>

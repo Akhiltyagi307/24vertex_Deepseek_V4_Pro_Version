@@ -12,7 +12,11 @@ import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function TeacherStudentPerformanceDirectoryPage() {
+type PageProps = {
+	searchParams: Promise<{ subject?: string }>;
+};
+
+export default async function TeacherStudentPerformanceDirectoryPage({ searchParams }: PageProps) {
 	const user = await getServerUser();
 	if (!user) {
 		redirect("/login");
@@ -28,17 +32,22 @@ export default async function TeacherStudentPerformanceDirectoryPage() {
 
 	const activeOrg = await getActiveTeacherOrganizationSnapshot(user.id);
 
-	const [subjectsCatalog, initialRows, filterOptions] = await Promise.all([
+	const [subjectsCatalog, filterOptions] = await Promise.all([
 		listActiveSubjectsCatalog(),
-		listTeacherPerformanceDirectoryStudents({
-			teacherId: user.id,
-			activeOrganizationId: activeOrg?.id ?? null,
-		}),
 		getTeacherPerformanceDirectoryFilterOptions({
 			teacherId: user.id,
 			activeOrganizationId: activeOrg?.id ?? null,
 		}),
 	]);
+	const sp = await searchParams;
+	const initialSubjectId =
+		sp.subject && subjectsCatalog.some((subject) => subject.id === sp.subject) ? sp.subject : "all";
+
+	const initialRows = await listTeacherPerformanceDirectoryStudents({
+		teacherId: user.id,
+		activeOrganizationId: activeOrg?.id ?? null,
+		subjectId: initialSubjectId === "all" ? undefined : initialSubjectId,
+	});
 
 	const workspaceDescription = activeOrg
 		? `Review subject-level performance for students at ${activeOrg.name} that your teacher account can reach. Filter by grade, section, or subject (grades 11–12 respect stream and elective), then open a student to see detailed progress—the same subject view families see in the parent portal.`
@@ -50,6 +59,7 @@ export default async function TeacherStudentPerformanceDirectoryPage() {
 			subjectsCatalog={subjectsCatalog}
 			initialRows={initialRows}
 			filterOptions={filterOptions}
+			initialSubjectId={initialSubjectId}
 		/>
 	);
 }

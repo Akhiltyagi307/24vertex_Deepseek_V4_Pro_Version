@@ -14,6 +14,7 @@ import {
 	FieldDescription,
 	FieldLabel,
 } from "@/components/ui/field";
+import { settingsCtaButtonClass, settingsCtaButtonWidthClass } from "@/app/student/settings/_settings-form-styles";
 import { getCroppedImageBlob } from "@/lib/images/crop-to-blob";
 import { createClient } from "@/lib/supabase/client";
 import { AVATAR_MAX_BYTES } from "@/lib/supabase/avatar-storage-url";
@@ -215,7 +216,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 									type="button"
 									variant="default"
 									size="lg"
-									className="h-10 w-full gap-2 px-5 medium:w-auto"
+									className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "gap-2")}
 									onClick={openFilePicker}
 								>
 									{avatarUrl ? (
@@ -230,7 +231,11 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 										type="button"
 										variant="ghost"
 										size="lg"
-										className="h-10 w-full text-muted-foreground medium:w-auto"
+										className={cn(
+											settingsCtaButtonClass,
+											settingsCtaButtonWidthClass,
+											"text-muted-foreground",
+										)}
 										onClick={removePhoto}
 									>
 										Remove photo
@@ -303,11 +308,24 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 							/>
 						</div>
 
-						<div className="flex justify-end gap-2 border-border border-t pt-2">
-							<Button type="button" variant="outline" onClick={closeCropDialog} disabled={busy}>
+						<div className="flex flex-col-reverse justify-end gap-2 border-border border-t pt-2 medium:flex-row">
+							<Button
+								type="button"
+								variant="outline"
+								size="lg"
+								className={cn(settingsCtaButtonClass, "medium:w-auto")}
+								onClick={closeCropDialog}
+								disabled={busy}
+							>
 								Cancel
 							</Button>
-							<Button type="button" onClick={() => void confirmCrop()} disabled={busy || !croppedAreaPixels}>
+							<Button
+								type="button"
+								size="lg"
+								className={cn(settingsCtaButtonClass, "medium:w-auto")}
+								onClick={() => void confirmCrop()}
+								disabled={busy || !croppedAreaPixels}
+							>
 								{busy ? "Uploading…" : "Save photo"}
 							</Button>
 						</div>

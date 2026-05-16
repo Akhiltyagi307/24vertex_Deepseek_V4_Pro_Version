@@ -1,8 +1,10 @@
 const path = require("node:path");
 
 /** Next.js dev server managed by PM2 (survives closing the terminal; optional `pm2 startup` for reboot).
- *  Webpack + `NEXT_DEV_WEBPACK_CLEAR_DEV` clears `.next/dev` on each start; `scripts/next-dev.mjs` also
- *  watchdogs `routes-manifest.json` when that env is set so PM2 can auto-restart after rare dev corruption.
+ *  Uses **default Turbopack** (`pnpm dev`). Next.js 16.2 + Webpack dev (`NEXT_DEV_WEBPACK=1`) can emit HTML that
+ *  references `/_next/static/css/app/layout.css` which never resolves → totally unstyled pages (Tailwind absent).
+ *  `scripts/next-dev.mjs` clears `.next/dev` on each start unless `NEXT_DEV_PRESERVE_DEV_CACHE=true`.
+ *  Optional: `NEXT_DEV_ROUTES_WATCHDOG=1` in env helps PM2 exit/restart if `.next/dev` corrupts (was webpack-centric).
  */
 module.exports = {
 	apps: [
@@ -20,12 +22,6 @@ module.exports = {
 			env: {
 				NODE_ENV: "development",
 				PORT: "3001",
-				// Turbopack dev cache can corrupt across restarts (missing manifests / `[turbopack]_runtime.js`).
-				// Webpack is slower but stable for a long-lived PM2 process; see `scripts/next-dev.mjs`.
-				NEXT_DEV_WEBPACK: "1",
-				// Clear `.next/dev` whenever PM2 starts the wrapper so stale/partial dev output
-				// (e.g. missing `routes-manifest.json` after internal Next restarts) cannot linger.
-				NEXT_DEV_WEBPACK_CLEAR_DEV: "1",
 			},
 		},
 	],

@@ -12,7 +12,7 @@ const topBarControlChrome =
 	"border border-border/90 bg-sidebar-accent shadow-sm dark:border-border dark:bg-sidebar-accent";
 
 export type TeacherTopBarProps = {
-	organizationName: string;
+	organizationName: string | null;
 	userDisplayName: string;
 };
 
@@ -28,7 +28,7 @@ export function TeacherTopBar({ organizationName, userDisplayName }: TeacherTopB
 				/>
 				<HeaderBreadcrumbSlash />
 				<AppHeaderBrandTrail
-					organizationName={organizationName}
+					organizationName={organizationName ?? undefined}
 					userDisplayName={userDisplayName}
 					shareableId={null}
 					headerPortal="student"

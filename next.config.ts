@@ -59,8 +59,11 @@ const nextConfig: NextConfig = {
 	// no parse failures; production `next build` succeeds without listing it here.
 	// See `src/lib/practice/visuals/__tests__/svg-maps-india-package.test.ts`.
 	transpilePackages: ["smiles-drawer"],
+	// In dev (Turbopack), external `@sentry/nextjs` can split OpenTelemetry into chunks
+	// the proxy/middleware runtime fails to resolve (ChunkLoadError). Keep Sentry bundled
+	// locally in development; production builds still externalize it.
 	serverExternalPackages: [
-		"@sentry/nextjs",
+		...(process.env.NODE_ENV === "production" ? (["@sentry/nextjs"] as const) : []),
 		"drizzle-orm",
 		"postgres",
 		"@react-pdf/renderer",

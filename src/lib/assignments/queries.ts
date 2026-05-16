@@ -23,9 +23,30 @@ import {
 export type AssignmentTopicCatalogRow = {
 	id: string;
 	subjectId: string;
+	unitNumber: number;
 	unitName: string;
+	chapterNumber: number;
 	chapterName: string;
+	topicNumber: number;
 	topicName: string;
+};
+
+/** Per-student rows for a teacher’s assignments (published only). */
+export type TeacherAssignmentSubmissionRow = {
+	assignmentId: string;
+	assignmentTitle: string;
+	dueAt: string | null;
+	createdAt: string | null;
+	subjectName: string | null;
+	studentId: string;
+	studentFullName: string;
+	studentGrade: number | null;
+	studentSection: string | null;
+	lifecycleStatus: string;
+	score: string | null;
+	testId: string | null;
+	submittedAt: string | null;
+	gradedAt: string | null;
 };
 
 export type TeacherAssignmentSummaryRow = {
@@ -75,8 +96,11 @@ export async function listAssignmentTopicCatalog(): Promise<AssignmentTopicCatal
 		.select({
 			id: topics.id,
 			subjectId: topics.subjectId,
+			unitNumber: topics.unitNumber,
 			unitName: topics.unitName,
+			chapterNumber: topics.chapterNumber,
 			chapterName: topics.chapterName,
+			topicNumber: topics.topicNumber,
 			topicName: topics.topicName,
 		})
 		.from(topics)
@@ -101,8 +125,11 @@ export async function listTeacherAssignmentSubjectCatalog(teacherId: string): Pr
 		.select({
 			id: topics.id,
 			subjectId: topics.subjectId,
+			unitNumber: topics.unitNumber,
 			unitName: topics.unitName,
+			chapterNumber: topics.chapterNumber,
 			chapterName: topics.chapterName,
+			topicNumber: topics.topicNumber,
 			topicName: topics.topicName,
 		})
 		.from(topics)
@@ -202,6 +229,69 @@ export async function listTeacherAssignmentSummaries(
 					gradingFailed: Number(countRow?.gradingFailed ?? 0),
 				},
 				averageScore: countRow?.averageScore == null ? null : Number(countRow.averageScore),
+			},
+		];
+	});
+}
+
+export async function listTeacherAssignmentSubmissionRows(
+	teacherId: string,
+): Promise<TeacherAssignmentSubmissionRow[]> {
+	const rows = await db
+		.select({
+			assignmentId: assignments.id,
+			assignmentTitle: assignments.title,
+			dueAt: assignments.dueAt,
+			createdAt: assignments.createdAt,
+			config: assignments.config,
+			studentId: profiles.id,
+			studentFullName: profiles.fullName,
+			studentGrade: profiles.grade,
+			studentSection: profiles.section,
+			lifecycleStatus: assignmentSubmissions.lifecycleStatus,
+			score: assignmentSubmissions.score,
+			testId: assignmentSubmissions.testId,
+			submittedAt: assignmentSubmissions.submittedAt,
+			gradedAt: assignmentSubmissions.gradedAt,
+		})
+		.from(assignmentSubmissions)
+		.innerJoin(assignments, eq(assignments.id, assignmentSubmissions.assignmentId))
+		.innerJoin(profiles, eq(profiles.id, assignmentSubmissions.studentId))
+		.where(
+			and(eq(assignments.teacherId, teacherId), eq(assignments.status, "published"), eq(profiles.role, "student")),
+		)
+		.orderBy(desc(assignments.createdAt), asc(profiles.fullName));
+
+	const configs = rows.map((row) => assignmentConfigSchema.safeParse(row.config));
+	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
+	const subjectRows =
+		subjectIds.length > 0 ?
+			await db
+				.select({ id: subjects.id, name: subjects.name })
+				.from(subjects)
+				.where(inArray(subjects.id, subjectIds))
+		:	[];
+	const subjectNameById = new Map(subjectRows.map((row) => [row.id, row.name]));
+
+	return rows.flatMap((row, index) => {
+		const config = configs[index];
+		const subjectName = config.success ? (subjectNameById.get(config.data.subject_id) ?? null) : null;
+		return [
+			{
+				assignmentId: row.assignmentId,
+				assignmentTitle: row.assignmentTitle,
+				dueAt: toIso(row.dueAt),
+				createdAt: toIso(row.createdAt),
+				subjectName,
+				studentId: row.studentId,
+				studentFullName: row.studentFullName,
+				studentGrade: row.studentGrade,
+				studentSection: row.studentSection,
+				lifecycleStatus: row.lifecycleStatus,
+				score: row.score != null ? String(row.score) : null,
+				testId: row.testId,
+				submittedAt: toIso(row.submittedAt),
+				gradedAt: toIso(row.gradedAt),
 			},
 		];
 	});

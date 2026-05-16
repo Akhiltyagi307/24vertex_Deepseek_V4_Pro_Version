@@ -31,6 +31,11 @@ type ReportsPillSelectProps = {
 	onValueChange: (next: string) => void;
 	icon: LucideIcon;
 	className?: string;
+	/**
+	 * Stretch the trigger to the parent width (e.g. stacked filters in a fixed column).
+	 * Default keeps a compact pill (`min-w` / `medium:w-56`) for horizontal filter bars.
+	 */
+	fullWidth?: boolean;
 };
 
 export function ReportsPillSelect({
@@ -41,6 +46,7 @@ export function ReportsPillSelect({
 	onValueChange,
 	icon: Icon,
 	className,
+	fullWidth = false,
 }: ReportsPillSelectProps) {
 	const toRadio = (v: string) => (v === "" ? ANY_VALUE : v);
 	const fromRadio = (v: string) => (v === ANY_VALUE ? "" : v);
@@ -59,7 +65,10 @@ export function ReportsPillSelect({
 						variant="outline"
 						size="sm"
 						className={cn(
-							"h-8 min-w-[12rem] shrink-0 justify-start gap-1.5 rounded-full border-border px-3 font-normal shadow-none medium:w-56 medium:max-w-[min(100%,18rem)]",
+							"h-8 justify-start gap-1.5 rounded-full border-border px-3 font-normal shadow-none",
+							fullWidth ?
+								"w-full min-w-0 shrink"
+							:	"min-w-[12rem] shrink-0 medium:w-56 medium:max-w-[min(100%,18rem)]",
 							"[&_svg]:text-emerald-700 dark:[&_svg]:text-emerald-400",
 							"hover:[&_svg]:text-white data-[popup-open]:[&_svg]:text-white",
 							"[&_span]:text-emerald-900 dark:[&_span]:text-emerald-200",

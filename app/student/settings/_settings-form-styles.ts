@@ -22,3 +22,9 @@ export const placementSelectClass = cn(
 	panelRaisedInputClass,
 	"w-full cursor-pointer appearance-none pr-10",
 );
+
+/** Primary & outline CTAs on Profile settings — same tap target + type scale as sticky “Save changes”. */
+export const settingsCtaButtonClass = "h-11 min-h-11 px-6 text-base font-medium";
+
+/** Full-width on narrow layouts; auto width from `medium` up. */
+export const settingsCtaButtonWidthClass = "w-full medium:w-auto";

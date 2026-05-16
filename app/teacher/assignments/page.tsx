@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { TeacherAssignmentsManager } from "./teacher-assignments-manager";
+import { loadTeacherSubmissionAssignmentBundles } from "@/lib/assignments/teacher-submissions-hub";
 import {
 	listTeacherAssignmentSubjectCatalog,
 	listTeacherAssignableStudents,
-	listTeacherAssignmentSummaries,
 } from "@/lib/assignments/queries";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
@@ -20,11 +20,11 @@ export default async function TeacherAssignmentsPage() {
 	if (!profile || profile.role !== "teacher") redirect("/login");
 	if (!profile.is_verified) redirect("/teacher/pending");
 
-	const [subjectsCatalogRaw, topicsCatalog, students, assignments] = await Promise.all([
+	const [subjectsCatalogRaw, topicsCatalog, students, submissionBundles] = await Promise.all([
 		listActiveSubjectsCatalog(),
 		listTeacherAssignmentSubjectCatalog(user.id),
 		listTeacherAssignableStudents(user.id),
-		listTeacherAssignmentSummaries(user.id),
+		loadTeacherSubmissionAssignmentBundles(user.id),
 	]);
 	const visibleSubjectIds = new Set(topicsCatalog.map((topic) => topic.subjectId));
 	const subjectsCatalog = subjectsCatalogRaw.filter((subject) => visibleSubjectIds.has(subject.id));
@@ -34,7 +34,7 @@ export default async function TeacherAssignmentsPage() {
 			subjectsCatalog={subjectsCatalog}
 			topicsCatalog={topicsCatalog}
 			students={students}
-			assignments={assignments}
+			submissionBundles={submissionBundles}
 		/>
 	);
 }

@@ -36,6 +36,8 @@ import {
 import {
 	accountReadonlyInputClass,
 	panelRaisedInputClass,
+	settingsCtaButtonClass,
+	settingsCtaButtonWidthClass,
 	tabAccentClass,
 } from "./_settings-form-styles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -463,7 +465,12 @@ export function StudentProfileSettingsForm({
 				>
 					{shareText}
 				</div>
-				<Button type="button" variant="outline" size="default" onClick={copyShareCode} className="shrink-0">
+				<Button
+					type="button"
+					variant="outline"
+					onClick={copyShareCode}
+					className={cn(settingsCtaButtonClass, "shrink-0 gap-2")}
+				>
 					{copied ? <CheckIcon /> : <CopyIcon />}
 					{copied ? "Copied" : "Copy"}
 				</Button>
@@ -513,7 +520,12 @@ export function StudentProfileSettingsForm({
 						))}
 					</select>
 				</div>
-				<Button type="submit" formAction={organizationFormAction} variant="outline">
+				<Button
+					type="submit"
+					formAction={organizationFormAction}
+					variant="default"
+					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
+				>
 					Save organization
 				</Button>
 				<Button
@@ -521,7 +533,8 @@ export function StudentProfileSettingsForm({
 					formAction={organizationFormAction}
 					name="organizationId"
 					value=""
-					variant="ghost"
+					variant="outline"
+					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
 				>
 					Unlink
 				</Button>
@@ -755,8 +768,7 @@ export function StudentProfileSettingsForm({
 					</p>
 					<Button
 						type="submit"
-						size="lg"
-						className="h-11 w-full shrink-0 px-6 text-base medium:w-auto"
+						className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
 					>
 						Save changes
 					</Button>

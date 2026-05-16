@@ -1,4 +1,5 @@
 import { renderToBuffer } from "@react-pdf/renderer";
+import { z } from "zod";
 
 import { getServerUser } from "@/lib/auth/get-server-user";
 import {
@@ -17,8 +18,8 @@ type RouteContext = { params: Promise<{ testId: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
 	const { testId } = await context.params;
-	if (!testId) {
-		return new Response("Missing test id", { status: 400 });
+	if (!testId || !z.string().uuid().safeParse(testId).success) {
+		return new Response("Missing or invalid test id", { status: 400 });
 	}
 
 	const url = new URL(request.url);

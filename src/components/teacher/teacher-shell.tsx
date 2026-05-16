@@ -9,7 +9,8 @@ import { TeacherTopBar } from "@/components/teacher/teacher-top-bar";
 const neverShellPath = () => false;
 
 export type TeacherShellProps = {
-	organizationName: string;
+	/** Set when the teacher has an active organization membership; hides workspace segment in the top bar when null. */
+	organizationName: string | null;
 	userDisplayName: string;
 	/** Sidebar subtitle (organization role line). */
 	contextLabel: string;

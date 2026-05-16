@@ -82,6 +82,7 @@ tw-debug.css
 .agents/
 .cursor/
 .claude/
+.superpowers/
 
 # TestSprite generated suites (local tooling output)
 testsprite_tests/

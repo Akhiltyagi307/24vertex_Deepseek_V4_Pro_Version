@@ -20,6 +20,7 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
 const raisedInputClass =
@@ -33,11 +34,14 @@ export function LoginEmailChangeForm({
 	currentEmail,
 	inputIdPrefix = "loginEmail",
 	variant = "card",
+	ctaButtonClassName,
 }: {
 	currentEmail: string;
 	inputIdPrefix?: string;
 	/** `embedded`: heading + fields only (for tab panels that already provide chrome). */
 	variant?: "card" | "embedded";
+	/** Optional sizing so settings tabs match Save profile / password CTAs. */
+	ctaButtonClassName?: string;
 }) {
 	const [nextEmail, setNextEmail] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -106,7 +110,12 @@ export function LoginEmailChangeForm({
 					</AlertDescription>
 				</Alert>
 			) : null}
-			<Button type="button" disabled={busy} onClick={() => void submit()}>
+			<Button
+				type="button"
+				disabled={busy}
+				onClick={() => void submit()}
+				className={cn(ctaButtonClassName)}
+			>
 				{busy ? "Saving…" : "Update login email"}
 			</Button>
 		</div>

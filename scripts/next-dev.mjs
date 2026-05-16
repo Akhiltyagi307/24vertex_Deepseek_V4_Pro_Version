@@ -168,6 +168,10 @@ const devArgs = ["dev", "-H", "127.0.0.1", "-p", String(port)];
 const useWebpack =
 	process.env.NEXT_DEV_WEBPACK === "1" || process.env.NEXT_DEV_WEBPACK === "true";
 if (useWebpack) {
+	console.warn(
+		"\n[next-dev] NEXT_DEV_WEBPACK: webpack dev can serve HTML without Tailwind/global CSS " +
+			"(missing `/_next/static/css/app/layout.css`). If the UI is unstyled, stop webpack mode or run `pnpm run dev:clean`.\n",
+	);
 	const clearWebpackDev =
 		process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "1" ||
 		process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "true";
