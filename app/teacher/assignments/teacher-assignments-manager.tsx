@@ -40,6 +40,8 @@ type AssignmentBandFilterId = Extract<
 	"at_risk" | "near_target" | "needs_support"
 >;
 
+type BandCheckState = Record<AssignmentBandFilterId, boolean>;
+
 const ASSIGNMENT_STUDENT_BAND_FILTER_OPTIONS: { id: AssignmentBandFilterId; label: string }[] = [
 	{ id: "at_risk", label: "At risk" },
 	{ id: "near_target", label: "Near target" },
