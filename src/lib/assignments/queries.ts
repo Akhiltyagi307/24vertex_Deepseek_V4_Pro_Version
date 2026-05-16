@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -138,7 +139,7 @@ export async function listTeacherAssignmentSubjectCatalog(teacherId: string): Pr
 	return rows;
 }
 
-export async function listTeacherAssignableStudents(teacherId: string): Promise<TeacherPerformanceStudentRow[]> {
+export const listTeacherAssignableStudents = cache(async (teacherId: string): Promise<TeacherPerformanceStudentRow[]> => {
 	const activeOrganization = await getActiveTeacherOrganizationSnapshot(teacherId);
 	if (activeOrganization) {
 		const [teacher] = await db
@@ -161,7 +162,7 @@ export async function listTeacherAssignableStudents(teacherId: string): Promise<
 		teacherId,
 		activeOrganizationId: null,
 	});
-}
+});
 
 export async function listTeacherAssignmentSummaries(
 	teacherId: string,

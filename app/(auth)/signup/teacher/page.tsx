@@ -53,8 +53,10 @@ export default function TeacherSignupPage() {
 		try {
 			emailRedirectTo = resolveEmailRedirectTo();
 		} catch (error) {
-			const details = error instanceof Error ? ` (${error.message})` : "";
-			setState({ error: `Account setup is unavailable until the app URL is configured.${details}` });
+			if (process.env.NODE_ENV !== "production") {
+				console.error("Teacher signup redirect URL unavailable", error);
+			}
+			setState({ error: "Account setup is unavailable until the app URL is configured. Contact support." });
 			setPending(false);
 			return;
 		}

@@ -73,8 +73,19 @@ export async function loadTeacherSubmissionAssignmentBundles(
 	if (submissions.length === 0) return [];
 
 	const assignmentIds = [...new Set(submissions.map((s) => s.assignmentId))];
+	const testIds = [
+		...new Set(
+			submissions.map((s) => s.testId).filter((id): id is string => typeof id === "string" && id.length > 0),
+		),
+	];
 
-	const assignmentMetaRows = await db
+	type ReportPick = {
+		testId: string;
+		topicPerformance: unknown;
+		summaryReport: unknown;
+	};
+
+	const assignmentMetaRowsPromise = db
 		.select({
 			id: assignments.id,
 			title: assignments.title,
@@ -84,6 +95,20 @@ export async function loadTeacherSubmissionAssignmentBundles(
 		})
 		.from(assignments)
 		.where(and(eq(assignments.teacherId, teacherId), inArray(assignments.id, assignmentIds)));
+
+	const reportsPromise =
+		testIds.length > 0 ?
+			db
+				.select({
+					testId: testReports.testId,
+					topicPerformance: testReports.topicPerformance,
+					summaryReport: testReports.summaryReport,
+				})
+				.from(testReports)
+				.where(inArray(testReports.testId, testIds))
+		:	Promise.resolve([] as ReportPick[]);
+
+	const [assignmentMetaRows, reports] = await Promise.all([assignmentMetaRowsPromise, reportsPromise]);
 
 	const metaById = new Map(
 		assignmentMetaRows.map((row) => {
@@ -118,30 +143,6 @@ export async function loadTeacherSubmissionAssignmentBundles(
 		:	[];
 
 	const subjectGradeById = new Map(subjectGradeRows.map((s) => [s.id, s.grade]));
-
-	const testIds = [
-		...new Set(
-			submissions.map((s) => s.testId).filter((id): id is string => typeof id === "string" && id.length > 0),
-		),
-	];
-
-	type ReportPick = {
-		testId: string;
-		topicPerformance: unknown;
-		summaryReport: unknown;
-	};
-
-	let reports: ReportPick[] = [];
-	if (testIds.length > 0) {
-		reports = await db
-			.select({
-				testId: testReports.testId,
-				topicPerformance: testReports.topicPerformance,
-				summaryReport: testReports.summaryReport,
-			})
-			.from(testReports)
-			.where(inArray(testReports.testId, testIds));
-	}
 
 	const reportByTestId = new Map(
 		reports.map((r) => [

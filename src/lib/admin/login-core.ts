@@ -7,6 +7,7 @@ import { type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { clientIpFromRequest } from "@/lib/admin/api-request-meta";
+import { isAdminIpAllowed } from "@/lib/admin/ip-allowlist";
 import { clientIpForPostgresInet } from "@/lib/admin/ip-sanitize";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { writeAdminAction } from "@/lib/admin/audit";
@@ -91,6 +92,23 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 	const ip = clientIpFromRequest(request);
 	const ipInet = clientIpForPostgresInet(ip);
 	const ua = request.headers.get("user-agent") ?? "";
+
+	if (!isAdminIpAllowed(ip)) {
+		await recordAdminLoginFailure(ip);
+		await writeAdminAction({
+			action: "login_failed",
+			ipAddress: ipInet,
+			userAgent: ua,
+			payload: { reason: "ip_not_allowed" },
+		});
+		reportAdminLoginRejected(request, { code: "forbidden_ip", status: 403, ip });
+		return {
+			ok: false,
+			status: 403,
+			code: "forbidden_ip",
+			message: "This network address is not allowed to sign in to admin.",
+		};
+	}
 
 	if (await isAdminLoginBlocked(ip)) {
 		reportAdminLoginRejected(request, { code: "rate_limited", status: 429, ip });

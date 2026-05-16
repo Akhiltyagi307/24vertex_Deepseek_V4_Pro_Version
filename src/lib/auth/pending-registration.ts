@@ -290,7 +290,7 @@ export async function consumePendingRegistration(
 	const sessionUser = session?.user ?? null;
 
 	const seed = apiUser ?? sessionUser ?? handshake;
-	let user =
+	const user =
 		seed != null ?
 			foldPendingUserHints(seed, [handshake, sessionUser, apiUser])
 		: handshake?.id ? foldPendingUserHints(handshake, [handshake])

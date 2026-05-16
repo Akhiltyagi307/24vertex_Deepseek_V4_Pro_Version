@@ -25,8 +25,8 @@ export default async function TeacherPendingPage() {
 					</CardHeader>
 					<CardContent className="space-y-4 text-sm text-muted-foreground">
 						<p>
-							Your profile is in the <span className="text-foreground">24vertex</span> review queue. Approvals are
-							handled in the admin panel, typically within <span className="text-foreground">24–48 hours</span>.
+							Your profile is in review. An administrator will approve educator access after confirming the
+							account details.
 						</p>
 						<p>
 							We&apos;ll email you at your login address when your access is active. Until then, you can sign out and

@@ -16,7 +16,7 @@ let body = text;
 try {
   const o = JSON.parse(text);
   if (typeof o.result === "string") body = o.result;
-} catch (_) {
+} catch {
   /* raw tool output */
 }
 

@@ -195,6 +195,10 @@ export async function listTeacherTopicStudentBreakdown(params: {
 
 	const rosterById = new Map(roster.map((s) => [s.id, s]));
 
+	if (roster.length === 0) {
+		return { topicLabel: "Topic", subjectName: "", topicSubjectId: null, rows: [] };
+	}
+
 	const metaRows = await db
 		.select({
 			topicName: topics.topicName,
@@ -209,10 +213,6 @@ export async function listTeacherTopicStudentBreakdown(params: {
 	const topicLabel = metaRows[0]?.topicName ?? "Topic";
 	const subjectName = metaRows[0]?.subjectName ?? "";
 	const topicSubjectId = metaRows[0]?.subjectId ?? null;
-
-	if (roster.length === 0) {
-		return { topicLabel, subjectName, topicSubjectId, rows: [] };
-	}
 
 	const studentIds = roster.map((s) => s.id);
 

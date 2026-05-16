@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 
@@ -9,6 +9,12 @@ const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", 
 
 function readMigration(fileName: string) {
 	return readFileSync(join(migrationsDir, fileName), "utf8");
+}
+
+function readMigrationBySuffix(suffix: string) {
+	const fileName = readdirSync(migrationsDir).find((name) => name.endsWith(suffix));
+	expect(fileName).toBeDefined();
+	return readMigration(fileName!);
 }
 
 describe("organization SQL migration invariants", () => {
@@ -54,5 +60,22 @@ describe("organization SQL migration invariants", () => {
 		expect(sql).toContain("image/jpeg");
 		expect(sql).toContain("image/webp");
 		expect(sql).not.toContain("image/svg+xml");
+	});
+
+	it("adds a batched teacher student access function with the same access sources", () => {
+		const sql = readMigrationBySuffix("_teacher_filter_accessible_student_ids.sql");
+
+		expect(sql).toContain("CREATE OR REPLACE FUNCTION public.teacher_filter_accessible_student_ids");
+		expect(sql).toContain("p_teacher_id uuid");
+		expect(sql).toContain("p_student_ids uuid[]");
+		expect(sql).toContain("public.auth_is_verified_teacher(p_teacher_id)");
+		expect(sql).toContain("unnest(p_student_ids)");
+		expect(sql).toContain("public.teacher_organization_memberships tom");
+		expect(sql).toContain("tom.status = 'active'");
+		expect(sql).toContain("tom.organization_id = s.organization_id");
+		expect(sql).toContain("public.teacher_student_links tsl");
+		expect(sql).toContain("tsl.status = 'active'");
+		expect(sql).toContain("REVOKE ALL ON FUNCTION public.teacher_filter_accessible_student_ids(uuid, uuid[]) FROM PUBLIC");
+		expect(sql).toContain("GRANT EXECUTE ON FUNCTION public.teacher_filter_accessible_student_ids(uuid, uuid[]) TO authenticated");
 	});
 });

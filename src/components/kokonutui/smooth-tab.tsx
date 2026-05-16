@@ -260,6 +260,8 @@ interface SmoothTabProps {
   onChange?: (tabId: string) => void;
   /** When true, tab panels stay mounted (required for native forms). Uses simple show/hide; hero `cardContent` mode still animates. */
   persistContentPanels?: boolean;
+  /** Keep these panels unmounted until first activation, then persist them like normal content panels. */
+  deferUntilActivatedTabIds?: string[];
   /** Optional class for the scrollable panel wrapper (e.g. min-height). */
   panelClassName?: string;
   /** Tab bar above or below the panel. Default keeps the KokonutUI bottom toolbar layout. */
@@ -313,6 +315,7 @@ export default function SmoothTab({
   activeColor = "bg-[#1F9CFE]",
   onChange,
   persistContentPanels = false,
+  deferUntilActivatedTabIds = [],
   panelClassName,
   tabListPosition = "bottom",
   activateTabRequest = null,
@@ -320,6 +323,15 @@ export default function SmoothTab({
   const [selected, setSelected] = React.useState<string>(defaultTabId);
   const [direction, setDirection] = React.useState(0);
   const [dimensions, setDimensions] = React.useState({ width: 0, left: 0 });
+  const deferredTabIdsKey = deferUntilActivatedTabIds.join("\u0000");
+  const deferredTabIds = React.useMemo(
+    () => new Set(deferUntilActivatedTabIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- callers often pass small inline arrays.
+    [deferredTabIdsKey]
+  );
+  const [activatedDeferredTabIds, setActivatedDeferredTabIds] = React.useState(
+    () => new Set<string>(deferredTabIds.has(defaultTabId) ? [defaultTabId] : [])
+  );
 
   // Reference for the selected button
   const buttonRefs = React.useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -331,9 +343,12 @@ export default function SmoothTab({
     const idx = items.findIndex((item) => item.id === tabId);
     if (idx === -1) return;
     setDirection(1);
+    if (deferredTabIds.has(tabId)) {
+      setActivatedDeferredTabIds((prev) => new Set(prev).add(tabId));
+    }
     setSelected(tabId);
     onChange?.(tabId);
-  }, [activateTabRequest?.token, activateTabRequest?.tabId, items, onChange]);
+  }, [activateTabRequest, deferredTabIds, items, onChange]);
 
   // Update dimensions whenever selected tab changes or on mount
   React.useLayoutEffect(() => {
@@ -366,6 +381,9 @@ export default function SmoothTab({
     const currentIndex = items.findIndex((item) => item.id === selected);
     const newIndex = items.findIndex((item) => item.id === tabId);
     setDirection(newIndex > currentIndex ? 1 : -1);
+    if (deferredTabIds.has(tabId)) {
+      setActivatedDeferredTabIds((prev) => new Set(prev).add(tabId));
+    }
     setSelected(tabId);
     onChange?.(tabId);
   };
@@ -402,6 +420,10 @@ export default function SmoothTab({
         >
           {items.map((item) => {
             const isSelected = selected === item.id;
+            const shouldRenderPanel =
+              !deferredTabIds.has(item.id) ||
+              activatedDeferredTabIds.has(item.id) ||
+              isSelected;
             return (
               <div
                 aria-labelledby={`tab-${item.id}`}
@@ -411,7 +433,7 @@ export default function SmoothTab({
                 key={item.id}
                 role="tabpanel"
               >
-                {item.content ?? item.cardContent}
+                {shouldRenderPanel ? (item.content ?? item.cardContent) : null}
               </div>
             );
           })}

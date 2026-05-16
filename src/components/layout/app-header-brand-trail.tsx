@@ -29,7 +29,7 @@ export function HeaderBreadcrumbSlash() {
 	);
 }
 
-export type HeaderPortal = "student" | "parent";
+export type HeaderPortal = "student" | "parent" | "teacher";
 
 export type AppHeaderBrandTrailProps = {
 	/** When omitted or blank, the organization segment (school icon + divider) is hidden. */
@@ -113,6 +113,14 @@ function copyLabels(portal: HeaderPortal, shareableId: string, copied: boolean) 
 			ariaLabel: copied
 				? "Child link code copied to clipboard"
 				: `Copy child link code ${shareableId} to clipboard`,
+		};
+	}
+	if (portal === "teacher") {
+		return {
+			tooltip: copied ? "Student link code copied" : "Copy student link code",
+			ariaLabel: copied
+				? "Student link code copied to clipboard"
+				: `Copy student link code ${shareableId} to clipboard`,
 		};
 	}
 	return {

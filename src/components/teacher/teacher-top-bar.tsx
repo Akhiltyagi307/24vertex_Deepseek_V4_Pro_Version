@@ -31,7 +31,7 @@ export function TeacherTopBar({ organizationName, userDisplayName }: TeacherTopB
 					organizationName={organizationName ?? undefined}
 					userDisplayName={userDisplayName}
 					shareableId={null}
-					headerPortal="student"
+					headerPortal="teacher"
 					omitLogo={false}
 				/>
 			</div>

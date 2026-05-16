@@ -5,7 +5,10 @@ import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tests } from "@/db/schema/assessment";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
-import { listTeacherPerformanceDirectoryStudents } from "@/lib/teachers/teacher-performance-directory-queries";
+import {
+	listTeacherPerformanceDirectoryStudents,
+	type TeacherPerformanceStudentRow,
+} from "@/lib/teachers/teacher-performance-directory-queries";
 import type { TeacherAtRiskStudentRow } from "@/lib/teachers/teacher-at-risk-types";
 
 /** Product rule: mean of up to 5 most recent graded items (assignments + self-practice tests) must stay at or above this. */
@@ -76,6 +79,21 @@ export async function listTeacherAtRiskStudents(params: {
 		section: scopeSection,
 		subjectId: scopeSubject,
 	});
+
+	return listTeacherAtRiskStudentsForRoster({
+		teacherId: params.teacherId,
+		roster,
+		subjectId: scopeSubject,
+	});
+}
+
+export async function listTeacherAtRiskStudentsForRoster(params: {
+	teacherId: string;
+	roster: TeacherPerformanceStudentRow[];
+	subjectId?: string | "all" | null;
+}): Promise<TeacherAtRiskStudentRow[]> {
+	const scopeSubject = params.subjectId === "all" ? undefined : (params.subjectId ?? undefined);
+	const roster = params.roster;
 
 	if (roster.length === 0) {
 		return [];

@@ -6,7 +6,10 @@ import { db } from "@/db";
 import { performanceTracker, tests } from "@/db/schema/assessment";
 import { subjects, topics } from "@/db/schema/academic";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
-import { listTeacherPerformanceDirectoryStudents } from "@/lib/teachers/teacher-performance-directory-queries";
+import {
+	listTeacherPerformanceDirectoryStudents,
+	type TeacherPerformanceStudentRow,
+} from "@/lib/teachers/teacher-performance-directory-queries";
 import type {
 	TeacherClassPerformanceScope,
 	TeacherClassPerformanceSummary,
@@ -292,6 +295,21 @@ export async function getTeacherClassPerformanceSummary(
 		section: scopeSection,
 		subjectId: scopeSubject,
 	});
+
+	return getTeacherClassPerformanceSummaryForRoster({
+		teacherId: params.teacherId,
+		roster,
+		subjectId: scopeSubject,
+	});
+}
+
+export async function getTeacherClassPerformanceSummaryForRoster(params: {
+	teacherId: string;
+	roster: TeacherPerformanceStudentRow[];
+	subjectId?: string | "all" | null;
+}): Promise<TeacherClassPerformanceSummary> {
+	const scopeSubject = params.subjectId === "all" ? undefined : (params.subjectId ?? undefined);
+	const roster = params.roster;
 
 	if (roster.length === 0) {
 		return {

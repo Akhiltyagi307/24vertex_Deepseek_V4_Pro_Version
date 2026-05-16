@@ -26,6 +26,8 @@ export function ErrorScreen({
 	homeLabel = "Go home",
 	tag = "app",
 }: ErrorScreenProps) {
+	const showReference = process.env.NODE_ENV === "development";
+
 	useEffect(() => {
 		if (error) {
 			Sentry.captureException(error, {
@@ -42,7 +44,7 @@ export function ErrorScreen({
 					<h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
 					<p className="text-sm text-muted-foreground">{description}</p>
 				</div>
-				{error?.digest ? (
+				{showReference && error?.digest ? (
 					<p className="rounded-md border border-border/60 bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
 						Reference: {error.digest}
 					</p>

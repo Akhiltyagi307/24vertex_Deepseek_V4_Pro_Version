@@ -21,6 +21,7 @@
  * dedicated unit tests in `src/lib/practice/__tests__/`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { makeMockSupabase } from "../../factories";
 
@@ -78,6 +79,7 @@ vi.mock("ai", () => ({
 vi.mock("@/lib/practice", () => ({
 	practiceGenerationOutputSchema: { parse: (x: unknown) => x },
 	validateAndStripGeneration: (...args: unknown[]) => mocks.validateImpl(...args),
+	practiceDifficultySchema: z.enum(["easy", "medium", "hard"]),
 }));
 
 import { appendAdaptiveFollowups } from "@/app/student/practice/session-actions";

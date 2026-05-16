@@ -2,8 +2,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { z } from "zod";
 
 import { teacherOwnsAssignmentTest } from "@/lib/assignments/teacher-submissions-hub";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
 import {
 	buildPracticeGradingReportPdfBuffer,
 	uploadPracticeGradingReportPdf,
@@ -38,22 +37,17 @@ export async function GET(request: Request, context: RouteContext) {
 		url.searchParams.get("view") === "1" ||
 		url.searchParams.get("inline") === "1";
 
-	const user = await getServerUser();
-	if (!user) {
-		logTeacherReportPdfOutcome({ outcome: "unauthorized", status: 401, testId });
-		return new Response("Unauthorized", { status: 401 });
-	}
-
-	const profile = await getCachedAppProfileRow();
-	if (!profile || profile.role !== "teacher" || !profile.is_verified) {
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
 		logTeacherReportPdfOutcome({
-			outcome: "forbidden_not_teacher",
-			status: 403,
-			userId: user.id,
+			outcome: session.status === 401 ? "unauthorized" : "forbidden_not_teacher",
+			status: session.status,
+			userId: session.userId,
 			testId,
 		});
-		return new Response("Forbidden", { status: 403 });
+		return new Response(session.status === 401 ? "Unauthorized" : "Forbidden", { status: session.status });
 	}
+	const { user } = session;
 
 	const rate = await consumeTeacherReportPdfRateLimit(user.id);
 	if (!rate.ok) {
@@ -100,19 +94,20 @@ export async function GET(request: Request, context: RouteContext) {
 		return new Response("Not found", { status: 404 });
 	}
 
-	const { data: subjectRow } = await supabase
+	const subjectRowPromise = supabase
 		.from("subjects")
 		.select("name")
 		.eq("id", testRow.subject_id as string)
 		.maybeSingle();
 
-	const subjectName = subjectRow?.name?.trim() ? String(subjectRow.name) : "Subject";
-
-	const { data: reportRow } = await supabase
+	const reportRowPromise = supabase
 		.from("test_reports")
 		.select("id, pdf_storage_path")
 		.eq("test_id", testId)
 		.maybeSingle();
+
+	const [{ data: subjectRow }, { data: reportRow }] = await Promise.all([subjectRowPromise, reportRowPromise]);
+	const subjectName = subjectRow?.name?.trim() ? String(subjectRow.name) : "Subject";
 
 	const pdfPath = reportRow?.pdf_storage_path?.trim();
 	if (pdfPath) {
