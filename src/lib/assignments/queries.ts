@@ -363,13 +363,20 @@ export async function createPublishedPracticeAssignment(input: {
 	return result;
 }
 
-export async function validatePracticeAssignmentConfigForStudents(input: {
+export type PracticeAssignmentEligibilityInput = {
 	activeOrganizationId: string | null;
 	teacherRosterGrade: number | null;
 	teacherRosterSubjectId: string | null;
 	config: AssignmentConfig;
 	studentIds: string[];
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+};
+
+export async function resolvePracticeAssignmentEligibleStudentIds(
+	input: PracticeAssignmentEligibilityInput,
+): Promise<{ ok: true; eligibleStudentIds: string[] } | { ok: false; message: string }> {
+	const uniqueStudentIds = [...new Set(input.studentIds)];
+	const requiredTopicIds = [...new Set(input.config.topic_ids)];
+
 	if (input.activeOrganizationId) {
 		if (input.teacherRosterGrade == null || input.teacherRosterSubjectId == null) {
 			return { ok: false, message: "Set your organization teaching grade and subject before assigning tests." };
@@ -379,25 +386,31 @@ export async function validatePracticeAssignmentConfigForStudents(input: {
 		}
 	}
 
-	const topicRows = await db
-		.select({ id: topics.id })
-		.from(topics)
-		.where(and(eq(topics.isActive, true), eq(topics.subjectId, input.config.subject_id), inArray(topics.id, input.config.topic_ids)));
-	if (topicRows.length !== input.config.topic_ids.length) {
-		return { ok: false, message: "One or more selected topics are not active for this subject." };
+	if (requiredTopicIds.length > 0) {
+		const topicRows = await db
+			.select({ id: topics.id })
+			.from(topics)
+			.where(and(eq(topics.isActive, true), eq(topics.subjectId, input.config.subject_id), inArray(topics.id, requiredTopicIds)));
+		if (topicRows.length !== requiredTopicIds.length) {
+			return { ok: false, message: "One or more selected topics are not active for this subject." };
+		}
 	}
 
-	if (input.activeOrganizationId && input.teacherRosterGrade != null) {
+	if (input.activeOrganizationId && input.teacherRosterGrade != null && uniqueStudentIds.length > 0) {
 		const studentRows = await db
 			.select({ id: profiles.id, grade: profiles.grade })
 			.from(profiles)
-			.where(and(inArray(profiles.id, input.studentIds), eq(profiles.role, "student")));
+			.where(and(inArray(profiles.id, uniqueStudentIds), eq(profiles.role, "student")));
 		if (
-			studentRows.length !== input.studentIds.length ||
+			studentRows.length !== uniqueStudentIds.length ||
 			studentRows.some((student) => student.grade !== input.teacherRosterGrade)
 		) {
 			return { ok: false, message: "Selected students must be in your configured organization teaching grade." };
 		}
+	}
+
+	if (uniqueStudentIds.length === 0 || requiredTopicIds.length === 0) {
+		return { ok: true, eligibleStudentIds: uniqueStudentIds };
 	}
 
 	const trackerRows = await db
@@ -408,12 +421,12 @@ export async function validatePracticeAssignmentConfigForStudents(input: {
 		.from(performanceTracker)
 		.where(
 			and(
-				inArray(performanceTracker.studentId, input.studentIds),
+				inArray(performanceTracker.studentId, uniqueStudentIds),
 				eq(performanceTracker.subjectId, input.config.subject_id),
-				inArray(performanceTracker.topicId, input.config.topic_ids),
+				inArray(performanceTracker.topicId, requiredTopicIds),
 			),
 		);
-	const required = new Set(input.config.topic_ids);
+	const required = new Set(requiredTopicIds);
 	const topicsByStudent = new Map<string, Set<string>>();
 	for (const row of trackerRows) {
 		if (!row.studentId || !row.topicId) continue;
@@ -421,19 +434,28 @@ export async function validatePracticeAssignmentConfigForStudents(input: {
 		studentTopics.add(row.topicId);
 		topicsByStudent.set(row.studentId, studentTopics);
 	}
-	const missing = input.studentIds.some((studentId) => {
-		const studentTopics = topicsByStudent.get(studentId);
-		if (!studentTopics) return true;
-		for (const topicId of required) {
-			if (!studentTopics.has(topicId)) return true;
-		}
-		return false;
-	});
 
-	if (missing) {
+	return {
+		ok: true,
+		eligibleStudentIds: uniqueStudentIds.filter((studentId) => {
+			const studentTopics = topicsByStudent.get(studentId);
+			if (!studentTopics) return false;
+			for (const topicId of required) {
+				if (!studentTopics.has(topicId)) return false;
+			}
+			return true;
+		}),
+	};
+}
+
+export async function validatePracticeAssignmentConfigForStudents(
+	input: PracticeAssignmentEligibilityInput,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const eligibility = await resolvePracticeAssignmentEligibleStudentIds(input);
+	if (!eligibility.ok) return eligibility;
+	if (eligibility.eligibleStudentIds.length !== new Set(input.studentIds).size) {
 		return { ok: false, message: "Selected students are missing tracker rows for one or more selected topics." };
 	}
-
 	return { ok: true };
 }
 

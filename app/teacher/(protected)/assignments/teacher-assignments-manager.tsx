@@ -15,7 +15,16 @@ import SmoothTab from "@/components/kokonutui/smooth-tab";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Separator } from "@/components/ui/separator";
 import { createTeacherAssignmentAction, type CreateTeacherAssignmentState } from "./actions";
+import { previewEligibleStudentIdsForPracticeAssignment } from "./student-eligibility-actions";
 import { fetchAssignableStudentPerformanceBands } from "./student-band-filters-actions";
+import {
+	arrayShallowEqual,
+	ASSIGNMENT_SECTION_FILTER_NONE,
+	filterAssignmentCandidateStudents,
+	isAssignmentBandFilterActive,
+	type AssignmentBandCheckState,
+	type AssignmentBandFilterId,
+} from "@/lib/assignments/recipient-selection";
 import type { AssignmentTopicCatalogRow } from "@/lib/assignments/queries";
 import type { TeacherSubmissionAssignmentBundle } from "@/lib/assignments/teacher-submissions-hub-types";
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
@@ -32,16 +41,6 @@ type Props = {
 
 const initialState: CreateTeacherAssignmentState = { ok: false, message: "" };
 
-/** Client-only section filter value for students with no section on their profile. */
-const SECTION_FILTER_NONE = "__section_none__";
-
-type AssignmentBandFilterId = Extract<
-	TeacherPerformanceBandId,
-	"at_risk" | "near_target" | "needs_support"
->;
-
-type BandCheckState = Record<AssignmentBandFilterId, boolean>;
-
 const ASSIGNMENT_STUDENT_BAND_FILTER_OPTIONS: { id: AssignmentBandFilterId; label: string }[] = [
 	{ id: "at_risk", label: "At risk" },
 	{ id: "near_target", label: "Near target" },
@@ -51,12 +50,17 @@ const ASSIGNMENT_STUDENT_BAND_FILTER_OPTIONS: { id: AssignmentBandFilterId; labe
 const ASSIGNMENTS_SMOOTH_TAB_PANEL_CLASS =
 	"min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm medium:px-8 medium:py-8 dark:border-border dark:bg-muted/20";
 
-function SubmitButton() {
+function SubmitButton({
+	disabled,
+}: {
+	disabled: boolean;
+}) {
 	const { pending } = useFormStatus();
+	const blocked = pending || disabled;
 	return (
 		<button
 			type="submit"
-			disabled={pending}
+			disabled={blocked}
 			className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition-[colors,opacity] duration-150 ease-out hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
 		>
 			{pending ? "Publishing…" : "Publish assignment"}
@@ -85,7 +89,7 @@ export function TeacherAssignmentsManager({
 	const [selectedTopicIds, setSelectedTopicIds] = React.useState<Set<string>>(() => new Set());
 	const [chapterVersion, setChapterVersion] = React.useState(0);
 	const [studentSectionFilter, setStudentSectionFilter] = React.useState("");
-	const [bandChecks, setBandChecks] = React.useState<BandCheckState>({
+	const [bandChecks, setBandChecks] = React.useState<AssignmentBandCheckState>({
 		at_risk: false,
 		near_target: false,
 		needs_support: false,
@@ -95,15 +99,31 @@ export function TeacherAssignmentsManager({
 	>({});
 	const [bandsPending, setBandsPending] = React.useState(false);
 	const [bandsError, setBandsError] = React.useState<string | null>(null);
+	const [eligibilityPending, setEligibilityPending] = React.useState(false);
+	const [eligibilityError, setEligibilityError] = React.useState<string | null>(null);
+	const [eligibleStudentIds, setEligibleStudentIds] = React.useState<string[]>([]);
+	const [manualSelectionEnabled, setManualSelectionEnabled] = React.useState(false);
+	const [selectedStudentIds, setSelectedStudentIds] = React.useState<string[]>([]);
 
 	const sortedAssignableStudentIds = React.useMemo(
 		() => [...students.map((s) => s.id)].sort(),
 		[students],
 	);
 	const studentIdsFetchKey = sortedAssignableStudentIds.join(",");
+	const studentOrderById = React.useMemo(
+		() => new Map(students.map((student, index) => [student.id, index])),
+		[students],
+	);
+	const selectedTopicIdsArray = React.useMemo(() => Array.from(selectedTopicIds), [selectedTopicIds]);
+	const selectedTopicIdsFetchKey = React.useMemo(
+		() => [...selectedTopicIdsArray].sort().join(","),
+		[selectedTopicIdsArray],
+	);
 
-	const performanceBandFilterActive =
-		bandChecks.at_risk || bandChecks.near_target || bandChecks.needs_support;
+	const performanceBandFilterActive = React.useMemo(
+		() => isAssignmentBandFilterActive(bandChecks),
+		[bandChecks],
+	);
 
 	const distinctStudentSections = React.useMemo(() => {
 		const seen = new Set<string>();
@@ -119,40 +139,27 @@ export function TeacherAssignmentsManager({
 		[students],
 	);
 
-	const studentMatchesSectionFilter = React.useCallback(
-		(student: TeacherPerformanceStudentRow) => {
-			if (!studentSectionFilter) return true;
-			const sec = (student.section ?? "").trim();
-			if (studentSectionFilter === SECTION_FILTER_NONE) return sec === "";
-			return sec === studentSectionFilter;
-		},
-		[studentSectionFilter],
+	const filteredStudents = React.useMemo(
+		() =>
+			filterAssignmentCandidateStudents({
+				students,
+				sectionFilter: studentSectionFilter,
+				bandByStudentId,
+				bandChecks,
+				bandsPending,
+			}),
+		[students, studentSectionFilter, bandByStudentId, bandChecks, bandsPending],
 	);
-
-	const studentMatchesPerformanceBandFilter = React.useCallback(
-		(student: TeacherPerformanceStudentRow) => {
-			if (!performanceBandFilterActive) return true;
-			if (bandsPending) return true;
-			const band = bandByStudentId[student.id];
-			if (band == null) return false;
-			if (bandChecks.at_risk && band === "at_risk") return true;
-			if (bandChecks.near_target && band === "near_target") return true;
-			if (bandChecks.needs_support && band === "needs_support") return true;
-			return false;
-		},
-		[performanceBandFilterActive, bandsPending, bandByStudentId, bandChecks],
-	);
-
-	const studentMatchesRosterFilters = React.useCallback(
-		(student: TeacherPerformanceStudentRow) =>
-			studentMatchesSectionFilter(student) && studentMatchesPerformanceBandFilter(student),
-		[studentMatchesSectionFilter, studentMatchesPerformanceBandFilter],
-	);
-
-	const visibleStudentCount = React.useMemo(
-		() => students.reduce((n, s) => (studentMatchesRosterFilters(s) ? n + 1 : n), 0),
-		[students, studentMatchesRosterFilters],
-	);
+	const filteredStudentIds = React.useMemo(() => filteredStudents.map((student) => student.id), [filteredStudents]);
+	const filteredStudentsFetchKey = React.useMemo(() => filteredStudentIds.join(","), [filteredStudentIds]);
+	const filteredStudentIdSet = React.useMemo(() => new Set(filteredStudentIds), [filteredStudentIds]);
+	const visibleStudentCount = filteredStudents.length;
+	const eligibleStudentIdsFetchKey = React.useMemo(() => eligibleStudentIds.join(","), [eligibleStudentIds]);
+	const eligibleStudentIdSet = React.useMemo(() => new Set(eligibleStudentIds), [eligibleStudentIds]);
+	const selectedStudentIdSet = React.useMemo(() => new Set(selectedStudentIds), [selectedStudentIds]);
+	const ineligibleFilteredCount = Math.max(0, filteredStudentIds.length - eligibleStudentIds.length);
+	const recipientSyncPending = bandsPending || eligibilityPending;
+	const submitDisabled = recipientSyncPending || selectedStudentIds.length === 0;
 
 	const sectionFilterDisabled =
 		students.length === 0 || (distinctStudentSections.length === 0 && !hasStudentsWithoutSection);
@@ -161,6 +168,10 @@ export function TeacherAssignmentsManager({
 		setChapterVersion((v) => v + 1);
 		setSelectedTopicIds(new Set());
 		setBandChecks({ at_risk: false, near_target: false, needs_support: false });
+		setManualSelectionEnabled(false);
+		setSelectedStudentIds([]);
+		setEligibleStudentIds([]);
+		setEligibilityError(null);
 	}, [subjectId]);
 
 	React.useEffect(() => {
@@ -194,10 +205,112 @@ export function TeacherAssignmentsManager({
 	}, [subjectId, studentIdsFetchKey, sortedAssignableStudentIds, students.length]);
 
 	React.useEffect(() => {
+		let cancelled = false;
+		if (!subjectId || students.length === 0) {
+			setEligibilityPending(false);
+			setEligibilityError(null);
+			setEligibleStudentIds((prev) => (prev.length === 0 ? prev : []));
+			return;
+		}
+		if (bandsPending) {
+			setEligibilityPending(true);
+			return () => {
+				cancelled = true;
+			};
+		}
+		if (filteredStudentIds.length === 0) {
+			setEligibilityPending(false);
+			setEligibilityError(null);
+			setEligibleStudentIds((prev) => (prev.length === 0 ? prev : []));
+			return;
+		}
+		if (selectedTopicIdsArray.length === 0) {
+			setEligibilityPending(false);
+			setEligibilityError(null);
+			setEligibleStudentIds((prev) =>
+				arrayShallowEqual(prev, filteredStudentIds) ? prev : filteredStudentIds,
+			);
+			return;
+		}
+
+		setEligibilityPending(true);
+		setEligibilityError(null);
+		const timer = window.setTimeout(() => {
+			void (async () => {
+				const res = await previewEligibleStudentIdsForPracticeAssignment({
+					subjectId,
+					topicIds: selectedTopicIdsArray,
+					candidateStudentIds: filteredStudentIds,
+				});
+				if (cancelled) return;
+				if ("error" in res) {
+					setEligibilityError(res.error);
+					setEligibleStudentIds((prev) => (prev.length === 0 ? prev : []));
+				} else {
+					const nextEligible = res.eligibleStudentIds.filter((id) => filteredStudentIdSet.has(id));
+					setEligibilityError(null);
+					setEligibleStudentIds((prev) =>
+						arrayShallowEqual(prev, nextEligible) ? prev : nextEligible,
+					);
+				}
+				setEligibilityPending(false);
+			})();
+		}, 180);
+
+		return () => {
+			cancelled = true;
+			window.clearTimeout(timer);
+		};
+	}, [
+		subjectId,
+		selectedTopicIdsArray,
+		selectedTopicIdsFetchKey,
+		filteredStudentIds,
+		filteredStudentIdSet,
+		filteredStudentsFetchKey,
+		bandsPending,
+		students.length,
+	]);
+
+	React.useEffect(() => {
+		if (manualSelectionEnabled) return;
+		setSelectedStudentIds((prev) => (arrayShallowEqual(prev, eligibleStudentIds) ? prev : eligibleStudentIds));
+	}, [manualSelectionEnabled, eligibleStudentIds, eligibleStudentIdsFetchKey]);
+
+	React.useEffect(() => {
+		if (!manualSelectionEnabled) return;
+		setSelectedStudentIds((prev) => {
+			const next = prev.filter((id) => eligibleStudentIdSet.has(id));
+			return arrayShallowEqual(prev, next) ? prev : next;
+		});
+	}, [manualSelectionEnabled, eligibleStudentIdSet, eligibleStudentIdsFetchKey]);
+
+	const toggleStudentSelection = React.useCallback(
+		(studentId: string) => {
+			if (!manualSelectionEnabled || !eligibleStudentIdSet.has(studentId)) return;
+			setSelectedStudentIds((prev) => {
+				if (prev.includes(studentId)) return prev.filter((id) => id !== studentId);
+				const next = [...prev, studentId];
+				next.sort(
+					(a, b) =>
+						(studentOrderById.get(a) ?? Number.MAX_SAFE_INTEGER) -
+						(studentOrderById.get(b) ?? Number.MAX_SAFE_INTEGER),
+				);
+				return next;
+			});
+		},
+		[eligibleStudentIdSet, manualSelectionEnabled, studentOrderById],
+	);
+
+	React.useEffect(() => {
 		if (!state.ok || !state.message) return;
 		router.refresh();
 		setFormKey((k) => k + 1);
 		setSelectedTopicIds(new Set());
+		setManualSelectionEnabled(false);
+		setSelectedStudentIds([]);
+		setEligibleStudentIds([]);
+		setEligibilityError(null);
 		setActivateTabRequest((prev) => ({
 			token: (prev?.token ?? 0) + 1,
 			tabId: "submissions",
@@ -234,16 +347,16 @@ export function TeacherAssignmentsManager({
 							<form
 								key={formKey}
 								action={formAction}
-								className="space-y-8 rounded-2xl border border-border/70 bg-card p-5 shadow-sm medium:p-7"
+								className="space-y-10 rounded-2xl border border-border/70 bg-card p-5 shadow-sm medium:space-y-11 medium:p-7"
 							>
-						<div className="flex flex-wrap items-start gap-4">
+						<div className="flex flex-wrap items-center gap-5 border-border/50 border-b pb-8">
 							<div
 								className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary dark:bg-primary/16"
 								aria-hidden
 							>
 								<ClipboardList className="size-5" />
 							</div>
-							<div className="min-w-0 flex-1 space-y-1">
+							<div className="min-w-0 flex-1 space-y-1.5">
 								<h2 className="font-semibold text-foreground text-lg tracking-tight">New assignment</h2>
 								<p className="text-muted-foreground text-sm leading-relaxed">
 									Jobs materialize tests on a short stagger so the queue stays smooth.
@@ -251,129 +364,147 @@ export function TeacherAssignmentsManager({
 							</div>
 						</div>
 
-						<section className="space-y-4" aria-labelledby="assign-basics-heading">
-							<div className="flex items-center gap-2">
-								<h3 id="assign-basics-heading" className="font-medium text-foreground text-sm">
+						<section className="space-y-5" aria-labelledby="assign-basics-heading">
+							<div className="flex items-center gap-3">
+								<h3 id="assign-basics-heading" className="shrink-0 font-medium text-foreground text-sm">
 									Basics
 								</h3>
 								<Separator className="flex-1" />
 							</div>
-							<label className="block space-y-2">
-								<span className="font-medium text-foreground text-sm">Title</span>
-								<input
-									name="title"
-									required
-									maxLength={300}
-									placeholder="Algebra checkpoint"
-									className={cn(panelRaisedInputClass, "w-full rounded-lg border border-input", inputFocusRing)}
-								/>
-							</label>
+							<div className="space-y-5">
+								<label className="block space-y-2">
+									<span className="font-medium text-foreground text-sm">Title</span>
+									<input
+										name="title"
+										required
+										maxLength={300}
+										placeholder="Algebra checkpoint"
+										className={cn(panelRaisedInputClass, "w-full rounded-lg border border-input", inputFocusRing)}
+									/>
+								</label>
 
-							<label className="block space-y-2">
-								<span className="font-medium text-foreground text-sm">Instructions</span>
-								<span className="sr-only">Optional</span>
-								<textarea
-									name="instructions"
-									rows={3}
-									placeholder="Tell students how to approach this test."
-									className={cn(panelRaisedInputClass, "w-full resize-y rounded-lg border border-input", inputFocusRing)}
-								/>
-							</label>
+								<label className="block space-y-2">
+									<span className="font-medium text-foreground text-sm">Instructions</span>
+									<span className="sr-only">Optional</span>
+									<textarea
+										name="instructions"
+										rows={4}
+										placeholder="Tell students how to approach this test."
+										className={cn(
+											panelRaisedInputClass,
+											"min-h-[6.5rem] w-full resize-y rounded-lg border border-input",
+											inputFocusRing,
+										)}
+									/>
+								</label>
+							</div>
 						</section>
 
-						<section className="space-y-4" aria-labelledby="assign-test-heading">
-							<div className="flex items-center gap-2">
-								<h3 id="assign-test-heading" className="font-medium text-foreground text-sm">
+						<section className="space-y-5" aria-labelledby="assign-test-heading">
+							<div className="flex items-center gap-3">
+								<h3 id="assign-test-heading" className="shrink-0 font-medium text-foreground text-sm">
 									Test design
 								</h3>
 								<Separator className="flex-1" />
 							</div>
 
-							<div className="grid gap-4 medium:grid-cols-2">
-								<label className="block space-y-2">
-									<span className="font-medium text-foreground text-sm">Subject</span>
-									<NativeSelect
-										name="subject_id"
-										value={subjectId}
-										onChange={(e) => setSubjectId(e.target.value)}
-										required
-										className={cn("rounded-lg border border-input", inputFocusRing)}
-									>
-										{subjectsCatalog.map((subject) => (
-											<option key={subject.id} value={subject.id}>
-												Grade {subject.grade} · {subject.name}
-											</option>
-										))}
-									</NativeSelect>
-								</label>
+							<div className="space-y-5">
+								<div className="grid gap-5 medium:grid-cols-2">
+									<label className="block min-w-0 space-y-2">
+										<span className="font-medium text-foreground text-sm">Subject</span>
+										<NativeSelect
+											name="subject_id"
+											value={subjectId}
+											onChange={(e) => setSubjectId(e.target.value)}
+											required
+											className={cn("rounded-lg border border-input", inputFocusRing)}
+										>
+											{subjectsCatalog.map((subject) => (
+												<option key={subject.id} value={subject.id}>
+													Grade {subject.grade} · {subject.name}
+												</option>
+											))}
+										</NativeSelect>
+									</label>
 
-								<label className="block space-y-2">
-									<span className="font-medium text-foreground text-sm">Difficulty</span>
-									<NativeSelect
-										name="difficulty"
-										defaultValue="medium"
-										required
-										className={cn("rounded-lg border border-input", inputFocusRing)}
-									>
-										<option value="easy">Easy</option>
-										<option value="medium">Medium</option>
-										<option value="hard">Hard</option>
-									</NativeSelect>
-								</label>
+									<label className="block min-w-0 space-y-2">
+										<span className="font-medium text-foreground text-sm">Difficulty</span>
+										<NativeSelect
+											name="difficulty"
+											defaultValue="medium"
+											required
+											className={cn("rounded-lg border border-input", inputFocusRing)}
+										>
+											<option value="easy">Easy</option>
+											<option value="medium">Medium</option>
+											<option value="hard">Hard</option>
+										</NativeSelect>
+									</label>
 
-								<label className="block space-y-2">
-									<span className="font-medium text-foreground text-sm">Duration</span>
-									<NativeSelect
-										name="time_limit_seconds"
-										defaultValue="3600"
-										required
-										className={cn("rounded-lg border border-input", inputFocusRing)}
-									>
-										<option value="3600">1 hour · 15 questions</option>
-										<option value="10800">3 hours · 30 questions</option>
-									</NativeSelect>
-								</label>
+									<label className="block min-w-0 space-y-2">
+										<span className="font-medium text-foreground text-sm">Duration</span>
+										<NativeSelect
+											name="time_limit_seconds"
+											defaultValue="3600"
+											required
+											className={cn("rounded-lg border border-input", inputFocusRing)}
+										>
+											<option value="3600">1 hour · 15 questions</option>
+											<option value="10800">3 hours · 30 questions</option>
+										</NativeSelect>
+									</label>
 
-								<div className="block space-y-2">
-									<span className="font-medium text-foreground text-sm">Section</span>
-									<span className="sr-only">Filter students by class section</span>
-									<NativeSelect
-										value={studentSectionFilter}
-										disabled={sectionFilterDisabled}
-										onChange={(e) => setStudentSectionFilter(e.target.value)}
-										className={cn(
-											"rounded-lg border border-input",
-											inputFocusRing,
-											sectionFilterDisabled && "cursor-not-allowed opacity-60",
-										)}
-										aria-label="Filter students by section"
-									>
-										<option value="">All sections</option>
-										{hasStudentsWithoutSection ? (
-											<option value={SECTION_FILTER_NONE}>No section on profile</option>
-										) : null}
-										{distinctStudentSections.map((sec) => (
-											<option key={sec} value={sec}>
-												Section {sec}
-											</option>
-										))}
-									</NativeSelect>
+									<div className="block min-w-0 space-y-2">
+										<span className="font-medium text-foreground text-sm">Section</span>
+										<span className="sr-only">Filter students by class section</span>
+										<NativeSelect
+											value={studentSectionFilter}
+											disabled={sectionFilterDisabled}
+											onChange={(e) => setStudentSectionFilter(e.target.value)}
+											className={cn(
+												"rounded-lg border border-input",
+												inputFocusRing,
+												sectionFilterDisabled && "cursor-not-allowed opacity-60",
+											)}
+											aria-label="Filter students by section"
+										>
+											<option value="">All sections</option>
+											{hasStudentsWithoutSection ? (
+												<option value={ASSIGNMENT_SECTION_FILTER_NONE}>No section on profile</option>
+											) : null}
+											{distinctStudentSections.map((sec) => (
+												<option key={sec} value={sec}>
+													Section {sec}
+												</option>
+											))}
+										</NativeSelect>
+									</div>
 								</div>
+							</div>
+						</section>
 
+						<section className="space-y-5" aria-labelledby="assign-performance-heading">
+							<div className="flex items-center gap-3">
+								<h3
+									id="assign-performance-heading"
+									className="shrink-0 font-medium text-foreground text-sm"
+								>
+									Filter students by performance
+								</h3>
+								<Separator className="flex-1" />
+							</div>
+							<div className="space-y-5">
 								<fieldset
 									disabled={students.length === 0 || !subjectId || bandsPending}
-									className="medium:col-span-2 space-y-2 disabled:opacity-60"
-									aria-label="Filter students by performance band"
+									className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60"
+									aria-labelledby="assign-performance-heading"
 								>
-									<legend className="font-medium text-foreground text-sm">
-										Filter students by performance
-									</legend>
 									{bandsError ? (
 										<p className="text-destructive text-xs" role="alert">
 											{bandsError}
 										</p>
 									) : null}
-									<div className="flex flex-wrap gap-x-5 gap-y-2">
+									<div className="flex flex-wrap gap-x-8 gap-y-4">
 										{ASSIGNMENT_STUDENT_BAND_FILTER_OPTIONS.map(({ id, label }) => (
 											<label
 												key={id}
@@ -399,107 +530,170 @@ export function TeacherAssignmentsManager({
 										<p className="text-muted-foreground text-xs">Loading performance bands…</p>
 									) : null}
 								</fieldset>
-
-								<div className="medium:col-span-2">
-									<AssignmentDueDatetimeField id="teacher-assign-due" />
-								</div>
 							</div>
 						</section>
 
-						<section className="space-y-3" aria-labelledby="assign-topics-heading">
-							<div className="flex flex-wrap items-end justify-between gap-2">
-								<div className="space-y-1">
-									<h3 id="assign-topics-heading" className="font-medium text-foreground text-sm">
-										Topics
-									</h3>
-									<p className="max-w-[62ch] text-muted-foreground text-xs leading-relaxed">
-										Same chapter layout as the student practice test builder. Expand a chapter and tick topics.
-									</p>
-								</div>
-								<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-									{selectedTopicIds.size} selected
-								</p>
+						<section className="space-y-5" aria-labelledby="assign-due-heading">
+							<div className="flex items-center gap-3">
+								<h3 id="assign-due-heading" className="shrink-0 font-medium text-foreground text-sm">
+									Due date
+								</h3>
+								<Separator className="flex-1" />
 							</div>
-
-							{Array.from(selectedTopicIds).map((id) => (
-								<input key={id} type="hidden" name="topic_ids" value={id} />
-							))}
-
-							<TeacherAssignmentTopicMatrix
-								topics={topicsForSubject}
-								subjectId={subjectId}
-								selectedTopicIds={selectedTopicIds}
-								onSelectedTopicIdsChange={setSelectedTopicIds}
-								chapterVersion={chapterVersion}
+							<AssignmentDueDatetimeField
+								id="teacher-assign-due"
+								labelledByHeadingId="assign-due-heading"
+								className="min-w-0"
 							/>
 						</section>
 
-						<section className="space-y-3" aria-labelledby="assign-roster-heading">
-							<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-								<div className="flex min-w-0 flex-1 items-center gap-2">
-									<h3 id="assign-roster-heading" className="font-medium text-foreground text-sm">
-										Students
-									</h3>
-									<Separator className="hidden min-w-[3rem] flex-1 medium:block" />
-								</div>
-								{students.length > 0 && (studentSectionFilter || performanceBandFilterActive) ? (
-									<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-										Showing {visibleStudentCount} of {students.length}
-									</p>
-								) : null}
+						<section className="space-y-5" aria-labelledby="assign-topics-heading">
+							<div className="flex items-center gap-3">
+								<h3 id="assign-topics-heading" className="shrink-0 font-medium text-foreground text-sm">
+									Topics
+								</h3>
+								<Separator className="flex-1" />
 							</div>
-							<div className="max-h-52 space-y-2 overflow-auto rounded-xl border border-border/70 bg-muted/15 p-3 dark:bg-muted/10">
-								{students.length === 0 ? (
-									<p className="text-muted-foreground text-sm">No reachable students yet.</p>
-								) : visibleStudentCount === 0 ? (
-									<p className="text-muted-foreground text-sm leading-relaxed">
-										{performanceBandFilterActive && !bandsPending ? (
-											<>
-												No students match these filters. Adjust the section, clear performance filters, or
-												note learners without graded work in this subject won&apos;t appear when a band is
-												selected.
-											</>
+							<div className="space-y-5">
+								<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+									<p className="max-w-[62ch] text-muted-foreground text-xs leading-relaxed">
+										Same chapter layout as the student practice test builder. Expand a chapter and tick topics.
+									</p>
+									<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+										{selectedTopicIds.size} selected
+									</p>
+								</div>
+
+								{Array.from(selectedTopicIds).map((id) => (
+									<input key={id} type="hidden" name="topic_ids" value={id} />
+								))}
+
+								<TeacherAssignmentTopicMatrix
+									topics={topicsForSubject}
+									subjectId={subjectId}
+									selectedTopicIds={selectedTopicIds}
+									onSelectedTopicIdsChange={setSelectedTopicIds}
+									chapterVersion={chapterVersion}
+								/>
+							</div>
+						</section>
+
+						<section className="space-y-5" aria-labelledby="assign-roster-heading">
+							<div className="flex items-center gap-3">
+								<h3 id="assign-roster-heading" className="shrink-0 font-medium text-foreground text-sm">
+									Students
+								</h3>
+								<Separator className="flex-1" />
+							</div>
+							<div className="space-y-5">
+								{selectedStudentIds.map((id) => (
+									<input key={id} type="hidden" name="student_ids" value={id} />
+								))}
+								{students.length > 0 ? (
+									<div className="flex flex-wrap items-center justify-between gap-3">
+										<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+											Showing {visibleStudentCount} of {students.length} · Recipients {selectedStudentIds.length}
+										</p>
+										{manualSelectionEnabled ? (
+											<button
+												type="button"
+												className="text-link text-xs underline-offset-4 hover:underline"
+												onClick={() => setManualSelectionEnabled(false)}
+											>
+												Reset to filtered recipients
+											</button>
 										) : (
-											<>
-												No students match this section. Pick another section or{" "}
-												<button
-													type="button"
-													className="text-link underline-offset-4 hover:underline"
-													onClick={() => setStudentSectionFilter("")}
-												>
-													show all sections
-												</button>
-												.
-											</>
+											<button
+												type="button"
+												className="text-link text-xs underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+												disabled={eligibleStudentIds.length === 0}
+												onClick={() => setManualSelectionEnabled(true)}
+											>
+												Customize selection
+											</button>
 										)}
+									</div>
+								) : null}
+								{eligibilityError ? (
+									<p className="text-destructive text-xs" role="alert">
+										{eligibilityError}
 									</p>
 								) : null}
-								{students.length === 0 ? null : (
-									students.map((student) => (
-										<label
-											key={student.id}
-											className={cn(
-												"flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-background/80",
-												!studentMatchesRosterFilters(student) && "hidden",
+								{recipientSyncPending ? (
+									<p className="text-muted-foreground text-xs">Syncing recipients from current filters…</p>
+								) : null}
+								{ineligibleFilteredCount > 0 && !recipientSyncPending ? (
+									<p className="text-muted-foreground text-xs">
+										{ineligibleFilteredCount} filtered student
+										{ineligibleFilteredCount === 1 ? "" : "s"} skipped because selected topics are not ready for
+										assignment yet.
+									</p>
+								) : null}
+								<div className="max-h-52 space-y-2 overflow-auto rounded-xl border border-border/70 bg-muted/15 p-3 dark:bg-muted/10">
+									{students.length === 0 ? (
+										<p className="text-muted-foreground text-sm">No reachable students yet.</p>
+									) : visibleStudentCount === 0 ? (
+										<p className="text-muted-foreground text-sm leading-relaxed">
+											{performanceBandFilterActive && !bandsPending ? (
+												<>
+													No students match these filters. Adjust the section, clear performance filters, or
+													note learners without graded work in this subject won&apos;t appear when a band is
+													selected.
+												</>
+											) : (
+												<>
+													No students match this section. Pick another section or{" "}
+													<button
+														type="button"
+														className="text-link underline-offset-4 hover:underline"
+														onClick={() => setStudentSectionFilter("")}
+													>
+														show all sections
+													</button>
+													.
+												</>
 											)}
-										>
-											<input
-												name="student_ids"
-												type="checkbox"
-												value={student.id}
-												className={cn(
-													"size-4 shrink-0 rounded border-input text-primary focus-visible:ring-2 focus-visible:ring-ring",
-												)}
-											/>
-											<span className="min-w-0">
-												<span className="block truncate font-medium text-foreground">{student.fullName}</span>
-												<span className="text-muted-foreground text-xs">
-													Grade {student.grade ?? "—"} · Section {student.section ?? "—"}
-												</span>
-											</span>
-										</label>
-									))
-								)}
+										</p>
+									) : null}
+									{students.length === 0
+										? null
+										: filteredStudents.map((student) => {
+												const isEligible = eligibleStudentIdSet.has(student.id);
+												return (
+													<label
+														key={student.id}
+														className={cn(
+															"flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-background/80",
+															!isEligible && "cursor-not-allowed opacity-60",
+														)}
+													>
+														<input
+															type="checkbox"
+															checked={selectedStudentIdSet.has(student.id)}
+															onChange={() => toggleStudentSelection(student.id)}
+															disabled={!manualSelectionEnabled || !isEligible}
+															className={cn(
+																"size-4 shrink-0 rounded border-input text-primary focus-visible:ring-2 focus-visible:ring-ring",
+																!manualSelectionEnabled && "cursor-not-allowed",
+															)}
+														/>
+														<span className="min-w-0">
+															<span className="block truncate font-medium text-foreground">
+																{student.fullName}
+															</span>
+															<span className="text-muted-foreground text-xs">
+																Grade {student.grade ?? "—"} · Section {student.section ?? "—"}
+															</span>
+															{!isEligible ? (
+																<span className="block text-muted-foreground text-xs">
+																	Unavailable for selected topics.
+																</span>
+															) : null}
+														</span>
+													</label>
+												);
+											})}
+								</div>
 							</div>
 						</section>
 
@@ -512,8 +706,15 @@ export function TeacherAssignmentsManager({
 							</p>
 						) : null}
 
-						<div className="flex flex-wrap items-center gap-3 pt-1">
-							<SubmitButton />
+						<div className="flex flex-wrap items-center gap-3 border-border/50 border-t pt-8">
+							<SubmitButton disabled={submitDisabled} />
+							{submitDisabled ? (
+								<p className="text-muted-foreground text-xs">
+									{recipientSyncPending
+										? "Recipients are still syncing."
+										: "Select at least one eligible student to publish."}
+								</p>
+							) : null}
 						</div>
 					</form>
 				),
