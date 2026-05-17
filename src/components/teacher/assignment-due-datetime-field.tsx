@@ -4,7 +4,7 @@ import * as React from "react";
 import { CalendarIcon, ChevronDownIcon } from "lucide-react";
 
 import { panelRaisedInputClass } from "@/app/student/settings/_settings-form-styles";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,16 +24,25 @@ export type AssignmentDueDatetimeFieldProps = {
 	/** Optional controlled key bump when the parent form resets (same as form remount). */
 	id?: string;
 	className?: string;
+	/**
+	 * When set, the visible “Due date” label is omitted — use the same id on the parent section `<h3>` for accessibility.
+	 */
+	labelledByHeadingId?: string;
 };
 
 /**
  * Shadcn Calendar + Popover due picker for assignment forms.
  * Submits `due_at` via a hidden input (`datetime-local`-compatible string, empty when unset).
  */
-export function AssignmentDueDatetimeField({ id, className }: AssignmentDueDatetimeFieldProps) {
+export function AssignmentDueDatetimeField({
+	id,
+	className,
+	labelledByHeadingId,
+}: AssignmentDueDatetimeFieldProps) {
 	const labelId = id ?? "assignment-due-field-label";
 	const timeId = `${labelId}-time`;
 	const hintId = `${labelId}-hint`;
+	const triggerLabelledBy = labelledByHeadingId ?? labelId;
 
 	const [open, setOpen] = React.useState(false);
 	const [selected, setSelected] = React.useState<Date | undefined>(undefined);
@@ -53,13 +62,15 @@ export function AssignmentDueDatetimeField({ id, className }: AssignmentDueDatet
 	}, []);
 
 	return (
-		<div className={cn("flex flex-col gap-2", className)}>
+		<div className={cn(labelledByHeadingId ? "space-y-5" : "space-y-2", className)}>
 			<input type="hidden" name="due_at" value={selected ? dateToDueAtFieldValue(selected) : ""} readOnly aria-hidden />
 
-			<div className="space-y-1.5">
-				<span id={labelId} className="font-medium text-foreground text-sm leading-none">
-					Due date
-				</span>
+			<div className="space-y-1">
+				{labelledByHeadingId ? null : (
+					<span id={labelId} className="block font-medium text-foreground text-sm">
+						Due date
+					</span>
+				)}
 				<p id={hintId} className="text-muted-foreground text-xs leading-relaxed">
 					Optional. Students still see the assignment without one.
 				</p>
@@ -68,24 +79,24 @@ export function AssignmentDueDatetimeField({ id, className }: AssignmentDueDatet
 			<Popover open={open} onOpenChange={setOpen}>
 				<PopoverTrigger
 					type="button"
-					aria-labelledby={labelId}
+					aria-labelledby={triggerLabelledBy}
 					aria-describedby={hintId}
 					className={cn(
-						buttonVariants({ variant: "outline" }),
-						"h-auto min-h-12 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left font-normal shadow-sm",
-						"hover:bg-muted/50 dark:bg-input/35 dark:hover:bg-input/50",
-						"focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/45",
+						"flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 text-left font-normal text-sm shadow-sm",
+						"hover:bg-muted/40 dark:bg-input/35 dark:hover:bg-input/50",
+						"medium:text-base",
+						"focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/45",
 					)}
 				>
-					<span className="flex min-w-0 items-center gap-2.5">
-						<CalendarIcon className="size-5 shrink-0 text-primary" aria-hidden />
-						<span className="min-w-0 truncate text-base text-foreground leading-snug medium:text-[17px]">
+					<span className="flex min-w-0 items-center gap-2">
+						<CalendarIcon className="size-4 shrink-0 text-primary" aria-hidden />
+						<span className="min-w-0 truncate text-foreground">
 							{selected ? formatDateTimeMediumShortInAppTimeZone(selected) : "Pick date and time"}
 						</span>
 					</span>
 					<ChevronDownIcon
 						className={cn(
-							"size-5 shrink-0 text-muted-foreground transition-transform duration-200 ease-out",
+							"size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out",
 							open && "rotate-180",
 						)}
 						aria-hidden
