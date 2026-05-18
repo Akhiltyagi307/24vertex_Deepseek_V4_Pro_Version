@@ -5,6 +5,7 @@ import { Resend } from "resend";
 
 import { db } from "@/db";
 import { emailLog } from "@/db/schema/comms-audit";
+import { injectEmailBrandHeaderIfAbsent } from "@/lib/email/email-brand-logo";
 import { renderActiveEmailTemplate } from "@/lib/email/db-email-templates";
 import { signUnsubscribeToken } from "@/lib/email/unsubscribe-token";
 import { getAppUrl, getResendApiKey, getResendFrom } from "@/lib/env";
@@ -104,7 +105,8 @@ export async function sendHtmlEmailLogged(params: SendHtmlEmailLoggedParams): Pr
 
 	const dbRendered = await renderActiveEmailTemplate(params.templateSlug, params.templateVariables ?? {});
 	const subject = dbRendered?.subject ?? params.subject;
-	const html = dbRendered?.html ?? params.html;
+	const appUrl = getAppUrl();
+	const html = injectEmailBrandHeaderIfAbsent(dbRendered?.html ?? params.html, appUrl);
 
 	const initialPayload = params.dedupKey ? { dedup_key: params.dedupKey } : null;
 

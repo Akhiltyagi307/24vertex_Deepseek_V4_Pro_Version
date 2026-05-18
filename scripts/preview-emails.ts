@@ -13,7 +13,9 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { primeEmailLogoForPreview } from "../src/lib/email/email-brand-logo";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,18 +24,9 @@ if (!process.env.NEXT_PUBLIC_APP_URL?.trim()) {
 	process.env.NEXT_PUBLIC_APP_URL = "https://app.eduai.example.com";
 }
 
-// Point the email logo at the local `public/brand/logo-icon.png` so the static
-// HTML samples actually render the brand mark when opened in a browser.
-// Production uses `${NEXT_PUBLIC_APP_URL}/brand/logo-icon.png` automatically.
-{
-	const logoPath = resolve(__dirname, "..", "public", "brand", "logo-icon.png");
-	process.env.EMAIL_LOGO_URL = pathToFileURL(logoPath).href;
-}
+primeEmailLogoForPreview();
 
-// `renderEmailShell` itself is pure — `getAppUrl()` is called per-render
-// (not at module load) so a normal import works as long as the env var above
-// is set before any `renderEmailShell({...})` call below.
-import { escapeHtml, renderEmailShell } from "../src/lib/email/render-email-shell";
+import { escapeHtml, renderEmailShell } from "../src/lib/email/render-email-shell-core";
 
 type Sample = {
 	slug: string;
