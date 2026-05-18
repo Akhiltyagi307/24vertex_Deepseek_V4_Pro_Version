@@ -1,10 +1,15 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { writeAuthAudit } from "@/lib/auth/audit";
+import { AUTH_ACTIONS } from "@/lib/auth/audit-actions";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
+import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
 	notifyParentChildLinkConfirmed,
@@ -70,6 +75,21 @@ export async function completeParentRegistration(
 		await notifyParentLinkedToStudent({ studentId, parentId: user.id });
 		await notifyParentChildLinkConfirmed({ studentId, parentId: user.id });
 	}
+
+	const reqHeaders = await headers();
+	await writeAuthAudit({
+		action: AUTH_ACTIONS.SIGNUP_COMPLETED,
+		userId: user.id,
+		entityType: "profile",
+		entityId: user.id,
+		changes: { role: "parent", source: "email", linked_student_id: studentId ?? null },
+		ipAddress: clientIpFromHeaders(reqHeaders),
+	});
+	Sentry.addBreadcrumb({
+		category: "auth.signup",
+		message: "parent profile created",
+		level: "info",
+	});
 
 	redirect("/parent/select-student");
 }

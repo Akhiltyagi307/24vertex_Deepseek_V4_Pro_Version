@@ -3,7 +3,7 @@
 import { LogOutIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { signOutEverywhere } from "@/lib/auth/sign-out";
 
 export function ParentPortalSignOut() {
 	return (
@@ -12,11 +12,7 @@ export function ParentPortalSignOut() {
 			variant="ghost"
 			size="sm"
 			className="text-muted-foreground hover:text-foreground"
-			onClick={async () => {
-				const supabase = createClient();
-				await supabase.auth.signOut();
-				window.location.href = "/";
-			}}
+			onClick={() => void signOutEverywhere()}
 		>
 			<LogOutIcon data-icon="inline-start" className="size-4" />
 			Sign out

@@ -95,28 +95,20 @@ test.describe("Auth flow", () => {
 		expect(errors, `Console errors on login: ${errors.join("\n")}`).toHaveLength(0);
 	});
 
-	test("admin login submits and Supabase Auth call completes", async ({ page }) => {
+	test("admin login submits and resolves to a redirect or visible error", async ({ page }) => {
 		await page.goto("/login");
 
 		await page.getByLabel(/email/i).first().fill(ADMIN_EMAIL);
 		await page.getByLabel(/password/i).first().fill(ADMIN_PASSWORD);
 
-		// Watch for the Supabase Auth token call so we know signInWithPassword fired.
-		const authResponse = page.waitForResponse(
-			(res) => /\/auth\/v1\/token/.test(res.url()) && res.request().method() === "POST",
-			{ timeout: 15_000 },
-		);
-
+		// Server action handles signInWithPassword + role routing server-side now —
+		// the Supabase auth call is no longer observable from the browser. Validate
+		// the user-visible outcome instead: either redirect away from /login (creds
+		// accepted) or an error alert renders (creds rejected). Both prove the form
+		// wired through to the action.
 		await page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click();
 
-		const res = await authResponse;
-		// 200 = creds accepted, 400 = creds rejected. We're testing the form/network path,
-		// not the validity of the creds — both outcomes prove auth wiring works.
-		expect([200, 400]).toContain(res.status());
-
-		// On 200, the form does window.location.assign("/") — verify navigation off /login.
-		// On 400, an error alert renders. Accept either.
-		await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+		await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
 		const onErrorAlert = await page.getByRole("alert").first().isVisible().catch(() => false);
 		const navigatedAway = !/\/login/.test(new URL(page.url()).pathname);
 		expect(onErrorAlert || navigatedAway, "either an error alert or successful navigation must occur").toBe(true);
@@ -126,19 +118,15 @@ test.describe("Auth flow", () => {
 test.describe("Student auth (optional env)", () => {
 	test.skip(!STUDENT_EMAIL || !STUDENT_PASSWORD, "playwright_user_* or PLAYWRIGHT_USER_* not set");
 
-	test("student login submits and Supabase returns 200", async ({ page }) => {
+	test("student login submits and navigates off /login", async ({ page }) => {
 		await page.goto("/login");
 
 		await page.getByLabel(/email/i).first().fill(STUDENT_EMAIL);
 		await page.getByLabel(/password/i).first().fill(STUDENT_PASSWORD);
 
-		const authResponse = page.waitForResponse(
-			(res) => /\/auth\/v1\/token/.test(res.url()) && res.request().method() === "POST",
-			{ timeout: 15_000 },
-		);
+		// Auth + role routing run inside the server action, so the navigation is
+		// the user-visible signal that credentials were accepted.
 		await page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click();
-		const res = await authResponse;
-		expect(res.status(), "student credentials must be accepted for student portal E2E").toBe(200);
 		await page.waitForURL((url) => !/\/login/.test(url.pathname), { timeout: 15_000 });
 	});
 });

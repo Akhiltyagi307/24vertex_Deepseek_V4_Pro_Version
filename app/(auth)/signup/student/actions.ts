@@ -1,10 +1,15 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { writeAuthAudit } from "@/lib/auth/audit";
+import { AUTH_ACTIONS } from "@/lib/auth/audit-actions";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
+import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { studentSignupSchema } from "@/lib/validations/auth";
 
@@ -68,6 +73,21 @@ export async function completeStudentRegistration(
 		logSupabaseError("completeStudentRegistration.register_student", rpcError);
 		return { error: "We couldn't complete registration. Try again or contact support." };
 	}
+
+	const reqHeaders = await headers();
+	await writeAuthAudit({
+		action: AUTH_ACTIONS.SIGNUP_COMPLETED,
+		userId: user.id,
+		entityType: "profile",
+		entityId: user.id,
+		changes: { role: "student", source: "email" },
+		ipAddress: clientIpFromHeaders(reqHeaders),
+	});
+	Sentry.addBreadcrumb({
+		category: "auth.signup",
+		message: "student profile created",
+		level: "info",
+	});
 
 	redirect("/student/dashboard");
 }

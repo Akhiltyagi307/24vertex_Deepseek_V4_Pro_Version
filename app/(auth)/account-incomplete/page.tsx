@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+
+export const metadata: Metadata = {
+	title: "Account could not be loaded",
+};
 
 export default function AccountIncompletePage() {
 	return (

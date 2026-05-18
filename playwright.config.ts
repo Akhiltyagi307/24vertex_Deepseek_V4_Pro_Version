@@ -87,7 +87,7 @@ export default defineConfig({
 		{
 			name: "unauth",
 			testMatch:
-				/(smoke|playwright-env|admin-panel|security-headers|a11y-axe|practice-visuals|visual-snapshots)\.spec\.ts$/,
+				/(smoke|playwright-env|admin-panel|security-headers|a11y-axe|practice-visuals|visual-snapshots|auth-pages)\.spec\.ts$/,
 		},
 		{
 			name: "student",

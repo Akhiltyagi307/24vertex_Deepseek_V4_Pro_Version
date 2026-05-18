@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
+
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { StudentSignupForm } from "./student-form";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Student sign up",
+	description: "Create your EduAI student account and start adaptive practice in minutes.",
+};
 
 function isTransientFetchError(error: { message?: string } | null): boolean {
 	if (!error?.message) return false;

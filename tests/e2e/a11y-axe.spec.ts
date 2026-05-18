@@ -7,9 +7,16 @@
  * (no extra wrapper libs).
  *
  * Routes covered:
- *   - `/`               marketing landing
- *   - `/login`          auth
- *   - `/auth/forgot-password`
+ *   - `/`                       marketing landing
+ *   - `/login`                  auth (student/parent)
+ *   - `/login/educator`         auth (teacher)
+ *   - `/forgot-password`        recovery request (group (auth) → no `/auth/` prefix)
+ *   - `/auth/update-password`   recovery completion (renders expired-link UI when
+ *                               visited without the recovery cookie)
+ *   - `/signup/role-picker`     pre-signup role choice
+ *   - `/signup/student`         student signup (step 0 of the wizard)
+ *   - `/signup/parent`          parent signup
+ *   - `/signup/teacher`         teacher signup
  *   - `/legal/privacy`
  *   - `/legal/terms`
  *
@@ -49,7 +56,19 @@ async function runAxe(page: import("@playwright/test").Page): Promise<AxeResults
 	return results;
 }
 
-const ROUTES = ["/", "/login", "/auth/forgot-password", "/legal/privacy", "/legal/terms"];
+const ROUTES = [
+	"/",
+	"/login",
+	"/login/educator",
+	"/forgot-password",
+	"/auth/update-password",
+	"/signup/role-picker",
+	"/signup/student",
+	"/signup/parent",
+	"/signup/teacher",
+	"/legal/privacy",
+	"/legal/terms",
+];
 
 for (const route of ROUTES) {
 	test(`a11y: ${route} has no critical/serious WCAG 2.1 AA violations`, async ({ page }) => {

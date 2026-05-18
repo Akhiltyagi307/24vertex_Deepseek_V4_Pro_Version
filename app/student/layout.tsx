@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 // avoid the ~25KB on cold loads outside the authenticated surface.
 import "katex/dist/katex.min.css";
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
+import { AuthSignedOutListener } from "@/components/auth/auth-signed-out-listener";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { StudentShell } from "@/components/student/student-shell";
 import { SubscriptionBanner } from "@/components/student/subscription/subscription-banner";
@@ -39,6 +40,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 	return (
 		<>
 			<SkipToContent />
+			<AuthSignedOutListener />
 			<AdminImpersonationBanner />
 			<StudentShell
 			organizationName={org}

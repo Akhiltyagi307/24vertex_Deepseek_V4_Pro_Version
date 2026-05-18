@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { postAuthPathFromProfile } from "@/lib/auth/post-auth-path";
-import { createClient } from "@/lib/supabase/client";
+import { useActionState, useMemo } from "react";
+import { useFormStatus } from "react-dom";
+
+import { loginAction, type LoginState } from "@/app/(auth)/login/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,27 +28,42 @@ function sanitizeLoginErrorMessage(raw: string): string {
 	return `${collapsed.slice(0, MAX_CALLBACK_ERROR_DISPLAY)}…`;
 }
 
+function SubmitLoginButton() {
+	const { pending } = useFormStatus();
+	return (
+		<Button
+			type="submit"
+			className="h-11 w-full text-base font-semibold"
+			disabled={pending}
+		>
+			{pending ? "Signing in…" : "Log in"}
+		</Button>
+	);
+}
+
 type Props = {
 	callbackError?: string;
 	/** Set after email confirmation + profile creation — user should sign in with password. */
 	emailVerified?: boolean;
+	/** Set after a recovery-flow password update — user should sign in with the new password. */
+	passwordReset?: boolean;
 	/**
 	 * Educator login: same shell as students, with teacher signup link and educator marketing column
 	 * (see `AuthStudioCardGate`). Post-auth routing still uses `profiles.role` / `is_verified`.
 	 */
 	variant?: "default" | "educator";
 	className?: string;
-} & Omit<React.ComponentProps<"form">, "onSubmit">;
+} & Omit<React.ComponentProps<"form">, "onSubmit" | "action">;
 
 export function LoginForm({
 	callbackError,
 	emailVerified,
+	passwordReset,
 	variant = "default",
 	className,
 	...props
 }: Props) {
-	const [error, setError] = useState<string | null>(null);
-	const [pending, setPending] = useState(false);
+	const [state, formAction] = useActionState<LoginState, FormData>(loginAction, {});
 
 	const callbackMessage = useMemo(() => {
 		if (!callbackError?.trim()) return null;
@@ -59,56 +75,11 @@ export function LoginForm({
 	}, [callbackError]);
 
 	const displayError =
-		error != null ? sanitizeLoginErrorMessage(error) : callbackMessage;
-
-	async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-		e.preventDefault();
-		setError(null);
-		setPending(true);
-		const form = e.currentTarget;
-		const fd = new FormData(form);
-		const email = String(fd.get("email") ?? "").trim();
-		const password = String(fd.get("password") ?? "");
-
-		const supabase = createClient();
-		const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
-			email,
-			password,
-		});
-
-		if (signInError) {
-			setError(signInError.message);
-			setPending(false);
-			return;
-		}
-
-		const userId = signInData.user?.id;
-		if (!userId) {
-			window.location.replace("/");
-			return;
-		}
-
-		const { error: profileError, data: profileRow } = await supabase
-			.from("profiles")
-			.select("role, is_verified")
-			.eq("id", userId)
-			.maybeSingle();
-
-		if (profileError) {
-			// Prefer a single server-driven hop if the profile read fails (rare).
-			window.location.replace("/");
-			return;
-		}
-
-		const destination = postAuthPathFromProfile(
-			profileRow ? { role: profileRow.role, is_verified: profileRow.is_verified } : null,
-		);
-		window.location.replace(destination);
-	}
+		state.error != null ? sanitizeLoginErrorMessage(state.error) : callbackMessage;
 
 	return (
 		<form
-			onSubmit={handleSubmit}
+			action={formAction}
 			className={cn("flex flex-col gap-6", className)}
 			{...props}
 		>
@@ -125,6 +96,14 @@ export function LoginForm({
 						<AlertDescription>
 							Your account is ready. Sign in with the email and password you chose when you
 							registered.
+						</AlertDescription>
+					</Alert>
+				</AnimateFormAlert>
+				<AnimateFormAlert show={Boolean(passwordReset)} motionKey="login-password-reset">
+					<Alert>
+						<AlertTitle>Password updated</AlertTitle>
+						<AlertDescription>
+							Sign in with your new password to continue.
 						</AlertDescription>
 					</Alert>
 				</AnimateFormAlert>
@@ -164,9 +143,7 @@ export function LoginForm({
 					/>
 				</Field>
 				<Field>
-					<Button type="submit" className="h-11 w-full text-base font-semibold" disabled={pending}>
-						{pending ? "Signing in…" : "Log in"}
-					</Button>
+					<SubmitLoginButton />
 				</Field>
 				<div className="space-y-2 text-center text-sm text-muted-foreground">
 					<FieldDescription className="text-center text-sm text-muted-foreground">

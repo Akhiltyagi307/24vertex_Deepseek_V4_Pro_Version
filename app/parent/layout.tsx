@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import "katex/dist/katex.min.css";
 
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
+import { AuthSignedOutListener } from "@/components/auth/auth-signed-out-listener";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { getProfile } from "@/lib/auth/routing";
@@ -24,6 +25,7 @@ export default async function ParentLayout({ children }: { children: React.React
 	return (
 		<>
 			<SkipToContent />
+			<AuthSignedOutListener />
 			<AdminImpersonationBanner />
 			{children}
 		</>

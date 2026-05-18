@@ -4,7 +4,7 @@
  * Subsequent test projects load that file via `storageState` config.
  */
 
-import { test as setup, expect } from "@playwright/test";
+import { test as setup } from "@playwright/test";
 import path from "node:path";
 
 function playwrightUserEmail(): string {
@@ -37,16 +37,11 @@ setup("authenticate", async ({ page }) => {
 	await page.getByLabel(/email/i).first().fill(USER_EMAIL);
 	await page.getByLabel(/password/i).first().fill(USER_PASSWORD);
 
-	const [authRes] = await Promise.all([
-		page.waitForResponse(
-			(r) => /\/auth\/v1\/token/.test(r.url()) && r.request().method() === "POST",
-			{ timeout: 15_000 },
-		),
-		page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click(),
-	]);
-	expect(authRes.status(), "Supabase Auth must accept these credentials").toBe(200);
-
-	// One navigation: login resolves role on the client, then `window.location.replace(destination)`.
+	// `signInWithPassword` + role routing run inside the server action — the
+	// Supabase Auth call is no longer observable from the browser. Wait for the
+	// navigation off /login as proof that credentials were accepted; if they were
+	// not, the page stays on /login and `waitForURL` times out (test fails).
+	await page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click();
 	await page.waitForURL((url) => !/\/login/.test(url.pathname), { timeout: 15_000 });
 
 	// Persist storage state so subsequent test projects can load it directly.

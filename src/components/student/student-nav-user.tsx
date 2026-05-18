@@ -20,7 +20,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
-import { createClient } from "@/lib/supabase/client";
+import { signOutEverywhere } from "@/lib/auth/sign-out";
 import { BadgeCheckIcon, ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -47,12 +47,6 @@ export function StudentNavUser({
 	const router = useRouter();
 	const av = user.avatar ?? "";
 	const fb = initials(user.name);
-
-	async function signOut() {
-		const supabase = createClient();
-		await supabase.auth.signOut();
-		window.location.href = "/";
-	}
 
 	return (
 		<SidebarMenu>
@@ -99,7 +93,10 @@ export function StudentNavUser({
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem variant="destructive" onClick={signOut}>
+						<DropdownMenuItem
+							variant="destructive"
+							onClick={() => void signOutEverywhere()}
+						>
 							<LogOutIcon />
 							Log out
 						</DropdownMenuItem>

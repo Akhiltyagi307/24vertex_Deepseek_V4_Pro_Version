@@ -11,22 +11,23 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { AnimateFormAlert } from "@/components/motion/animate-form-alert";
 import { cn } from "@/lib/utils";
-import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
+import {
+	buildPendingRegistrationMeta,
+	resolveEmailRedirectTo,
+	validatePasswordPair,
+} from "@/lib/auth/signup-client";
 import { studentSignupSchema } from "@/lib/validations/auth";
-import { getAppUrl } from "@/lib/env";
 import { createClient } from "@/lib/supabase/client";
 
-const step0Schema = z
+// Step 0 covers only the account-identity fields (name + email). Password rules
+// are owned by the shared `passwordPairSchema` / `validatePasswordPair` helper so
+// every signup form uses the same minimum length + mismatch message.
+const step0AccountSchema = z
 	.object({
 		fullName: z.string().min(1).max(200),
 		email: z.string().email(),
-		password: z.string().min(8),
-		confirmPassword: z.string().min(8),
 	})
-	.refine((data) => data.password === data.confirmPassword, {
-		message: "Passwords do not match",
-		path: ["confirmPassword"],
-	});
+	.strict();
 
 const selectClassName = cn(
 	"h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base text-foreground transition-colors outline-none",
@@ -71,17 +72,6 @@ type Elective = { id: string; name: string; grade: number };
 type Props = {
 	electives: Elective[];
 };
-
-function resolveEmailRedirectTo(): string {
-	try {
-		return `${getAppUrl()}/auth/callback`;
-	} catch (error) {
-		if (typeof window !== "undefined" && window.location.origin) {
-			return `${window.location.origin}/auth/callback`;
-		}
-		throw error;
-	}
-}
 
 function formatStepErrors(err: z.ZodError): string {
 	const flat = err.flatten();
@@ -135,14 +125,17 @@ export function StudentSignupForm({ electives }: Props) {
 
 	function goNext() {
 		setStepError(null);
-		const parsed = step0Schema.safeParse({
+		const parsed = step0AccountSchema.safeParse({
 			fullName: fullName.trim(),
 			email: email.trim(),
-			password,
-			confirmPassword,
 		});
 		if (!parsed.success) {
 			setStepError(formatStepErrors(parsed.error));
+			return;
+		}
+		const pw = validatePasswordPair(password, confirmPassword);
+		if (!pw.ok) {
+			setStepError(pw.error);
 			return;
 		}
 		setStep(1);
@@ -179,8 +172,9 @@ export function StudentSignupForm({ electives }: Props) {
 			return;
 		}
 
-		if (password !== confirmPassword) {
-			setStepError("Passwords do not match");
+		const pwResult = validatePasswordPair(password, confirmPassword);
+		if (!pwResult.ok) {
+			setStepError(pwResult.error);
 			return;
 		}
 
@@ -218,22 +212,16 @@ export function StudentSignupForm({ electives }: Props) {
 			password,
 			options: {
 				emailRedirectTo,
-				data: {
-					[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
-						version: 1,
-						role: "student",
-						payload: {
-							email: d.email,
-							fullName: d.fullName,
-							grade: d.grade,
-							section: d.section,
-							stream: d.stream,
-							electiveSubjectId: d.electiveSubjectId,
-							parentName: d.parentName ?? null,
-							parentEmail: d.parentEmail ?? null,
-						},
-					}),
-				},
+				data: buildPendingRegistrationMeta("student", {
+					email: d.email,
+					fullName: d.fullName,
+					grade: d.grade,
+					section: d.section,
+					stream: d.stream,
+					electiveSubjectId: d.electiveSubjectId,
+					parentName: d.parentName ?? null,
+					parentEmail: d.parentEmail ?? null,
+				}),
 			},
 		});
 

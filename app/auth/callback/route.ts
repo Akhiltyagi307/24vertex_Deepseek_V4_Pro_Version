@@ -3,6 +3,7 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { consumePendingRegistration } from "@/lib/auth/pending-registration";
+import { openRecoveryWindow } from "@/lib/auth/recovery-window";
 import { resolveSafeNextPath } from "@/lib/auth/safe-redirect";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/env";
@@ -98,6 +99,17 @@ export async function GET(request: Request) {
 		} = await supabase.auth.getUser();
 		if (user?.id) {
 			void notifyEmailChanged(user.id, user.email);
+		}
+	}
+
+	// Recovery flow: when redirecting to the password-update page, open a short
+	// recovery window cookie so the update action can prove this session came
+	// from a fresh recovery link rather than a stale tab.
+	if (sessionEstablished && next === "/auth/update-password") {
+		const userId =
+			sessionUserHandshake?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
+		if (userId) {
+			await openRecoveryWindow(userId);
 		}
 	}
 
