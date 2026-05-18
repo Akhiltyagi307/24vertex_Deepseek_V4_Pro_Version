@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { shouldRedirectToMaintenance } from "@/lib/admin/maintenance-routing";
 import { adminProxyGate } from "@/lib/admin/proxy-guard";
 import { billingProxyGate } from "@/lib/billing/proxy-guard";
+import { parentProxyGate } from "@/lib/parent/proxy-guard";
 import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
 import { updateSession } from "@/lib/supabase/session";
 
@@ -44,6 +45,13 @@ export async function proxy(request: NextRequest) {
 		billingEarly.headers.set(REQUEST_ID_HEADER, requestId);
 		billingEarly.headers.set("Content-Security-Policy", csp);
 		return billingEarly;
+	}
+
+	const parentEarly = parentProxyGate(request);
+	if (parentEarly) {
+		parentEarly.headers.set(REQUEST_ID_HEADER, requestId);
+		parentEarly.headers.set("Content-Security-Policy", csp);
+		return parentEarly;
 	}
 
 	if (shouldRedirectToMaintenance(pathname, process.env.MAINTENANCE_MODE)) {

@@ -1,26 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { UserPlus, Users } from "lucide-react";
 
-import { selectParentStudentAction } from "../../select-student/actions";
+import { LinkStudentSection } from "./sections/link-student-section";
+import { SwitchStudentSection, type LinkedStudent } from "./sections/switch-student-section";
 import SmoothTab from "@/components/kokonutui/smooth-tab";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const tabAccentClass =
 	"bg-emerald-600 hover:bg-emerald-600/90 dark:bg-emerald-500 dark:hover:bg-emerald-500/90";
-
-const settingsNestedWellClass =
-	"rounded-xl border border-border/80 bg-sidebar-accent p-4 shadow-sm dark:border-border dark:bg-foreground/10 medium:p-5";
-
-const studentSelectButtonClass = cn(
-	"w-full rounded-lg border border-border/90 bg-background px-4 py-3 text-left text-sm font-medium text-foreground shadow-sm transition-colors",
-	"hover:bg-muted/50 dark:border-border dark:bg-muted/50 dark:hover:bg-muted/70",
-);
-
-type LinkedStudent = { id: string; displayName: string };
 
 export function ParentAccountSettingsClient({
 	signedInAs,
@@ -57,41 +45,10 @@ export function ParentAccountSettingsClient({
 						icon: Users,
 						color: tabAccentClass,
 						content: (
-							<div className="space-y-8">
-								<div>
-									<h2 className="font-semibold text-lg tracking-tight text-foreground">Switch student</h2>
-									<p className="mt-1 text-foreground/75 text-sm leading-relaxed dark:text-muted-foreground">
-										View overview, progress, and test reports for another student linked to your account.
-										Select a name below or open the full student picker.
-									</p>
-								</div>
-								<div className={settingsNestedWellClass}>
-									<p className="text-foreground text-sm font-semibold">Linked students</p>
-									{linkedStudents.length > 0 ? (
-										<ul className="mt-3 flex flex-col gap-2">
-											{linkedStudents.map((c) => (
-												<li key={c.id}>
-													<form action={selectParentStudentAction}>
-														<input type="hidden" name="studentId" value={c.id} />
-														<button type="submit" className={studentSelectButtonClass}>
-															{c.displayName}
-														</button>
-													</form>
-												</li>
-											))}
-										</ul>
-									) : (
-										<p className="mt-3 text-muted-foreground text-sm">No linked students yet.</p>
-									)}
-								</div>
-								<Button
-									variant="outline"
-									className="w-full medium:w-auto"
-									render={<Link href="/parent/select-student" />}
-								>
-									Switch student account
-								</Button>
-							</div>
+							<SwitchStudentSection
+								linkedStudents={linkedStudents}
+								onSwitchHref="/parent/select-student"
+							/>
 						),
 					},
 					{
@@ -99,31 +56,7 @@ export function ParentAccountSettingsClient({
 						title: "Link a student",
 						icon: UserPlus,
 						color: tabAccentClass,
-						content: (
-							<div className="space-y-8">
-								<div>
-									<h2 className="font-semibold text-lg tracking-tight text-foreground">Link a student</h2>
-									<p className="mt-1 text-foreground/75 text-sm leading-relaxed dark:text-muted-foreground">
-										Add another student with the six-character link code from their Profile, or their
-										account id.
-									</p>
-								</div>
-								<div className={settingsNestedWellClass}>
-									<p className="text-foreground text-sm font-semibold">Connect a student</p>
-									<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
-										You&apos;ll confirm the link on the next screen. The student must generate the code
-										from their EduAI profile.
-									</p>
-									<Button
-										className="mt-4 h-11 text-base"
-										size="lg"
-										render={<Link href="/parent/link-child" />}
-									>
-										Link another student account
-									</Button>
-								</div>
-							</div>
-						),
+						content: <LinkStudentSection />,
 					},
 				]}
 			/>

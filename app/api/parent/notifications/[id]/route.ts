@@ -3,15 +3,19 @@ import { z } from "zod";
 
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { consumeParentNotifRead } from "@/lib/parent/rate-limit";
+import { rateLimitedResponse } from "@/lib/ratelimit/headers";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const bodySchema = z.object({
-	is_read: z.boolean(),
-});
+const bodySchema = z
+	.object({
+		is_read: z.boolean(),
+	})
+	.strict();
 
 function privateHeaders(): HeadersInit {
 	return { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" };
@@ -25,6 +29,11 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 	const profile = await getCachedAppProfileRow();
 	if (!profile || profile.role !== "parent") {
 		return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: privateHeaders() });
+	}
+
+	const rl = await consumeParentNotifRead(user.id);
+	if (!rl.ok) {
+		return rateLimitedResponse(rl.result, rl.limit, { code: "parent_notif_rate_limited" });
 	}
 
 	const { id } = await ctx.params;

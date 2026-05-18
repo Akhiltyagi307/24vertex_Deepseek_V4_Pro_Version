@@ -16,11 +16,18 @@ import {
 } from "@/lib/notifications/account-security";
 import { writeParentAudit } from "@/lib/parent/audit";
 import { PARENT_ACTIONS } from "@/lib/parent/audit-actions";
+import {
+	consumeParentLinkPerParent,
+	consumeParentLinkPerStudent,
+} from "@/lib/parent/rate-limit";
 import { logSupabaseError, logServerError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 import { linkParentSchema } from "@/lib/validations/auth";
 
 export type LinkChildState = { error?: string; success?: boolean };
+
+const THROTTLED_USER_MESSAGE =
+	"Too many link attempts. Wait a few minutes and try again.";
 
 export async function linkParentToStudent(
 	_prev: LinkChildState,
@@ -47,6 +54,40 @@ export async function linkParentToStudent(
 	const ip = clientIpFromHeaders(reqHeaders);
 	const ua = reqHeaders.get("user-agent") ?? null;
 
+	// Per-parent cap (10/hour). The defining brake against brute-forcing
+	// the link code: even an attacker with infinite codes can only try 10
+	// per hour from one compromised parent account.
+	if (parentUser?.id) {
+		const perParent = await consumeParentLinkPerParent(parentUser.id);
+		if (!perParent.ok) {
+			await writeParentAudit({
+				action: PARENT_ACTIONS.LINK_CHILD_THROTTLED,
+				parentId: parentUser.id,
+				payload: { scope: "per_parent", student_ref: parsed.data.studentId },
+				ipAddress: ip,
+				userAgent: ua,
+			});
+			return { error: THROTTLED_USER_MESSAGE };
+		}
+	}
+
+	// Per-student-reference cap (5/15min). Cheap protection against
+	// repeated hits on the same input — also catches a single compromised
+	// parent who tries the same wrong code in a loop.
+	const perStudent = await consumeParentLinkPerStudent(parsed.data.studentId);
+	if (!perStudent.ok) {
+		if (parentUser?.id) {
+			await writeParentAudit({
+				action: PARENT_ACTIONS.LINK_CHILD_THROTTLED,
+				parentId: parentUser.id,
+				payload: { scope: "per_student_ref", student_ref: parsed.data.studentId },
+				ipAddress: ip,
+				userAgent: ua,
+			});
+		}
+		return { error: THROTTLED_USER_MESSAGE };
+	}
+
 	const { error } = await supabase.rpc("link_parent_to_student", {
 		p_student_ref: parsed.data.studentId,
 	});
@@ -69,6 +110,9 @@ export async function linkParentToStudent(
 				ipAddress: ip,
 				userAgent: ua,
 			});
+			Sentry.metrics.count("parent.link.failure", 1, {
+				attributes: { reason: kind },
+			});
 		}
 		return { error: message };
 	}
@@ -89,6 +133,7 @@ export async function linkParentToStudent(
 			ipAddress: ip,
 			userAgent: ua,
 		});
+		Sentry.metrics.count("parent.link.success", 1);
 		if (studentId) {
 			try {
 				await notifyParentLinkedToStudent({ studentId, parentId: parentUser.id });

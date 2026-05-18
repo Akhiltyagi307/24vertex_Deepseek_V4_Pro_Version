@@ -1,14 +1,24 @@
+import * as Sentry from "@sentry/nextjs";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { StudentPerformanceAsync } from "../../../student/performance/student-performance-async";
 import { StudentPerformanceSkeleton } from "../../../student/performance/student-performance-skeleton";
+import { ParentPerformanceChartA11yWrapper } from "@/components/parent/performance-chart-a11y-wrapper";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Performance · Parent",
+	description: "Subject-by-subject breakdown of your child's strengths, gaps, and topic mastery.",
+	robots: { index: false, follow: false },
+};
 
 type PageProps = {
 	searchParams: Promise<{ subject?: string }>;
@@ -29,12 +39,18 @@ export default async function ParentPerformancePage({ searchParams }: PageProps)
 		redirect("/parent/select-student");
 	}
 
-	const supabase = await createClient();
-	const { data: row } = await supabase
-		.from("profiles")
-		.select("grade, stream, elective_subject_id, role")
-		.eq("id", activeId)
-		.maybeSingle();
+	const { row } = await Sentry.startSpan(
+		{ name: "parent.performance.prepare", op: "function" },
+		async () => {
+			const supabase = await createClient();
+			const { data } = await supabase
+				.from("profiles")
+				.select("grade, stream, elective_subject_id, role, full_name")
+				.eq("id", activeId)
+				.maybeSingle();
+			return { row: data };
+		},
+	);
 
 	if (!row || row.role !== "student") {
 		redirect("/parent/select-student");
@@ -47,15 +63,19 @@ export default async function ParentPerformancePage({ searchParams }: PageProps)
 		role: row.role,
 	};
 
+	const childName = formatPersonDisplayName(row.full_name ?? "") || "your child";
+
 	return (
-		<Suspense fallback={<StudentPerformanceSkeleton />}>
-			<StudentPerformanceAsync
-				userId={activeId}
-				profileRow={profileRow}
-				subjectFromUrl={sp.subject ?? null}
-				portalBasePath="/parent"
-				parentViewer
-			/>
-		</Suspense>
+		<ParentPerformanceChartA11yWrapper childName={childName}>
+			<Suspense fallback={<StudentPerformanceSkeleton />}>
+				<StudentPerformanceAsync
+					userId={activeId}
+					profileRow={profileRow}
+					subjectFromUrl={sp.subject ?? null}
+					portalBasePath="/parent"
+					parentViewer
+				/>
+			</Suspense>
+		</ParentPerformanceChartA11yWrapper>
 	);
 }

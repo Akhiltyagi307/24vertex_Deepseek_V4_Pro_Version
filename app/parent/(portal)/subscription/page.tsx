@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -23,6 +24,12 @@ import { assertParentActiveLink } from "@/lib/parent/linked-children";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Plan & billing · Parent",
+	description: "Manage your child's EduAI subscription, payments, and renewal.",
+	robots: { index: false, follow: false },
+};
 
 function isMissingProfileColumnError(error: {
 	message: string;

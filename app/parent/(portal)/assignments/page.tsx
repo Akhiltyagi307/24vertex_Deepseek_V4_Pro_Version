@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AssignmentsKanban } from "@/components/assignments/assignments-kanban";
@@ -7,6 +8,12 @@ import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Assignments · Parent",
+	description: "Track teacher-assigned practice tests for your child from “to do” through graded.",
+	robots: { index: false, follow: false },
+};
 
 export default async function ParentAssignmentsPage() {
 	const user = await getServerUser();

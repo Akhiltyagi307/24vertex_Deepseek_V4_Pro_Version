@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ParentDoubtHistoryView } from "@/components/parent/parent-doubt-history-view";
@@ -13,6 +14,12 @@ import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Doubt chats · Parent",
+	description: "Read-only history of your child's doubt-chat conversations with EduAI.",
+	robots: { index: false, follow: false },
+};
 
 type PageProps = { searchParams: Promise<{ c?: string }> };
 

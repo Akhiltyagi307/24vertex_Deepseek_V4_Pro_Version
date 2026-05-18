@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -8,6 +9,12 @@ import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Reports · Parent",
+	description: "Open and download your child's practice test reports.",
+	robots: { index: false, follow: false },
+};
 
 export default async function ParentReportsPage() {
 	const user = await getServerUser();

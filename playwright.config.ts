@@ -87,7 +87,7 @@ export default defineConfig({
 		{
 			name: "unauth",
 			testMatch:
-				/(smoke|playwright-env|admin-panel|security-headers|a11y-axe|practice-visuals|visual-snapshots|auth-pages)\.spec\.ts$/,
+				/(smoke|playwright-env|admin-panel|security-headers|a11y-axe|practice-visuals|visual-snapshots|auth-pages|parent-csrf-gate)\.spec\.ts$/,
 		},
 		{
 			name: "student",
@@ -97,7 +97,10 @@ export default defineConfig({
 		},
 		{
 			name: "parent",
-			testMatch: /parent-portal\.spec\.ts$/,
+			// Match every parent-*.spec.ts except the *.setup.ts file (which has
+			// its own project above). The `-portal`, `-link-child`, `-select-student`,
+			// `-subscription`, and `-a11y` specs all share the same storage state.
+			testMatch: /parent-(?!auth\.setup)[\w-]+\.spec\.ts$/,
 			dependencies: ["parent-auth-setup"],
 			use: { storageState: PARENT_STORAGE_STATE },
 		},

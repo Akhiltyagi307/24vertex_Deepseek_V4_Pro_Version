@@ -6,6 +6,8 @@ import {
 	getStudentUnreadCount,
 	listNotificationsForRecipient,
 } from "@/lib/notifications/student-queries";
+import { consumeParentNotifRead } from "@/lib/parent/rate-limit";
+import { rateLimitedResponse } from "@/lib/ratelimit/headers";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +29,11 @@ export async function GET(request: Request) {
 	const profile = await getCachedAppProfileRow();
 	if (!profile || profile.role !== "parent") {
 		return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: privateHeaders() });
+	}
+
+	const rl = await consumeParentNotifRead(user.id);
+	if (!rl.ok) {
+		return rateLimitedResponse(rl.result, rl.limit, { code: "parent_notif_rate_limited" });
 	}
 
 	const url = new URL(request.url);

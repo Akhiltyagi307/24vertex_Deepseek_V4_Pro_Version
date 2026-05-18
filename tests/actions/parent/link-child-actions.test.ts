@@ -24,6 +24,9 @@ const {
 	notifyConfirmedMock,
 	redirectMock,
 	headersMock,
+	rateLimitPerParentMock,
+	rateLimitPerStudentMock,
+	sentryMetricsMock,
 } = vi.hoisted(() => ({
 	mockSupabase: { current: null as unknown },
 	mockUser: { current: null as null | { id: string } },
@@ -46,6 +49,17 @@ const {
 			get: (k: string) => (k.toLowerCase() === "user-agent" ? "vitest" : null),
 		}),
 	},
+	rateLimitPerParentMock: {
+		current: vi.fn(async (): Promise<{ ok: true } | { ok: false; result: unknown; limit: number }> => ({
+			ok: true,
+		})),
+	},
+	rateLimitPerStudentMock: {
+		current: vi.fn(async (): Promise<{ ok: true } | { ok: false; result: unknown; limit: number }> => ({
+			ok: true,
+		})),
+	},
+	sentryMetricsMock: { current: vi.fn() },
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -84,9 +98,19 @@ vi.mock("@/lib/server/log-supabase-error", () => ({
 	logServerError: () => undefined,
 	isPostgresUndefinedColumnError: () => false,
 }));
+vi.mock("@/lib/parent/rate-limit", () => ({
+	consumeParentLinkPerParent: (...args: unknown[]) =>
+		(rateLimitPerParentMock.current as (...a: unknown[]) => unknown)(...args),
+	consumeParentLinkPerStudent: (...args: unknown[]) =>
+		(rateLimitPerStudentMock.current as (...a: unknown[]) => unknown)(...args),
+}));
 vi.mock("@sentry/nextjs", () => ({
 	captureException: () => undefined,
 	captureMessage: () => undefined,
+	metrics: {
+		count: (...args: unknown[]) =>
+			(sentryMetricsMock.current as (...a: unknown[]) => unknown)(...args),
+	},
 }));
 
 import { linkParentToStudent } from "@/app/parent/link-child/actions";
@@ -111,6 +135,9 @@ beforeEach(() => {
 		(err as { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};308;`;
 		throw err;
 	});
+	rateLimitPerParentMock.current = vi.fn(async () => ({ ok: true as const }));
+	rateLimitPerStudentMock.current = vi.fn(async () => ({ ok: true as const }));
+	sentryMetricsMock.current = vi.fn();
 });
 
 afterEach(() => {
@@ -184,5 +211,65 @@ describe("linkParentToStudent", () => {
 		);
 		expect(notifyLinkedMock.current).not.toHaveBeenCalled();
 		expect(notifyConfirmedMock.current).not.toHaveBeenCalled();
+	});
+
+	it("returns throttled error and writes throttled audit when per-parent rate limit denies", async () => {
+		rateLimitPerParentMock.current = vi.fn(async () => ({
+			ok: false as const,
+			result: { resetAt: new Date(Date.now() + 60_000) },
+			limit: 10,
+		}));
+		const out = await linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }));
+		expect(out.error).toMatch(/too many/i);
+		expect(auditMock.current).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: expect.stringMatching(/link_child_throttled/i),
+				payload: expect.objectContaining({ scope: "per_parent" }),
+			}),
+		);
+		// RPC must not run when throttled at the parent layer.
+		expect(redirectMock.current).not.toHaveBeenCalled();
+	});
+
+	it("returns throttled error when per-student-reference rate limit denies", async () => {
+		rateLimitPerStudentMock.current = vi.fn(async () => ({
+			ok: false as const,
+			result: { resetAt: new Date(Date.now() + 60_000) },
+			limit: 5,
+		}));
+		const out = await linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }));
+		expect(out.error).toMatch(/too many/i);
+		expect(auditMock.current).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: expect.stringMatching(/link_child_throttled/i),
+				payload: expect.objectContaining({ scope: "per_student_ref" }),
+			}),
+		);
+	});
+
+	it("increments parent.link.success counter on success", async () => {
+		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
+			/NEXT_REDIRECT/,
+		);
+		const successCalls = sentryMetricsMock.current.mock.calls.filter(
+			(c) => (c as unknown[])[0] === "parent.link.success",
+		);
+		expect(successCalls).toHaveLength(1);
+	});
+
+	it("increments parent.link.failure counter with reason tag on RPC error", async () => {
+		mockSupabase.current = makeMockSupabase({
+			user: { id: PARENT_ID },
+			rpcs: { link_parent_to_student: { error: { message: "wrong_code" } } },
+		});
+		classifyMock.current = vi.fn(() => "wrong_code");
+		await linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }));
+		const failureCalls = sentryMetricsMock.current.mock.calls.filter(
+			(c) => (c as unknown[])[0] === "parent.link.failure",
+		);
+		expect(failureCalls).toHaveLength(1);
+		expect((failureCalls[0] as unknown[])[2]).toMatchObject({
+			attributes: { reason: "wrong_code" },
+		});
 	});
 });

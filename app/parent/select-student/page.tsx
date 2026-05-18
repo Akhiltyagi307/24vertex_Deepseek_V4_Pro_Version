@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -17,6 +18,12 @@ import { loadLinkedChildrenForParent } from "@/lib/parent/linked-children";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Choose a child · Parent",
+	description: "Pick which linked child to open the parent overview for.",
+	robots: { index: false, follow: false },
+};
 
 function gradeLabel(grade: number | null, section: string | null): string {
 	if (grade == null) return "Grade not set";

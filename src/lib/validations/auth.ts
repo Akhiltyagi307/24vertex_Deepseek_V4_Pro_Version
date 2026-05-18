@@ -92,13 +92,15 @@ export const parentProfileBodySchema = z
 	})
 	.strict();
 
-/** Parent signup + pending registration: student link code (format XX1234). */
+/** Parent signup + pending registration: student link code (legacy XX1234 or new XXX12345). */
 export const parentRegistrationPayloadSchema = parentProfileBodySchema
 	.extend({
 		studentLinkCode: z
 			.string()
 			.trim()
-			.regex(/^[A-Za-z]{2}\d{4}$/, { message: "Enter the 6-character link code (e.g. AB1234)." })
+			.regex(/^([A-Za-z]{2}\d{4}|[A-Za-z]{3}\d{5})$/, {
+				message: "Enter the link code from the student's profile (e.g. AB1234 or XYZ12345).",
+			})
 			.transform((s) => s.toUpperCase()),
 	})
 	.strict();
@@ -148,9 +150,13 @@ export const teacherSignupSchema = teacherRegistrationPayloadSchema
 	})
 	.strict();
 
-const studentLinkCodePattern = /^[A-Za-z]{2}\d{4}$/;
+// Accepts both the legacy 6-char format (XX1234, ~6.76M combos) and the
+// strengthened 8-char format (XXX12345, ~1.76B combos). The 8-char format
+// is generated for all new students; legacy codes remain valid until each
+// student rotates theirs from the student profile screen.
+const studentLinkCodePattern = /^([A-Za-z]{2}\d{4}|[A-Za-z]{3}\d{5})$/;
 
-/** Independent teachers link students via six-character link code only (`link_teacher_to_student`). */
+/** Independent teachers link students via link code only (`link_teacher_to_student`). Accepts legacy 6-char or new 8-char. */
 export const linkTeacherStudentSchema = z
 	.object({
 		studentId: z
@@ -158,7 +164,7 @@ export const linkTeacherStudentSchema = z
 			.trim()
 			.min(1)
 			.refine((s) => studentLinkCodePattern.test(s), {
-				message: "Enter the student's six-character link code from Profile (e.g. AB1234).",
+				message: "Enter the student's link code from Profile (e.g. AB1234 or XYZ12345).",
 			})
 			.transform((s) => s.toUpperCase()),
 	})
@@ -172,7 +178,7 @@ export const linkParentSchema = z
 			.min(1)
 			.refine(
 				(s) => z.string().uuid().safeParse(s).success || studentLinkCodePattern.test(s),
-				{ message: "Enter the 6-character link code (e.g. AB1234) or the student UUID." },
+				{ message: "Enter the link code from the student app or the student UUID." },
 			)
 			.transform((s) => (studentLinkCodePattern.test(s) ? s.toUpperCase() : s)),
 	})

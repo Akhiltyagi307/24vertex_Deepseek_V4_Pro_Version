@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -8,7 +9,11 @@ import { getServerUser } from "@/lib/auth/get-server-user";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Notifications" };
+export const metadata: Metadata = {
+	title: "Notifications · Parent",
+	description: "Updates for your linked students — each card shows which child it refers to.",
+	robots: { index: false, follow: false },
+};
 
 export default async function ParentNotificationsPage() {
 	const user = await getServerUser();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
@@ -11,6 +12,12 @@ import { cn } from "@/lib/utils";
 import { ParentAccountSettingsClient } from "./parent-account-settings-client";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "Account · Parent",
+	description: "Switch between linked students, link a new student, or unlink an existing one.",
+	robots: { index: false, follow: false },
+};
 
 export default async function ParentSettingsPage() {
 	const user = await getServerUser();

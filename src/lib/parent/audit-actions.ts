@@ -13,6 +13,7 @@ export const PARENT_ACTIONS = {
 	LINK_CHILD_REQUEST: "link_child_request",
 	LINK_CHILD_FAILED: "link_child_failed",
 	LINK_CHILD_SUCCESS: "link_child_success",
+	LINK_CHILD_THROTTLED: "link_child_throttled",
 	UNLINK_CHILD: "unlink_child",
 
 	// Active student selection
@@ -28,6 +29,7 @@ export const PARENT_ACTIONS = {
 
 	// Reports
 	REPORT_DOWNLOAD: "report_download",
+	REPORT_OPENED: "report_opened",
 } as const;
 
 export type ParentActionName = (typeof PARENT_ACTIONS)[keyof typeof PARENT_ACTIONS];

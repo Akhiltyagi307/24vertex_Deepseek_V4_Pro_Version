@@ -31,7 +31,10 @@ export async function selectParentStudentAction(formData: FormData): Promise<voi
 	const ip = clientIpFromHeaders(reqHeaders);
 	const ua = reqHeaders.get("user-agent") ?? null;
 
-	const linked = await assertParentActiveLink(user.id, parsed.data);
+	const linked = await Sentry.startSpan(
+		{ name: "parent.select_student.assert_link", op: "db.query" },
+		() => assertParentActiveLink(user.id, parsed.data),
+	);
 	if (!linked) {
 		// A parent attempting to set the cookie to an unlinked student id is
 		// a notable event — RLS would prevent any actual access, but the
@@ -59,7 +62,11 @@ export async function selectParentStudentAction(formData: FormData): Promise<voi
 		httpOnly: true,
 		sameSite: "lax",
 		secure: process.env.NODE_ENV === "production",
-		maxAge: 60 * 60 * 24 * 400,
+		// 30 days. Rewritten on every select-student / open-report call so
+		// active parents stay logged-in indefinitely; idle accounts fall off
+		// the cookie within a month. Previously 400 days — needlessly long
+		// blast radius if the cookie ever leaks.
+		maxAge: 60 * 60 * 24 * 30,
 	});
 
 	await writeParentAudit({
