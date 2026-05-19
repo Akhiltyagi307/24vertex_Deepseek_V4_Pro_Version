@@ -12,6 +12,7 @@ import {
 	UserRoundIcon,
 	TrendingUpIcon,
 	MessageCircleIcon,
+	BookOpenIcon,
 } from "lucide-react";
 
 import {
@@ -42,6 +43,7 @@ const progressItems: NavItem[] = [
 	{ title: "Assignments", href: "/parent/assignments", icon: ClipboardListIcon },
 	{ title: "Subject progress", href: "/parent/performance", icon: TrendingUpIcon },
 	{ title: "Test reports", href: "/parent/reports", icon: FileBarChartIcon },
+	{ title: "QnA logs", href: "/parent/qna-logs", icon: BookOpenIcon },
 ];
 
 const accountItems: NavItem[] = [

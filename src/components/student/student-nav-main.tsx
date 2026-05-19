@@ -13,6 +13,7 @@ import {
 	SquarePenIcon,
 	TrendingUpIcon,
 	MessageCircleIcon,
+	BookOpenIcon,
 } from "lucide-react";
 
 import { NotificationUnreadPill } from "@/components/student/notifications/notification-unread-pill";
@@ -42,6 +43,7 @@ const progressItems: NavItem[] = [
 	{ title: "Assignments", href: "/student/assignments", icon: ClipboardListIcon },
 	{ title: "Performance", href: "/student/performance", icon: TrendingUpIcon },
 	{ title: "Reports", href: "/student/reports", icon: FileBarChartIcon },
+	{ title: "QnA logs", href: "/student/qna-logs", icon: BookOpenIcon },
 ];
 
 const accountItems: NavItem[] = [
