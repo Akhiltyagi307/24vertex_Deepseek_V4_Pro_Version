@@ -1,6 +1,8 @@
 import { AssignmentsKanban } from "@/components/assignments/assignments-kanban";
+import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { listStudentAssignments } from "@/lib/assignments/queries";
 import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
+import { studentMainPageShellClassName } from "@/lib/student/student-hub-page-layout";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +14,15 @@ export default async function StudentAssignmentsPage() {
 	const assignments = await listStudentAssignments(user.id);
 
 	return (
-		<div className="mx-auto w-full max-w-7xl space-y-6 py-6">
-			<div className="space-y-1">
-				<h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
-				<p className="text-sm text-muted-foreground">
+		<div className={studentMainPageShellClassName}>
+			<header className="flex w-full min-w-0 max-w-none shrink-0 flex-col gap-1.5">
+				<h1 className="text-balance font-semibold text-3xl tracking-tight text-foreground">
+					Assignments
+				</h1>
+				<PageHeaderSubtext variant="wrap">
 					Track teacher-assigned practice tests from generation through grading.
-				</p>
-			</div>
+				</PageHeaderSubtext>
+			</header>
 			<AssignmentsKanban assignments={assignments} portal="student" />
 		</div>
 	);

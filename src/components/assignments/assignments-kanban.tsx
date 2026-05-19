@@ -74,7 +74,7 @@ function assignmentHref(card: StudentAssignmentCard, portal: "student" | "parent
 export function AssignmentsKanban({ assignments, portal }: AssignmentsKanbanProps) {
 	if (assignments.length === 0) {
 		return (
-			<div className="rounded-2xl border border-dashed border-border/80 bg-muted/15 px-6 py-12 text-center">
+			<div className="w-full rounded-2xl border border-dashed border-border/80 bg-muted/15 px-6 py-12 text-center">
 				<p className="font-medium">No assignments yet</p>
 				<p className="mt-2 text-sm text-muted-foreground">
 					Teacher-assigned practice tests will appear here when they are published.
@@ -84,7 +84,7 @@ export function AssignmentsKanban({ assignments, portal }: AssignmentsKanbanProp
 	}
 
 	return (
-		<div className="grid gap-4 xl:grid-cols-4">
+		<div className="grid w-full gap-4 xl:grid-cols-4">
 			{columns.map((column) => {
 				const cards = assignments.filter((assignment) =>
 					(column.statuses as readonly string[]).includes(assignment.lifecycleStatus),
