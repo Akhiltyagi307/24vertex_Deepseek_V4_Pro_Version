@@ -1,22 +1,15 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { StudentDashboardAsync } from "./student-dashboard-async";
 import { StudentDashboardSkeleton } from "./student-dashboard-skeleton";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Dashboard" };
+
 export default async function StudentDashboardPage() {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
+	const { user, profile: row } = await requireVerifiedStudent();
 
 	const profileRow = {
 		grade: row.grade,

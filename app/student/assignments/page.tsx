@@ -1,18 +1,13 @@
-import { redirect } from "next/navigation";
-
 import { AssignmentsKanban } from "@/components/assignments/assignments-kanban";
 import { listStudentAssignments } from "@/lib/assignments/queries";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentAssignmentsPage() {
-	const user = await getServerUser();
-	if (!user) redirect("/login");
+export const metadata = { title: "Assignments" };
 
-	const profile = await getCachedAppProfileRow();
-	if (!profile || profile.role !== "student") redirect("/login");
+export default async function StudentAssignmentsPage() {
+	const { user } = await requireVerifiedStudent();
 
 	const assignments = await listStudentAssignments(user.id);
 

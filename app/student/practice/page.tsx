@@ -1,23 +1,16 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { StudentPracticeAsync } from "./student-practice-async";
 import { StudentPracticeSkeleton } from "./student-practice-skeleton";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Practice" };
+
 export default async function StudentPracticePage() {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
+	const { user, profile: row } = await requireVerifiedStudent();
 
 	const profileRow = {
 		grade: row.grade,

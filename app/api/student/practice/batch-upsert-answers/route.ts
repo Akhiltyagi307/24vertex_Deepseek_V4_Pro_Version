@@ -7,28 +7,37 @@ import {
 	writeStudentAnswerRows,
 } from "@/lib/practice/submit-practice-shared";
 import type { StudentAnswerWriteRow } from "@/lib/practice/student-answer-write";
+import {
+	STUDENT_PRACTICE_BATCH_UPSERT_LIMIT_N,
+	STUDENT_PRACTICE_BATCH_UPSERT_WINDOW_SECONDS,
+	consumeStudentRateLimit,
+} from "@/lib/student/rate-limit";
 
 const studentAnswerPayloadSchema = z.discriminatedUnion("kind", [
-	z.object({ kind: z.literal("mcq"), value: z.string().max(8) }),
-	z.object({ kind: z.literal("text"), value: z.string().max(16_000) }),
-	z.object({ kind: z.literal("numerical"), value: z.string().max(200) }),
+	z.object({ kind: z.literal("mcq"), value: z.string().max(8) }).strict(),
+	z.object({ kind: z.literal("text"), value: z.string().max(16_000) }).strict(),
+	z.object({ kind: z.literal("numerical"), value: z.string().max(200) }).strict(),
 ]);
 
-const batchSchema = z.object({
-	testId: z.string().uuid(),
-	items: z
-		.array(
-			z.object({
-				questionId: z.string().uuid(),
-				studentAnswer: studentAnswerPayloadSchema,
-				flaggedForReview: z.boolean(),
-				timeSpentMs: z.number().int().min(0).max(30 * 60_000).optional(),
-				visits: z.number().int().min(0).max(10_000).optional(),
-			}),
-		)
-		.min(1)
-		.max(400),
-});
+const batchSchema = z
+	.object({
+		testId: z.string().uuid(),
+		items: z
+			.array(
+				z
+					.object({
+						questionId: z.string().uuid(),
+						studentAnswer: studentAnswerPayloadSchema,
+						flaggedForReview: z.boolean(),
+						timeSpentMs: z.number().int().min(0).max(30 * 60_000).optional(),
+						visits: z.number().int().min(0).max(10_000).optional(),
+					})
+					.strict(),
+			)
+			.min(1)
+			.max(400),
+	})
+	.strict();
 
 function friendlyError(): string {
 	return "We couldn’t save your progress. Try again when you are back online.";
@@ -55,6 +64,21 @@ export async function POST(request: Request) {
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
+
+	const rl = await consumeStudentRateLimit({
+		userId: user.id,
+		bucket: "practice-batch-upsert",
+		limitN: STUDENT_PRACTICE_BATCH_UPSERT_LIMIT_N,
+		windowSeconds: STUDENT_PRACTICE_BATCH_UPSERT_WINDOW_SECONDS,
+	});
+	if (!rl.ok) {
+		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
+		return Response.json(
+			{ ok: false, message: "Too many save attempts. Try again shortly." },
+			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+		);
+	}
+
 	const supabase = await createClient();
 
 	const gate = await assertTestOwnedInProgress(supabase, parsed.data.testId, user.id);

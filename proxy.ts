@@ -5,6 +5,7 @@ import { adminProxyGate } from "@/lib/admin/proxy-guard";
 import { billingProxyGate } from "@/lib/billing/proxy-guard";
 import { parentProxyGate } from "@/lib/parent/proxy-guard";
 import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
+import { studentProxyGate } from "@/lib/student/proxy-guard";
 import { updateSession } from "@/lib/supabase/session";
 import { teacherProxyGate } from "@/lib/teachers/proxy-guard";
 
@@ -53,6 +54,13 @@ export async function proxy(request: NextRequest) {
 		parentEarly.headers.set(REQUEST_ID_HEADER, requestId);
 		parentEarly.headers.set("Content-Security-Policy", csp);
 		return parentEarly;
+	}
+
+	const studentEarly = studentProxyGate(request);
+	if (studentEarly) {
+		studentEarly.headers.set(REQUEST_ID_HEADER, requestId);
+		studentEarly.headers.set("Content-Security-Policy", csp);
+		return studentEarly;
 	}
 
 	const teacherEarly = teacherProxyGate(request);

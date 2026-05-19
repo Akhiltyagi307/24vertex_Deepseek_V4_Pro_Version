@@ -3,7 +3,7 @@
  * from `render-email-shell.ts`, which wires `getAppUrl()` from `@/lib/env`.
  */
 
-import { buildEmailBrandHeaderRow, resolveEmailLogoUrl } from "@/lib/email/email-brand-logo";
+import { buildEmailBrandHeaderRow } from "@/lib/email/email-brand-logo";
 
 let resolveAppUrl: () => string = defaultAppUrlForEmail;
 

@@ -1,22 +1,15 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { StudentReportsAsync } from "./student-reports-async";
 import { StudentReportsSkeleton } from "./student-reports-skeleton";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Reports" };
+
 export default async function StudentReportsPage() {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
+	const { user } = await requireVerifiedStudent();
 
 	return (
 		<Suspense fallback={<StudentReportsSkeleton />}>

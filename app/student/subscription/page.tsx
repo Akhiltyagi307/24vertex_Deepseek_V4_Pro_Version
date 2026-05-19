@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
@@ -12,8 +11,7 @@ import {
 import { PlansWithCouponSection } from "@/components/student/subscription/plans-with-coupon-section";
 import { TrialStateBand } from "@/components/student/subscription/trial-state-band";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { getCachedPlanCatalog } from "@/lib/cache/deterministic-lookups";
 import { getCachedEntitlements } from "@/lib/billing/entitlements";
 import { formatDateLongDMYInAppTimeZone } from "@/lib/datetime/app-timezone";
@@ -23,12 +21,10 @@ import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentSubscriptionPage() {
-	const user = await getServerUser();
-	if (!user) redirect("/login");
+export const metadata = { title: "Subscription" };
 
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") redirect("/login");
+export default async function StudentSubscriptionPage() {
+	const { user, profile: row } = await requireVerifiedStudent();
 	const profile = row;
 
 	const supabase = await createClient();

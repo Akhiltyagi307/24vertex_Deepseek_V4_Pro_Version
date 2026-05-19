@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 // KaTeX CSS is loaded only on student-portal pages (where the doubt-chat
 // tutor renders LaTeX). Public/marketing/login pages don't need it, so we
 // avoid the ~25KB on cold loads outside the authenticated surface.
@@ -8,8 +7,7 @@ import { AuthSignedOutListener } from "@/components/auth/auth-signed-out-listene
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { StudentShell } from "@/components/student/student-shell";
 import { SubscriptionBanner } from "@/components/student/subscription/subscription-banner";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { mapAppProfileToStudentLayoutContext } from "@/lib/auth/student-layout";
 import { getCachedEntitlements } from "@/lib/billing/entitlements";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
@@ -20,17 +18,10 @@ function gradeLabel(grade: number | null, section: string | null) {
 }
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-	const [row, entitlement] = await Promise.all([getCachedAppProfileRow(), getCachedEntitlements()]);
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
-	if (row.is_suspended) {
-		redirect("/login?suspended=1");
-	}
+	const [{ user, profile: row }, entitlement] = await Promise.all([
+		requireVerifiedStudent(),
+		getCachedEntitlements(),
+	]);
 
 	const ctx = mapAppProfileToStudentLayoutContext(row, user.email);
 

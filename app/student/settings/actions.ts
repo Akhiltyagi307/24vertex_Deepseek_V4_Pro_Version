@@ -1,5 +1,16 @@
 "use server";
 
+/**
+ * Tenant boundary (D8): every mutation here MUST scope writes to the
+ * authenticated student's own `profiles` row. The only acceptable source for
+ * `user_id` is `(await getServerUser()).id` — never a value read from
+ * `formData`, request body, or any parsed payload. Schemas in
+ * `@/lib/validations/auth` deliberately do not include `userId` / `id`
+ * fields. If you add a field that includes a profile id in the future,
+ * cross-check the helper test `tests/actions/student/settings-tenant-boundary.test.ts`
+ * which fails when an action accepts a payload-supplied profile id.
+ */
+
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 

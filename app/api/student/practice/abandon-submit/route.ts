@@ -3,11 +3,18 @@ import { z } from "zod";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { executePracticeTestSubmit } from "@/lib/practice/submit-practice-shared";
+import {
+	STUDENT_PRACTICE_ABANDON_LIMIT_N,
+	STUDENT_PRACTICE_ABANDON_WINDOW_SECONDS,
+	consumeStudentRateLimit,
+} from "@/lib/student/rate-limit";
 
-const bodySchema = z.object({
-	testId: z.string().uuid(),
-	elapsedSeconds: z.number().int().min(0).max(86400),
-});
+const bodySchema = z
+	.object({
+		testId: z.string().uuid(),
+		elapsedSeconds: z.number().int().min(0).max(86400),
+	})
+	.strict();
 
 /**
  * Same grading + submit as the server action, for navigator.sendBeacon / fetch keepalive on unload.
@@ -29,6 +36,21 @@ export async function POST(request: Request) {
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
 	}
+
+	const rl = await consumeStudentRateLimit({
+		userId: user.id,
+		bucket: "practice-abandon",
+		limitN: STUDENT_PRACTICE_ABANDON_LIMIT_N,
+		windowSeconds: STUDENT_PRACTICE_ABANDON_WINDOW_SECONDS,
+	});
+	if (!rl.ok) {
+		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
+		return Response.json(
+			{ ok: false, message: "Too many submit attempts. Try again shortly." },
+			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+		);
+	}
+
 	const supabase = await createClient();
 
 	const result = await executePracticeTestSubmit(

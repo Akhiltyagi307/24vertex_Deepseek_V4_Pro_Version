@@ -2,18 +2,14 @@
 
 import {
 	Bell,
-	Building2,
 	CheckIcon,
 	CopyIcon,
 	GraduationCap,
 	KeyRound,
-	Pencil,
-	ShieldAlert,
-	ShieldCheck,
 	User,
 	Users,
 } from "lucide-react";
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
 	updateStudentOrganization,
@@ -28,44 +24,22 @@ import type {
 	NotificationPreferencesState,
 } from "./notification-preferences-types";
 import { PasswordChangeForm } from "./password-change-form";
+import { PlacementFieldDialog, type PlacementField } from "./placement-field-dialog";
+import { AccountDetailsPanel } from "./sections/account-details-panel";
+import { settingsNestedWellClass } from "./sections/_account-fields";
+import { OrganizationPanel } from "./sections/organization-panel";
+import { ParentPanel } from "./sections/parent-panel";
+import { ProfileEditorPanel } from "./sections/profile-editor-panel";
+import { SubjectsPanel } from "./sections/subjects-panel";
 import {
-	formatPlacementStream,
-	PlacementFieldDialog,
-	type PlacementField,
-} from "./placement-field-dialog";
-import {
-	accountReadonlyInputClass,
-	panelRaisedInputClass,
 	settingsCtaButtonClass,
 	settingsCtaButtonWidthClass,
 	tabAccentClass,
 } from "./_settings-form-styles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	Field,
-	FieldContent,
-	FieldGroup,
-	FieldLabel,
-	FieldLegend,
-	FieldSet,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import SmoothTab from "@/components/kokonutui/smooth-tab";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
-import { StudentAvatarUpload } from "@/components/student/student-avatar-upload";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatDateLongStyleInAppTimeZone } from "@/lib/datetime/app-timezone";
 import type { SerializedOrganization } from "@/lib/organizations/schemas";
@@ -92,208 +66,6 @@ export type StudentProfileSettingsRow = {
 	is_verified: boolean | null;
 	created_at: string;
 };
-
-const settingsNestedWellClass =
-	"rounded-xl border border-border/80 bg-sidebar-accent p-4 shadow-sm dark:border-border dark:bg-foreground/10 medium:p-5";
-
-function AccountFieldEditButton({
-	tooltipContent,
-	ariaLabel,
-	onClick,
-}: {
-	tooltipContent: string;
-	ariaLabel: string;
-	onClick?: () => void;
-}) {
-	return (
-		<Tooltip>
-			<TooltipTrigger
-				render={
-					<button
-						type="button"
-						onClick={onClick}
-						className={cn(
-							"rounded-md p-1.5",
-							"text-muted-foreground transition-colors",
-							"hover:bg-muted/80 hover:text-foreground",
-							"focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2",
-						)}
-						aria-label={ariaLabel}
-					>
-						<Pencil className="size-4" />
-					</button>
-				}
-			/>
-			<TooltipContent side="top" className="max-w-[240px] text-center text-xs">
-				{tooltipContent}
-			</TooltipContent>
-		</Tooltip>
-	);
-}
-
-function AccountReadonlyField({
-	label,
-	value,
-	schoolManaged,
-	onSchoolPlacementEdit,
-	placementEditTooltip,
-	placementEditAriaLabel,
-	lockedFieldHint,
-	description,
-	className,
-}: {
-	label: string;
-	value: string;
-	schoolManaged?: boolean;
-	/** Opens the school placement editor for this row. */
-	onSchoolPlacementEdit?: () => void;
-	placementEditTooltip?: string;
-	placementEditAriaLabel?: string;
-	/** Shows the same pencil affordance with this message (non–school-managed fields). */
-	lockedFieldHint?: string;
-	/** Muted helper below the field (no edit affordance). */
-	description?: string;
-	className?: string;
-}) {
-	const id = useId();
-	const showSchoolEdit = Boolean(schoolManaged);
-	const showLockedEdit = Boolean(lockedFieldHint) && !schoolManaged;
-	const trailing = showSchoolEdit ? (
-		<div className="absolute top-1/2 right-1.5 z-10 -translate-y-1/2">
-			<AccountFieldEditButton
-				tooltipContent={
-					onSchoolPlacementEdit
-						? (placementEditTooltip ?? "Edit this field.")
-						: "Set by your school. It cannot be edited here."
-				}
-				ariaLabel={
-					onSchoolPlacementEdit
-						? (placementEditAriaLabel ?? "Edit placement")
-						: "School-managed field. Cannot be changed in EduAI."
-				}
-				onClick={onSchoolPlacementEdit}
-			/>
-		</div>
-	) : showLockedEdit ? (
-		<div className="absolute top-1/2 right-1.5 z-10 -translate-y-1/2">
-			<AccountFieldEditButton
-				tooltipContent={lockedFieldHint!}
-				ariaLabel="This field cannot be edited in EduAI."
-			/>
-		</div>
-	) : null;
-
-	return (
-		<div className={cn("flex flex-col gap-2", className)}>
-			<label htmlFor={id} className="text-foreground/70 text-sm font-medium leading-snug">
-				{label}
-			</label>
-			<div className="relative">
-				<Input
-					id={id}
-					readOnly
-					value={value}
-					className={cn(
-						accountReadonlyInputClass,
-						"font-medium text-foreground",
-						trailing ? "pr-11" : "pr-3",
-						description && !trailing && "cursor-default",
-					)}
-				/>
-				{trailing}
-			</div>
-			{description ? (
-				<p className="mt-1.5 text-muted-foreground text-xs leading-relaxed">{description}</p>
-			) : null}
-		</div>
-	);
-}
-
-// PlacementFieldDialog and related helpers were extracted to ./placement-field-dialog.tsx (Phase 1.4).
-
-
-function LoginEmailField({
-	email,
-	isVerified,
-}: {
-	email: string;
-	isVerified: boolean | null;
-}) {
-	const id = useId();
-	const verificationAffordance =
-		isVerified === true ? (
-			<Tooltip>
-				<TooltipTrigger
-					render={
-						<button
-							type="button"
-							className={cn(
-								"rounded-md p-1.5",
-								"text-emerald-600 transition-colors dark:text-emerald-400",
-								"hover:bg-muted/80",
-								"focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2",
-							)}
-							aria-label="Verified account"
-						>
-							<ShieldCheck className="size-4" aria-hidden />
-						</button>
-					}
-				/>
-				<TooltipContent side="top" className="max-w-[240px] text-center text-xs">
-					Verified account
-				</TooltipContent>
-			</Tooltip>
-		) : isVerified === false ? (
-			<Tooltip>
-				<TooltipTrigger
-					render={
-						<button
-							type="button"
-							className={cn(
-								"rounded-md p-1.5",
-								"text-amber-600 transition-colors dark:text-amber-500",
-								"hover:bg-muted/80",
-								"focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2",
-							)}
-							aria-label="Verification pending"
-						>
-							<ShieldAlert className="size-4" aria-hidden />
-						</button>
-					}
-				/>
-				<TooltipContent side="top" className="max-w-[240px] text-center text-xs">
-					Verification pending
-				</TooltipContent>
-			</Tooltip>
-		) : null;
-
-	return (
-		<div className="flex flex-col gap-2">
-			<label htmlFor={id} className="text-foreground/70 text-sm font-medium leading-snug">
-				Login email
-			</label>
-			<div className="relative">
-				<Input
-					id={id}
-					readOnly
-					value={email || "—"}
-					className={cn(
-						accountReadonlyInputClass,
-						"font-medium text-foreground",
-						verificationAffordance ? "pr-[5.25rem]" : "pr-11",
-					)}
-				/>
-				<div className="absolute top-1/2 right-1.5 z-10 flex -translate-y-1/2 items-center gap-0.5">
-					{verificationAffordance}
-					<AccountFieldEditButton
-						tooltipContent="Your login email is tied to your sign-in and cannot be changed here."
-						ariaLabel="Login email cannot be edited in EduAI."
-					/>
-				</div>
-			</div>
-		</div>
-	);
-}
 
 export function StudentProfileSettingsForm({
 	userId,
@@ -350,107 +122,6 @@ export function StudentProfileSettingsForm({
 	}
 
 	const enrolled = formatDateLongStyleInAppTimeZone(profile.created_at);
-	const accountDetails = (
-		<div className={cn(settingsNestedWellClass, "text-base")}>
-			<div className="grid grid-cols-1 gap-4 medium:grid-cols-2">
-				<div className="min-w-0 medium:col-span-2">
-					<LoginEmailField email={loginEmail} isVerified={profile.is_verified} />
-				</div>
-				<AccountReadonlyField
-					className="min-w-0 medium:col-span-2"
-					label="Enrollment date"
-					value={enrolled}
-					description="Set when your account was created. This cannot be changed."
-				/>
-				<AccountReadonlyField
-					className="min-w-0"
-					label="Grade"
-					schoolManaged
-					value={profile.grade != null ? String(profile.grade) : "—"}
-					onSchoolPlacementEdit={() => setPlacementField("grade")}
-					placementEditTooltip="Edit grade"
-					placementEditAriaLabel="Edit grade"
-				/>
-				<AccountReadonlyField
-					className="min-w-0"
-					label="Section"
-					schoolManaged
-					value={profile.section?.trim() || "—"}
-					onSchoolPlacementEdit={() => setPlacementField("section")}
-					placementEditTooltip="Edit section"
-					placementEditAriaLabel="Edit section"
-				/>
-				<AccountReadonlyField
-					className="min-w-0"
-					label="Stream"
-					schoolManaged
-					value={formatPlacementStream(profile.stream)}
-					onSchoolPlacementEdit={() => setPlacementField("stream")}
-					placementEditTooltip="Edit stream"
-					placementEditAriaLabel="Edit stream"
-				/>
-				<AccountReadonlyField
-					className="min-w-0"
-					label="Elective"
-					schoolManaged
-					value={electiveSubjectName ?? "—"}
-					onSchoolPlacementEdit={() => setPlacementField("elective")}
-					placementEditTooltip="Edit elective"
-					placementEditAriaLabel="Edit elective"
-				/>
-				<AccountReadonlyField
-					className="min-w-0 medium:col-span-2"
-					label="School"
-					schoolManaged
-					value={profile.school_name?.trim() || "—"}
-					onSchoolPlacementEdit={() => setPlacementField("school")}
-					placementEditTooltip="Edit school name"
-					placementEditAriaLabel="Edit school"
-				/>
-			</div>
-		</div>
-	);
-
-	const subjectsPanel = (
-		<div className={settingsNestedWellClass}>
-			<p className="text-foreground text-sm font-semibold">Subjects</p>
-			{subjectsLoadError ? (
-				<Alert variant="destructive" className="mt-3">
-					<AlertTitle>Could not refresh subjects</AlertTitle>
-					<AlertDescription>{subjectsLoadError}</AlertDescription>
-				</Alert>
-			) : null}
-			<div className="mt-2 flex flex-wrap gap-2">
-				{resolvedSubjects.length > 0 ? (
-					resolvedSubjects.map((s) => (
-						<span
-							key={s.id}
-							className="inline-flex items-center gap-2 rounded-lg border border-border/90 bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm dark:border-border dark:bg-muted/50"
-						>
-							<span
-								className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 dark:bg-emerald-500"
-								aria-hidden
-							>
-								<CheckIcon className="size-3 text-white" strokeWidth={2.75} />
-							</span>
-							{s.name}
-						</span>
-					))
-				) : (
-					<span className="rounded-lg border border-border/90 bg-background px-3 py-2 text-foreground/70 text-sm shadow-sm dark:border-border dark:bg-muted/50">
-						—
-					</span>
-				)}
-			</div>
-			<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
-				{profile.grade == null
-					? "Set your grade (and stream or elective for 11–12) so we can list the subjects you should see."
-					: profile.grade >= 11
-						? "We pick these from your grade, stream, and elective. If something’s missing, fix the fields above or ask your school."
-						: "We pick these from your grade. If the list looks wrong, double-check the fields above with your school."}
-			</p>
-		</div>
-	);
 
 	const linkCodePanel = (
 		<div className={settingsNestedWellClass}>
@@ -478,77 +149,6 @@ export function StudentProfileSettingsForm({
 			<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
 				Give this code to a parent—they’ll use it in their app to connect to your account.
 			</p>
-		</div>
-	);
-
-	const organizationPanel = (
-		<div className={settingsNestedWellClass}>
-			<div className="flex flex-col gap-4 medium:flex-row medium:items-start medium:justify-between">
-				<div className="min-w-0">
-					<div className="flex items-center gap-2">
-						<Building2 className="size-4 text-muted-foreground" aria-hidden />
-						<p className="text-foreground text-sm font-semibold">School or tuition center</p>
-					</div>
-					<p className="mt-2 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
-						Connect your account to an approved organization when your school or tuition center asks you to.
-						You can unlink anytime without losing independent tutor links.
-					</p>
-				</div>
-				<div className="shrink-0 rounded-lg border border-border/80 bg-muted/30 px-3 py-2 text-sm">
-					{currentOrganization ? currentOrganization.name : "Not connected"}
-				</div>
-			</div>
-			<div className="mt-4 grid gap-3 medium:grid-cols-[1fr_auto_auto] medium:items-end">
-				<div className="space-y-2">
-					<label htmlFor="organizationId" className="text-sm font-medium text-foreground/80">
-						Choose organization
-					</label>
-					<select
-						id="organizationId"
-						name="organizationId"
-						defaultValue={profile.organization_id ?? ""}
-						className={cn(
-							panelRaisedInputClass,
-							"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-						)}
-					>
-						<option value="">No organization</option>
-						{organizations.map((org) => (
-							<option key={org.id} value={org.id}>
-								{org.name} ({org.type_label})
-							</option>
-						))}
-					</select>
-				</div>
-				<Button
-					type="submit"
-					formAction={organizationFormAction}
-					variant="default"
-					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
-				>
-					Save organization
-				</Button>
-				<Button
-					type="submit"
-					formAction={organizationFormAction}
-					name="organizationId"
-					value=""
-					variant="outline"
-					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
-				>
-					Unlink
-				</Button>
-			</div>
-			{organizationState?.error ? (
-				<p className="mt-3 text-destructive text-sm leading-relaxed" role="alert">
-					{organizationState.error}
-				</p>
-			) : null}
-			{organizationState?.success ? (
-				<p className="mt-3 text-sm text-foreground/80" role="status">
-					Organization updated.
-				</p>
-			) : null}
 		</div>
 	);
 
@@ -622,9 +222,25 @@ export function StudentProfileSettingsForm({
 											your account and signup).
 										</p>
 									</div>
-									{accountDetails}
-									{organizationPanel}
-									{subjectsPanel}
+									<AccountDetailsPanel
+										loginEmail={loginEmail}
+										profile={profile}
+										enrolled={enrolled}
+										electiveSubjectName={electiveSubjectName}
+										onPlacementFieldEdit={setPlacementField}
+									/>
+									<OrganizationPanel
+										profile={profile}
+										organizations={organizations}
+										currentOrganization={currentOrganization}
+										organizationState={organizationState}
+										organizationFormAction={organizationFormAction}
+									/>
+									<SubjectsPanel
+										profile={profile}
+										resolvedSubjects={resolvedSubjects}
+										subjectsLoadError={subjectsLoadError}
+									/>
 									{linkCodePanel}
 								</div>
 							),
@@ -634,60 +250,7 @@ export function StudentProfileSettingsForm({
 							title: "Profile",
 							icon: User,
 							color: tabAccentClass,
-							content: (
-								<div>
-									<Card className="border-0 bg-transparent p-0 shadow-none ring-0">
-										<CardHeader className="px-0 pt-0">
-											<CardTitle className="text-lg">Profile</CardTitle>
-											<CardDescription className="text-base">
-												Name, photo, and phone—what classmates and reports see as you.
-											</CardDescription>
-										</CardHeader>
-										<CardContent className="px-0">
-											<FieldSet className="gap-6 border-0 p-0">
-												<FieldLegend className="sr-only">Editable profile</FieldLegend>
-												<FieldGroup className="gap-6">
-													<Field>
-														<FieldLabel className="text-base" htmlFor="fullName">
-															Display name
-														</FieldLabel>
-														<FieldContent>
-															<Input
-																id="fullName"
-																name="fullName"
-																required
-																className={panelRaisedInputClass}
-																defaultValue={profile.full_name}
-																autoComplete="name"
-															/>
-														</FieldContent>
-													</Field>
-													<StudentAvatarUpload
-														userId={userId}
-														displayName={profile.full_name}
-														initialAvatarUrl={profile.avatar_url}
-													/>
-													<Field>
-														<FieldLabel className="text-base" htmlFor="phone">
-															Phone
-														</FieldLabel>
-														<FieldContent>
-															<Input
-																id="phone"
-																name="phone"
-																type="tel"
-																className={panelRaisedInputClass}
-																autoComplete="tel"
-																defaultValue={profile.phone ?? ""}
-															/>
-														</FieldContent>
-													</Field>
-												</FieldGroup>
-											</FieldSet>
-										</CardContent>
-									</Card>
-								</div>
-							),
+							content: <ProfileEditorPanel userId={userId} profile={profile} />,
 						},
 						{
 							id: "password",
@@ -701,41 +264,7 @@ export function StudentProfileSettingsForm({
 							title: "Guardian",
 							icon: Users,
 							color: tabAccentClass,
-							content: (
-								<div>
-									<Card className="border-0 bg-transparent p-0 shadow-none ring-0">
-										<CardHeader className="px-0 pt-0">
-											<CardTitle className="text-lg">Guardian &amp; parent connection</CardTitle>
-											<CardDescription className="text-base leading-relaxed">
-												After a parent connects using your link code, we show their contact here.
-												You cannot change these fields.
-											</CardDescription>
-										</CardHeader>
-										<CardContent className="px-0">
-											<div className="flex flex-col gap-4">
-												<p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-relaxed">
-													<span className="text-muted-foreground font-medium">Guardian name</span>
-													<span className="text-muted-foreground"> - </span>
-													<span className="min-w-0 text-foreground">
-														{profile.parent_name?.trim() || "—"}
-													</span>
-												</p>
-												<p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-relaxed">
-													<span className="text-muted-foreground font-medium">Guardian email</span>
-													<span className="text-muted-foreground"> - </span>
-													<span className="min-w-0 break-all text-foreground">
-														{profile.parent_email?.trim() || "—"}
-													</span>
-												</p>
-											</div>
-											<p className="mt-6 text-muted-foreground text-sm leading-relaxed">
-												These values are set when your parent links their account with your link
-												code.
-											</p>
-										</CardContent>
-									</Card>
-								</div>
-							),
+							content: <ParentPanel profile={profile} />,
 						},
 						{
 							id: "notifications",

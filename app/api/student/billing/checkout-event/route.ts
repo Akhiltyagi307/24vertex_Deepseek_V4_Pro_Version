@@ -22,10 +22,12 @@ const ALLOWED_EVENTS = [
 	"checkout_modal_render_failed",
 ] as const;
 
-const bodySchema = z.object({
-	event_name: z.enum(ALLOWED_EVENTS),
-	props: z.record(z.unknown()).optional(),
-});
+const bodySchema = z
+	.object({
+		event_name: z.enum(ALLOWED_EVENTS),
+		props: z.record(z.unknown()).optional(),
+	})
+	.strict();
 
 export async function POST(req: Request) {
 	const auth = await getApiRequestUser(req);

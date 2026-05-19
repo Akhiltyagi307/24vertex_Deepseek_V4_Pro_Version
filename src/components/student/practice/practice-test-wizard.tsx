@@ -100,12 +100,17 @@ export function PracticeTestWizard({
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const paywall = usePaywall();
-	const STEP_LABELS = [
-		"Subject",
-		"Topics",
-		"Difficulty & time",
-		showPromptPreview ? "Prompt preview" : "Confirm & generate",
-	] as const;
+	// Memoized so the array identity is stable across renders — the D22 step-
+	// focus effect depends on this and would re-fire on every render otherwise.
+	const STEP_LABELS = React.useMemo(
+		() => [
+			"Subject",
+			"Topics",
+			"Difficulty & time",
+			showPromptPreview ? "Prompt preview" : "Confirm & generate",
+		],
+		[showPromptPreview],
+	);
 
 	const [draft, draftDispatch] = React.useReducer(wizardDraftReducer, initialWizardDraft);
 	const { step, subjectId, focusArea, difficulty, durationSeconds } = draft;
@@ -206,6 +211,24 @@ export function PracticeTestWizard({
 
 	const isSubmitStep = !showPromptPreview && step === 2;
 	const isResultStep = step === 3;
+
+	// D22 (wizard step focus management): move keyboard focus to the active
+	// step's container when `step` changes, and announce the new step's name to
+	// assistive tech via the polite live region below. The first render is
+	// skipped (`hasMountedRef`) so screen readers don't bark "Step 1: Subject"
+	// on every page visit.
+	const stepContainerRef = React.useRef<HTMLDivElement | null>(null);
+	const hasMountedRef = React.useRef(false);
+	const [liveAnnouncement, setLiveAnnouncement] = React.useState("");
+	React.useEffect(() => {
+		if (!hasMountedRef.current) {
+			hasMountedRef.current = true;
+			return;
+		}
+		const label = STEP_LABELS[step] ?? `Step ${step + 1}`;
+		setLiveAnnouncement(`Step ${step + 1} of ${STEP_LABELS.length}: ${label}`);
+		stepContainerRef.current?.focus();
+	}, [step, STEP_LABELS]);
 
 	const prevSubjectIdForResetRef = React.useRef<string | null>(null);
 	React.useEffect(() => {
@@ -811,7 +834,20 @@ export function PracticeTestWizard({
 						<WizardStepIndicator step={step} labels={STEP_LABELS} />
 					</div>
 
-					<div className="flex flex-col gap-7 pr-1">
+					{/*
+					  D22: polite live region announces the active step's name on
+					  transition without stealing focus.
+					*/}
+					<div className="sr-only" aria-live="polite" aria-atomic="true" role="status">
+						{liveAnnouncement}
+					</div>
+
+					<div
+						ref={stepContainerRef}
+						tabIndex={-1}
+						aria-label={`Step ${step + 1} of ${STEP_LABELS.length}: ${STEP_LABELS[step] ?? ""}`}
+						className="flex flex-col gap-7 pr-1 outline-none"
+					>
 						{step === 0 ? (
 							<StepSubject
 								enrolledSubjects={enrolledSubjects}

@@ -1,12 +1,24 @@
 "use server";
 
+/**
+ * Tenant boundary (D8): the upsert here is keyed exclusively by
+ * `(await getServerUser()).id`. `notificationPreferencesPayloadSchema`
+ * deliberately excludes any `userId` / `profileId` field so a forged payload
+ * cannot redirect the write to another student's row. See
+ * `tests/actions/student/settings-tenant-boundary.test.ts` for the codified
+ * invariant.
+ */
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 
 import { db } from "@/db";
 import { userPreferences } from "@/db/schema/comms-audit";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import {
+	notificationPreferencesPayloadSchema,
+	type NotificationPreferencesPayload,
+} from "@/lib/notifications/preferences-schema";
 import {
 	DEFAULT_NOTIFICATION_TYPES,
 	NOTIFICATION_PREFERENCE_KEYS,
@@ -15,20 +27,14 @@ import { logServerError } from "@/lib/server/log-supabase-error";
 
 import type { NotificationPreferencesState } from "./notification-preferences-types";
 
-const payloadSchema = z.object({
-	enableInApp: z.boolean(),
-	enableEmail: z.boolean(),
-	types: z.record(z.enum(NOTIFICATION_PREFERENCE_KEYS), z.boolean()),
-});
-
 /**
  * Upserts the signed-in student's notification preferences. Unknown keys are
  * ignored; missing keys fall back to `DEFAULT_NOTIFICATION_TYPES`.
  */
 export async function updateNotificationPreferences(
-	input: z.infer<typeof payloadSchema>,
+	input: NotificationPreferencesPayload,
 ): Promise<NotificationPreferencesState> {
-	const parsed = payloadSchema.safeParse(input);
+	const parsed = notificationPreferencesPayloadSchema.safeParse(input);
 	if (!parsed.success) {
 		return { ok: false, error: "Invalid preferences." };
 	}

@@ -1,11 +1,18 @@
 import { z } from "zod";
 
 import { assertTestOwnedInProgress } from "@/lib/practice/submit-practice-shared";
+import {
+	STUDENT_PRACTICE_TAB_BLUR_LIMIT_N,
+	STUDENT_PRACTICE_TAB_BLUR_WINDOW_SECONDS,
+	consumeStudentRateLimit,
+} from "@/lib/student/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
-const bodySchema = z.object({
-	testId: z.string().uuid(),
-});
+const bodySchema = z
+	.object({
+		testId: z.string().uuid(),
+	})
+	.strict();
 
 /**
  * Throttled client beacon: increments `tests.tab_blur_count` for anomaly / live monitor signals.
@@ -28,6 +35,20 @@ export async function POST(request: Request) {
 	} = await supabase.auth.getUser();
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+	}
+
+	const rl = await consumeStudentRateLimit({
+		userId: user.id,
+		bucket: "practice-tab-blur",
+		limitN: STUDENT_PRACTICE_TAB_BLUR_LIMIT_N,
+		windowSeconds: STUDENT_PRACTICE_TAB_BLUR_WINDOW_SECONDS,
+	});
+	if (!rl.ok) {
+		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
+		return Response.json(
+			{ ok: false, message: "Too many tab-blur events. Slow down." },
+			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+		);
 	}
 
 	const gate = await assertTestOwnedInProgress(supabase, parsed.data.testId, user.id);

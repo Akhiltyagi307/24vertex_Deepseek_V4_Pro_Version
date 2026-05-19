@@ -182,8 +182,9 @@ export function preferenceKeyForRow(row: { type: NotificationType; category: Not
 
 /**
  * Keys shown in the student notification preferences UI and accepted from the
- * client payload. Keep in sync with the Zod schema in
- * `app/student/settings/notification-preferences-actions.ts`.
+ * client payload. The canonical Zod schema lives at
+ * `@/lib/notifications/preferences-schema` and consumes this constant directly,
+ * so the two no longer drift.
  */
 export const NOTIFICATION_PREFERENCE_KEYS = [
 	"test_result",

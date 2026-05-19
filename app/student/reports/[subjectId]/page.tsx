@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Reports" };
+
 type PageProps = {
 	params: Promise<{ subjectId: string }>;
 	searchParams: Promise<Record<string, string | string[] | undefined>>;

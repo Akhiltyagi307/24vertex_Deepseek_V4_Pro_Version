@@ -1,19 +1,18 @@
 import { notFound, redirect } from "next/navigation";
 
 import { PracticeGradingProgressView } from "@/components/student/practice/practice-grading-progress-view";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Grading" };
 
 type PageProps = { params: Promise<{ testId: string }> };
 
 export default async function PracticeGradingPage({ params }: PageProps) {
 	const { testId } = await params;
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
+	const { user } = await requireVerifiedStudent();
 	const supabase = await createClient();
 
 	const { data: test, error: tErr } = await supabase

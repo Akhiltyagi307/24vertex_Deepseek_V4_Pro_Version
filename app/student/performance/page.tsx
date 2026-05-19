@@ -1,12 +1,12 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { StudentPerformanceAsync } from "./student-performance-async";
 import { StudentPerformanceSkeleton } from "./student-performance-skeleton";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Performance" };
 
 type PageProps = {
 	searchParams: Promise<{ subject?: string }>;
@@ -14,14 +14,7 @@ type PageProps = {
 
 export default async function StudentPerformancePage({ searchParams }: PageProps) {
 	const sp = await searchParams;
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
+	const { user, profile: row } = await requireVerifiedStudent();
 
 	const profileRow = {
 		grade: row.grade,

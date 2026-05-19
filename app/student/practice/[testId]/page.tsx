@@ -6,13 +6,15 @@ import {
 	type PracticeSessionQuestion,
 	type SessionStudentAnswer,
 } from "@/components/student/practice/practice-test-session";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Practice session" };
 
 type PageProps = { params: Promise<{ testId: string }> };
 
@@ -47,10 +49,7 @@ function topicsFieldsFromRow(topics: unknown): { topic_name: string; chapter_nam
 
 export default async function PracticeSessionPage({ params }: PageProps) {
 	const { testId } = await params;
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
+	const { user } = await requireVerifiedStudent();
 	const supabase = await createClient();
 
 	const { data: test, error: tErr } = await supabase

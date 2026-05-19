@@ -2,13 +2,20 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { moderationFlags } from "@/db/schema/moderation-flags";
+import {
+	STUDENT_FLAG_QUESTION_LIMIT_N,
+	STUDENT_FLAG_QUESTION_WINDOW_SECONDS,
+	consumeStudentRateLimit,
+} from "@/lib/student/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
-const bodySchema = z.object({
-	questionId: z.string().uuid(),
-	reason: z.string().min(1).max(200),
-	notes: z.string().max(4000).optional(),
-});
+const bodySchema = z
+	.object({
+		questionId: z.string().uuid(),
+		reason: z.string().min(1).max(200),
+		notes: z.string().max(4000).optional(),
+	})
+	.strict();
 
 /**
  * Phase 5: students can report a broken question from the session player.
@@ -33,6 +40,20 @@ export async function POST(request: Request) {
 	} = await supabase.auth.getUser();
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+	}
+
+	const rl = await consumeStudentRateLimit({
+		userId: user.id,
+		bucket: "flag-question",
+		limitN: STUDENT_FLAG_QUESTION_LIMIT_N,
+		windowSeconds: STUDENT_FLAG_QUESTION_WINDOW_SECONDS,
+	});
+	if (!rl.ok) {
+		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
+		return Response.json(
+			{ ok: false, message: "You've reported too many questions recently. Try again later." },
+			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+		);
 	}
 
 	// Gate: question must belong to a test owned by the student. The RLS

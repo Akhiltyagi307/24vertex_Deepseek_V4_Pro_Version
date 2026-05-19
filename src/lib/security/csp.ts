@@ -47,7 +47,13 @@ export function buildCsp(nonce: string): string {
 		"https://api.razorpay.com",
 	);
 
-	const imgParts = ["'self'", "data:", "blob:", "https:"];
+	// D4 (img-src tightening): replace the previous blanket `https:` with an
+	// explicit allowlist that mirrors `next.config.ts` `images.remotePatterns`.
+	// `data:` keeps base64 placeholders working (next/image, OG previews);
+	// `blob:` covers in-app generated thumbnails (e.g. doubt-chat attachment
+	// previews before upload). Add new origins here AND to `remotePatterns`
+	// in `next.config.ts` so the optimizer and the browser agree.
+	const imgParts = ["'self'", "data:", "blob:", "https://images.unsplash.com"];
 	const supabaseImg = supabaseImageOrigin();
 	if (supabaseImg) imgParts.push(supabaseImg);
 

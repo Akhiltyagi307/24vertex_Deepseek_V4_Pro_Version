@@ -126,6 +126,7 @@ export function QuestionVisual({
 	return (
 		<figure
 			role="figure"
+			aria-labelledby={undefined}
 			aria-label={visual.altText}
 			className={cn(
 				"my-4 flex w-full flex-col items-stretch gap-2 rounded-lg border border-border bg-card p-3",
@@ -134,7 +135,19 @@ export function QuestionVisual({
 			data-question-visual
 			data-question-visual-kind={visual.spec.kind}
 		>
-			<div className="max-h-[min(52dvh,28rem)] w-full overflow-x-auto overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]">
+			{/*
+			  D21: ship the spec's `altText` as actual sr-only DOM content (not just
+			  an `aria-label` attribute) so AT users can navigate to it like body
+			  text. The renderer body is `aria-hidden` so SVG/canvas internals
+			  don't pollute the AT tree — for non-trivial diagrams the underlying
+			  shapes have no meaningful labels, so the textual altText is the
+			  authoritative description for assistive tech.
+			*/}
+			<span className="sr-only">{visual.altText}</span>
+			<div
+				className="max-h-[min(52dvh,28rem)] w-full overflow-x-auto overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]"
+				aria-hidden="true"
+			>
 				<div className="flex min-h-[120px] w-full items-center justify-center">
 					<RendererDispatch visual={visual} />
 				</div>

@@ -19,6 +19,13 @@ import { z } from "zod";
  *   - `tutorMode` defaults to "explain" so legacy clients without the
  *     field still work (the route launched before solve_with_me existed).
  */
+/**
+ * Note: this schema deliberately does NOT use `.strict()` because the @ai-sdk
+ * /react `useChat` transport may attach internal fields (e.g. `trigger`,
+ * `messageId`) that we want to tolerate. The explicit fields we DO use are
+ * pinned to UUIDs / enums so an attacker can't widen the schema by smuggling
+ * a forged value.
+ */
 export const doubtChatBodySchema = z.object({
 	/** @ai-sdk/react chat id (optional) */
 	id: z.string().optional(),

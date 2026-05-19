@@ -10,7 +10,7 @@ import {
 	loadDoubtTokenSummaryForConversation,
 	loadLastDoubtTutorModeForConversation,
 } from "@/lib/doubt/loaders";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 
 export const metadata = {
 	title: "Ask about a topic",
@@ -19,10 +19,7 @@ export const metadata = {
 type PageProps = { searchParams: Promise<{ c?: string }> };
 
 export default async function StudentDoubtChatPage({ searchParams }: PageProps) {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
+	const { user } = await requireVerifiedStudent();
 
 	const sp = await searchParams;
 	const cParam = typeof sp.c === "string" ? sp.c : null;

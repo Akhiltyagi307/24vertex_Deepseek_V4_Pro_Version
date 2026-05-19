@@ -4,16 +4,38 @@ import { z } from "zod";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
+import {
+	STUDENT_NOTIFICATIONS_LIMIT_N,
+	STUDENT_NOTIFICATIONS_WINDOW_SECONDS,
+	consumeStudentRateLimit,
+} from "@/lib/student/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const bodySchema = z.object({
-	is_read: z.boolean(),
-});
+const bodySchema = z
+	.object({
+		is_read: z.boolean(),
+	})
+	.strict();
 
-function privateHeaders(): HeadersInit {
-	return { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" };
+function privateHeaders(extra?: Record<string, string>): HeadersInit {
+	return {
+		"X-Robots-Tag": "noindex, nofollow",
+		"Cache-Control": "no-store",
+		...extra,
+	};
+}
+
+function rateLimitedResponse(resetAt: Date): NextResponse {
+	const retryAfterSec = Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000));
+	return NextResponse.json(
+		{ error: "Too many requests. Try again shortly." },
+		{
+			status: 429,
+			headers: privateHeaders({ "Retry-After": String(retryAfterSec) }),
+		},
+	);
 }
 
 /**
@@ -27,6 +49,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
 	if (!user) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders() });
 	}
+
+	const rl = await consumeStudentRateLimit({
+		userId: user.id,
+		bucket: "notif-patch",
+		limitN: STUDENT_NOTIFICATIONS_LIMIT_N,
+		windowSeconds: STUDENT_NOTIFICATIONS_WINDOW_SECONDS,
+	});
+	if (!rl.ok) {
+		return rateLimitedResponse(rl.resetAt);
+	}
+
 	const { id } = await ctx.params;
 	if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
 		return NextResponse.json({ error: "Invalid id" }, { status: 400, headers: privateHeaders() });

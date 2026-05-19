@@ -1,4 +1,5 @@
 import { convertToModelMessages, type UIMessage, streamText } from "ai";
+import * as Sentry from "@sentry/nextjs";
 
 import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/doubt-prompt-templates";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
@@ -311,12 +312,40 @@ export async function POST(req: Request) {
 		model: getOpenAIProvider().chat(modelId),
 		system,
 		messages: modelMessages,
+		// D29: surface AI SDK internals (token counts, model id, finish reason)
+		// to Sentry traces. `recordTelemetry` doesn't currently wire to OTel, so
+		// we manually forward in `onFinish` below; setting `isEnabled` lets the
+		// AI SDK emit OTLP spans if a tracer is configured (no-op otherwise).
+		experimental_telemetry: {
+			isEnabled: true,
+			functionId: "student.doubt-chat",
+			metadata: {
+				route: "/api/student/doubt-chat",
+				model: modelId,
+			},
+		},
 		// Cancel the OpenAI HTTP call when the client disconnects so we stop
 		// paying for tokens after the user closes the tab.
 		abortSignal: req.signal,
 		onFinish: async ({ text, totalUsage, finishReason }) => {
 			const promptT = totalUsage?.inputTokens ?? null;
 			const compT = totalUsage?.outputTokens ?? null;
+			const latencyMs = Date.now() - streamStartedAt;
+			// D29: forward usage/latency/model to Sentry with the route tag so
+			// dashboards can slice on this without joining against the DB.
+			Sentry.getCurrentScope().setTag("ai.route", "/api/student/doubt-chat");
+			Sentry.addBreadcrumb({
+				category: "ai",
+				level: "info",
+				message: "doubt-chat stream finished",
+				data: {
+					model: modelId,
+					promptTokens: promptT,
+					outputTokens: compT,
+					latencyMs,
+					finishReason,
+				},
+			});
 			// Telemetry runs unconditionally — we want visibility on aborts/errors too.
 			void recordAiCall({
 				feature: "doubt.chat",
@@ -325,10 +354,12 @@ export async function POST(req: Request) {
 				promptId: dbPrompt?.id ?? null,
 				inputTokens: promptT ?? 0,
 				outputTokens: compT ?? 0,
-				latencyMs: Date.now() - streamStartedAt,
+				latencyMs,
 				status: "ok",
 			});
 			// Bill only normal completions (not provider errors, aborts, or tool loops).
+			// Note: the `latencyMs` constant above is reused so DB telemetry and
+			// Sentry breadcrumbs agree on the wall-clock measurement.
 			// Aborted/errored streams skip persistence entirely so the sidebar doesn't
 			// reorder for half-baked answers.
 			const billableTurn = finishReason === "stop" || finishReason === "length";

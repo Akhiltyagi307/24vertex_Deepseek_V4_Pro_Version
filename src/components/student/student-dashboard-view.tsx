@@ -44,6 +44,7 @@ const StudentDashboardAnalytics = dynamic(
 			default: m.StudentDashboardAnalytics,
 		})),
 	{
+		ssr: false,
 		loading: () => (
 			<div
 				className={cn(

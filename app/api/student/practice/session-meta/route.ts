@@ -2,12 +2,19 @@ import { z } from "zod";
 
 import { assertTestOwnedInProgress } from "@/lib/practice/submit-practice-shared";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
+import {
+	STUDENT_PRACTICE_SESSION_META_LIMIT_N,
+	STUDENT_PRACTICE_SESSION_META_WINDOW_SECONDS,
+	consumeStudentRateLimit,
+} from "@/lib/student/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
-const bodySchema = z.object({
-	testId: z.string().uuid(),
-	deviceFingerprint: z.string().min(8).max(64).optional(),
-});
+const bodySchema = z
+	.object({
+		testId: z.string().uuid(),
+		deviceFingerprint: z.string().min(8).max(64).optional(),
+	})
+	.strict();
 
 /**
  * Fills `tests.last_ip` / `tests.device_fingerprint` when still null (live monitor / anomalies).
@@ -30,6 +37,20 @@ export async function POST(request: Request) {
 	} = await supabase.auth.getUser();
 	if (!user) {
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+	}
+
+	const rl = await consumeStudentRateLimit({
+		userId: user.id,
+		bucket: "practice-session-meta",
+		limitN: STUDENT_PRACTICE_SESSION_META_LIMIT_N,
+		windowSeconds: STUDENT_PRACTICE_SESSION_META_WINDOW_SECONDS,
+	});
+	if (!rl.ok) {
+		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
+		return Response.json(
+			{ ok: false, message: "Too many session updates. Try again shortly." },
+			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+		);
 	}
 
 	const gate = await assertTestOwnedInProgress(supabase, parsed.data.testId, user.id);

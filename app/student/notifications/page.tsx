@@ -1,24 +1,15 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { NotificationsAsync } from "@/components/student/notifications/notifications-async";
 import { NotificationsSkeleton } from "@/components/student/notifications/notifications-skeleton";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Notifications" };
 
 export default async function StudentNotificationsPage() {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
+	const { user } = await requireVerifiedStudent();
 
 	return (
 		<section className="flex flex-col gap-5 py-6">

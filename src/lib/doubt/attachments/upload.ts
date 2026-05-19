@@ -7,6 +7,7 @@ import {
 	classifyAttachment,
 	type AttachmentRow,
 	validateAttachment,
+	validateAttachmentMagicBytes,
 } from "./types";
 
 const BUCKET = "doubt-attachments";
@@ -59,6 +60,11 @@ export async function uploadDoubtAttachment(
 	const validation = validateAttachment(file);
 	if (!validation.ok) {
 		return { ok: false, message: validation.reason };
+	}
+
+	const magic = await validateAttachmentMagicBytes(file, file.type);
+	if (!magic.ok) {
+		return { ok: false, message: magic.reason };
 	}
 
 	const kind = validation.kind ?? classifyAttachment(file.type);

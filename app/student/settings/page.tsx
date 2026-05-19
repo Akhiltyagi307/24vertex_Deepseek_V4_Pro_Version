@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import { updateNotificationPreferences } from "./notification-preferences-actions";
 import {
@@ -8,8 +6,7 @@ import {
 	type StudentProfileSettingsRow,
 } from "./student-profile-settings-form";
 import type { AppProfileRow } from "@/lib/auth/cached-profile";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { getNotificationPrefs } from "@/lib/notifications/prefs";
 import { listCatalogOrganizations } from "@/lib/organizations/queries";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
@@ -18,6 +15,8 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Settings" };
 
 function appProfileToSettingsRow(row: AppProfileRow): StudentProfileSettingsRow {
 	return {
@@ -40,16 +39,8 @@ function appProfileToSettingsRow(row: AppProfileRow): StudentProfileSettingsRow 
 }
 
 export default async function StudentSettingsPage() {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
+	const { user, profile: row } = await requireVerifiedStudent();
 	const supabase = await createClient();
-
-	const row = await getCachedAppProfileRow();
-	if (!row || row.role !== "student") {
-		redirect("/login");
-	}
 	const profile = appProfileToSettingsRow(row);
 
 	let electiveSubjectName: string | null = null;
