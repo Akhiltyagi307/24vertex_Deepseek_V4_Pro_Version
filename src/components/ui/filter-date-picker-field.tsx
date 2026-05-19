@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CalendarIcon, ChevronDownIcon } from "lucide-react";
+import type { Matcher } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -45,8 +46,8 @@ export function FilterDatePickerField({
 		[value],
 	);
 
-	const disabledMatchers = React.useMemo(() => {
-		const matchers: Array<{ before?: Date; after?: Date }> = [];
+	const disabledMatchers = React.useMemo((): Matcher[] | undefined => {
+		const matchers: Matcher[] = [];
 		if (minDateKey) {
 			const min = dateKeyToNoonInAppTimeZone(minDateKey);
 			if (Number.isFinite(min.getTime())) matchers.push({ before: min });
