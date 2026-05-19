@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 import { loadTeacherDashboardBundleForTeacher } from "./teacher-dashboard-data";
 import { TeacherDashboardPanel } from "./teacher-dashboard-panel";
-import { getProfile } from "@/lib/auth/routing";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import {
 	getActiveTeacherOrganizationSnapshot,
 	listActiveTeacherLinkedStudentProfiles,
@@ -14,25 +15,31 @@ import {
 } from "@/lib/teachers/teacher-at-risk-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
 
-export default async function TeacherDashboardPage() {
-	const profile = await getProfile();
-	if (!profile?.is_verified) {
-		redirect("/teacher/pending");
-	}
+export const metadata: Metadata = {
+	title: "Teacher dashboard",
+	robots: { index: false, follow: false },
+};
 
-	const activeOrganization = await getActiveTeacherOrganizationSnapshot(profile.id);
+export default async function TeacherDashboardPage() {
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
+		handleVerifiedTeacherSessionFailure(session);
+	}
+	const teacherId = session.user.id;
+
+	const activeOrganization = await getActiveTeacherOrganizationSnapshot(teacherId);
 	const linkCodeStudents = activeOrganization
 		? []
-		: await listActiveTeacherLinkedStudentProfiles(profile.id);
+		: await listActiveTeacherLinkedStudentProfiles(teacherId);
 
 	const [subjectsCatalog, filterOptions, initialDashboardBundle] = await Promise.all([
 		listActiveSubjectsCatalog(),
 		getTeacherPerformanceDirectoryFilterOptions({
-			teacherId: profile.id,
+			teacherId,
 			activeOrganizationId: activeOrganization?.id ?? null,
 		}),
 		loadTeacherDashboardBundleForTeacher({
-			teacherId: profile.id,
+			teacherId,
 			activeOrganizationId: activeOrganization?.id ?? null,
 			filters: { grade: "all", section: "all", subjectId: "all" },
 		}),

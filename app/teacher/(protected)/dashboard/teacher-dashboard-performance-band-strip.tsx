@@ -69,6 +69,20 @@ function LoadingStrip() {
 	);
 }
 
+function distributionScreenReaderSummary(
+	summary: TeacherClassPerformanceSummary | null,
+	bands: TeacherPerformanceBandSummary[],
+): string | null {
+	if (!summary || bands.length === 0) return null;
+	const scope = summary.studentsInScope;
+	const parts = bands.map((band) => `${band.count} ${band.label.toLowerCase()}`).join(", ");
+	const scopeLabel = `${scope} ${scope === 1 ? "student" : "students"} in scope`;
+	if (summary.studentsWithRecentScores === 0) {
+		return `Distribution summary: ${scopeLabel}, none with recent graded work yet.`;
+	}
+	return `Distribution summary across ${scopeLabel}: ${parts}.`;
+}
+
 function distributionInsight(summary: TeacherClassPerformanceSummary | null) {
 	if (!summary) return null;
 	if (summary.studentsInScope === 0) {
@@ -222,9 +236,11 @@ export function TeacherDashboardPerformanceBandStrip({ summary, pending, error, 
 	if (bands.length === 0) return null;
 
 	const insight = distributionInsight(summary);
+	const accessibleSummary = distributionScreenReaderSummary(summary, bands);
 
 	return (
 		<section className="flex min-w-0 flex-col gap-3" aria-label="Student distribution by performance band">
+			{accessibleSummary ? <span className="sr-only">{accessibleSummary}</span> : null}
 			<div className="flex flex-col gap-2">
 				<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
 					<div className="min-w-0">

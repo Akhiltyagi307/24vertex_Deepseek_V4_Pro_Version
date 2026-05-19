@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 import { TeacherAssignmentsManager } from "./teacher-assignments-manager";
 import { loadTeacherSubmissionAssignmentBundles } from "@/lib/assignments/teacher-submissions-hub";
@@ -6,20 +6,24 @@ import {
 	listTeacherAssignmentSubjectCatalog,
 	listTeacherAssignableStudents,
 } from "@/lib/assignments/queries";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
 
 // Authenticated teacher assignments include roster/submission state and should not be statically cached.
 export const dynamic = "force-dynamic";
 
-export default async function TeacherAssignmentsPage() {
-	const user = await getServerUser();
-	if (!user) redirect("/login");
+export const metadata: Metadata = {
+	title: "Assignments",
+	robots: { index: false, follow: false },
+};
 
-	const profile = await getCachedAppProfileRow();
-	if (!profile || profile.role !== "teacher") redirect("/login");
-	if (!profile.is_verified) redirect("/teacher/pending");
+export default async function TeacherAssignmentsPage() {
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
+		handleVerifiedTeacherSessionFailure(session);
+	}
+	const { user } = session;
 
 	const [subjectsCatalogRaw, topicsCatalog, students, submissionBundles] = await Promise.all([
 		listActiveSubjectsCatalog(),

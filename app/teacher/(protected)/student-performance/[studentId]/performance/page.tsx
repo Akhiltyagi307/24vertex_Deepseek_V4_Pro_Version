@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { StudentPerformanceAsync } from "@/app/student/performance/student-performance-async";
 import { StudentPerformanceSkeleton } from "@/app/student/performance/student-performance-skeleton";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import { teacherCanAccessStudentForSession } from "@/lib/teachers/teacher-student-access";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { createClient } from "@/lib/supabase/server";
@@ -18,22 +19,36 @@ type PageProps = {
 	searchParams: Promise<{ subject?: string }>;
 };
 
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+	const { studentId } = await params;
+	let displayName: string | null = null;
+	try {
+		const supabase = await createClient();
+		const { data: row } = await supabase
+			.from("profiles")
+			.select("full_name")
+			.eq("id", studentId)
+			.maybeSingle();
+		const formatted = row?.full_name ? formatPersonDisplayName(row.full_name) : null;
+		displayName = formatted && formatted.length > 0 ? formatted : null;
+	} catch {
+		displayName = null;
+	}
+	return {
+		title: displayName ? `${displayName} · Student performance` : "Student performance",
+		robots: { index: false, follow: false },
+	};
+}
+
 export default async function TeacherStudentPerformanceDetailPage({ params, searchParams }: PageProps) {
 	const { studentId } = await params;
 	const sp = await searchParams;
 
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
+		handleVerifiedTeacherSessionFailure(session);
 	}
-
-	const teacherProfile = await getCachedAppProfileRow();
-	if (!teacherProfile || teacherProfile.role !== "teacher") {
-		redirect("/login");
-	}
-	if (!teacherProfile.is_verified) {
-		redirect("/teacher/pending");
-	}
+	const { user } = session;
 
 	const allowed = await teacherCanAccessStudentForSession(user.id, studentId);
 	if (!allowed) {

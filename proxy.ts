@@ -6,6 +6,7 @@ import { billingProxyGate } from "@/lib/billing/proxy-guard";
 import { parentProxyGate } from "@/lib/parent/proxy-guard";
 import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
 import { updateSession } from "@/lib/supabase/session";
+import { teacherProxyGate } from "@/lib/teachers/proxy-guard";
 
 /** Root request proxy (Next.js `proxy.ts` convention). Runs on the Node.js runtime. */
 
@@ -52,6 +53,13 @@ export async function proxy(request: NextRequest) {
 		parentEarly.headers.set(REQUEST_ID_HEADER, requestId);
 		parentEarly.headers.set("Content-Security-Policy", csp);
 		return parentEarly;
+	}
+
+	const teacherEarly = teacherProxyGate(request);
+	if (teacherEarly) {
+		teacherEarly.headers.set(REQUEST_ID_HEADER, requestId);
+		teacherEarly.headers.set("Content-Security-Policy", csp);
+		return teacherEarly;
 	}
 
 	if (shouldRedirectToMaintenance(pathname, process.env.MAINTENANCE_MODE)) {

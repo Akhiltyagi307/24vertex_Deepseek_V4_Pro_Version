@@ -10,6 +10,7 @@ import { AdminAuditWriteError } from "@/lib/admin/audit";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { sendTeacherApprovedEmail } from "@/lib/email/teacher-approved-email";
 import { insertTeacherWelcomeNotification, setTeacherVerified } from "@/lib/admin/teacher-approval";
+import { recordTeacherApprovalHistory } from "@/lib/admin/teacher-approval-history";
 import { adminGetUserById } from "@/lib/admin/users-list";
 
 export const runtime = "nodejs";
@@ -29,9 +30,35 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			if (!profile || profile.role !== "teacher") {
 				return adminErrorResponse("Teacher not found", { status: 404 });
 			}
+			const before = { is_verified: profile.is_verified ?? false };
 
 			const ok = await setTeacherVerified(uuid.data, true);
-			if (!ok) return adminErrorResponse("Update failed", { status: 500 });
+			if (!ok) {
+				Sentry.captureMessage("teacher_approve_setverified_failed", {
+					level: "error",
+					tags: { feature: "admin", route: "teachers_approve" },
+					extra: { teacherId: uuid.data },
+				});
+				return adminErrorResponse("Update failed", { status: 500 });
+			}
+
+			// Append a history row so the 24h re-signup cooldown and approval
+			// reconstruction queries have a single source of truth. Email is
+			// denormalised so the row survives a future profile deletion.
+			if (profile.email) {
+				try {
+					await recordTeacherApprovalHistory({
+						teacherUserId: uuid.data,
+						email: profile.email,
+						action: "verified",
+					});
+				} catch (historyErr) {
+					Sentry.captureException(historyErr, {
+						tags: { feature: "admin", route: "teachers_approve", phase: "history_insert" },
+						extra: { teacherId: uuid.data },
+					});
+				}
+			}
 
 			if (profile.email) {
 				const sent = await sendTeacherApprovedEmail(profile.email, profile.full_name);
@@ -51,11 +78,14 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 			// Strict audit: approval flips a profile flag, dispatches an email
 			// through Resend, and inserts a notification — three side effects we
-			// must be able to attribute.
+			// must be able to attribute. Capture the before/after `is_verified`
+			// state on the audit row so the transition is reconstructable from
+			// the log alone.
 			await writeAdminActionStrict({
 				action: ADMIN_ACTIONS.TEACHER_APPROVE,
 				targetType: "profile",
 				targetId: uuid.data,
+				payload: { before, after: { is_verified: true } },
 				ipAddress: clientIpFromRequest(request),
 				userAgent: userAgentFromRequest(request),
 			});

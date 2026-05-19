@@ -64,16 +64,18 @@ export type AssignmentConfig = z.infer<typeof assignmentConfigSchema>;
 export type AssignmentLifecycleStatus = z.infer<typeof assignmentLifecycleStatusSchema>;
 export type AssignmentStatus = z.infer<typeof assignmentStatusSchema>;
 
-export const createAssignmentInputSchema = z.object({
-	title: z.string().trim().min(1, "Enter an assignment title.").max(300),
-	instructions: optionalTextToNull,
-	config: assignmentConfigSchema,
-	student_ids: z.array(z.string().uuid()).min(1, "Select at least one student."),
-	due_at: optionalTextToNull.refine(
-		(value) => value === null || !Number.isNaN(Date.parse(value)),
-		"Enter a valid due date.",
-	),
-});
+export const createAssignmentInputSchema = z
+	.object({
+		title: z.string().trim().min(1, "Enter an assignment title.").max(300),
+		instructions: optionalTextToNull,
+		config: assignmentConfigSchema,
+		student_ids: z.array(z.string().uuid()).min(1, "Select at least one student."),
+		due_at: optionalTextToNull.refine(
+			(value) => value === null || !Number.isNaN(Date.parse(value)),
+			"Enter a valid due date.",
+		),
+	})
+	.strict();
 
 export type CreateAssignmentInput = z.infer<typeof createAssignmentInputSchema>;
 

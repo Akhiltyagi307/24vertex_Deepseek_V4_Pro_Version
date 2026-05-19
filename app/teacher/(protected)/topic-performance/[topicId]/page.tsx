@@ -1,9 +1,13 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { eq } from "drizzle-orm";
 
 import { Button } from "@/components/ui/button";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { db } from "@/db";
+import { topics } from "@/db/schema/academic";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
 import { listTeacherTopicStudentBreakdown } from "@/lib/teachers/teacher-topic-performance-queries";
 
@@ -17,6 +21,28 @@ type PageProps = {
 	params: Promise<{ topicId: string }>;
 	searchParams: Promise<{ grade?: string; section?: string; subject?: string }>;
 };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+	const { topicId } = await params;
+	if (!UUID_RE.test(topicId)) {
+		return { title: "Topic breakdown", robots: { index: false, follow: false } };
+	}
+	let topicName: string | null = null;
+	try {
+		const [row] = await db
+			.select({ topicName: topics.topicName })
+			.from(topics)
+			.where(eq(topics.id, topicId))
+			.limit(1);
+		topicName = row?.topicName?.trim() || null;
+	} catch {
+		topicName = null;
+	}
+	return {
+		title: topicName ? `${topicName} · Topic breakdown` : "Topic breakdown",
+		robots: { index: false, follow: false },
+	};
+}
 
 function parseFilters(sp: { grade?: string; section?: string; subject?: string }): {
 	grade?: number | null;
@@ -59,18 +85,11 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 		notFound();
 	}
 
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
+		handleVerifiedTeacherSessionFailure(session);
 	}
-
-	const teacherProfile = await getCachedAppProfileRow();
-	if (!teacherProfile || teacherProfile.role !== "teacher") {
-		redirect("/login");
-	}
-	if (!teacherProfile.is_verified) {
-		redirect("/teacher/pending");
-	}
+	const { user } = session;
 
 	const activeOrg = await getActiveTeacherOrganizationSnapshot(user.id);
 	const sp = await searchParams;

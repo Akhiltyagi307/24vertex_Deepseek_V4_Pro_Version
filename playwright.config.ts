@@ -38,6 +38,7 @@ loadEnv({ path: fs.existsSync(envLocal) ? envLocal : envFallback });
 
 const STUDENT_STORAGE_STATE = path.join(__dirname, "playwright/.auth/user.json");
 const PARENT_STORAGE_STATE = path.join(__dirname, "playwright/.auth/parent.json");
+const TEACHER_STORAGE_STATE = path.join(__dirname, "playwright/.auth/teacher.json");
 
 const baseURL =
 	process.env.PLAYWRIGHT_BASE_URL?.trim() ||
@@ -73,13 +74,17 @@ export default defineConfig({
 	projects: [
 		{
 			name: "auth-setup",
-			// Match auth.setup.ts but NOT parent-auth.setup.ts — the parent
-			// variant is its own project below.
-			testMatch: /(?<!parent-)auth\.setup\.ts$/,
+			// Match auth.setup.ts but NOT parent-auth.setup.ts or
+			// educator-auth.setup.ts — each role has its own setup project.
+			testMatch: /^(?:(?!parent|educator).)*auth\.setup\.ts$/,
 		},
 		{
 			name: "parent-auth-setup",
 			testMatch: /parent-auth\.setup\.ts$/,
+		},
+		{
+			name: "teacher-auth-setup",
+			testMatch: /educator-auth\.setup\.ts$/,
 		},
 		// Specs that don't need a pre-loaded session: smoke, env probe, and
 		// admin-panel (which signs in fresh via `loginAsAdmin` and would
@@ -103,6 +108,12 @@ export default defineConfig({
 			testMatch: /parent-(?!auth\.setup)[\w-]+\.spec\.ts$/,
 			dependencies: ["parent-auth-setup"],
 			use: { storageState: PARENT_STORAGE_STATE },
+		},
+		{
+			name: "teacher",
+			testMatch: /teacher-(portal|a11y)\.spec\.ts$/,
+			dependencies: ["teacher-auth-setup"],
+			use: { storageState: TEACHER_STORAGE_STATE },
 		},
 	],
 });

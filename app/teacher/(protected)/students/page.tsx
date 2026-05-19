@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 import { TeacherIndependentStudentsPanel } from "./independent-students-panel";
 import { subjects } from "@/db/schema/academic";
 import { db } from "@/db";
 import { SensitiveLinkCode } from "@/components/teacher/sensitive-link-code";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import { getActiveTeacherOrganizationSnapshot, listActiveTeacherLinkedStudentProfiles } from "@/lib/organizations/queries";
 import { listOrganizationStudentsForTeachingRoster } from "@/lib/teachers/roster-queries";
 import { eq } from "drizzle-orm";
@@ -14,13 +14,17 @@ import { eq } from "drizzle-orm";
 // Authenticated teacher rosters are organization/link-code scoped and should not be statically cached.
 export const dynamic = "force-dynamic";
 
-export default async function TeacherStudentsPage() {
-	const user = await getServerUser();
-	if (!user) redirect("/login");
+export const metadata: Metadata = {
+	title: "Linked students",
+	robots: { index: false, follow: false },
+};
 
-	const profile = await getCachedAppProfileRow();
-	if (!profile || profile.role !== "teacher") redirect("/login");
-	if (!profile.is_verified) redirect("/teacher/pending");
+export default async function TeacherStudentsPage() {
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
+		handleVerifiedTeacherSessionFailure(session);
+	}
+	const { user, profile } = session;
 
 	const activeOrgSnapshot = await getActiveTeacherOrganizationSnapshot(user.id);
 

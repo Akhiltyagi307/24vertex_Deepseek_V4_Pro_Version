@@ -1,8 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getProfile } from "@/lib/auth/routing";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const metadata: Metadata = {
+	title: "Awaiting verification",
+	robots: { index: false, follow: false },
+};
 
 export default async function TeacherPendingPage() {
 	const profile = await getProfile();

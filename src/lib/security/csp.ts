@@ -60,6 +60,22 @@ export function buildCsp(nonce: string): string {
 	];
 	if (isDev) scriptSrcParts.push("'unsafe-eval'");
 
+	// Opt-in production knob to drop the `'unsafe-inline'` legacy fallback.
+	// Modern browsers ignore `'unsafe-inline'` whenever `'strict-dynamic'` is
+	// present, so removing it changes nothing in evergreen Chrome/Firefox/Safari
+	// — but legacy browsers (Chrome <70, Safari <15) that don't recognise
+	// `'strict-dynamic'` will start refusing inline `<script>` tags. Default off
+	// so the operator deliberately confirms legacy support is no longer needed.
+	// To revert: unset PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK.
+	if (
+		process.env.VERCEL_ENV === "production" &&
+		process.env.PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK === "1"
+	) {
+		const filtered = scriptSrcParts.filter((part) => part !== "'unsafe-inline'");
+		scriptSrcParts.length = 0;
+		scriptSrcParts.push(...filtered);
+	}
+
 	const directives = [
 		"default-src 'self'",
 		"base-uri 'self'",

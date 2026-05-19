@@ -1,8 +1,8 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 import { TeacherAccountSettingsForm } from "./teacher-account-settings-form";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import {
 	getActiveTeacherOrganizationSnapshot,
 	listActiveTeacherLinkedStudentProfiles,
@@ -13,13 +13,17 @@ import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
 // Authenticated teacher settings include organization/roster-sensitive state and should not be statically cached.
 export const dynamic = "force-dynamic";
 
-export default async function TeacherSettingsPage() {
-	const user = await getServerUser();
-	if (!user) redirect("/login");
+export const metadata: Metadata = {
+	title: "Teacher settings",
+	robots: { index: false, follow: false },
+};
 
-	const profile = await getCachedAppProfileRow();
-	if (!profile || profile.role !== "teacher") redirect("/login");
-	if (!profile.is_verified) redirect("/teacher/pending");
+export default async function TeacherSettingsPage() {
+	const session = await getVerifiedTeacherSession();
+	if (!session.ok) {
+		handleVerifiedTeacherSessionFailure(session);
+	}
+	const { user, profile } = session;
 
 	const [catalog, activeOrganization, subjectsCatalog] = await Promise.all([
 		listCatalogOrganizations(),

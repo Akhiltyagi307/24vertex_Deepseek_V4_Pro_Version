@@ -10,6 +10,7 @@ import {
 import { contentDispositionWithFilename } from "@/lib/http/content-disposition";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
+import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
 import { logTeacherReportPdfOutcome } from "@/lib/teachers/teacher-report-pdf-audit-log";
 import { consumeTeacherReportPdfRateLimit } from "@/lib/teachers/teacher-report-pdf-rate-limit";
 import { parseTestRow, type SubjectTestRowSerialized } from "@/lib/student/subject-test-report";
@@ -20,8 +21,10 @@ export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ testId: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
+	return withTeacherActionTelemetry("teacherReportPdfRoute", async (breadcrumb) => {
 	const { testId } = await context.params;
 	if (!testId || !z.string().uuid().safeParse(testId).success) {
+		breadcrumb("invalid_test_id");
 		logTeacherReportPdfOutcome({
 			outcome: "invalid_test_id",
 			status: 400,
@@ -174,6 +177,7 @@ export async function GET(request: Request, context: RouteContext) {
 			inline ? "inline" : "attachment",
 			filename,
 		);
+		breadcrumb("pdf_rendered_inline");
 		return new Response(new Uint8Array(buffer), {
 			status: 200,
 			headers: {
@@ -183,7 +187,9 @@ export async function GET(request: Request, context: RouteContext) {
 			},
 		});
 	} catch (e) {
+		breadcrumb("pdf_render_failed");
 		logServerError("TeacherReportPdfRoute.renderToBuffer", e, { testId });
 		return new Response("Failed to generate PDF", { status: 500 });
 	}
+	});
 }

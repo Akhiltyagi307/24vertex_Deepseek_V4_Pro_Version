@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { writeAuthAudit } from "@/lib/auth/audit";
 import { AUTH_ACTIONS } from "@/lib/auth/audit-actions";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { hasRecentTeacherRejection } from "@/lib/auth/teacher-recent-rejection-check";
 import { createClient } from "@/lib/supabase/server";
 import { sendTeacherPendingApprovalEmail } from "@/lib/email/teacher-pending-approval-email";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
@@ -49,6 +50,17 @@ export async function completeTeacherRegistration(
 
 	if (user.email?.toLowerCase() !== v.email.toLowerCase()) {
 		return { error: "Email does not match the signed-in account." };
+	}
+
+	// 24h cooldown after an admin rejection — pulls from `teacher_approval_history`,
+	// which is empty until an admin reject route is built. Forward-compat guard so the
+	// signup flow is wired up the day a reject UI lands.
+	const cooldown = await hasRecentTeacherRejection(v.email);
+	if (cooldown.cooldownActive) {
+		const retryAt = cooldown.retryAfter?.toUTCString() ?? "in a few hours";
+		return {
+			error: `This email was recently rejected for a teacher account. Try again after ${retryAt}, or contact support.`,
+		};
 	}
 
 	const { error: rpcError } = await supabase.rpc("register_teacher", {
