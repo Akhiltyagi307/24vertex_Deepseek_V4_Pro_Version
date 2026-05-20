@@ -1,0 +1,121 @@
+# Lighthouse audit for the public marketing surface. Runs the Google Lighthouse
+# CLI against the locally-built production server, gating on Performance,
+# Accessibility, Best Practices, and SEO scores. Triggered when something that
+# could move those numbers changes (landing page, public layouts, marketing
+# components, security headers, CSP).
+name: Landing Lighthouse
+
+on:
+  pull_request:
+    paths:
+      - "app/(public)/**"
+      - "app/layout.tsx"
+      - "app/sitemap.ts"
+      - "app/robots.ts"
+      - "app/not-found.tsx"
+      - "src/components/marketing/**"
+      - "src/lib/security/csp.ts"
+      - "src/lib/marketing/**"
+      - "next.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/lighthouse-budget.mjs"
+      - ".github/workflows/landing-lighthouse.yml"
+  workflow_dispatch:
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # Mirror `bundle-budget.yml` setup: pnpm/action-setup reads its version
+      # from package.json's `packageManager` field — don't pass `version:`.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
+          SUPABASE_SERVICE_ROLE_KEY: "placeholder"
+          DATABASE_URL: "postgres://placeholder@localhost:5432/placeholder"
+          OPENAI_API_KEY: "placeholder"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+        run: pnpm build
+
+      # Background processes started in one step do NOT reliably survive into
+      # the next step on GitHub Actions runners — the runner reaps the step's
+      # process group. Start the server, run Lighthouse against both URLs, and
+      # stop the server all inside one step so the server PID stays in scope.
+      - name: Run Lighthouse audit
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
+          SUPABASE_SERVICE_ROLE_KEY: "placeholder"
+          DATABASE_URL: "postgres://placeholder@localhost:5432/placeholder"
+          OPENAI_API_KEY: "placeholder"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+        run: |
+          set -e
+          nohup pnpm start > server.log 2>&1 &
+          SERVER_PID=$!
+          echo "started server pid=$SERVER_PID"
+
+          # Wait up to 60s for the server to bind.
+          for i in {1..30}; do
+            if curl -fs http://localhost:3000/ >/dev/null 2>&1; then
+              echo "server ready after ${i} attempts"
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "server process died before binding — log:"
+              cat server.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if ! curl -fs http://localhost:3000/ >/dev/null 2>&1; then
+            echo "server failed to bind within 60s — log:"
+            cat server.log
+            kill "$SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
+
+          # `npx lighthouse@12` is more reliable than `pnpm add -g lighthouse`
+          # in CI — npx is always on PATH and caches the binary in ~/.npm/_npx.
+          LIGHTHOUSE_FLAGS="--quiet --chrome-flags=--headless=new --chrome-flags=--no-sandbox --chrome-flags=--disable-gpu --chrome-flags=--disable-dev-shm-usage --output=json --only-categories=performance,accessibility,best-practices,seo --preset=desktop --max-wait-for-load=45000"
+
+          npx --yes lighthouse@12 http://localhost:3000/ \
+            $LIGHTHOUSE_FLAGS \
+            --output-path=./lighthouse-landing.json \
+            || (cat server.log && kill "$SERVER_PID" 2>/dev/null || true; exit 1)
+
+          npx --yes lighthouse@12 http://localhost:3000/legal/privacy \
+            $LIGHTHOUSE_FLAGS \
+            --output-path=./lighthouse-legal-privacy.json \
+            || (cat server.log && kill "$SERVER_PID" 2>/dev/null || true; exit 1)
+
+          kill "$SERVER_PID" 2>/dev/null || true
+
+      - name: Assert score thresholds
+        run: node scripts/lighthouse-budget.mjs
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: |
+            lighthouse-landing.json
+            lighthouse-legal-privacy.json
+            server.log

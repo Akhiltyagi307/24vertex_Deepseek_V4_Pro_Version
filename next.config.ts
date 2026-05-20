@@ -95,8 +95,17 @@ const nextConfig: NextConfig = {
 			{ key: "X-Frame-Options", value: "SAMEORIGIN" },
 			{
 				key: "Permissions-Policy",
-				value: "camera=(), microphone=(), geolocation=()",
+				// `payment=(self "https://checkout.razorpay.com")` permits the Razorpay
+				// hosted checkout iframe to use the Payment Request API. `interest-cohort=()`
+				// opts out of FLoC/Topics tracking. `fullscreen=(self)` allows in-app
+				// fullscreen (used by visual renderers) but blocks third-party iframes.
+				value:
+					'camera=(), microphone=(), geolocation=(), payment=(self "https://checkout.razorpay.com"), interest-cohort=(), fullscreen=(self)',
 			},
+			// COEP intentionally omitted — it would block cross-origin images
+			// (Unsplash, Razorpay branding) until they all served CORP headers.
+			{ key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+			{ key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 		];
 
 		if (process.env.VERCEL_ENV === "production") {

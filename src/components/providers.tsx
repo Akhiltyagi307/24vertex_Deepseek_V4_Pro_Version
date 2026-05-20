@@ -11,10 +11,26 @@ import { TooltipProvider } from "@/components/ui/tooltip";
  * "dark mode chosen because dashboards look cool dark" anti-pattern listed
  * in the product brief. `enableSystem` keeps the user's manual override
  * working — once they toggle, next-themes persists their choice.
+ *
+ * `nonce` (optional) is forwarded to `next-themes`'s pre-hydration inline
+ * `<script>` so it survives a strict CSP. The root layout reads the per-request
+ * nonce from headers and passes it down.
  */
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+	children,
+	nonce,
+}: {
+	children: React.ReactNode;
+	nonce?: string;
+}) {
 	return (
-		<ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+		<ThemeProvider
+			attribute="class"
+			defaultTheme="system"
+			enableSystem
+			disableTransitionOnChange
+			nonce={nonce}
+		>
 			<TooltipProvider delay={0}>
 				{children}
 				<AppToaster />

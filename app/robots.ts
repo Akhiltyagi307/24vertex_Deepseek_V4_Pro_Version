@@ -8,6 +8,10 @@ import { getAppUrl } from "@/lib/env";
  * The admin portal already serves `X-Robots-Tag: noindex, nofollow` per-response
  * (see `app/admin/(authenticated)/layout.tsx`); this is the canonical
  * site-wide gate that crawlers honour before they fetch.
+ *
+ * `/login` and `/signup` are root-level routes (not under `/auth/`), so they
+ * need their own disallow entries — the `/auth/` prefix only covers callbacks
+ * like `/auth/callback` and `/auth/update-password`.
  */
 function resolvePublicBaseUrl(): string {
 	// `getAppUrl()` throws when `NEXT_PUBLIC_APP_URL` is a loopback host while
@@ -36,6 +40,8 @@ export default function robots(): MetadataRoute.Robots {
 					"/teacher/",
 					"/api/",
 					"/auth/",
+					"/login",
+					"/signup",
 					"/maintenance",
 					"/dev/",
 				],

@@ -2,8 +2,17 @@ import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { resolvePostAuthPath } from "@/lib/auth/routing";
 
-export default function NotFound() {
+/**
+ * Root 404 page — covers every surface. Role-aware: if the user is signed in,
+ * the secondary CTA links to their actual portal dashboard (student/teacher/
+ * parent/admin) instead of always pointing at /student/dashboard.
+ */
+export default async function NotFound() {
+	const postAuthPath = await resolvePostAuthPath();
+	const isSignedIn = postAuthPath !== "/login";
+
 	return (
 		<div className="flex min-h-[60vh] items-center justify-center px-4 py-16">
 			<div className="w-full max-w-md space-y-6 rounded-xl border border-border bg-card p-8 shadow-sm">
@@ -20,12 +29,21 @@ export default function NotFound() {
 					<Link href="/" className={cn(buttonVariants({ variant: "default", size: "default" }))}>
 						Go home
 					</Link>
-					<Link
-						href="/student/dashboard"
-						className={cn(buttonVariants({ variant: "outline", size: "default" }))}
-					>
-						My dashboard
-					</Link>
+					{isSignedIn ? (
+						<Link
+							href={postAuthPath}
+							className={cn(buttonVariants({ variant: "outline", size: "default" }))}
+						>
+							My dashboard
+						</Link>
+					) : (
+						<Link
+							href="/login"
+							className={cn(buttonVariants({ variant: "outline", size: "default" }))}
+						>
+							Sign in
+						</Link>
+					)}
 				</div>
 			</div>
 		</div>

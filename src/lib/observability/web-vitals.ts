@@ -7,9 +7,22 @@ type ReportableMetric = Metric & { rating?: "good" | "needs-improvement" | "poor
  * Normalize the current pathname into a low-cardinality route tag. Concrete
  * UUIDs / numeric ids would explode the tag dimension; collapse them into
  * `:id` so Sentry dashboards can group by route shape.
+ *
+ * Public/marketing surfaces get a distinct `public/...` namespace so dashboards
+ * can chart landing-page web vitals separately from authenticated portal vitals
+ * (marketing regressions otherwise drown in the portal volume).
  */
 function routeTagFromPathname(pathname: string): string {
 	if (!pathname) return "/";
+	if (pathname === "/") return "public/landing";
+
+	// `/legal/<slug>` → `public/legal/<slug>` (privacy, terms, refund, shipping).
+	// Any deeper or dynamic legal route keeps the same prefix.
+	if (pathname === "/legal" || pathname.startsWith("/legal/")) {
+		const rest = pathname.replace(/^\/legal\/?/, "");
+		return rest ? `public/legal/${rest}` : "public/legal";
+	}
+
 	return pathname
 		.split("/")
 		.map((seg) => {

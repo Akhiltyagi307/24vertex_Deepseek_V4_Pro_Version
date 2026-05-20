@@ -11,10 +11,11 @@ import { getAppUrl } from "@/lib/env";
  * Update this list when adding a new public marketing or legal page.
  */
 function resolvePublicBaseUrl(): string {
-	// See `robots.ts` for the rationale — `getAppUrl()` throws on a loopback
-	// `NEXT_PUBLIC_APP_URL` during a `NODE_ENV=production` build (CI bundle
-	// budget), so fall back gracefully. Real production builds get the live
-	// origin from the env and never enter this fallback.
+	// `getAppUrl()` throws when `NEXT_PUBLIC_APP_URL` is a loopback host while
+	// `NODE_ENV === "production"` — which is exactly the case during the CI
+	// bundle-budget build (uses placeholder `http://localhost:3000`). Fall back
+	// to the raw env so the static prerender doesn't fail; in any real
+	// production deploy `NEXT_PUBLIC_APP_URL` points to the live origin.
 	try {
 		return getAppUrl();
 	} catch {

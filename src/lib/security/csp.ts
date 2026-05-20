@@ -73,6 +73,14 @@ export function buildCsp(nonce: string): string {
 	// `'strict-dynamic'` will start refusing inline `<script>` tags. Default off
 	// so the operator deliberately confirms legacy support is no longer needed.
 	// To revert: unset PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK.
+	//
+	// TODO(public-marketing-followup): Once legal pages and the landing page
+	// are truly ISR-cached (via `app/(public)/` route group), their cached HTML
+	// cannot carry a per-request nonce. The `'unsafe-inline'` fallback is what
+	// keeps inline framework scripts loading on those routes. Removing it
+	// requires either hash-based CSP for static-cached HTML or reverting the
+	// public surface to per-request rendering. Do not flip
+	// PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK=1 until that follow-up ships.
 	if (
 		process.env.VERCEL_ENV === "production" &&
 		process.env.PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK === "1"

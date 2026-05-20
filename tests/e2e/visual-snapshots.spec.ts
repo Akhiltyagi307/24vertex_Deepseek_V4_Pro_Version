@@ -25,6 +25,8 @@ const ROUTES: { path: string; name: string }[] = [
 	{ path: "/auth/forgot-password", name: "forgot-password" },
 	{ path: "/legal/privacy", name: "legal-privacy" },
 	{ path: "/legal/terms", name: "legal-terms" },
+	{ path: "/legal/refund", name: "legal-refund" },
+	{ path: "/legal/shipping", name: "legal-shipping" },
 ];
 
 for (const { path, name } of ROUTES) {

@@ -5,7 +5,6 @@ import {
 	AvatarFallback,
 	AvatarGroup,
 	AvatarGroupCount,
-	AvatarImage,
 } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
@@ -62,16 +61,16 @@ export function AuthTrustedStudentsGlassStrip({
 				role="group"
 				aria-label={avatarAria}
 			>
+				{/* Illustrative initials only — historical GitHub-hosted placeholders
+				    were blocked by the tightened CSP `img-src`. Replace with locally-
+				    hosted brand-owned avatars when real testimonial data ships. */}
 				<Avatar size="lg">
-					<AvatarImage src="https://github.com/shadcn.png" alt="" />
 					<AvatarFallback>CN</AvatarFallback>
 				</Avatar>
 				<Avatar size="lg">
-					<AvatarImage src="https://github.com/maxleiter.png" alt="" />
 					<AvatarFallback>LR</AvatarFallback>
 				</Avatar>
 				<Avatar size="lg">
-					<AvatarImage src="https://github.com/evilrabbit.png" alt="" />
 					<AvatarFallback>ER</AvatarFallback>
 				</Avatar>
 				<AvatarGroupCount

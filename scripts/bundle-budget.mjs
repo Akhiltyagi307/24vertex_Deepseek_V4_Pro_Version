@@ -50,6 +50,9 @@ export const VISUAL_CHUNK_BUDGETS = {
 	/** Box-plot path pulls `plotly.js-dist-min`; gzipped payload is large. */
 	"plotly.js-dist-min": 1400,
 	mermaid: 320,
+	/** `DottedSurface` marketing background imports `three`. Lazy-loaded so it
+	 * doesn't count against the landing first-load, but watch the chunk grows. */
+	three: 200,
 	mafs: 90,
 	"function-plot": 70,
 	"smiles-drawer": 60,
@@ -62,6 +65,13 @@ const VISUAL_LIB_RULES = [
 	{ key: "smiles-drawer", test: (s) => /smiles-drawer|SmilesDrawer/i.test(s) },
 	{ key: "function-plot", test: (s) => /function-plot/i.test(s) },
 	{ key: "mafs", test: (s) => /mafs/i.test(s) },
+	// three.js: WebGLRenderer + PerspectiveCamera + BufferGeometry are
+	// distinctive together — none of the other visual libs use this trio.
+	{
+		key: "three",
+		test: (s) =>
+			/WebGLRenderer/.test(s) && /PerspectiveCamera/.test(s) && /BufferGeometry/.test(s),
+	},
 ];
 
 const SLACK_PCT = Number(process.env.BUDGET_SLACK_PCT ?? "5");

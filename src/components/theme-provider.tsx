@@ -11,6 +11,10 @@ export function ThemeProvider({
 	// React 19 warns when a client-rendered tree includes executable <script>. next-themes
 	// relies on an inline script for pre-hydration theme; keep that on SSR, mark inert on the client.
 	// https://github.com/pacocoursey/next-themes/issues/387
+	//
+	// next-themes overrides `scriptProps.nonce` with its own top-level `nonce` prop in the SSR
+	// branch (see internals: `nonce: typeof window=="undefined" ? d : ""`). So a CSP nonce
+	// MUST be passed as a top-level `nonce` prop, not nested inside `scriptProps`.
 	const scriptProps =
 		typeof window === "undefined"
 			? scriptPropsFromProps

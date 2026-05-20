@@ -19,6 +19,8 @@
  *   - `/signup/teacher`         teacher signup
  *   - `/legal/privacy`
  *   - `/legal/terms`
+ *   - `/legal/refund`
+ *   - `/legal/shipping`
  *
  * Authenticated routes (student dashboard, admin) are not in this spec; they
  * belong in their own session-scoped projects (Phase 3 follow-up).
@@ -68,6 +70,8 @@ const ROUTES = [
 	"/signup/teacher",
 	"/legal/privacy",
 	"/legal/terms",
+	"/legal/refund",
+	"/legal/shipping",
 ];
 
 for (const route of ROUTES) {

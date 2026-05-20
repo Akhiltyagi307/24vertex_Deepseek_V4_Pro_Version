@@ -4,14 +4,19 @@
  * non-negotiable minimum so a future refactor can't quietly drop them.
  *
  * Header surface:
- *   - Content-Security-Policy : `strict-dynamic` script-src + per-request nonce.
+ *   - Content-Security-Policy   : `strict-dynamic` script-src + per-request nonce.
+ *                                 `img-src` allowlist (no broad `https:`).
  *     Set in proxy.ts; the static next.config.ts headers don't include it
  *     (CSP is per-request to issue a fresh nonce).
- *   - X-Frame-Options          : SAMEORIGIN (next.config.ts:78)
- *   - X-Content-Type-Options   : nosniff
- *   - Referrer-Policy          : strict-origin-when-cross-origin
- *   - Permissions-Policy       : camera=(), microphone=(), geolocation=()
- *   - X-Robots-Tag             : noindex,nofollow on /admin and /api/admin only
+ *   - X-Frame-Options            : SAMEORIGIN
+ *   - X-Content-Type-Options     : nosniff
+ *   - Referrer-Policy            : strict-origin-when-cross-origin
+ *   - Permissions-Policy         : camera=(), microphone=(), geolocation=(),
+ *                                  payment=(self "checkout.razorpay.com"),
+ *                                  interest-cohort=(), fullscreen=(self)
+ *   - Cross-Origin-Opener-Policy : same-origin
+ *   - Cross-Origin-Resource-Policy : same-origin
+ *   - X-Robots-Tag               : noindex,nofollow on /admin and /api/admin only
  */
 import { test, expect } from "@playwright/test";
 
@@ -20,6 +25,10 @@ const BASE_HEADERS_REQUIRED = [
 	["referrer-policy", /^strict-origin-when-cross-origin$/i],
 	["x-frame-options", /^SAMEORIGIN$/i],
 	["permissions-policy", /camera=\(\)/i],
+	["permissions-policy", /interest-cohort=\(\)/i],
+	["permissions-policy", /payment=\(self "https:\/\/checkout\.razorpay\.com"\)/i],
+	["cross-origin-opener-policy", /^same-origin$/i],
+	["cross-origin-resource-policy", /^same-origin$/i],
 ] as const;
 
 test.describe("security headers", () => {
