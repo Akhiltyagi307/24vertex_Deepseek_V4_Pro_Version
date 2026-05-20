@@ -21,7 +21,7 @@ const couponBase = z.object({
 	// to clients ("expected number greater than or equal to 1").
 	max_redemptions: z.number().int().min(1).max(1_000_000),
 	expires_at: z.string().datetime().optional().nullable(),
-});
+}).strict();
 
 // Discriminated union requires ZodObject members, not ZodEffects, so the
 // cross-field refines (W2.3 free-plan-grant rejection, W2.4 high-discount

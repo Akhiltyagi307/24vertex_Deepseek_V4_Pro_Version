@@ -13,7 +13,7 @@ const audienceSchema = z.object({
 	section: z.string().optional(),
 	stream: z.string().optional(),
 	plan_code: z.string().optional(),
-});
+}).strict();
 
 export async function POST(request: NextRequest) {
 	const gate = await requireAdminApi();
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 	} catch {
 		return adminErrorResponse("Invalid JSON");
 	}
-	const parsed = z.object({ audience: audienceSchema }).safeParse(json);
+	const parsed = z.object({ audience: audienceSchema }).strict().safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 	}

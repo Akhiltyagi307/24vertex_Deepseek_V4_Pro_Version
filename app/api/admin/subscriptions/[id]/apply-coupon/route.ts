@@ -19,7 +19,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	coupon_code: z.string().trim().min(2).max(40),
-});
+}).strict();
 
 /**
  * Applies a coupon to the subscription's profile using the same atomic RPC as student self-serve.

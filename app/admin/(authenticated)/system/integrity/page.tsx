@@ -34,20 +34,37 @@ export default async function AdminIntegrityPage() {
 				title="Integrity checks"
 				description="Run checks on demand via API, or daily via Supabase pg_cron → `/api/internal/admin/integrity-checks`."
 			/>
+			{/*
+			 * D25: explicit `scope="col"` so screen readers announce the column
+			 * header when navigating each cell. The table is read-only and
+			 * already keyboard-accessible via the browser's native table
+			 * navigation; roving tabindex is unnecessary here.
+			 */}
 			<div className="overflow-x-auto rounded-md border border-border">
 				<table className="w-full min-w-[640px] text-left text-sm">
+					<caption className="sr-only">Last result for each integrity check</caption>
 					<thead className="border-b border-border bg-muted/40">
 						<tr>
-							<th className="px-3 py-2 font-medium">Check</th>
-							<th className="px-3 py-2 font-medium">Last rows</th>
-							<th className="px-3 py-2 font-medium">Last run</th>
-							<th className="px-3 py-2 font-medium">Actions</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Check
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Last rows
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Last run
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Actions
+							</th>
 						</tr>
 					</thead>
 					<tbody>
 						{summaries.map(({ name, last }) => (
 							<tr key={name} className="border-b border-border/80">
-								<td className="px-3 py-2 font-mono text-xs">{name}</td>
+								<th scope="row" className="px-3 py-2 text-left font-mono text-xs font-normal">
+									{name}
+								</th>
 								<td className="px-3 py-2">{last?.rowsFound ?? "—"}</td>
 								<td className="px-3 py-2 text-muted-foreground">{last?.ranAt?.toISOString() ?? "—"}</td>
 								<td className="px-3 py-2 text-muted-foreground">POST /api/admin/system/integrity/checks/{name}/run</td>

@@ -9,6 +9,12 @@ import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { parseCsvWithHeader } from "@/lib/admin/import/csv-parser";
 import { previewTopicCsvDiff } from "@/lib/admin/import/diff-preview";
 
+export const metadata = {
+	title: "Curriculum import · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default function AdminCurriculumImportPage() {
 	const [tab, setTab] = useState<"subjects" | "topics" | "chunks">("topics");
 	const [raw, setRaw] = useState("");

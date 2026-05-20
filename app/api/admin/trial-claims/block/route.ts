@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	identity_key: z.string().trim().min(1).max(512),
 	reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 /** Blocks normalized identity from future trial signup (enforced when wired into seed path). */
 export async function POST(request: NextRequest) {

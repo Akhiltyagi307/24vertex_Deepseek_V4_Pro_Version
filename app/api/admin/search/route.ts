@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 const querySchema = z.object({
 	q: z.string().trim().min(2, "q must be at least 2 characters").max(120),
-});
+}).strict();
 
 const SEARCH_SLO_MS = 300;
 

@@ -18,7 +18,7 @@ const postBodySchema = z.object({
 	quantity: z.number().int().positive().max(10_000),
 	expires_at: z.string().datetime().optional().nullable(),
 	note: z.string().max(2000).optional().nullable(),
-});
+}).strict();
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {

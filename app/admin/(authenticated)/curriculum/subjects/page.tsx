@@ -8,6 +8,12 @@ import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
+export const metadata = {
+	title: "Subjects · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default async function AdminSubjectsPage() {
 	const rows = await db.select().from(subjects).orderBy(asc(subjects.grade), asc(subjects.sortOrder), asc(subjects.name));
 

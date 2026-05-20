@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+export const metadata = {
+	title: "Compose broadcast · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default function AdminBroadcastComposePage() {
 	const router = useRouter();
 	const [subject, setSubject] = useState("");

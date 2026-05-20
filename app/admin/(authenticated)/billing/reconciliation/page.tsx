@@ -38,12 +38,20 @@ export default async function AdminBillingReconciliationPage({ searchParams }: P
 		})
 		.from(billingReconciliationDrift);
 	const listFiltered = whereSql ? listBase.where(whereSql) : listBase;
-	const rows = await listFiltered.orderBy(desc(billingReconciliationDrift.detectedAt)).limit(pageSize).offset(offset);
-
 	const countBase = db.select({ total: count() }).from(billingReconciliationDrift);
 	const countFiltered = whereSql ? countBase.where(whereSql) : countBase;
-	const [{ total }] = await countFiltered;
-	const totalPages = Math.max(1, Math.ceil(Number(total ?? 0) / pageSize));
+
+	// D23: list + count are independent — run in parallel so the page TTFB
+	// is bounded by the slower of the two, not their sum.
+	const [rows, totalRows] = await Promise.all([
+		listFiltered
+			.orderBy(desc(billingReconciliationDrift.detectedAt))
+			.limit(pageSize)
+			.offset(offset),
+		countFiltered,
+	]);
+	const total = totalRows[0]?.total ?? 0;
+	const totalPages = Math.max(1, Math.ceil(Number(total) / pageSize));
 
 	return (
 		<div className="space-y-4">

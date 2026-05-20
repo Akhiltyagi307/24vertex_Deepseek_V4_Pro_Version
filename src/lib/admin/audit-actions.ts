@@ -27,6 +27,8 @@ export const ADMIN_ACTIONS = {
 	ADMIN_SESSIONS_REVOKE_OTHERS: "admin_sessions_revoke_others",
 	PANIC_REVOKE_ALL: "panic_revoke_all",
 	IMPERSONATE: "impersonate",
+	TOTP_SECRET_ROTATED: "totp_secret_rotated",
+	JWT_KID_ROTATED: "jwt_kid_rotated",
 
 	// User management
 	USER_SOFT_DELETE: "user_soft_delete",

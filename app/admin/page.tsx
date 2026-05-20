@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { verifyAdminJwt } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 
+export const metadata = {
+	title: "Admin · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default async function AdminIndexPage() {
 	const jar = await cookies();
 	const token = jar.get(ADMIN_SESSION_COOKIE)?.value;

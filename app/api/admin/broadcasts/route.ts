@@ -17,13 +17,13 @@ const audienceSchema = z.object({
 	section: z.string().optional(),
 	stream: z.string().optional(),
 	plan_code: z.string().optional(),
-});
+}).strict();
 
 const channelsSchema = z.object({
 	in_app: z.boolean().default(true),
 	email: z.boolean().default(false),
 	priority_urgent: z.boolean().default(false),
-});
+}).strict();
 
 export async function GET(request: NextRequest) {
 	const gate = await requireAdminApi();
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 		body_md: z.string().min(1),
 		audience: audienceSchema,
 		channels: channelsSchema.optional(),
-	});
+	}).strict();
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });

@@ -16,7 +16,7 @@ const patchSchema = z.object({
 	tests_taken: z.number().int().min(0).optional(),
 	trend: z.string().max(20).optional(),
 	reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ studentId: string; topicId: string }> }) {
 	const gate = await requireAdminApi();

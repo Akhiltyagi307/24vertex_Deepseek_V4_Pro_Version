@@ -43,4 +43,37 @@ describe.skipIf(!hasDb)("admin login core (integration)", () => {
 			expect(result.status).toBe(401);
 		}
 	});
+
+	// D8: wire response must NOT leak ADMIN_PASSWORD_HASH_B64 / pooler topology / TOTP hints.
+	it("D8: wire message for bad password is generic and contains no operator-config detail", async () => {
+		const { performAdminLogin } = await import("@/lib/admin/login-core");
+		const req = new NextRequest(new URL("http://localhost:3001/api/admin/auth/login"), {
+			headers: { "x-forwarded-for": "203.0.113.11" },
+		});
+		const result = await performAdminLogin(req, {
+			email: "admin@test.local",
+			password: "wrong-password-for-d8",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.message).toBe("Sign-in failed");
+			expect(result.message).not.toMatch(/ADMIN_PASSWORD_HASH|bcrypt|dotenv|pooler|ADMIN_TOTP/i);
+		}
+	});
+
+	it("D8: wire message for bad email is generic", async () => {
+		const { performAdminLogin } = await import("@/lib/admin/login-core");
+		const req = new NextRequest(new URL("http://localhost:3001/api/admin/auth/login"), {
+			headers: { "x-forwarded-for": "203.0.113.12" },
+		});
+		const result = await performAdminLogin(req, {
+			email: "wrong@test.local",
+			password: "good-password",
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.message).toBe("Sign-in failed");
+			expect(result.message).not.toMatch(/ADMIN_EMAIL/i);
+		}
+	});
 });

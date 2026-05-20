@@ -20,7 +20,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	target_status: z.string().trim().min(1).max(20),
 	reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 /**
  * Offline-only status correction when there is no Razorpay subscription id.

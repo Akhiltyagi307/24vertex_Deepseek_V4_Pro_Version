@@ -111,12 +111,25 @@ export function AdminSqlConsoleClient({ writeEnabled }: { writeEnabled: boolean 
 					<code className="text-foreground">ADMIN_TOTP_SECRET</code> is set.
 				</p>
 			</div>
-			{error ? <p className="text-sm text-destructive">{error}</p> : null}
-			{result ?
-				<pre className="max-h-[360px] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs">
+			{error ? (
+				<p role="alert" className="text-sm text-destructive">
+					{error}
+				</p>
+			) : null}
+			{result ? (
+				// D25: keep the result region keyboard-focusable so screen readers
+				// can land on it (Pre with tabindex=0 becomes a focusable scroll
+				// region). The aria-label lets AT announce what the pre contains
+				// without forcing the user to read every JSON line.
+				<pre
+					tabIndex={0}
+					role="region"
+					aria-label="SQL query result"
+					className="max-h-[360px] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs focus-visible:outline-2 focus-visible:outline-ring"
+				>
 					{JSON.stringify(result, null, 2)}
 				</pre>
-			:	null}
+			) : null}
 		</div>
 	);
 }

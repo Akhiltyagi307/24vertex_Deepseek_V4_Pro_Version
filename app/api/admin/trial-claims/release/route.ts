@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	identity_key: z.string().trim().min(1).max(512),
 	reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 /** Allows another profile to claim a free trial for the same normalized identity. */
 export async function POST(request: NextRequest) {

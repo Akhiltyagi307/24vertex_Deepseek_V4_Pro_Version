@@ -19,7 +19,7 @@ const postSchema = z.object({
 	chunk_type: z.enum(["context", "exercise"]),
 	source_ref: z.string().optional().nullable(),
 	metadata: z.record(z.unknown()).optional(),
-});
+}).strict();
 
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {

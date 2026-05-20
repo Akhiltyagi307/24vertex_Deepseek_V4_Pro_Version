@@ -19,7 +19,7 @@ const postSchema = z.object({
 	pattern: z.string().min(1).max(20_000),
 	applies_to: z.string().min(1).max(30).default("question_generator"),
 	reason: z.string().min(1).max(500),
-});
+}).strict();
 
 export async function GET() {
 	return Sentry.withScope(async (scope) => {

@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	amount_paise: z.number().int().positive().optional(),
-});
+}).strict();
 
 const REFUND_RATE_LIMIT_PER_MIN = 5;
 const REFUND_RATE_WINDOW_SEC = 60;

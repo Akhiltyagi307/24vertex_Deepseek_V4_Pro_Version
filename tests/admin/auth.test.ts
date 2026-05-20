@@ -4,6 +4,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 vi.mock("@/lib/admin/runtime-pg", () => ({
 	getAdminJwtVersion: vi.fn(async () => 0),
 	bumpAdminJwtVersion: vi.fn(async () => 1),
+	getAdminJwtKid: vi.fn(async () => null),
+	setAdminJwtKid: vi.fn(async () => {}),
+	getAdminTotpFingerprint: vi.fn(async () => null),
+	setAdminTotpFingerprint: vi.fn(async () => {}),
+	isAdminSessionRevoked: vi.fn(async () => false),
+	recordAdminSessionRevocation: vi.fn(async () => {}),
+	maybePruneExpiredAdminSessionRevocations: vi.fn(async () => {}),
 }));
 
 describe("admin auth", () => {
@@ -102,6 +109,47 @@ describe("admin auth", () => {
 			vi.resetModules();
 			const { verifyAdminPassword } = await import("@/lib/admin/auth");
 			expect(await verifyAdminPassword("strongcost")).toBe(true);
+		});
+	});
+
+	describe("D1: plaintext ADMIN_PASSWORD prod guard", () => {
+		afterEach(() => {
+			vi.unstubAllEnvs();
+			process.env.ADMIN_PASSWORD = "correct-horse-battery";
+			delete process.env.ADMIN_PASSWORD_HASH;
+			delete process.env.ADMIN_PASSWORD_HASH_B64;
+			vi.resetModules();
+		});
+
+		it("rejects plaintext ADMIN_PASSWORD when NODE_ENV is production", async () => {
+			vi.stubEnv("NODE_ENV", "production");
+			process.env.ADMIN_PASSWORD = "leaked-plain-from-env";
+			delete process.env.ADMIN_PASSWORD_HASH;
+			delete process.env.ADMIN_PASSWORD_HASH_B64;
+			vi.resetModules();
+			const { verifyAdminPassword } = await import("@/lib/admin/auth");
+			expect(await verifyAdminPassword("leaked-plain-from-env")).toBe(false);
+		});
+
+		it("accepts plaintext ADMIN_PASSWORD when NODE_ENV is not production", async () => {
+			vi.stubEnv("NODE_ENV", "development");
+			process.env.ADMIN_PASSWORD = "dev-only-password";
+			delete process.env.ADMIN_PASSWORD_HASH;
+			delete process.env.ADMIN_PASSWORD_HASH_B64;
+			vi.resetModules();
+			const { verifyAdminPassword } = await import("@/lib/admin/auth");
+			expect(await verifyAdminPassword("dev-only-password")).toBe(true);
+		});
+
+		it("bcrypt B64 wins over plaintext even when both are set in production", async () => {
+			vi.stubEnv("NODE_ENV", "production");
+			const rawHash = bcrypt.hashSync("real-secret", 12);
+			process.env.ADMIN_PASSWORD_HASH_B64 = Buffer.from(rawHash, "utf8").toString("base64");
+			process.env.ADMIN_PASSWORD = "leaked-plain";
+			vi.resetModules();
+			const { verifyAdminPassword } = await import("@/lib/admin/auth");
+			expect(await verifyAdminPassword("leaked-plain")).toBe(false);
+			expect(await verifyAdminPassword("real-secret")).toBe(true);
 		});
 	});
 });

@@ -6,6 +6,12 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { listTopicsWithZeroContextChunks } from "@/lib/admin/context-chunk-coverage";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
+export const metadata = {
+	title: "Context chunk tools · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default async function AdminContextChunkToolsPage() {
 	const rows = await listTopicsWithZeroContextChunks();
 

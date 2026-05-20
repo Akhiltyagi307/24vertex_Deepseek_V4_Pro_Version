@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	body: z.string().min(1).max(2000),
-});
+}).strict();
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();

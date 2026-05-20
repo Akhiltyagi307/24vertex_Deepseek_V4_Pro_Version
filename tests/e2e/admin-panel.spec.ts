@@ -232,23 +232,6 @@ test.describe("Phase 6 command palette (browser, requires admin env)", () => {
 	});
 });
 
-test.describe("Phase 6 panic invalidates admin session (requires panic token)", () => {
-	test.beforeEach(() => {
-		test.skip(
-			!process.env.PLAYWRIGHT_ADMIN_EMAIL ||
-				!process.env.PLAYWRIGHT_ADMIN_PASSWORD ||
-				!process.env.PLAYWRIGHT_PANIC_TOKEN,
-			"Set PLAYWRIGHT_ADMIN_EMAIL, PLAYWRIGHT_ADMIN_PASSWORD, PLAYWRIGHT_PANIC_TOKEN — this test revokes the logged-in admin session.",
-		);
-	});
-
-	test("GET /api/admin/panic then admin search returns 401", async ({ page }) => {
-		await loginAsAdmin(page);
-		const base = apiBase();
-		const token = process.env.PLAYWRIGHT_PANIC_TOKEN!;
-		const pr = await page.request.get(`${base}/api/admin/panic?token=${encodeURIComponent(token)}`);
-		expect(pr.ok()).toBeTruthy();
-		const sr = await page.request.get(`${base}/api/admin/search?q=ab`);
-		expect(sr.status()).toBe(401);
-	});
-});
+// Dedicated panic flow moved to `admin-panic.spec.ts` per D34. The existing
+// suite intentionally no longer includes the panic call so unrelated admin
+// smoke tests aren't gated on PLAYWRIGHT_PANIC_TOKEN / PLAYWRIGHT_PANIC_TOTP.

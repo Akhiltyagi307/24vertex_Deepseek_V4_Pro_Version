@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	} catch {
 		json = {};
 	}
-	const parsed = z.object({ user: z.string().min(1).max(8000).optional() }).safeParse(json);
+	const parsed = z.object({ user: z.string().min(1).max(8000).optional() }).strict().safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("Invalid body");
 	}

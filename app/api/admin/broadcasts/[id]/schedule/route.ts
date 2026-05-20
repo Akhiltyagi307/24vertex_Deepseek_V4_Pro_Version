@@ -22,7 +22,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	} catch {
 		return adminErrorResponse("Invalid JSON");
 	}
-	const parsed = z.object({ scheduled_at: z.string().datetime() }).safeParse(json);
+	const parsed = z.object({ scheduled_at: z.string().datetime() }).strict().safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("scheduled_at ISO datetime required");
 	}

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 	} catch {
 		json = {};
 	}
-	const parsed = z.object({ variables: z.record(z.string(), z.string()).optional() }).safeParse(json);
+	const parsed = z.object({ variables: z.record(z.string(), z.string()).optional() }).strict().safeParse(json);
 	if (!parsed.success) return adminErrorResponse("Invalid body");
 	const vars = parsed.data.variables ?? {};
 

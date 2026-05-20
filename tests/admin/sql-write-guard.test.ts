@@ -17,8 +17,11 @@ describe("parseWritableAdminSql", () => {
 		expect(parseWritableAdminSql("SELECT 1", allow).ok).toBe(false);
 	});
 
-	it("accepts allowlisted UPDATE", () => {
-		const r = parseWritableAdminSql(`UPDATE profiles SET full_name = full_name WHERE false`, allow);
+	it("accepts allowlisted UPDATE with RETURNING", () => {
+		const r = parseWritableAdminSql(
+			`UPDATE profiles SET full_name = full_name WHERE false RETURNING *`,
+			allow,
+		);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			expect(r.verb).toBe("UPDATE");
@@ -27,12 +30,15 @@ describe("parseWritableAdminSql", () => {
 	});
 
 	it("rejects non-allowlisted table", () => {
-		const r = parseWritableAdminSql("DELETE FROM tests WHERE false", allow);
+		const r = parseWritableAdminSql("DELETE FROM tests WHERE false RETURNING *", allow);
 		expect(r.ok).toBe(false);
 	});
 
 	it("parses quoted identifiers with hyphens (previously rejected as unparseable)", () => {
-		const r = parseWritableAdminSql(`UPDATE "user-audit" SET note = '' WHERE false`, allow);
+		const r = parseWritableAdminSql(
+			`UPDATE "user-audit" SET note = '' WHERE false RETURNING *`,
+			allow,
+		);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			expect(r.table).toBe("user-audit");
@@ -40,19 +46,28 @@ describe("parseWritableAdminSql", () => {
 	});
 
 	it("parses schema-qualified table names", () => {
-		const r = parseWritableAdminSql(`UPDATE public.profiles SET full_name = '' WHERE false`, allow);
+		const r = parseWritableAdminSql(
+			`UPDATE public.profiles SET full_name = '' WHERE false RETURNING *`,
+			allow,
+		);
 		expect(r.ok).toBe(true);
 		if (r.ok) expect(r.table).toBe("profiles");
 	});
 
 	it("parses quoted schema + quoted table", () => {
-		const r = parseWritableAdminSql(`UPDATE "public"."profiles" SET full_name = '' WHERE false`, allow);
+		const r = parseWritableAdminSql(
+			`UPDATE "public"."profiles" SET full_name = '' WHERE false RETURNING *`,
+			allow,
+		);
 		expect(r.ok).toBe(true);
 		if (r.ok) expect(r.table).toBe("profiles");
 	});
 
 	it("handles INSERT INTO with quoted table", () => {
-		const r = parseWritableAdminSql(`INSERT INTO "user-audit" (note) VALUES ('x')`, allow);
+		const r = parseWritableAdminSql(
+			`INSERT INTO "user-audit" (note) VALUES ('x') RETURNING id`,
+			allow,
+		);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			expect(r.verb).toBe("INSERT");
@@ -61,8 +76,55 @@ describe("parseWritableAdminSql", () => {
 	});
 
 	it("handles DELETE FROM ONLY", () => {
-		const r = parseWritableAdminSql(`DELETE FROM ONLY profiles WHERE false`, allow);
+		const r = parseWritableAdminSql(
+			`DELETE FROM ONLY profiles WHERE false RETURNING id`,
+			allow,
+		);
 		expect(r.ok).toBe(true);
 		if (r.ok) expect(r.table).toBe("profiles");
+	});
+
+	// D31 / SQL-3: writable SQL must include a RETURNING clause for audit-diff capture.
+	describe("D31 / SQL-3: RETURNING enforcement", () => {
+		it("rejects UPDATE without RETURNING", () => {
+			const r = parseWritableAdminSql(
+				`UPDATE profiles SET full_name = '' WHERE false`,
+				allow,
+			);
+			expect(r.ok).toBe(false);
+			if (!r.ok) expect(r.error).toMatch(/RETURNING/i);
+		});
+
+		it("rejects INSERT without RETURNING", () => {
+			const r = parseWritableAdminSql(
+				`INSERT INTO profiles (full_name) VALUES ('x')`,
+				allow,
+			);
+			expect(r.ok).toBe(false);
+			if (!r.ok) expect(r.error).toMatch(/RETURNING/i);
+		});
+
+		it("rejects DELETE without RETURNING", () => {
+			const r = parseWritableAdminSql(`DELETE FROM profiles WHERE false`, allow);
+			expect(r.ok).toBe(false);
+			if (!r.ok) expect(r.error).toMatch(/RETURNING/i);
+		});
+
+		it("rejects when RETURNING appears only inside a string literal", () => {
+			const r = parseWritableAdminSql(
+				`UPDATE profiles SET full_name = 'I want RETURNING' WHERE false`,
+				allow,
+			);
+			expect(r.ok).toBe(false);
+			if (!r.ok) expect(r.error).toMatch(/RETURNING/i);
+		});
+
+		it("accepts RETURNING <columns>", () => {
+			const r = parseWritableAdminSql(
+				`UPDATE profiles SET full_name = '' WHERE false RETURNING id, full_name`,
+				allow,
+			);
+			expect(r.ok).toBe(true);
+		});
 	});
 });

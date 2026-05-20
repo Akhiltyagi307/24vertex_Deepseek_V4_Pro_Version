@@ -24,7 +24,7 @@ const postSchema = z.object({
 	topic_name: z.string().min(1).max(250),
 	topic_number: z.number().int(),
 	description: z.string().optional().nullable(),
-});
+}).strict();
 
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {

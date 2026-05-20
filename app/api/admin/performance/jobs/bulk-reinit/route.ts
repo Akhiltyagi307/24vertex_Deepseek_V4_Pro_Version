@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	grade: z.number().int().min(1).max(12),
 	dry_run: z.boolean().optional(),
-});
+}).strict();
 
 export async function POST(request: NextRequest) {
 	const gate = await requireAdminApi();

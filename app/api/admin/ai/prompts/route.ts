@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 		temperature: z.number().optional(),
 		max_tokens: z.number().optional(),
 		notes: z.string().optional(),
-	});
+	}).strict();
 	const parsed = schema.safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });

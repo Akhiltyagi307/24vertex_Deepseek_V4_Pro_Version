@@ -25,7 +25,7 @@ const patchBodySchema = z.object({
 	pool_multiplier: z.number().int().min(1).optional(),
 	is_active: z.boolean().optional(),
 	sort_order: z.number().int().optional(),
-});
+}).strict();
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ code: string }> }) {
 	return Sentry.withScope(async (scope) => {

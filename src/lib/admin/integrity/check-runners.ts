@@ -4,6 +4,21 @@ import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
 
+import {
+	emailLogStuckSchema,
+	embeddingDimensionMismatchSchema,
+	overlappingUsagePeriodSchema,
+	parentLinkDeletedUserSchema,
+	parseIntegrityRows,
+	paymentWithoutSubscriptionSchema,
+	questionWithoutAnswerKeySchema,
+	studentMissingTrackerSchema,
+	subscriptionWithoutPlanSchema,
+	testWithoutQuestionsSchema,
+	topicWithZeroChunksSchema,
+	trackerRowSchema,
+} from "./mappers";
+
 export type IntegrityCheckResult = {
 	rowsFound: number;
 	details: unknown[] | null;
@@ -26,6 +41,8 @@ export const INTEGRITY_CHECK_NAMES = [
 
 export type IntegrityCheckName = (typeof INTEGRITY_CHECK_NAMES)[number];
 
+const DETAIL_PREVIEW_CAP = 50;
+
 export async function runIntegrityCheck(name: IntegrityCheckName): Promise<IntegrityCheckResult> {
 	switch (name) {
 		case "students_missing_tracker_rows": {
@@ -38,8 +55,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				  AND NOT EXISTS (SELECT 1 FROM public.performance_tracker pt WHERE pt.student_id = p.id LIMIT 1)
 				LIMIT 500
 			`);
-			const details = rows as unknown as { student_id: string }[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, studentMissingTrackerSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "tracker_rows_pointing_at_inactive_topics": {
 			const rows = await db.execute(sql`
@@ -49,8 +66,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				WHERE COALESCE(t.is_active, TRUE) = FALSE
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, trackerRowSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "tests_without_questions": {
 			const rows = await db.execute(sql`
@@ -59,8 +76,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				WHERE NOT EXISTS (SELECT 1 FROM public.questions q WHERE q.test_id = t.id)
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, testWithoutQuestionsSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "questions_without_answer_keys": {
 			const rows = await db.execute(sql`
@@ -69,8 +86,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				WHERE q.answer_key IS NULL OR q.answer_key = 'null'::jsonb OR q.answer_key = '{}'::jsonb
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, questionWithoutAnswerKeySchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "subscriptions_without_plans": {
 			const rows = await db.execute(sql`
@@ -79,8 +96,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				WHERE NOT EXISTS (SELECT 1 FROM public.plans p WHERE p.code = s.plan_code)
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, subscriptionWithoutPlanSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "payments_without_subscriptions": {
 			const rows = await db.execute(sql`
@@ -90,8 +107,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				  AND NOT EXISTS (SELECT 1 FROM public.subscriptions s WHERE s.id = pay.subscription_id)
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, paymentWithoutSubscriptionSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "usage_periods_overlapping": {
 			const rows = await db.execute(sql`
@@ -104,8 +121,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				 AND u2.period_start < u1.period_end
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, overlappingUsagePeriodSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "parent_links_with_deleted_users": {
 			const rows = await db.execute(sql`
@@ -116,8 +133,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				WHERE pp.deleted_at IS NOT NULL OR ps.deleted_at IS NOT NULL
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, parentLinkDeletedUserSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "email_log_stuck_queued": {
 			const rows = await db.execute(sql`
@@ -127,8 +144,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				  AND e.created_at < NOW() - INTERVAL '1 hour'
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, emailLogStuckSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "embeddings_dimension_mismatch": {
 			try {
@@ -139,8 +156,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 					  AND vector_dims(q.embedding) IS DISTINCT FROM 1536
 					LIMIT 500
 				`);
-				const details = rows as unknown as Record<string, unknown>[];
-				return { rowsFound: details.length, details: details.slice(0, 50) };
+				const { rows: typed } = parseIntegrityRows(rows, embeddingDimensionMismatchSchema);
+				return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 			} catch {
 				return { rowsFound: 0, details: [{ note: "vector_dims_unavailable_or_no_rows" }] };
 			}
@@ -153,8 +170,8 @@ export async function runIntegrityCheck(name: IntegrityCheckName): Promise<Integ
 				  AND NOT EXISTS (SELECT 1 FROM public.topic_context_chunks c WHERE c.topic_id = t.id LIMIT 1)
 				LIMIT 500
 			`);
-			const details = rows as unknown as Record<string, unknown>[];
-			return { rowsFound: details.length, details: details.slice(0, 50) };
+			const { rows: typed } = parseIntegrityRows(rows, topicWithZeroChunksSchema);
+			return { rowsFound: typed.length, details: typed.slice(0, DETAIL_PREVIEW_CAP) };
 		}
 		case "audit_holes": {
 			return { rowsFound: 0, details: [] };

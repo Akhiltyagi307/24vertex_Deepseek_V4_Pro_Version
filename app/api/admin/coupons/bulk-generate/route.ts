@@ -22,7 +22,7 @@ const bodySchema = z.object({
 	max_redemptions: z.number().int().min(1).max(1000).default(1),
 	code_prefix: z.string().trim().max(12).optional().default(""),
 	description: z.string().max(2000).optional().nullable(),
-});
+}).strict();
 
 function makeCode(prefix: string): string {
 	const rand = randomBytes(5).toString("hex").toUpperCase();

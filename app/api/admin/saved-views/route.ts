@@ -14,7 +14,7 @@ const postSchema = z.object({
 	list_id: z.string().min(1).max(120),
 	name: z.string().min(1).max(200),
 	state: z.record(z.unknown()).default({}),
-});
+}).strict();
 
 export async function GET(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {

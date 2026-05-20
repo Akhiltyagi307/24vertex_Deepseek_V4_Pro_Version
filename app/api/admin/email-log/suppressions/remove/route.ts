@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 	} catch {
 		return adminErrorResponse("Invalid JSON");
 	}
-	const parsed = z.object({ email: z.string().email(), reason: z.string().min(1).max(500) }).safeParse(json);
+	const parsed = z.object({ email: z.string().email(), reason: z.string().min(1).max(500) }).strict().safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
 	}

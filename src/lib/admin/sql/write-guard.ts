@@ -55,6 +55,17 @@ function firstDmlTable(inner: string): string | null {
 	return raw ? raw.toLowerCase() : null;
 }
 
+/**
+ * D31 / SQL-3: writable SQL must end with `RETURNING …` so the route can
+ * capture an OLD/NEW row snapshot for the audit log without parsing the
+ * statement's WHERE clause. Strings are stripped before the lookup so an
+ * accidental `'RETURNING'` literal doesn't pass.
+ */
+export function statementHasReturningClause(inner: string): boolean {
+	const stringsStripped = inner.replace(/'(?:[^']|'')*'/g, "''");
+	return /\breturning\b/i.test(stringsStripped);
+}
+
 export function parseWritableAdminSql(
 	sqlText: string,
 	allowTables: Set<string>,
@@ -76,6 +87,17 @@ export function parseWritableAdminSql(
 	if (!table) return { ok: false, error: "Could not parse target table" };
 	if (!allowTables.has(table)) {
 		return { ok: false, error: `Table "${table}" is not in ADMIN_SQL_WRITE_ALLOWLIST_TABLES` };
+	}
+
+	// D31 / SQL-3: writable SQL must include RETURNING so the route can capture
+	// the OLD/NEW row snapshot in the audit log. The operator burden is small —
+	// add `RETURNING *` — and the upside is full diff visibility on every write.
+	if (!statementHasReturningClause(inner)) {
+		return {
+			ok: false,
+			error:
+				"Writable SQL must include a RETURNING clause (e.g. `RETURNING *`) so the audit log can capture the affected rows.",
+		};
 	}
 
 	return {

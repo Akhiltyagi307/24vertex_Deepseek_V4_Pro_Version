@@ -17,7 +17,7 @@ const bodySchema = z.object({
 	status: z.enum(["open", "reviewing", "upheld", "dismissed"]),
 	resolution: z.string().max(30).optional(),
 	resolution_notes: z.string().max(2000).optional(),
-});
+}).strict();
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {

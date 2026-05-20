@@ -20,23 +20,30 @@ export async function POST(request: NextRequest) {
 	try {
 		return await Sentry.withScope(async (scope) => {
 			scope.setTag("feature", "admin");
+			// D15: pin admin login to `application/json`. The previous
+			// urlencoded / multipart fallback expanded the attack surface
+			// (extra body parsers, mismatched validation paths) without a
+			// real-world need — operator UIs and the admin login form both
+			// POST JSON. Any non-JSON content-type now gets a 415.
 			let body: { email?: string; password?: string; totp?: string } = {};
 			const ct = request.headers.get("content-type") ?? "";
 			if (ct.includes("application/json")) {
 				try {
 					body = (await request.json()) as typeof body;
 				} catch {
-					return stampAdminLoginHandler(adminErrorResponse("Invalid JSON", { code: "bad_request" }), "bad_request");
+					return stampAdminLoginHandler(
+						adminErrorResponse("Invalid JSON", { code: "bad_request" }),
+						"bad_request",
+					);
 				}
-			} else if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
-				const form = await request.formData();
-				body = {
-					email: String(form.get("email") ?? ""),
-					password: String(form.get("password") ?? ""),
-					totp: form.get("totp") ? String(form.get("totp")) : undefined,
-				};
 			} else {
-				return stampAdminLoginHandler(adminErrorResponse("Unsupported content type", { status: 415, code: "bad_request" }), "bad_request");
+				return stampAdminLoginHandler(
+					adminErrorResponse(
+						"Admin login accepts application/json only",
+						{ status: 415, code: "unsupported_media_type" },
+					),
+					"unsupported_media_type",
+				);
 			}
 
 			const email = String(body.email ?? "");

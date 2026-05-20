@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 		body_mjml: z.string().min(1),
 		variables: z.record(z.string(), z.any()).optional(),
 		notes: z.string().optional(),
-	});
+	}).strict();
 	const parsed = schema.safeParse(json);
 	if (!parsed.success) {
 		return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });

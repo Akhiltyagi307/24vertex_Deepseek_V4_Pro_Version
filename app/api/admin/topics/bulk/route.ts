@@ -18,11 +18,11 @@ const bodySchema = z.discriminatedUnion("action", [
 	z.object({
 		action: z.literal("deactivate"),
 		ids: z.array(z.string().uuid()).min(1),
-	}),
+	}).strict(),
 	z.object({
 		action: z.literal("activate"),
 		ids: z.array(z.string().uuid()).min(1),
-	}),
+	}).strict(),
 ]);
 
 export async function POST(request: NextRequest) {

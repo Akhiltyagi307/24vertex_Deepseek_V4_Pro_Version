@@ -16,7 +16,7 @@ const bodySchema = z.object({
 	reason: z.string().min(1).max(2000),
 	amount: z.number().int().min(1).max(100).optional(),
 	idempotency_key: z.string().uuid().optional(),
-});
+}).strict();
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();

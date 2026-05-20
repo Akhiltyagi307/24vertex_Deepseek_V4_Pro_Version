@@ -4,6 +4,12 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { AdminUsersBrowser } from "@/components/admin/users/admin-users-browser";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
+export const metadata = {
+	title: "Parents · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default function AdminParentsPage() {
 	return (
 		<div>

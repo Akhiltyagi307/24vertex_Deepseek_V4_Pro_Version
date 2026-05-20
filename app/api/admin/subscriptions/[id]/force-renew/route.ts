@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	/** When set, extends `current_period_end` by this many whole days instead of plan interval. */
 	extend_days: z.number().int().min(1).max(730).optional(),
-});
+}).strict();
 
 /**
  * Pushes `current_period_end` forward (offline / comp). Razorpay-linked rows are

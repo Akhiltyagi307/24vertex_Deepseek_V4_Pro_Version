@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	minutes: z.number().int().min(1).max(180),
-});
+}).strict();
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();

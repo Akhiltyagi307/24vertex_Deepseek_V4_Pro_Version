@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	ids: z.array(z.string().uuid()).min(1),
-});
+}).strict();
 
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {

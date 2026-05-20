@@ -10,6 +10,11 @@ loadEnv({ path: fs.existsSync(localEnv) ? localEnv : mainRepoEnv });
 export default defineConfig({
 	test: {
 		environment: "node",
+		// Cold-import of Next.js route handlers under heavy parallelism can
+		// take 5–10s the first time vitest touches them. Default 5s timeout
+		// caused flaky 401-gate tests in tests/admin/routes/** during the
+		// D32 sweep. 15s gives enough headroom without masking real hangs.
+		testTimeout: 15_000,
 		include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts", "tests/**/*.test.tsx"],
 		coverage: {
 			provider: "v8",

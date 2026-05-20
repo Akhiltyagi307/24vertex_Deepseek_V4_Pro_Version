@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	dry_run: z.boolean(),
 	row_ids: z.array(z.string()).optional(),
-});
+}).strict();
 
 /**
  * Auto-fix is check-specific; Phase 8 ships dry-run previews first (PDR §4.30).

@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	questions: z.array(z.string().min(1).max(500)).min(1).max(20),
-});
+}).strict();
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {

@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	confirm_email: z.string().min(3).max(320),
 	totp: z.string().optional(),
-});
+}).strict();
 
 // 3 hard-deletes per minute per admin. The blast radius of an accidental or
 // adversarial loop here is enormous (irreversibly removes a user from auth);

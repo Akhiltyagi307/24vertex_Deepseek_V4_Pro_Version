@@ -7,6 +7,12 @@ import { AdminSubjectForm } from "@/components/admin/curriculum/subject-form";
 import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 
+export const metadata = {
+	title: "Subject detail · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default async function AdminSubjectEditPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
 	const rows = await db.select().from(subjects).where(eq(subjects.id, id)).limit(1);

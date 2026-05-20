@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
 	refund_credit: z.boolean().optional(),
 	refund_reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();

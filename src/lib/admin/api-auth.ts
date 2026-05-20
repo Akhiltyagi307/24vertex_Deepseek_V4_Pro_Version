@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 
 import { verifyAdminJwt } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
+import { isAdminSessionRevoked } from "@/lib/admin/runtime-pg";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { db } from "@/db";
 import { adminSessions } from "@/db/schema/admin-sessions";
@@ -62,10 +63,20 @@ function evictOldestAdminSessionEntries(): void {
 	}
 }
 
-function isAdminSessionCacheHit(jti: string): { sessionId: string } | null {
+async function isAdminSessionCacheHit(jti: string): Promise<{ sessionId: string } | null> {
 	const entry = adminSessionCache.get(jti);
 	if (!entry) return null;
 	if (Date.now() - entry.cachedAt > ADMIN_SESSION_CACHE_TTL_MS) {
+		adminSessionCache.delete(jti);
+		return null;
+	}
+	// D10: in a multi-process deployment, a logout on Process B must invalidate
+	// a cached entry on Process A. Per-jti tombstones in `admin_runtime_kv`
+	// are written on logout and checked here on every cache hit. The lookup
+	// is a primary-key SELECT — cheaper than the `admin_sessions` lookup we
+	// avoided by hitting the cache. Net cost: one DB hit per cache hit (same
+	// order of magnitude as the existing `jwt_version` read in verifyAdminJwt).
+	if (await isAdminSessionRevoked(jti)) {
 		adminSessionCache.delete(jti);
 		return null;
 	}
@@ -106,8 +117,9 @@ export async function requireAdminApi(): Promise<{ jti: string; sessionId: strin
 
 	// Cache fast-path: if we verified this jti in the last 10s, skip the DB
 	// roundtrip. Cache only stores valid sessions; nothing to forge here since
-	// the JWT signature was just verified above.
-	const cached = isAdminSessionCacheHit(payload.jti);
+	// the JWT signature was just verified above. D10: cache hit also consults
+	// the cross-process revocation tombstone so a logout elsewhere is honored.
+	const cached = await isAdminSessionCacheHit(payload.jti);
 	if (cached) {
 		return { jti: payload.jti, sessionId: cached.sessionId };
 	}

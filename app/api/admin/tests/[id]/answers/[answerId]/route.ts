@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 const patchSchema = z.object({
 	score_earned: z.string().max(20),
 	reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string; answerId: string }> }) {
 	const gate = await requireAdminApi();

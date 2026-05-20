@@ -27,7 +27,7 @@ const patchSchema = z.object({
 	discount_percent: z.number().int().min(1).max(100).optional(),
 	eligible_plan_codes: z.array(z.enum(["pro_monthly", "pro_annual"])).max(2).nullable().optional(),
 	razorpay_offers_by_plan: z.record(z.string().min(1).max(40)).optional(),
-});
+}).strict();
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ code: string }> }) {
 	return Sentry.withScope(async (scope) => {

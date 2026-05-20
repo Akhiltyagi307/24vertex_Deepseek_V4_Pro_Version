@@ -7,6 +7,12 @@ import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { Button } from "@/components/ui/button";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
+export const metadata = {
+	title: "Email suppressions · EduAI Admin",
+	robots: { index: false, follow: false },
+};
+
+
 export default function AdminEmailSuppressionsPage() {
 	const [raw, setRaw] = useState<string>("Loading…");
 	const [email, setEmail] = useState("");

@@ -3,6 +3,7 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 
 import { clientIpForPostgresInet } from "@/lib/admin/ip-sanitize";
+import { recordAdminMetric } from "@/lib/admin/metrics";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 import type { AdminActionName } from "./audit-actions";
@@ -58,9 +59,17 @@ async function attemptInsert(input: AdminAuditInput): Promise<{ ok: true } | { o
  *     compliance hole. Those use `writeAdminActionStrict`.
  */
 export async function writeAdminAction(input: AdminAuditInput): Promise<boolean> {
+	const startedAt = Date.now();
 	for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
 		const r = await attemptInsert(input);
-		if (r.ok) return true;
+		if (r.ok) {
+			recordAdminMetric({
+				action: input.action,
+				ok: true,
+				latencyMs: Date.now() - startedAt,
+			});
+			return true;
+		}
 		if (attempt < RETRY_DELAYS_MS.length - 1) {
 			await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
 		}
@@ -69,6 +78,11 @@ export async function writeAdminAction(input: AdminAuditInput): Promise<boolean>
 		level: "error",
 		tags: { feature: "admin", phase: "audit_insert" },
 		extra: { action: input.action, target_type: input.targetType, target_id: input.targetId },
+	});
+	recordAdminMetric({
+		action: input.action,
+		ok: false,
+		latencyMs: Date.now() - startedAt,
 	});
 	return false;
 }
@@ -91,10 +105,18 @@ export class AdminAuditWriteError extends Error {
 }
 
 export async function writeAdminActionStrict(input: AdminAuditInput): Promise<void> {
+	const startedAt = Date.now();
 	let lastReason = "unknown";
 	for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
 		const r = await attemptInsert(input);
-		if (r.ok) return;
+		if (r.ok) {
+			recordAdminMetric({
+				action: input.action,
+				ok: true,
+				latencyMs: Date.now() - startedAt,
+			});
+			return;
+		}
 		lastReason = r.reason;
 		if (attempt < RETRY_DELAYS_MS.length - 1) {
 			await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
@@ -104,6 +126,11 @@ export async function writeAdminActionStrict(input: AdminAuditInput): Promise<vo
 	Sentry.captureException(err, {
 		tags: { feature: "admin", phase: "audit_insert_strict" },
 		extra: { action: input.action, target_type: input.targetType, target_id: input.targetId, reason: lastReason },
+	});
+	recordAdminMetric({
+		action: input.action,
+		ok: false,
+		latencyMs: Date.now() - startedAt,
 	});
 	throw err;
 }
