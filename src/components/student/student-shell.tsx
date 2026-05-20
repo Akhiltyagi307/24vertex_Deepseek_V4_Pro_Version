@@ -7,6 +7,7 @@ import { StudentAppSidebar } from "@/components/student/student-app-sidebar";
 import { StudentTopBar } from "@/components/student/student-top-bar";
 import { PaywallProvider } from "@/components/student/subscription/paywall-dialog";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
+import type { StudentActivityStreakSnapshot } from "@/lib/student/activity-streak";
 import {
 	isStudentDoubtChatPath,
 	isStudentImmersiveShellPath,
@@ -23,6 +24,7 @@ export type StudentShellProps = {
 	entitlement: EntitlementSnapshot | null;
 	/** Auth user id — used to subscribe the top-bar bell to Realtime inserts. */
 	userId?: string | null;
+	activityStreak?: StudentActivityStreakSnapshot | null;
 	children: React.ReactNode;
 };
 
@@ -35,6 +37,7 @@ export function StudentShell({
 	gradeLabel,
 	entitlement,
 	userId,
+	activityStreak = null,
 	children,
 }: StudentShellProps) {
 	return (
@@ -50,6 +53,7 @@ export function StudentShell({
 						userDisplayName={userDisplayName}
 						shareableId={shareableId}
 						userId={userId ?? null}
+						activityStreak={activityStreak}
 					/>
 				}
 				sidebar={

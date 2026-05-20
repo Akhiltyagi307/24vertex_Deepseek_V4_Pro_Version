@@ -5,7 +5,9 @@ import {
 	HeaderBreadcrumbSlash,
 	type HeaderPortal,
 } from "@/components/layout/app-header-brand-trail";
+import { ActivityStreakWidget } from "@/components/student/activity-streak-widget";
 import { StudentNotificationsBell } from "@/components/student/notifications/notifications-bell";
+import type { StudentActivityStreakSnapshot } from "@/lib/student/activity-streak";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -22,6 +24,8 @@ export type StudentTopBarProps = {
 	headerPortal?: HeaderPortal;
 	/** Present for the student portal (bell + unread). */
 	userId?: string | null;
+	/** Server-hydrated weekly streak for the top-bar widget. */
+	activityStreak?: StudentActivityStreakSnapshot | null;
 	/** Parent auth user id — when set with `headerPortal="parent"`, shows parent notifications bell. */
 	parentNotificationsUserId?: string | null;
 };
@@ -33,6 +37,7 @@ export function StudentTopBar({
 	headerPortal = "student",
 	userId,
 	parentNotificationsUserId,
+	activityStreak = null,
 }: StudentTopBarProps) {
 	return (
 		<header className="sticky top-[env(safe-area-inset-top)] z-50 flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-sidebar px-4">
@@ -53,6 +58,9 @@ export function StudentTopBar({
 				/>
 			</div>
 			<div className="flex items-center gap-2">
+				{userId && headerPortal === "student" ? (
+					<ActivityStreakWidget initialSnapshot={activityStreak} />
+				) : null}
 				{userId && headerPortal === "student" ? (
 					<StudentNotificationsBell userId={userId} />
 				) : parentNotificationsUserId && headerPortal === "parent" ? (

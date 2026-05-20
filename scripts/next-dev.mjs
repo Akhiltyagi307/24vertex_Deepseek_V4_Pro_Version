@@ -8,6 +8,22 @@ const execFileAsync = promisify(execFile);
 
 const port = Number(process.env.PORT) || 3001;
 
+/** macOS Finder / iCloud sometimes duplicates `.next/dev` as `dev 2`, `dev 4`, etc. */
+function removeStaleNextDevArtifacts() {
+	const nextRoot = resolve(process.cwd(), ".next");
+	if (!fs.existsSync(nextRoot)) return;
+	for (const name of fs.readdirSync(nextRoot)) {
+		if (/^dev \d+$/.test(name) || /^server \d+$/.test(name)) {
+			try {
+				fs.rmSync(resolve(nextRoot, name), { recursive: true, force: true });
+				console.warn(`[next-dev] removed stale .next/${name}`);
+			} catch (e) {
+				console.warn(`[next-dev] could not remove .next/${name}:`, e?.message ?? e);
+			}
+		}
+	}
+}
+
 function sleep(ms) {
 	return new Promise((r) => setTimeout(r, ms));
 }
@@ -167,6 +183,7 @@ const devArgs = ["dev", "-H", "127.0.0.1", "-p", String(port)];
 // `pnpm run dev:clean` fixes that; `NEXT_DEV_WEBPACK=1` opts into webpack dev instead.
 const useWebpack =
 	process.env.NEXT_DEV_WEBPACK === "1" || process.env.NEXT_DEV_WEBPACK === "true";
+removeStaleNextDevArtifacts();
 if (useWebpack) {
 	console.warn(
 		"\n[next-dev] NEXT_DEV_WEBPACK: webpack dev can serve HTML without Tailwind/global CSS " +
@@ -231,6 +248,70 @@ const routesManifestWatchdog =
 	process.env.NEXT_DEV_ROUTES_WATCHDOG === "true" ||
 	process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "1" ||
 	process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "true";
+
+/**
+ * Next throws "Cannot find the middleware module" when `proxy.ts` exists but
+ * `.next/dev/server/middleware.js` (or its Turbopack chunks) is missing — common
+ * after interrupted compiles or stale `.next/dev`. Opt out with NEXT_DEV_MIDDLEWARE_WATCHDOG=0.
+ */
+const middlewareWatchdog =
+	process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG !== "0" &&
+	process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG !== "false";
+const hasRootProxy = fs.existsSync(resolve(process.cwd(), "proxy.ts"));
+
+if (middlewareWatchdog && hasRootProxy) {
+	const middlewareJs = resolve(process.cwd(), ".next/dev/server/middleware.js");
+	const turbopackRuntime = resolve(
+		process.cwd(),
+		".next/dev/server/chunks/[turbopack]_runtime.js",
+	);
+	const tickMs = Number(process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG_MS) || 3000;
+	const missingThreshold = Number(process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG_MISSING_TICKS) || 4;
+	const bootGraceMs = Number(process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG_BOOT_GRACE_MS) || 90_000;
+	let sawMiddleware = false;
+	let consecutiveMissing = 0;
+	let childBootTime = Date.now();
+	let middlewareWatchdogExiting = false;
+
+	child.on("spawn", () => {
+		childBootTime = Date.now();
+	});
+
+	function exitForMissingMiddleware(reason) {
+		if (middlewareWatchdogExiting) return;
+		middlewareWatchdogExiting = true;
+		console.error(
+			`next-dev middleware watchdog: ${reason} Exiting so the process supervisor can restart with a clean .next/dev.`,
+		);
+		try {
+			child.kill("SIGTERM");
+		} catch {
+			/* ignore */
+		}
+		setTimeout(() => process.exit(1), 1500);
+	}
+
+	const middlewareInterval = setInterval(() => {
+		if (middlewareWatchdogExiting) return;
+		const ok =
+			fs.existsSync(middlewareJs) && fs.existsSync(turbopackRuntime);
+		if (ok) {
+			sawMiddleware = true;
+			consecutiveMissing = 0;
+			return;
+		}
+		if (!sawMiddleware && Date.now() - childBootTime < bootGraceMs) return;
+		consecutiveMissing++;
+		if (consecutiveMissing >= missingThreshold) {
+			clearInterval(middlewareInterval);
+			exitForMissingMiddleware(
+				`proxy.ts is present but compiled middleware output is missing (${consecutiveMissing} checks, ~${(consecutiveMissing * tickMs) / 1000}s).`,
+			);
+		}
+	}, tickMs);
+
+	process.on("exit", () => clearInterval(middlewareInterval));
+}
 
 if (routesManifestWatchdog) {
 	const routesManifestPath = resolve(process.cwd(), ".next/dev/routes-manifest.json");

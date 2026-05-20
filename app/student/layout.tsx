@@ -10,6 +10,9 @@ import { SubscriptionBanner } from "@/components/student/subscription/subscripti
 import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { mapAppProfileToStudentLayoutContext } from "@/lib/auth/student-layout";
 import { getCachedEntitlements } from "@/lib/billing/entitlements";
+import { getStudentActivityStreakSnapshot } from "@/lib/student/activity-streak";
+import { createClient } from "@/lib/supabase/server";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 function gradeLabel(grade: number | null, section: string | null) {
 	if (grade == null) return "Student";
@@ -22,6 +25,16 @@ export default async function StudentLayout({ children }: { children: React.Reac
 		requireVerifiedStudent(),
 		getCachedEntitlements(),
 	]);
+
+	let activityStreak = null;
+	try {
+		const supabase = await createClient();
+		activityStreak = await getStudentActivityStreakSnapshot(supabase, user.id);
+	} catch (err) {
+		logSupabaseError("student.layout.activity_streak", err as { message?: string }, {
+			userId: user.id,
+		});
+	}
 
 	const ctx = mapAppProfileToStudentLayoutContext(row, user.email);
 
@@ -42,6 +55,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 			gradeLabel={gradeLabel(ctx.grade, ctx.section)}
 			entitlement={entitlement}
 			userId={user.id}
+			activityStreak={activityStreak}
 		>
 			<SubscriptionBanner entitlement={entitlement} />
 			{children}

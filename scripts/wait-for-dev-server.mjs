@@ -7,6 +7,9 @@ const host = process.env.WAIT_DEV_HOST || "127.0.0.1";
 const urlPath = process.env.WAIT_DEV_PATH || "/";
 const routesManifestRel =
 	process.env.WAIT_DEV_ROUTES_MANIFEST || path.join(".next", "dev", "routes-manifest.json");
+const middlewareJsRel =
+	process.env.WAIT_DEV_MIDDLEWARE_JS || path.join(".next", "dev", "server", "middleware.js");
+const rootProxyPath = path.resolve(process.cwd(), "proxy.ts");
 const timeoutMs = Number(process.env.WAIT_DEV_TIMEOUT_MS) || 120_000;
 const intervalMs = Number(process.env.WAIT_DEV_INTERVAL_MS) || 2000;
 
@@ -38,14 +41,17 @@ for (let attempt = 0; attempt < maxAttempts; attempt++) {
 	const code = await requestOnce();
 	lastCode = code;
 	const manifestPath = path.resolve(process.cwd(), routesManifestRel);
-	const manifestOk = code === 200 && fs.existsSync(manifestPath);
+	const middlewarePath = path.resolve(process.cwd(), middlewareJsRel);
+	const needsMiddleware = fs.existsSync(rootProxyPath);
+	const middlewareOk = !needsMiddleware || fs.existsSync(middlewarePath);
+	const manifestOk = code === 200 && fs.existsSync(manifestPath) && middlewareOk;
 	if (manifestOk) {
 		console.warn(
-			`wait-for-dev-server: ${host}:${port}${urlPath} -> ${code}; ${routesManifestRel} ok (${Date.now() - started}ms)`,
+			`wait-for-dev-server: ${host}:${port}${urlPath} -> ${code}; ${routesManifestRel} ok${needsMiddleware ? `; ${middlewareJsRel} ok` : ""} (${Date.now() - started}ms)`,
 		);
 		process.exit(0);
 	}
-	if (code === 200 && !fs.existsSync(manifestPath)) {
+	if (code === 200 && (!fs.existsSync(manifestPath) || !middlewareOk)) {
 		lastCode = 590; // synthetic: HTTP ok but dev output incomplete
 	}
 	if (Date.now() - started > timeoutMs) {

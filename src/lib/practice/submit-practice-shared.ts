@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/notifications/report-ready";
 import { gradePracticeTestWithAi, recordGradingFailure, renderAndUploadPracticeReportPdf } from "@/lib/practice/ai-grade-practice-test";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
+import { refreshActivityStreakAfterSubmit } from "@/lib/student/refresh-activity-streak-safe";
 import {
 	writeStudentAnswerRow,
 	writeStudentAnswerRows,
@@ -186,6 +187,8 @@ export async function executePracticeTestSubmit(
 	}
 
 	const clampedElapsed = gate.row.duration_seconds ?? elapsedSeconds;
+
+	refreshActivityStreakAfterSubmit(supabase, userId);
 
 	// Answer keys live behind a column-level GRANT that excludes the authenticated
 	// role. Use the service-role client for reads that need them.

@@ -20,6 +20,7 @@ export * from "./moderation-flags";
 export * from "./operator-jobs";
 export * from "./organizations";
 export * from "./practice-tables";
+export * from "./student-activity-streak";
 export * from "./retention-policies";
 export * from "./service-health-pings";
 export * from "./parental-consents";

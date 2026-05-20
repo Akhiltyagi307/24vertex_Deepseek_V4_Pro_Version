@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 
 import { submitPracticeTest } from "../../../../app/student/practice/session-actions";
+import { notifyActivityStreakRefresh } from "@/lib/student/activity-streak-display";
 import { useAdminTestMessageChannel } from "@/hooks/use-admin-test-message-channel";
 import { useLowBatteryWarning } from "@/hooks/use-low-battery-warning";
 import { useNetworkStatus } from "@/hooks/use-network-status";
@@ -507,6 +508,7 @@ export function PracticeTestSession({
 				setSubmitError(res.message);
 				return;
 			}
+			notifyActivityStreakRefresh();
 			allowUnloadRef.current = true;
 			clearPracticeDraft(testId);
 			clearPracticeSessionStart(testId);
