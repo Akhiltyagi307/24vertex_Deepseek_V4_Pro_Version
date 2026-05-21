@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { PRODUCT_NAME } from "@/lib/brand/constants";
+
 /** Hosted path for the header mark (PNG — best email-client support). */
 export const EMAIL_BRAND_LOGO_PUBLIC_PATH = "/brand/logo-icon.png";
 
@@ -62,11 +64,12 @@ export function resolveEmailLogoUrl(appUrl: string): string {
 	return `${base}${EMAIL_BRAND_LOGO_PUBLIC_PATH}`;
 }
 
-/** Detects whether HTML already includes the EduAI header mark. */
+/** Detects whether HTML already includes the 24Vertex header mark. */
 export function emailHtmlHasBrandLogo(html: string): boolean {
 	return (
 		/\blogo-icon(?:\.png|\.webp|\.avif)?\b/i.test(html) ||
 		/data:image\/(?:png|webp|avif);base64,/i.test(html) ||
+		/alt=["']24Vertex["'][^>]*width=["']36["']/i.test(html) ||
 		/alt=["']EduAI["'][^>]*width=["']36["']/i.test(html)
 	);
 }
@@ -79,15 +82,15 @@ export function buildEmailBrandHeaderRow(appUrl: string, logoUrl?: string): stri
 <tr>
   <td align="left" style="padding:32px 32px 16px;">
     <a href="${escapeHtml(href)}" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:${TEXT_FOREGROUND};">
-      <img src="${escapeHtml(src)}" alt="EduAI" width="36" height="36" style="display:block;border:0;object-fit:contain;" />
-      <span style="font-family:${FONT_STACK};font-size:18px;font-weight:700;letter-spacing:-0.01em;color:${TEXT_FOREGROUND};">EduAI</span>
+      <img src="${escapeHtml(src)}" alt="${escapeHtml(PRODUCT_NAME)}" width="36" height="36" style="display:block;border:0;object-fit:contain;" />
+      <span style="font-family:${FONT_STACK};font-size:18px;font-weight:700;letter-spacing:-0.01em;color:${TEXT_FOREGROUND};">${escapeHtml(PRODUCT_NAME)}</span>
     </a>
   </td>
 </tr>`;
 }
 
 /**
- * Prepends the standard EduAI logo + wordmark when the HTML body does not already
+ * Prepends the standard 24Vertex logo + wordmark when the HTML body does not already
  * include it (e.g. admin broadcasts, DB MJML overrides).
  */
 export function injectEmailBrandHeaderIfAbsent(html: string, appUrl: string): string {

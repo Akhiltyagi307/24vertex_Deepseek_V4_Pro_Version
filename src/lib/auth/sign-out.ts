@@ -1,12 +1,27 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { LEGACY_PRODUCT_SLUG, PRODUCT_SLUG } from "@/lib/brand/constants";
 
-const CHANNEL = "eduai-auth";
+const CHANNEL = `${PRODUCT_SLUG}-auth`;
+const LEGACY_CHANNEL = `${LEGACY_PRODUCT_SLUG}-auth`;
 const SIGNED_OUT_MESSAGE = "signed-out";
 
 export const AUTH_CHANNEL = CHANNEL;
 export const AUTH_SIGNED_OUT_MESSAGE = SIGNED_OUT_MESSAGE;
+
+function postSignedOutBroadcast(): void {
+	if (typeof BroadcastChannel === "undefined") return;
+	for (const name of [CHANNEL, LEGACY_CHANNEL]) {
+		try {
+			const ch = new BroadcastChannel(name);
+			ch.postMessage(SIGNED_OUT_MESSAGE);
+			ch.close();
+		} catch {
+			/* Older browsers / restricted contexts */
+		}
+	}
+}
 
 /**
  * Signs the user out everywhere (Supabase global revoke), notifies other
@@ -23,16 +38,6 @@ export async function signOutEverywhere(): Promise<void> {
 		// network call to revoke the refresh token failed. Continue with the
 		// local cleanup and redirect so the user always reaches a logged-out UI.
 	}
-	if (typeof BroadcastChannel !== "undefined") {
-		try {
-			const ch = new BroadcastChannel(CHANNEL);
-			ch.postMessage(SIGNED_OUT_MESSAGE);
-			ch.close();
-		} catch {
-			// Older browsers / restricted contexts (private mode) may throw; the
-			// AuthSignedOutListener's onAuthStateChange path still covers most
-			// same-browser tabs via Supabase's storage broadcast.
-		}
-	}
+	postSignedOutBroadcast();
 	window.location.href = "/login";
 }

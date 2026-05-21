@@ -1,4 +1,5 @@
 import FeaturesSection from "@/components/ui/demo";
+import RuixenFeaturedImageSection from "@/components/ui/ruixen-featured-image-section";
 import { AcmeHero } from "@/components/ui/acme-hero";
 import { Features } from "@/components/blocks/features-8";
 import { Pricing } from "@/components/ui/single-pricing-card-1";
@@ -45,6 +46,8 @@ export function LandingMarketingBody() {
 
 			<Features />
 
+			<RuixenFeaturedImageSection />
+
 			<FeaturesSection />
 
 			<Testimonials />
@@ -75,19 +78,19 @@ export function LandingMarketingBody() {
 								"mt-4 text-center leading-relaxed medium:text-lg medium:mt-6",
 							)}
 						>
-							Find essential details about EduAI and how each role can get the most from it.
+							Find essential details about 24Vertex and how each role can get the most from it.
 						</p>
 					</div>
 
 					<div className="w-full space-y-10">
-						<div className="grid gap-3 medium:grid-cols-2 medium:gap-6">
+						<div className="grid gap-3 xl:grid-cols-2 xl:gap-6">
 						{[
 							{
 								id: "1",
 								role: "All roles",
-								question: "What is EduAI and who can use it?",
+								question: "What is 24Vertex and who can use it?",
 								answer:
-									"EduAI supports students, parents, and teachers with role-based portals. Students practice and prepare, teachers manage assignments and progress, and parents stay updated through linked visibility.",
+									"24Vertex supports students, parents, and teachers with role-based portals. Students practice and prepare, teachers manage assignments and progress, and parents stay updated through linked visibility.",
 							},
 							{
 								id: "2",

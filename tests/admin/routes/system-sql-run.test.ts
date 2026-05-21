@@ -64,11 +64,11 @@ describe("D32 Sprint C · POST /api/admin/system/sql/run (route handler)", () =>
 		// Reset in-process global state between tests so the in-flight + plan-cost
 		// counters from a prior case don't leak into the next.
 		const g = globalThis as unknown as {
-			__eduAiAdminSqlInflight?: Map<string, number>;
-			__eduAiAdminSqlPlanCost?: Map<string, { windowStart: number; totalCost: number }>;
+			__vertex24AdminSqlInflight?: Map<string, number>;
+			__vertex24AdminSqlPlanCost?: Map<string, { windowStart: number; totalCost: number }>;
 		};
-		g.__eduAiAdminSqlInflight?.clear();
-		g.__eduAiAdminSqlPlanCost?.clear();
+		g.__vertex24AdminSqlInflight?.clear();
+		g.__vertex24AdminSqlPlanCost?.clear();
 	});
 
 	afterEach(() => {

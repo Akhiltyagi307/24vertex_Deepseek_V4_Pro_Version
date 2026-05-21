@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Terms of use — EduAI",
-	description: "Terms of use for the EduAI service.",
+	title: "Terms of use — 24Vertex",
+	description: "Terms of use for the 24Vertex service.",
 	alternates: {
 		canonical: "/legal/terms",
 	},
@@ -19,24 +19,24 @@ export default function LegalTermsPage() {
 			<p className="mt-2 text-sm text-muted-foreground">Last updated April 2026</p>
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
 				<p>
-					These terms govern your access to EduAI. They are a <strong className="text-foreground">working draft</strong>{" "}
+					These terms govern your access to 24Vertex. They are a <strong className="text-foreground">working draft</strong>{" "}
 					for early use and payment integration—they are <strong className="text-foreground">not legal advice</strong>.
 					Before accepting payments at scale, publish terms reviewed by qualified counsel for your jurisdiction and
-					entity. By using EduAI or subscribing, you agree to these terms and to our{" "}
+					entity. By using 24Vertex or subscribing, you agree to these terms and to our{" "}
 					<Link href="/legal/privacy" className="font-medium text-link underline-offset-4 hover:underline">
 						privacy policy
 					</Link>
 					.
 				</p>
 				<p>
-					<strong className="text-foreground">Service.</strong> EduAI provides educational practice and related
+					<strong className="text-foreground">Service.</strong> 24Vertex provides educational practice and related
 					tools, including optional AI-assisted features. Outputs are generated automatically and may be inaccurate or
 					incomplete; they are <strong className="text-foreground">assistive</strong>, not a substitute for classroom
 					instruction, professional tutoring, or official exam guidance. Features and availability may change. Some
 					capabilities require an active plan or trial as shown in the product.
 				</p>
 				<p>
-					<strong className="text-foreground">Eligibility.</strong> You may use EduAI only if you can form a binding
+					<strong className="text-foreground">Eligibility.</strong> You may use 24Vertex only if you can form a binding
 					agreement under applicable law. Where accounts are used by minors, a parent, guardian, or school that
 					controls billing or access should review these terms and our privacy policy.
 				</p>

@@ -49,14 +49,14 @@ export function StudentAppSidebar({
 
 	const homeTooltip = collapsedDesktop
 		? entitlement && showCollapsedDot
-			? `EduAI · ${gradeLabel} · ${formatStatusLabel(entitlement)}`
-			: `EduAI · ${gradeLabel}`
+			? `24Vertex · ${gradeLabel} · ${formatStatusLabel(entitlement)}`
+			: `24Vertex · ${gradeLabel}`
 		: undefined;
 
 	const homeAriaLabel = collapsedDesktop
 		? entitlement && showCollapsedDot
-			? `EduAI, ${gradeLabel}. Student dashboard. Billing: ${formatStatusLabel(entitlement)}.`
-			: `EduAI, ${gradeLabel}. Student dashboard.`
+			? `24Vertex, ${gradeLabel}. Student dashboard. Billing: ${formatStatusLabel(entitlement)}.`
+			: `24Vertex, ${gradeLabel}. Student dashboard.`
 		: undefined;
 
 	const homeTitle =
@@ -92,7 +92,7 @@ export function StudentAppSidebar({
 								)}
 							</div>
 							<div className="grid flex-1 text-left text-sm leading-tight">
-								<span className="truncate font-semibold">EduAI</span>
+								<span className="truncate font-semibold">24Vertex</span>
 								<span className="truncate text-xs text-muted-foreground">{gradeLabel}</span>
 							</div>
 						</SidebarMenuButton>

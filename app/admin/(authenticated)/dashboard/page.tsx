@@ -3,7 +3,7 @@ import { AdminRealtimeSmoke } from "@/components/admin/dashboard/admin-realtime-
 import { getAdminDashboardMetrics, metricToNumber } from "@/lib/admin/dashboard-metrics";
 
 export const metadata = {
-	title: "Admin dashboard · EduAI",
+	title: "Admin dashboard · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

@@ -201,7 +201,7 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
 		<aside className="hidden w-52 shrink-0 border-r border-border bg-muted/20 medium:block">
 			<div className="flex h-14 items-center border-b border-border px-4">
 				<Link href="/admin/dashboard" className="text-sm font-semibold tracking-tight">
-					EduAI Admin
+					24Vertex Admin
 				</Link>
 			</div>
 			<nav className="space-y-0.5 p-2">

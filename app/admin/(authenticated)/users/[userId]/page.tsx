@@ -39,7 +39,7 @@ import { USER_DETAIL_TABS, type UserDetailTab } from "./_tabs/types";
  */
 
 export const metadata = {
-	title: "Admin user · EduAI",
+	title: "Admin user · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

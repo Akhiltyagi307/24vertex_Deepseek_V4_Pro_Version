@@ -11,8 +11,8 @@ export const runtime = "nodejs";
  * JSON body but this header is missing, the browser is not reaching this app build (wrong host / proxy / tunnel).
  */
 function stampAdminLoginHandler(res: NextResponse, loginCode?: string): NextResponse {
-	res.headers.set("X-EduAI-Admin-Login-Handler", "app-route");
-	if (loginCode) res.headers.set("X-EduAI-Login-Code", loginCode);
+	res.headers.set("X-24Vertex-Admin-Login-Handler", "app-route");
+	if (loginCode) res.headers.set("X-24Vertex-Login-Code", loginCode);
 	return res;
 }
 

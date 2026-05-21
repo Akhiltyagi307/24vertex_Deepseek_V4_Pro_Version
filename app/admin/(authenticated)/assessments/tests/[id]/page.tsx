@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/admin/guards";
 import { adminGetTestBundle } from "@/lib/admin/tests-admin";
 
 export const metadata = {
-	title: "Admin test detail · EduAI",
+	title: "Admin test detail · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

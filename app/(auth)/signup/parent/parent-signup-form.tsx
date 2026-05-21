@@ -103,7 +103,7 @@ export function ParentSignupForm() {
 				<h1 className="text-2xl font-bold tracking-tight">Parent sign up</h1>
 				<p className="text-balance text-sm text-muted-foreground">
 					Use your own email for this parent account, and enter your child&apos;s six-character link code from
-					their EduAI Profile so we can connect them to you.
+					their 24Vertex Profile so we can connect them to you.
 				</p>
 			</div>
 			<form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -131,7 +131,7 @@ export function ParentSignupForm() {
 					<FieldLabel htmlFor="email">Email</FieldLabel>
 					<Input id="email" name="email" type="email" required autoComplete="email" />
 					<p className="text-muted-foreground mt-1.5 text-xs">
-						If your child&apos;s EduAI profile already lists a guardian/parent email, use that exact email
+						If your child&apos;s 24Vertex profile already lists a guardian/parent email, use that exact email
 						here. Otherwise linking will fail after you verify your inbox.
 					</p>
 				</Field>

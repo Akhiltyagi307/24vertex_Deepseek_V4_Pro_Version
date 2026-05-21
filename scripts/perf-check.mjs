@@ -114,7 +114,7 @@ const skipBuild = ["1", "true", "yes"].includes(
 );
 
 async function main() {
-	console.log("[perf] EduAI perf check —", new Date().toISOString());
+	console.log("[perf] 24Vertex perf check —", new Date().toISOString());
 	if (skipBuild) {
 		console.log("[perf] PERF_SKIP_BUILD set — skipping build");
 	} else {

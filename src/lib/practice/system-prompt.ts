@@ -425,7 +425,7 @@ Schema marker: intent=${userMessageSummary.intent}, schema_version=${userMessage
 }
 
 /**
- * Visuals discipline block — see `docs/EDU-AI-VISUALS-GUIDE-V2.md` §2.2.
+ * Visuals discipline block — see `docs/24Vertex-VISUALS-GUIDE-V2.md` §2.2.
  *
  * Only emitted when `PRACTICE_VISUALS=true`. Tells the model when to attach
  * a non-null `visual` envelope and what each renderer expects. Intentionally

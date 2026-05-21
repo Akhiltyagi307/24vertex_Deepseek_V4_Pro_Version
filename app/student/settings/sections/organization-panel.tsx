@@ -27,6 +27,12 @@ export function OrganizationPanel({
 	organizationState: UpdateStudentOrganizationState | undefined;
 	organizationFormAction: (formData: FormData) => void;
 }) {
+	function unlinkOrganization(_formData: FormData) {
+		const unlinkFormData = new FormData();
+		unlinkFormData.set("organizationId", "");
+		organizationFormAction(unlinkFormData);
+	}
+
 	return (
 		<div className={settingsNestedWellClass}>
 			<div className="flex flex-col gap-4 medium:flex-row medium:items-start medium:justify-between">
@@ -76,9 +82,7 @@ export function OrganizationPanel({
 				</Button>
 				<Button
 					type="submit"
-					formAction={organizationFormAction}
-					name="organizationId"
-					value=""
+					formAction={unlinkOrganization}
 					variant="outline"
 					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
 				>

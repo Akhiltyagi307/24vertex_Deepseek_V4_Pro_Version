@@ -2,7 +2,10 @@ import "server-only";
 
 import type { SubjectTopicRadarDatum } from "@/lib/charts/subject-topic-radar-config";
 import type { StudentDashboardSubjectCard } from "@/components/student/student-dashboard-view";
-import { buildStudentDashboardAnalyticsPayload } from "@/lib/student/dashboard-analytics";
+import type { StudentAssignmentCard } from "@/lib/assignments/student-assignment-card";
+import { buildStudentDashboardLeaderboardPayload } from "@/lib/student/dashboard-leaderboard.server";
+import type { StudentDashboardLeaderboardPayload } from "@/lib/student/dashboard-leaderboard";
+import { listOpenStudentAssignments } from "@/lib/student/dashboard-open-assignments.server";
 import { buildDashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
 import {
 	pickParentDashboardGreeting,
@@ -25,6 +28,7 @@ type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
 export type StudentDashboardProfileRow = StudentProfileSubjectsRow & {
 	section: string | null;
 	full_name: string | null;
+	organization_id: string | null;
 };
 
 type DashboardCompletedTestRow = {
@@ -61,10 +65,7 @@ function buildSubjectActionHref(
 ): string {
 	const mode = opts?.subjectCardLinkMode ?? "practice";
 	if (mode === "performance") {
-		const base = (opts?.performancePathPrefix ?? "/parent/performance").replace(/\/$/, "");
-		const params = new URLSearchParams();
-		params.set("subject", subjectId);
-		return `${base}?${params.toString()}`;
+		return buildPerformanceSubjectHref(subjectId, opts);
 	}
 	const params = new URLSearchParams();
 	params.set("subjectId", subjectId);
@@ -74,6 +75,17 @@ function buildSubjectActionHref(
 	return `/student/practice?${params.toString()}`;
 }
 
+function buildPerformanceSubjectHref(subjectId: string, opts?: LoadStudentDashboardOptions): string {
+	const isParentPerformance =
+		opts?.subjectCardLinkMode === "performance" || opts?.viewerRole === "parent";
+	const base = isParentPerformance
+		? (opts?.performancePathPrefix ?? "/parent/performance").replace(/\/$/, "")
+		: "/student/performance";
+	const params = new URLSearchParams();
+	params.set("subject", subjectId);
+	return `${base}?${params.toString()}#perf-topic-matrix`;
+}
+
 export type StudentDashboardViewPayload = {
 	headerGreeting: string;
 	performanceStats: ReturnType<typeof buildDashboardPerformanceStats>;
@@ -81,7 +93,8 @@ export type StudentDashboardViewPayload = {
 	/** Per enrolled subject: curriculum coverage vs solid topics (same series as marketing radar). */
 	topicProgressRadar: SubjectTopicRadarDatum[];
 	subjectsLoadError: string | null;
-	analytics: ReturnType<typeof buildStudentDashboardAnalyticsPayload>;
+	openAssignments: StudentAssignmentCard[];
+	leaderboard: StudentDashboardLeaderboardPayload;
 	trackerNeedsHydration: boolean;
 };
 
@@ -115,7 +128,7 @@ export async function loadStudentDashboardViewPayload(
 		)
 	`;
 
-	const [bundle, completedTestRes] = await Promise.all([
+	const [bundle, completedTestRes, openAssignments] = await Promise.all([
 		loadStudentPerformanceBundle(supabase, userId, bundleInput),
 		supabase
 			.from("tests")
@@ -125,6 +138,7 @@ export async function loadStudentDashboardViewPayload(
 			.in("status", ["submitted", "graded"])
 			.order("test_date", { ascending: false, nullsFirst: false })
 			.order("updated_at", { ascending: false }),
+		listOpenStudentAssignments(userId),
 	]);
 
 	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } = bundle;
@@ -134,12 +148,6 @@ export async function loadStudentDashboardViewPayload(
 	const completedTestRows = completedTestRes.data;
 
 	const performanceStats = buildDashboardPerformanceStats(rows, completedTestRows ?? []);
-
-	const analytics = buildStudentDashboardAnalyticsPayload(
-		(completedTestRows ?? []) as DashboardCompletedTestRow[],
-		rows,
-		enrolledSubjects.map((s) => ({ id: s.id, name: s.name })),
-	);
 
 	const enrolledSubjectCards = buildEnrolledSubjectCards(enrolledSubjects, topicCountBySubjectId, rows);
 	const trackerMap = buildSubjectCardTrackerStats(rows);
@@ -192,6 +200,16 @@ export async function loadStudentDashboardViewPayload(
 			status: dominantStatusFromTrackerStats(st),
 			scorePercent: averageTestScorePercentForSubject(rows, c.subjectId),
 			practiceHref: buildSubjectActionHref(c.subjectId, weakTopicIds, opts),
+			performanceHref: buildPerformanceSubjectHref(c.subjectId, opts),
+			topicStatusCounts:
+				st.trackedCount > 0
+					? {
+							good: st.good,
+							satisfactory: st.satisfactory,
+							bad: st.bad,
+							notTested: st.notTested,
+						}
+					: undefined,
 		};
 	});
 
@@ -201,6 +219,12 @@ export async function loadStudentDashboardViewPayload(
 		const coverage = c.percentCovered;
 		const perfected = topicTotal ? Math.round((st.good / topicTotal) * 100) : 0;
 		return { subject: c.subjectName, coverage, perfected };
+	});
+
+	const leaderboardPayload = await buildStudentDashboardLeaderboardPayload({
+		studentId: userId,
+		organizationId: profileRow.organization_id,
+		enrolledSubjects: enrolledSubjects.map((s) => ({ id: s.id, name: s.name })),
 	});
 
 	const headerGreeting =
@@ -214,7 +238,8 @@ export async function loadStudentDashboardViewPayload(
 		subjectCards,
 		topicProgressRadar,
 		subjectsLoadError: loadError,
-		analytics,
+		openAssignments,
+		leaderboard: leaderboardPayload,
 		trackerNeedsHydration,
 	};
 }

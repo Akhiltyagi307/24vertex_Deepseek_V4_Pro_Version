@@ -3,7 +3,7 @@
  * Compare local supabase/migrations/*.sql files to the remote
  * supabase_migrations.schema_migrations ledger of one or both projects.
  *
- * EduAI runs two Supabase projects per the project rule: a production project
+ * 24Vertex runs two Supabase projects per the project rule: a production project
  * (A) and a dev/staging mirror (B). Schema must apply identically to both. A
  * migration that lands on A but not B is a latent CI break; one that lands on
  * B but not A is operator confusion the next time someone reconciles state.

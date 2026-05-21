@@ -164,7 +164,7 @@
 
 **D27. ~12 of 65 admin pages lack `metadata` (−5)**
 - Admin is correctly `noindex,nofollow` via response header ([next.config.ts:109](../../next.config.ts)), so SEO score is high. The remaining gap is page titles in browser tabs.
-- **Fix:** Add `export const metadata = { title: 'Subscriptions · EduAI Admin' }` (etc.) to every admin page.
+- **Fix:** Add `export const metadata = { title: 'Subscriptions · 24Vertex Admin' }` (etc.) to every admin page.
 
 ### Errors + Loading — 75 / 100
 

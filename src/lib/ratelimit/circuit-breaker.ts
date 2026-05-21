@@ -47,19 +47,19 @@ interface OpenLog {
 }
 
 const globalForCb = globalThis as unknown as {
-	__eduAiRlSamples?: Sample[];
-	__eduAiRlOpenedAt?: { value: number };
-	__eduAiRlOpenLog?: OpenLog;
+	__vertex24RlSamples?: Sample[];
+	__vertex24RlOpenedAt?: { value: number };
+	__vertex24RlOpenLog?: OpenLog;
 };
 
-const samples: Sample[] = globalForCb.__eduAiRlSamples ?? [];
-if (!globalForCb.__eduAiRlSamples) globalForCb.__eduAiRlSamples = samples;
+const samples: Sample[] = globalForCb.__vertex24RlSamples ?? [];
+if (!globalForCb.__vertex24RlSamples) globalForCb.__vertex24RlSamples = samples;
 
-const openedAt = globalForCb.__eduAiRlOpenedAt ?? { value: 0 };
-if (!globalForCb.__eduAiRlOpenedAt) globalForCb.__eduAiRlOpenedAt = openedAt;
+const openedAt = globalForCb.__vertex24RlOpenedAt ?? { value: 0 };
+if (!globalForCb.__vertex24RlOpenedAt) globalForCb.__vertex24RlOpenedAt = openedAt;
 
-const openLog: OpenLog = globalForCb.__eduAiRlOpenLog ?? { transitions: [] };
-if (!globalForCb.__eduAiRlOpenLog) globalForCb.__eduAiRlOpenLog = openLog;
+const openLog: OpenLog = globalForCb.__vertex24RlOpenLog ?? { transitions: [] };
+if (!globalForCb.__vertex24RlOpenLog) globalForCb.__vertex24RlOpenLog = openLog;
 
 function prune() {
 	const cutoff = Date.now() - WINDOW_MS;

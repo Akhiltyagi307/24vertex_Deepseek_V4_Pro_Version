@@ -85,7 +85,7 @@ export function AccountReadonlyField({
 				ariaLabel={
 					onSchoolPlacementEdit
 						? (placementEditAriaLabel ?? "Edit placement")
-						: "School-managed field. Cannot be changed in EduAI."
+						: "School-managed field. Cannot be changed in 24Vertex."
 				}
 				onClick={onSchoolPlacementEdit}
 			/>
@@ -94,7 +94,7 @@ export function AccountReadonlyField({
 		<div className="absolute top-1/2 right-1.5 z-10 -translate-y-1/2">
 			<AccountFieldEditButton
 				tooltipContent={lockedFieldHint!}
-				ariaLabel="This field cannot be edited in EduAI."
+				ariaLabel="This field cannot be edited in 24Vertex."
 			/>
 		</div>
 	) : null;
@@ -200,7 +200,7 @@ export function LoginEmailField({
 					{verificationAffordance}
 					<AccountFieldEditButton
 						tooltipContent="Your login email is tied to your sign-in and cannot be changed here."
-						ariaLabel="Login email cannot be edited in EduAI."
+						ariaLabel="Login email cannot be edited in 24Vertex."
 					/>
 				</div>
 			</div>

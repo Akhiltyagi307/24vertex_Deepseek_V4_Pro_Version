@@ -128,7 +128,7 @@ describe("unlinkParentFromStudent", () => {
 		const out = await unlinkParentFromStudent({}, fd({ studentId: STUDENT_ID }));
 		expect(out.success).toBe(true);
 		expect(cookieStoreMock.current.delete).toHaveBeenCalledWith(
-			"eduai_parent_active_student",
+			"vertex24_parent_active_student",
 		);
 		expect(revalidateMock.current).toHaveBeenCalledWith("/parent", "layout");
 	});

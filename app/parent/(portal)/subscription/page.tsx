@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
 	title: "Plan & billing · Parent",
-	description: "Manage your child's EduAI subscription, payments, and renewal.",
+	description: "Manage your child's 24Vertex subscription, payments, and renewal.",
 	robots: { index: false, follow: false },
 };
 
@@ -120,7 +120,7 @@ export default async function ParentSubscriptionPage() {
 										{childName}&apos;s plan &amp; billing
 									</h1>
 									<PageHeaderSubtext>
-										Manage EduAI access for this child. Checkout uses your email; the subscription is tied to
+										Manage 24Vertex access for this child. Checkout uses your email; the subscription is tied to
 										their student account.
 									</PageHeaderSubtext>
 								</header>

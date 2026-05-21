@@ -73,7 +73,7 @@ function formatInrPaise(paise: number): string {
 
 /**
  * Records checkout_discount redemption once (idempotent) when notes carry
- * `eduai_coupon_id`. RPC failure is logged to `billing_action_failures` so
+ * `vertex24_coupon_id`. RPC failure is logged to `billing_action_failures` so
  * an admin can retry from the action-failures admin page (W1.4) — previously
  * a failure dropped silently with only a context-poor Sentry warning.
  *
@@ -90,7 +90,11 @@ async function maybeApplyCheckoutCouponRedemption(
 	input: { profileId: string; ourSubscriptionId: string; notesUnknown: unknown; razorpayEventId?: string | null },
 ): Promise<CouponRedemptionOutcome> {
 	const notes = input.notesUnknown as Record<string, unknown> | undefined;
-	const raw = notes?.eduai_coupon_id ?? notes?.eduai_coupon;
+	const raw =
+		notes?.vertex24_coupon_id ??
+		notes?.eduai_coupon_id ??
+		notes?.vertex24_coupon ??
+		notes?.eduai_coupon;
 	const couponId = typeof raw === "string" && /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;
 	if (!couponId) return { status: "no_coupon" };
 

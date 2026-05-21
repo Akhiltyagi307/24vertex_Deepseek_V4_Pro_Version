@@ -6,10 +6,17 @@
 import type { PracticeFocusArea } from "@/lib/practice/schemas";
 import type { SessionStudentAnswer } from "@/lib/practice/practice-session-utils";
 import type { PracticeSessionQuestion } from "@/components/student/practice/practice-session-types";
+import { LEGACY_PRODUCT_SLUG, PRODUCT_SLUG } from "@/lib/brand/constants";
+import {
+	readWithLegacyStorageKey,
+	removeStorageKey,
+	writeStorageKey,
+} from "@/lib/brand/storage-shim";
 
 /* ------------------------------ wizard draft ----------------------------- */
 
-const PRACTICE_WIZARD_DRAFT_KEY = "eduai:practice-wizard-draft:v1";
+const PRACTICE_WIZARD_DRAFT_KEY = `${PRODUCT_SLUG}:practice-wizard-draft:v1`;
+const LEGACY_PRACTICE_WIZARD_DRAFT_KEY = `${LEGACY_PRODUCT_SLUG}:practice-wizard-draft:v1`;
 
 /**
  * Per-user practice wizard draft. Survives a refresh / accidental nav so a
@@ -34,7 +41,7 @@ const PRACTICE_WIZARD_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function readPracticeWizardDraft(userId: string): PracticeWizardDraftV1 | null {
 	try {
-		const raw = localStorage.getItem(PRACTICE_WIZARD_DRAFT_KEY);
+		const raw = readWithLegacyStorageKey(PRACTICE_WIZARD_DRAFT_KEY, LEGACY_PRACTICE_WIZARD_DRAFT_KEY);
 		if (!raw) return null;
 		const parsed = JSON.parse(raw) as Partial<PracticeWizardDraftV1>;
 		if (
@@ -67,7 +74,7 @@ export function writePracticeWizardDraft(draft: Omit<PracticeWizardDraftV1, "v" 
 			updatedAt: Date.now(),
 			...draft,
 		};
-		localStorage.setItem(PRACTICE_WIZARD_DRAFT_KEY, JSON.stringify(payload));
+		writeStorageKey(PRACTICE_WIZARD_DRAFT_KEY, JSON.stringify(payload));
 	} catch {
 		/* quota / private mode */
 	}
@@ -75,7 +82,8 @@ export function writePracticeWizardDraft(draft: Omit<PracticeWizardDraftV1, "v" 
 
 export function clearPracticeWizardDraft(): void {
 	try {
-		localStorage.removeItem(PRACTICE_WIZARD_DRAFT_KEY);
+		removeStorageKey(PRACTICE_WIZARD_DRAFT_KEY);
+		removeStorageKey(LEGACY_PRACTICE_WIZARD_DRAFT_KEY);
 	} catch {
 		/* ignore */
 	}
@@ -83,7 +91,9 @@ export function clearPracticeWizardDraft(): void {
 
 /* ------------------------------ session start ----------------------------- */
 
-const PRACTICE_SESSION_START_KEY = (testId: string) => `eduai:practice-test-session:${testId}`;
+const PRACTICE_SESSION_START_KEY = (testId: string) => `${PRODUCT_SLUG}:practice-test-session:${testId}`;
+const LEGACY_PRACTICE_SESSION_START_KEY = (testId: string) =>
+	`${LEGACY_PRODUCT_SLUG}:practice-test-session:${testId}`;
 
 export type PracticeSessionStartPayload = {
 	startedAt: number;
@@ -95,7 +105,10 @@ export function readPracticeSessionStart(
 	timeLimitSeconds: number,
 ): PracticeSessionStartPayload | null {
 	try {
-		const raw = localStorage.getItem(PRACTICE_SESSION_START_KEY(testId));
+		const raw = readWithLegacyStorageKey(
+			PRACTICE_SESSION_START_KEY(testId),
+			LEGACY_PRACTICE_SESSION_START_KEY(testId),
+		);
 		if (!raw) return null;
 		const parsed = JSON.parse(raw) as Partial<PracticeSessionStartPayload>;
 		if (
@@ -114,7 +127,7 @@ export function readPracticeSessionStart(
 export function writePracticeSessionStart(testId: string, startedAt: number, timeLimitSeconds: number) {
 	try {
 		const payload: PracticeSessionStartPayload = { startedAt, timeLimitSeconds };
-		localStorage.setItem(PRACTICE_SESSION_START_KEY(testId), JSON.stringify(payload));
+		writeStorageKey(PRACTICE_SESSION_START_KEY(testId), JSON.stringify(payload));
 	} catch {
 		/* quota / private mode */
 	}
@@ -122,7 +135,8 @@ export function writePracticeSessionStart(testId: string, startedAt: number, tim
 
 export function clearPracticeSessionStart(testId: string) {
 	try {
-		localStorage.removeItem(PRACTICE_SESSION_START_KEY(testId));
+		removeStorageKey(PRACTICE_SESSION_START_KEY(testId));
+		removeStorageKey(LEGACY_PRACTICE_SESSION_START_KEY(testId));
 	} catch {
 		/* ignore */
 	}
@@ -130,7 +144,9 @@ export function clearPracticeSessionStart(testId: string) {
 
 /* -------------------------------- draft cache ----------------------------- */
 
-const PRACTICE_DRAFT_KEY = (testId: string) => `eduai:practice-answers-draft:${testId}`;
+const PRACTICE_DRAFT_KEY = (testId: string) => `${PRODUCT_SLUG}:practice-answers-draft:${testId}`;
+const LEGACY_PRACTICE_DRAFT_KEY = (testId: string) =>
+	`${LEGACY_PRODUCT_SLUG}:practice-answers-draft:${testId}`;
 
 export type PracticeAnswersDraftV1 = {
 	v: 1;
@@ -141,7 +157,7 @@ export type PracticeAnswersDraftV1 = {
 
 export function readPracticeDraft(testId: string): PracticeAnswersDraftV1 | null {
 	try {
-		const raw = localStorage.getItem(PRACTICE_DRAFT_KEY(testId));
+		const raw = readWithLegacyStorageKey(PRACTICE_DRAFT_KEY(testId), LEGACY_PRACTICE_DRAFT_KEY(testId));
 		if (!raw) return null;
 		const parsed = JSON.parse(raw) as Partial<PracticeAnswersDraftV1>;
 		if (parsed.v !== 1 || parsed.testId !== testId) return null;
@@ -160,7 +176,7 @@ export function readPracticeDraft(testId: string): PracticeAnswersDraftV1 | null
 
 export function writePracticeDraft(testId: string, draft: PracticeAnswersDraftV1) {
 	try {
-		localStorage.setItem(PRACTICE_DRAFT_KEY(testId), JSON.stringify(draft));
+		writeStorageKey(PRACTICE_DRAFT_KEY(testId), JSON.stringify(draft));
 	} catch {
 		/* quota / private mode */
 	}
@@ -168,7 +184,8 @@ export function writePracticeDraft(testId: string, draft: PracticeAnswersDraftV1
 
 export function clearPracticeDraft(testId: string) {
 	try {
-		localStorage.removeItem(PRACTICE_DRAFT_KEY(testId));
+		removeStorageKey(PRACTICE_DRAFT_KEY(testId));
+		removeStorageKey(LEGACY_PRACTICE_DRAFT_KEY(testId));
 	} catch {
 		/* ignore */
 	}

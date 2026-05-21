@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
 	return {
-		name: "EduAI",
-		short_name: "EduAI",
+		name: "24Vertex",
+		short_name: "24Vertex",
 		description: "Adaptive assessment and practice for grades 6 to 12.",
 		start_url: "/",
 		display: "standalone",

@@ -4,7 +4,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
 
 export const metadata = {
-	title: "Service health · EduAI Admin",
+	title: "Service health · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Refund & cancellation policy — EduAI",
-	description: "How refunds and subscription cancellations work for EduAI.",
+	title: "Refund & cancellation policy — 24Vertex",
+	description: "How refunds and subscription cancellations work for 24Vertex.",
 	alternates: {
 		canonical: "/legal/refund",
 	},
@@ -18,13 +18,13 @@ export default function LegalRefundPage() {
 			<p className="mt-2 text-sm text-muted-foreground">Last updated April 2026</p>
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
 				<p>
-					EduAI is billed through <strong className="text-foreground">Razorpay</strong> (cards, UPI, and
+					24Vertex is billed through <strong className="text-foreground">Razorpay</strong> (cards, UPI, and
 					subscription mandates). By subscribing, you agree that charges are processed by Razorpay under their terms
 					and your issuing bank or UPI provider rules. Razorpay&apos;s policies apply to payment instrument storage and
 					mandate management.
 				</p>
 				<p>
-					<strong className="text-foreground">Cancellation.</strong> You can cancel renewal from your EduAI
+					<strong className="text-foreground">Cancellation.</strong> You can cancel renewal from your 24Vertex
 					subscription page where indicated; cancellation is typically effective at the end of the current billing
 					period so you keep access you already paid for unless your payment provider or Razorpay shows otherwise.
 					Autopay mandates and saved payment methods may be managed through Razorpay&apos;s customer flows where

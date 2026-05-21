@@ -1,6 +1,11 @@
 import * as jose from "jose";
 
-import { ADMIN_JWT_AUDIENCE, ADMIN_JWT_ISSUER } from "@/lib/admin/constants";
+import {
+	ADMIN_JWT_AUDIENCE,
+	ADMIN_JWT_ISSUER,
+	LEGACY_ADMIN_JWT_AUDIENCE,
+	LEGACY_ADMIN_JWT_ISSUER,
+} from "@/lib/admin/constants";
 
 /**
  * D4 / D12: edge-safe key resolver. Mirrors `resolveAdminJwtKeyBytes` in
@@ -31,11 +36,25 @@ export async function verifyAdminJwtShape(token: string): Promise<{ jti: string;
 		}
 		const secret = resolveAdminJwtKeyBytesEdge(kid);
 		if (!secret) return null;
-		const { payload } = await jose.jwtVerify(token, secret, {
-			issuer: ADMIN_JWT_ISSUER,
-			audience: ADMIN_JWT_AUDIENCE,
-			algorithms: ["HS256"],
-		});
+		const issuerAudiencePairs: { issuer: string; audience: string }[] = [
+			{ issuer: ADMIN_JWT_ISSUER, audience: ADMIN_JWT_AUDIENCE },
+			{ issuer: LEGACY_ADMIN_JWT_ISSUER, audience: LEGACY_ADMIN_JWT_AUDIENCE },
+		];
+		let payload: jose.JWTPayload | null = null;
+		for (const { issuer, audience } of issuerAudiencePairs) {
+			try {
+				const verified = await jose.jwtVerify(token, secret, {
+					issuer,
+					audience,
+					algorithms: ["HS256"],
+				});
+				payload = verified.payload;
+				break;
+			} catch {
+				/* try legacy issuer */
+			}
+		}
+		if (!payload) return null;
 		const jti = typeof payload.jti === "string" ? payload.jti : null;
 		if (!jti) return null;
 		const v = typeof payload.v === "number" ? payload.v : Number(payload.v);

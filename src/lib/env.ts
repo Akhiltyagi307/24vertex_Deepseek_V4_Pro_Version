@@ -82,7 +82,7 @@ export function getResendApiKey(): string {
 }
 
 /**
- * Verified sender for Resend, e.g. `EduAI <notifications@yourdomain.com>` or `notifications@yourdomain.com`.
+ * Verified sender for Resend, e.g. `24Vertex <notifications@yourdomain.com>` or `notifications@yourdomain.com`.
  * Prefer `RESEND_FROM_EMAIL`; `RESEND_FROM` is supported for backward compatibility.
  */
 export function getResendFrom(): string {

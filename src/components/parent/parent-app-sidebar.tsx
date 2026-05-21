@@ -35,7 +35,7 @@ export function ParentAppSidebar({
 		email: string;
 		avatar: string | null;
 	};
-	/** Shown under EduAI (child's grade / section). */
+	/** Shown under 24Vertex (child's grade / section). */
 	childGradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
 }) {
@@ -47,14 +47,14 @@ export function ParentAppSidebar({
 
 	const homeTooltip = collapsedDesktop
 		? entitlement && showCollapsedDot
-			? `EduAI · ${childGradeLabel} · ${formatStatusLabel(entitlement)}`
-			: `EduAI · ${childGradeLabel}`
+			? `24Vertex · ${childGradeLabel} · ${formatStatusLabel(entitlement)}`
+			: `24Vertex · ${childGradeLabel}`
 		: undefined;
 
 	const homeAriaLabel = collapsedDesktop
 		? entitlement && showCollapsedDot
-			? `EduAI, ${childGradeLabel}. Parent dashboard. Billing: ${formatStatusLabel(entitlement)}.`
-			: `EduAI, ${childGradeLabel}. Parent dashboard.`
+			? `24Vertex, ${childGradeLabel}. Parent dashboard. Billing: ${formatStatusLabel(entitlement)}.`
+			: `24Vertex, ${childGradeLabel}. Parent dashboard.`
 		: undefined;
 
 	const homeTitle =
@@ -90,7 +90,7 @@ export function ParentAppSidebar({
 								)}
 							</div>
 							<div className="grid flex-1 text-left text-sm leading-tight">
-								<span className="truncate font-semibold">EduAI</span>
+								<span className="truncate font-semibold">24Vertex</span>
 								<span className="truncate text-xs text-muted-foreground">{childGradeLabel}</span>
 							</div>
 						</SidebarMenuButton>

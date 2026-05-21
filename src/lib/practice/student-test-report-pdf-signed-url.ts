@@ -2,7 +2,7 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
-/** Long-lived link for email recipients; no EduAI login required (Supabase token in URL). */
+/** Long-lived link for email recipients; no 24Vertex login required (Supabase token in URL). */
 export const STUDENT_TEST_REPORT_PDF_SIGNED_URL_TTL_SEC = 90 * 24 * 60 * 60; // 90 days
 
 export async function createStudentTestReportPdfSignedUrl(

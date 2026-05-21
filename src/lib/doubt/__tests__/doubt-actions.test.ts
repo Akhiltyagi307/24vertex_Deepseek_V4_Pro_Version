@@ -21,6 +21,7 @@ vi.mock("@/lib/server/log-supabase-error", () => ({
 
 vi.mock("@/lib/env", () => ({
 	getOpenAIDoubtChatModel: () => "gpt-test",
+	getAppUrl: () => "https://app.24vertex.example.com",
 }));
 
 vi.mock("@/lib/doubt/validate-doubt-scope", () => ({

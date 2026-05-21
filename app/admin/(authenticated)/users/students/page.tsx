@@ -5,7 +5,7 @@ import { AdminUsersBrowser } from "@/components/admin/users/admin-users-browser"
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
 export const metadata = {
-	title: "Students · EduAI Admin",
+	title: "Students · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

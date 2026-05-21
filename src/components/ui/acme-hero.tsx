@@ -3,18 +3,18 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, GraduationCap, Menu, MoonStarIcon, SunIcon } from "lucide-react";
+import { ChevronRight, GraduationCap, MoonStarIcon, SunIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import AnimatedToggle from "@/components/smoothui/animated-toggle";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { AuthTrustedStudentsGlassStrip } from "@/components/auth/auth-trusted-students-glass-strip";
+import { LandingMobileNavSheet } from "@/components/marketing/landing-mobile-nav-sheet";
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
 import { SchoolsMarquee } from "@/components/marketing/schools-marquee";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { landingFeatureBentoShell } from "@/lib/marketing/landing-feature-surface";
 import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
 import {
@@ -47,17 +47,17 @@ export function AcmeHero() {
             >
               <Image
                 src="/brand/logo-icon.png"
-                alt="24vertex logo"
+                alt="24Vertex logo"
                 width={40}
                 height={40}
                 priority
                 sizes="(min-width: 48rem) 40px, 32px"
                 className="size-8 shrink-0 object-contain medium:size-10"
               />
-              <span>24vertex</span>
+              <span>24Vertex</span>
             </Link>
           </div>
-          <div className="hidden flex-1 items-center justify-center gap-6 medium:flex">
+          <div className="hidden flex-1 items-center justify-center gap-6 xl:flex">
             <a
               href="#features"
               className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
@@ -106,7 +106,7 @@ export function AcmeHero() {
             <Separator orientation="vertical" className="bg-border h-7 medium:h-8" />
             <div
               className={cn(
-                "hidden medium:flex medium:items-center",
+                "hidden xl:flex xl:items-center",
                 LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
               )}
             >
@@ -119,47 +119,7 @@ export function AcmeHero() {
                 Log in
               </Button>
             </div>
-            <Sheet>
-              <SheetTrigger
-                render={<Button variant="ghost" size="icon-sm" className="medium:hidden" aria-label="Open menu" />}
-              >
-                <Menu className="size-[15px]" />
-                <span className="sr-only">Open menu</span>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[240px] medium:w-[300px]">
-                <nav className="flex flex-col gap-4">
-                  <Link href="/#home" className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-foreground">
-                    <Image src="/brand/logo-icon.png" alt="24vertex logo" width={36} height={36} sizes="(min-width: 48rem) 36px, 32px" className="size-8 shrink-0 object-contain medium:size-9" />
-                    <span>24vertex</span>
-                  </Link>
-                  <Separator />
-                  <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                    Features
-                  </a>
-                  <a href="#benefits" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                    Benefits
-                  </a>
-                  <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                    Pricing
-                  </a>
-                  <div
-                    className={cn(
-                      "flex flex-col items-center",
-                      LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
-                    )}
-                  >
-                    <LandingPrimaryCtaButton render={<Link href="/signup/role-picker" />} />
-                    <Button
-                      variant="marketingSecondary"
-                      className={LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME}
-                      render={<Link href="/login" />}
-                    >
-                      Log in
-                    </Button>
-                  </div>
-                </nav>
-              </SheetContent>
-            </Sheet>
+            <LandingMobileNavSheet />
           </div>
         </nav>
       </header>

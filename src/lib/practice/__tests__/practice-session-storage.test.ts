@@ -66,13 +66,13 @@ describe("practice-session-storage — sessionStart", () => {
 	});
 
 	it("rejects malformed JSON", () => {
-		localStorage.setItem(`eduai:practice-test-session:${TEST_ID}`, "{not json");
+		localStorage.setItem(`vertex24:practice-test-session:${TEST_ID}`, "{not json");
 		expect(readPracticeSessionStart(TEST_ID, 3600)).toBeNull();
 	});
 
 	it("rejects payloads with non-finite startedAt", () => {
 		localStorage.setItem(
-			`eduai:practice-test-session:${TEST_ID}`,
+			`vertex24:practice-test-session:${TEST_ID}`,
 			JSON.stringify({ startedAt: Number.NaN, timeLimitSeconds: 3600 }),
 		);
 		expect(readPracticeSessionStart(TEST_ID, 3600)).toBeNull();
@@ -100,7 +100,7 @@ describe("practice-session-storage — answer draft", () => {
 
 	it("rejects a draft with a wrong version", () => {
 		localStorage.setItem(
-			`eduai:practice-answers-draft:${TEST_ID}`,
+			`vertex24:practice-answers-draft:${TEST_ID}`,
 			JSON.stringify({ v: 2, testId: TEST_ID, answers, flagged }),
 		);
 		expect(readPracticeDraft(TEST_ID)).toBeNull();

@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { operatorJobs } from "@/db/schema/operator-jobs";
 
 export const metadata = {
-	title: "Operator jobs · EduAI Admin",
+	title: "Operator jobs · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

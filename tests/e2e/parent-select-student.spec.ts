@@ -30,7 +30,7 @@ test.describe("Parent select-student", () => {
 		await page.waitForURL((url) => url.pathname.startsWith("/parent/"), { timeout: 10_000 });
 
 		const cookies = await page.context().cookies();
-		const active = cookies.find((c) => c.name === "eduai_parent_active_student");
+		const active = cookies.find((c) => c.name === "vertex24_parent_active_student");
 		expect(active?.value).toMatch(/^[0-9a-f-]{36}$/i);
 		expect(active?.httpOnly).toBe(true);
 	});
@@ -46,7 +46,7 @@ test.describe("Parent select-student", () => {
 		await page.waitForURL((url) => url.pathname.startsWith("/parent/"), { timeout: 10_000 });
 
 		const cookies = await page.context().cookies();
-		const active = cookies.find((c) => c.name === "eduai_parent_active_student");
+		const active = cookies.find((c) => c.name === "vertex24_parent_active_student");
 		expect(active).toBeTruthy();
 		// Cookie should expire within ~31 days. Playwright reports `expires`
 		// as Unix seconds; -1 means session-only (we set a maxAge, so it

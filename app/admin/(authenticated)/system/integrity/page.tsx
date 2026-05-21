@@ -6,7 +6,7 @@ import { integrityCheckResults } from "@/db/schema/integrity-check-results";
 import { INTEGRITY_CHECK_NAMES } from "@/lib/admin/integrity/check-runners";
 
 export const metadata = {
-	title: "Data integrity · EduAI Admin",
+	title: "Data integrity · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -209,7 +209,7 @@ export function RazorpayCheckoutButton({
 			const rzp = new window.Razorpay({
 				key: razorpayKey,
 				subscription_id: data.subscriptionId,
-				name: "EduAI",
+				name: "24Vertex",
 				description: `Subscribe to ${label}`,
 				prefill: prefill ?? {},
 				theme: { color: "#059669" },

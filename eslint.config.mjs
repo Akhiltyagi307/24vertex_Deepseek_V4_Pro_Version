@@ -10,14 +10,14 @@ export default defineConfig([
 		// `.cjs` files are CommonJS by definition — `require()` is the only way
 		// to write them. The TS-ESLint config bundled with `eslint-config-next`
 		// flags `require()` everywhere by default; turn it off for `.cjs`.
-		name: "eduai-cjs-allow-require",
+		name: "vertex24-cjs-allow-require",
 		files: ["**/*.cjs"],
 		rules: {
 			"@typescript-eslint/no-require-imports": "off",
 		},
 	},
 	{
-		name: "eduai-no-unused-vars-underscore-ignore",
+		name: "vertex24-no-unused-vars-underscore-ignore",
 		files: ["**/*.{ts,tsx}"],
 		rules: {
 			"@typescript-eslint/no-unused-vars": [
@@ -38,7 +38,7 @@ export default defineConfig([
 		},
 	},
 	{
-		name: "eduai-service-role-import-boundary",
+		name: "vertex24-service-role-import-boundary",
 		files: ["**/*.{ts,tsx}"],
 		ignores: [
 			"src/lib/supabase/admin.ts",
@@ -76,7 +76,7 @@ export default defineConfig([
 		// can't reach Sentry as unhandled rejections. Type-aware rules need
 		// `parserOptions.project`; scoped to ts/tsx and skips test/script trees
 		// to keep cold-cache lint under target.
-		name: "eduai-type-aware",
+		name: "vertex24-type-aware",
 		files: ["**/*.{ts,tsx}"],
 		ignores: ["scripts/**", "tests/e2e/**", "**/*.cjs", "**/*.mjs"],
 		languageOptions: {

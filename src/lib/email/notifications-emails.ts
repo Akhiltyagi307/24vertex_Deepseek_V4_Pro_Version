@@ -21,7 +21,7 @@ export type ReportReadyEmailParams = {
 	testId: string;
 	/** UTC submission label (matches in-app bell), e.g. `12 May 2026`. */
 	submittedLabel?: string | null;
-	/** Supabase storage signed URL; opens PDF without EduAI login. */
+	/** Supabase storage signed URL; opens PDF without 24Vertex login. */
 	pdfSignedUrl?: string | null;
 };
 
@@ -41,9 +41,9 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 	);
 	if (pdfUrl) {
 		paragraphs.push(
-			"Open the PDF for the full printable report. You don't need to sign in to EduAI to use this link, and it stays valid for 90 days.",
+			"Open the PDF for the full printable report. You don't need to sign in to 24Vertex to use this link, and it stays valid for 90 days.",
 		);
-		paragraphs.push("For topic breakdowns and your next recommended practice inside the app, use <em>View in EduAI</em>.");
+		paragraphs.push("For topic breakdowns and your next recommended practice inside the app, use <em>View in 24Vertex</em>.");
 	} else {
 		paragraphs.push(
 			"Open the report to see topic-level strengths, weaknesses, and your next recommended practice.",
@@ -61,7 +61,7 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 		primaryCta: pdfUrl
 			? { label: "Open PDF report", href: pdfUrl }
 			: { label: "View report", href: portalHref },
-		secondaryCta: pdfUrl ? { label: "View in EduAI", href: portalHref } : undefined,
+		secondaryCta: pdfUrl ? { label: "View in 24Vertex", href: portalHref } : undefined,
 	});
 
 	return sendHtmlEmailLogged({
@@ -119,7 +119,7 @@ export async function sendParentPortalReportReadyEmail(
 	);
 	if (pdfUrl) {
 		paragraphs.push(
-			"Open the PDF for the full printable report. You don't need to sign in to EduAI to use this link, and it stays valid for 90 days.",
+			"Open the PDF for the full printable report. You don't need to sign in to 24Vertex to use this link, and it stays valid for 90 days.",
 		);
 		paragraphs.push("For the interactive parent portal version, use <em>Open parent portal</em>.");
 	} else {
@@ -177,17 +177,17 @@ export type ParentChildLinkConfirmedEmailParams = {
 export async function sendParentChildLinkConfirmedEmail(
 	params: ParentChildLinkConfirmedEmailParams,
 ): Promise<{ error: string | null }> {
-	const subject = `Connected to ${params.childDisplayName} on EduAI`;
+	const subject = `Connected to ${params.childDisplayName} on 24Vertex`;
 	const href = `${getAppUrl()}/parent/dashboard`;
 	const childName = escapeHtml(params.childDisplayName);
 	const parentName = escapeHtml(params.parentDisplayName ?? "there");
 
 	const html = renderEmailShell({
-		preheader: `You're now linked to ${params.childDisplayName} in EduAI.`,
+		preheader: `You're now linked to ${params.childDisplayName} in 24Vertex.`,
 		greeting: `Hi ${parentName},`,
 		title: subject,
 		paragraphs: [
-			`Your parent account is now linked to <strong>${childName}</strong> in EduAI.`,
+			`Your parent account is now linked to <strong>${childName}</strong> in 24Vertex.`,
 			"Open the parent portal to follow their progress, view test reports, and switch between children if you have more than one.",
 		],
 		primaryCta: { label: "Open parent portal", href },
@@ -384,16 +384,16 @@ export type AccountSecurityEmailParams = {
 export async function sendAccountPasswordChangedEmail(
 	params: AccountSecurityEmailParams,
 ): Promise<{ error: string | null }> {
-	const subject = "Your EduAI password was changed";
+	const subject = "Your 24Vertex password was changed";
 	const href = `${getAppUrl()}/student/settings`;
 	const displayName = escapeHtml(params.displayName?.trim() || "there");
 
 	const html = renderEmailShell({
-		preheader: "Confirming a password change on your EduAI account.",
+		preheader: "Confirming a password change on your 24Vertex account.",
 		greeting: `Hi ${displayName},`,
 		title: subject,
 		paragraphs: [
-			"This confirms the password for your EduAI account was just changed.",
+			"This confirms the password for your 24Vertex account was just changed.",
 			"If you did not make this change, reset your password from Account settings or contact support right away.",
 		],
 		callout: { tone: "info", text: "We'll always email you when something important changes on your account." },
@@ -420,19 +420,19 @@ export type AccountEmailChangedParams = AccountSecurityEmailParams & {
 export async function sendAccountEmailChangedEmail(
 	params: AccountEmailChangedParams,
 ): Promise<{ error: string | null }> {
-	const subject = "Your EduAI sign-in email was updated";
+	const subject = "Your 24Vertex sign-in email was updated";
 	const href = `${getAppUrl()}/student/settings`;
 	const displayName = escapeHtml(params.displayName?.trim() || "there");
 	const newEmail = params.newEmail?.trim() ?? "";
 
-	const paragraphs = ["The email address you use to sign in to EduAI was updated."];
+	const paragraphs = ["The email address you use to sign in to 24Vertex was updated."];
 	if (newEmail) {
 		paragraphs.push(`New address: <strong>${escapeHtml(newEmail)}</strong>.`);
 	}
 	paragraphs.push("If you did not request this, contact support immediately.");
 
 	const html = renderEmailShell({
-		preheader: "Confirming a sign-in email change on your EduAI account.",
+		preheader: "Confirming a sign-in email change on your 24Vertex account.",
 		greeting: `Hi ${displayName},`,
 		title: subject,
 		paragraphs,
@@ -463,7 +463,7 @@ export type ParentLinkedStudentEmailParams = {
 export async function sendParentLinkedStudentEmail(
 	params: ParentLinkedStudentEmailParams,
 ): Promise<{ error: string | null }> {
-	const subject = "A parent account was linked to your EduAI profile";
+	const subject = "A parent account was linked to your 24Vertex profile";
 	const href = `${getAppUrl()}/student/settings`;
 	const displayName = escapeHtml(params.studentName?.trim() || "there");
 	const parentLine = params.parentName?.trim()
@@ -471,7 +471,7 @@ export async function sendParentLinkedStudentEmail(
 		: "A parent or guardian account is now linked.";
 
 	const html = renderEmailShell({
-		preheader: "Heads up — a parent account is now linked to your EduAI profile.",
+		preheader: "Heads up — a parent account is now linked to your 24Vertex profile.",
 		greeting: `Hi ${displayName},`,
 		title: subject,
 		paragraphs: [

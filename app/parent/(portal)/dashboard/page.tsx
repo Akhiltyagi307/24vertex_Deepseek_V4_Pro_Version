@@ -36,7 +36,7 @@ export default async function ParentDashboardPage() {
 			const supabase = await createClient();
 			const { data } = await supabase
 				.from("profiles")
-				.select("grade, section, stream, elective_subject_id, role, full_name")
+				.select("grade, section, stream, elective_subject_id, role, full_name, organization_id")
 				.eq("id", activeId)
 				.maybeSingle();
 			return { row: data, linked: true };
@@ -57,6 +57,7 @@ export default async function ParentDashboardPage() {
 		elective_subject_id: row.elective_subject_id,
 		role: row.role,
 		full_name: row.full_name,
+		organization_id: row.organization_id ?? null,
 	};
 
 	return (

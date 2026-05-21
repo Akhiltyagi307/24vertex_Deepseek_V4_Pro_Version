@@ -56,7 +56,7 @@ function UnlinkButton({ student }: { student: LinkedStudent }) {
 						<AlertDialogTitle>Unlink {student.displayName}?</AlertDialogTitle>
 						<AlertDialogDescription>
 							You&apos;ll lose access to {student.displayName}&apos;s overview, reports, and
-							notifications. You can re-link any time using their link code from their EduAI
+							notifications. You can re-link any time using their link code from their 24Vertex
 							profile.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

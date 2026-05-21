@@ -187,7 +187,7 @@ export async function POST(req: Request) {
 	try {
 		customer = await createOrFetchCustomer({
 			existingCustomerId: subRow.razorpay_customer_id ?? undefined,
-			name: profile?.full_name ?? "EduAI student",
+			name: profile?.full_name ?? "24Vertex student",
 			email: user.email ?? "",
 			contact: profile?.phone ?? undefined,
 			notes: { profile_id: targetProfileId },
@@ -218,7 +218,7 @@ export async function POST(req: Request) {
 					ok: false,
 					code: "customer_collision",
 					message:
-						"This email is already linked to a different EduAI account in Razorpay. Contact support to resolve before subscribing.",
+						"This email is already linked to a different 24Vertex account in Razorpay. Contact support to resolve before subscribing.",
 				},
 				{ status: 409 },
 			);
@@ -238,7 +238,7 @@ export async function POST(req: Request) {
 	}
 
 	let offerId: string | undefined;
-	let eduaiCouponId: string | undefined;
+	let vertex24CouponId: string | undefined;
 	if (parsed.data.couponCode?.trim()) {
 		const q = await quoteCheckoutCouponForPlan({
 			couponCode: parsed.data.couponCode,
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
 			return Response.json({ ok: false, message: q.message }, { status: 400 });
 		}
 		offerId = q.offerId;
-		eduaiCouponId = q.couponId;
+		vertex24CouponId = q.couponId;
 	}
 
 	let razorpaySubscription;
@@ -262,7 +262,7 @@ export async function POST(req: Request) {
 			notes: {
 				profile_id: String(targetProfileId),
 				plan_code: plan.code,
-				...(eduaiCouponId ? { eduai_coupon_id: String(eduaiCouponId) } : {}),
+				...(vertex24CouponId ? { vertex24_coupon_id: String(vertex24CouponId) } : {}),
 			},
 		});
 	} catch (e) {

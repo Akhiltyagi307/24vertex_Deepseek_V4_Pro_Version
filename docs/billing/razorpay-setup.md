@@ -1,6 +1,6 @@
 # Razorpay setup runbook
 
-Everything that has to be configured **inside Razorpay's dashboard** for the EduAI billing system to work end-to-end. Order matters — later steps depend on earlier ones.
+Everything that has to be configured **inside Razorpay's dashboard** for the 24Vertex billing system to work end-to-end. Order matters — later steps depend on earlier ones.
 
 Companion docs:
 
@@ -158,11 +158,11 @@ WHERE razorpay_plan_id IS NOT NULL;
 
 ## 6. Subscription offers (zero manual work)
 
-Offers (Razorpay-side discount objects) are created **on demand by EduAI's admin panel**, not in Razorpay's dashboard. Workflow:
+Offers (Razorpay-side discount objects) are created **on demand by 24Vertex's admin panel**, not in Razorpay's dashboard. Workflow:
 
 1. Admin creates a `checkout_discount` coupon in `/admin/billing/coupons`.
 2. Admin clicks **Sync Razorpay offers** on the coupon detail page.
-3. EduAI calls Razorpay's `POST /v1/offers` for each eligible plan.
+3. 24Vertex calls Razorpay's `POST /v1/offers` for each eligible plan.
 4. Returned offer IDs are stored in `coupons.razorpay_offers_by_plan` JSONB.
 
 **Do NOT create offers manually** unless you have a specific reason. If you ever do, paste their IDs directly into the JSONB instead of clicking Sync.
@@ -197,7 +197,7 @@ UPI Autopay alone covers most Indian student/parent customers; the others are be
 
 **Dashboard → Settings → Checkout** (if available on your account tier):
 
-- [ ] **Customer notification email/SMS** — keep enabled. Razorpay sends payment receipts and failure notifications; our system layers EduAI-branded emails on top.
+- [ ] **Customer notification email/SMS** — keep enabled. Razorpay sends payment receipts and failure notifications; our system layers 24Vertex-branded emails on top.
 
 ---
 

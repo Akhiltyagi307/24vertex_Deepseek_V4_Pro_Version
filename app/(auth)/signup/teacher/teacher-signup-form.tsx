@@ -117,7 +117,7 @@ export function TeacherSignupForm() {
 			<div className="flex flex-col gap-2 text-center medium:text-left">
 				<h1 className="text-2xl font-bold tracking-tight">Teacher sign up</h1>
 				<p className="text-balance text-sm text-muted-foreground">
-					Use your work email and phone. After you sign up, the 24vertex team will approve your account (usually within
+					Use your work email and phone. After you sign up, the 24Vertex team will approve your account (usually within
 					24–48 hours) before the teacher workspace is unlocked. Student connections via school name and school ID come in a
 					later step.
 				</p>
@@ -202,7 +202,7 @@ export function TeacherSignupForm() {
 					<Alert>
 						<AlertTitle>Check your email</AlertTitle>
 						<AlertDescription>
-							Confirm your email to finish signup. The 24vertex team will email you again after your teacher account
+							Confirm your email to finish signup. The 24Vertex team will email you again after your teacher account
 							is approved (typically within 24–48 hours).
 						</AlertDescription>
 					</Alert>

@@ -70,10 +70,10 @@ export async function buildAdminWeeklyDigestHtml(): Promise<{ subject: string; h
 		`<ol>`,
 		...topTargets.map((t) => `<li><code>${escapeHtml(String(t.targetId ?? ""))}</code> — ${t.n}</li>`),
 		`</ol>`,
-		`<p class="muted" style="color:#666;font-size:12px">Sent automatically for EduAI admin operations.</p>`,
+		`<p class="muted" style="color:#666;font-size:12px">Sent automatically for 24Vertex admin operations.</p>`,
 	];
 
 	const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5">${lines.join("\n")}</body></html>`;
-	const subject = `EduAI admin weekly digest · ${since.toISOString().slice(0, 10)}`;
+	const subject = `24Vertex admin weekly digest · ${since.toISOString().slice(0, 10)}`;
 	return { subject, html };
 }

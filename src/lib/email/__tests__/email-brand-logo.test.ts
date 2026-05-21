@@ -35,7 +35,7 @@ describe("email-brand-logo", () => {
 	it("injects header when HTML has no brand mark", () => {
 		const out = injectEmailBrandHeaderIfAbsent("<html><body><p>Hi</p></body></html>", "https://app.example.com");
 		expect(emailHtmlHasBrandLogo(out)).toBe(true);
-		expect(out).toContain('alt="EduAI"');
+		expect(out).toContain('alt="24Vertex"');
 	});
 
 	it("does not double-inject when shell already has logo", () => {

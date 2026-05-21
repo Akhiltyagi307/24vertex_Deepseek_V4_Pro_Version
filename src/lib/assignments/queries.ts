@@ -20,6 +20,9 @@ import {
 	computeAssignmentJobRunAfter,
 	type AssignmentConfig,
 } from "./schemas";
+import type { StudentAssignmentCard } from "@/lib/assignments/student-assignment-card";
+
+export type { StudentAssignmentCard } from "@/lib/assignments/student-assignment-card";
 
 export type AssignmentTopicCatalogRow = {
 	id: string;
@@ -70,21 +73,6 @@ export type TeacherAssignmentSummaryRow = {
 		gradingFailed: number;
 	};
 	averageScore: number | null;
-};
-
-export type StudentAssignmentCard = {
-	id: string;
-	assignmentId: string;
-	title: string;
-	instructions: string | null;
-	lifecycleStatus: string;
-	testId: string | null;
-	score: string | null;
-	dueAt: string | null;
-	createdAt: string | null;
-	submittedAt: string | null;
-	gradedAt: string | null;
-	subjectName: string | null;
 };
 
 function toIso(value: Date | string | null | undefined): string | null {

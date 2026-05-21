@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import type { StudentAssignmentCard } from "@/lib/assignments/queries";
+import { studentAssignmentCardHref } from "@/lib/assignments/assignment-card-links";
+import type { StudentAssignmentCard } from "@/lib/assignments/student-assignment-card";
 
 type AssignmentsKanbanProps = {
 	assignments: StudentAssignmentCard[];
@@ -55,22 +56,6 @@ function statusLabel(status: string): string {
 	}
 }
 
-function assignmentHref(card: StudentAssignmentCard, portal: "student" | "parent") {
-	if (portal === "student" && card.testId && ["ready", "in_progress"].includes(card.lifecycleStatus)) {
-		return `/student/practice/${card.testId}`;
-	}
-	if (portal === "student" && card.testId && card.lifecycleStatus === "graded") {
-		return `/student/reports?test=${encodeURIComponent(card.testId)}`;
-	}
-	if (portal === "student" && card.testId && card.lifecycleStatus === "grading_failed") {
-		return `/student/practice/${card.testId}/grading`;
-	}
-	if (portal === "parent" && card.testId && card.lifecycleStatus === "graded") {
-		return `/parent/reports?test=${encodeURIComponent(card.testId)}`;
-	}
-	return null;
-}
-
 export function AssignmentsKanban({ assignments, portal }: AssignmentsKanbanProps) {
 	if (assignments.length === 0) {
 		return (
@@ -102,7 +87,7 @@ export function AssignmentsKanban({ assignments, portal }: AssignmentsKanbanProp
 								</p>
 							) : (
 								cards.map((card) => {
-									const href = assignmentHref(card, portal);
+									const href = studentAssignmentCardHref(card, portal);
 									const content = (
 										<div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm transition-[border-color,box-shadow] hover:border-violet-300 hover:shadow-md">
 											<div className="flex items-start justify-between gap-3">

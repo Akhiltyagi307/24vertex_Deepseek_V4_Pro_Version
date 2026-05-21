@@ -22,7 +22,7 @@ describe("assertCronRequestAuthorized", () => {
 		vi.stubEnv("VERCEL", "1");
 		vi.stubEnv("CRON_SECRET", undefined);
 
-		const result = assertCronRequestAuthorized(new Request("https://preview.eduai.app/api/internal/practice/run-jobs"));
+		const result = assertCronRequestAuthorized(new Request("https://preview.24vertex.app/api/internal/practice/run-jobs"));
 		expect(result?.status).toBe(401);
 		await expect(result?.json()).resolves.toEqual({ ok: false, message: "Unauthorized." });
 	});
@@ -41,12 +41,12 @@ describe("assertCronRequestAuthorized", () => {
 		vi.stubEnv("CRON_SECRET", "secret-token");
 
 		const ok = assertCronRequestAuthorized(
-			new Request("https://eduai.app/api/internal/practice/run-jobs", {
+			new Request("https://24vertex.app/api/internal/practice/run-jobs", {
 				headers: { authorization: "Bearer secret-token" },
 			}),
 		);
 		const denied = assertCronRequestAuthorized(
-			new Request("https://eduai.app/api/internal/practice/run-jobs", {
+			new Request("https://24vertex.app/api/internal/practice/run-jobs", {
 				headers: { authorization: "Bearer wrong-token" },
 			}),
 		);

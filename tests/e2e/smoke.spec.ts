@@ -136,7 +136,7 @@ test.describe("Static metadata routes", () => {
 		const res = await request.get("/manifest.webmanifest");
 		expect(res.status(), "manifest should be 200").toBe(200);
 		const json = await res.json();
-		expect(json.name).toBe("EduAI");
+		expect(json.name).toBe("24Vertex");
 	});
 
 	test("apple-icon.png is served", async ({ request }) => {

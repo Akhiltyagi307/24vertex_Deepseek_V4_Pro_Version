@@ -10,7 +10,7 @@ import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 export const metadata = {
-	title: "Context chunks · EduAI Admin",
+	title: "Context chunks · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -5,7 +5,7 @@ import { verifyAdminJwt } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 
 export const metadata = {
-	title: "Admin · EduAI Admin",
+	title: "Admin · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -2,7 +2,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { AdminTeacherApprovalQueue } from "@/components/admin/users/admin-teacher-approval-queue";
 
 export const metadata = {
-	title: "Teacher approval queue · EduAI Admin",
+	title: "Teacher approval queue · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

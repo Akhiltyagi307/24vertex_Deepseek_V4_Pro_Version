@@ -4,13 +4,13 @@
  * Uses the same `otplib` stack as `src/lib/admin/totp.ts`.
  *
  *   pnpm run admin:totp-secret
- *   pnpm run admin:totp-secret -- --issuer "EduAI" --label "admin@example.com"
+ *   pnpm run admin:totp-secret -- --issuer "24Vertex" --label "admin@example.com"
  */
 import { generateSecret, generateURI } from "otplib";
 
 function parseArgs(argv) {
 	const rest = argv.filter((a) => a !== "--");
-	let issuer = "EduAI-Admin";
+	let issuer = "24Vertex-Admin";
 	let label = "admin";
 	for (let i = 0; i < rest.length; i++) {
 		const a = rest[i];

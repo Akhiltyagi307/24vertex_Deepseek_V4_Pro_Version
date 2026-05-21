@@ -85,7 +85,7 @@ export async function createSubscriptionPercentOffer(input: {
 			name: `${input.percentOff}% off (first cycle)`,
 			amount: discounted,
 			currency: plan.item?.currency ?? "INR",
-			description: "EduAI checkout coupon",
+			description: "24Vertex checkout coupon",
 		},
 	};
 	return razorpayPostJson<{ id: string }>("/offers", body);

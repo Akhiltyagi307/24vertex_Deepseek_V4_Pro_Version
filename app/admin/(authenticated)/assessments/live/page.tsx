@@ -3,7 +3,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { requireAdmin } from "@/lib/admin/guards";
 
 export const metadata = {
-	title: "Admin live tests · EduAI",
+	title: "Admin live tests · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

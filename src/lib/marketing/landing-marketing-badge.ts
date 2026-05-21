@@ -1,5 +1,5 @@
 /**
- * Public marketing home: badge border reads the EduAI brand green (`--subject-grid-icon`)
+ * Public marketing home: badge border reads the 24Vertex brand green (`--subject-grid-icon`)
  * for One Voice identity (DESIGN.md §2); the TEXT uses `--link` (darker brand green) so
  * the badge clears WCAG AA (4.5:1) on its own light-mint surface — `--subject-grid-icon`
  * as text on `bg-.../12` only hits ~2.9:1.

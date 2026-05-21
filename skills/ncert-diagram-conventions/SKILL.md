@@ -1,7 +1,7 @@
 # ncert-diagram-conventions
 
 > NCERT-aligned conventions for math/physics figures emitted as
-> `visual.spec` envelopes by the EDU-AI practice generator. Use this skill
+> `visual.spec` envelopes by the 24Vertex practice generator. Use this skill
 > as a reference when validating or repairing a generated test's visuals
 > in Pass 2 (the OpenAI Skills validator pass).
 

@@ -8,7 +8,7 @@ import { escapeHtml, renderEmailShell } from "@/lib/email/render-email-shell-cor
 export type { EmailPreviewSample, EmailPreviewSource } from "@/lib/email/email-preview-types";
 
 const DEMO = {
-	appUrl: "https://app.eduai.example.com",
+	appUrl: "https://app.24vertex.example.com",
 	studentName: "Akhil",
 	parentName: "Sushma",
 	childName: "Akhil",
@@ -56,19 +56,19 @@ function organizationPreview(event: OrganizationEmailEventPreview): EmailPreview
 		{ subject: string; preheader: string; title: string; paragraphs: string[]; ctaHref: string; ctaLabel: string }
 	> = {
 		student_organization_linked: {
-			subject: `Connected to ${DEMO.orgName} on EduAI`,
-			preheader: `Your EduAI account is now connected to ${DEMO.orgName}.`,
+			subject: `Connected to ${DEMO.orgName} on 24Vertex`,
+			preheader: `Your 24Vertex account is now connected to ${DEMO.orgName}.`,
 			title: "Organization connected",
 			paragraphs: [
-				`Your student account is now connected to <strong>${org}</strong>. Teachers associated with this organization may be able to view the student data EduAI makes available to them.`,
+				`Your student account is now connected to <strong>${org}</strong>. Teachers associated with this organization may be able to view the student data 24Vertex makes available to them.`,
 				"You can unlink from Account settings anytime.",
 			],
 			ctaHref: u.studentSettings,
 			ctaLabel: "Open account settings",
 		},
 		student_organization_unlinked: {
-			subject: `Disconnected from ${DEMO.orgName} on EduAI`,
-			preheader: `Your EduAI account is no longer connected to ${DEMO.orgName}.`,
+			subject: `Disconnected from ${DEMO.orgName} on 24Vertex`,
+			preheader: `Your 24Vertex account is no longer connected to ${DEMO.orgName}.`,
 			title: "Organization disconnected",
 			paragraphs: [
 				`Your student account is no longer connected to <strong>${org}</strong>. Organization teachers will no longer get roster access through that organization.`,
@@ -78,67 +78,67 @@ function organizationPreview(event: OrganizationEmailEventPreview): EmailPreview
 			ctaLabel: "Open account settings",
 		},
 		student_organization_deactivated: {
-			subject: `${DEMO.orgName} was removed from EduAI`,
+			subject: `${DEMO.orgName} was removed from 24Vertex`,
 			preheader: `Your account was disconnected from ${DEMO.orgName}.`,
 			title: "Organization removed",
 			paragraphs: [
-				`<strong>${org}</strong> is no longer active on EduAI, so your student account was disconnected from it.`,
-				"You can continue using EduAI without an organization, or connect to another active school or tuition center from Account settings.",
+				`<strong>${org}</strong> is no longer active on 24Vertex, so your student account was disconnected from it.`,
+				"You can continue using 24Vertex without an organization, or connect to another active school or tuition center from Account settings.",
 			],
 			ctaHref: u.studentSettings,
 			ctaLabel: "Open account settings",
 		},
 		teacher_organization_joined: {
-			subject: `Connected to ${DEMO.orgName} on EduAI`,
+			subject: `Connected to ${DEMO.orgName} on 24Vertex`,
 			preheader: `Your teacher account is now connected to ${DEMO.orgName}.`,
 			title: "Organization connected",
 			paragraphs: [
-				`Your teacher account is now connected to <strong>${org}</strong>. You can access students associated with this organization according to EduAI's teacher access rules.`,
+				`Your teacher account is now connected to <strong>${org}</strong>. You can access students associated with this organization according to 24Vertex's teacher access rules.`,
 				"Link-code access is disabled while your account is connected to an organization.",
 			],
 			ctaHref: u.teacherSettings,
 			ctaLabel: "Open teacher settings",
 		},
 		teacher_organization_left: {
-			subject: `Disconnected from ${DEMO.orgName} on EduAI`,
+			subject: `Disconnected from ${DEMO.orgName} on 24Vertex`,
 			preheader: `Your teacher account is no longer connected to ${DEMO.orgName}.`,
 			title: "Organization disconnected",
 			paragraphs: [
 				`Your teacher account is no longer connected to <strong>${org}</strong>.`,
-				"You can now link students independently using their EduAI link code.",
+				"You can now link students independently using their 24Vertex link code.",
 			],
 			ctaHref: u.teacherSettings,
 			ctaLabel: "Open teacher settings",
 		},
 		teacher_organization_deactivated: {
-			subject: `${DEMO.orgName} was removed from EduAI`,
+			subject: `${DEMO.orgName} was removed from 24Vertex`,
 			preheader: `Your teacher account was disconnected from ${DEMO.orgName}.`,
 			title: "Organization removed",
 			paragraphs: [
-				`<strong>${org}</strong> is no longer active on EduAI, so your teacher account was disconnected from it.`,
+				`<strong>${org}</strong> is no longer active on 24Vertex, so your teacher account was disconnected from it.`,
 				"You can continue as an independent teacher or connect to another active organization from Teacher settings.",
 			],
 			ctaHref: u.teacherSettings,
 			ctaLabel: "Open teacher settings",
 		},
 		teacher_linked_student: {
-			subject: `${DEMO.teacherName} linked to your EduAI account`,
-			preheader: `${DEMO.teacherName} can now access your EduAI student data as an independent teacher.`,
+			subject: `${DEMO.teacherName} linked to your 24Vertex account`,
+			preheader: `${DEMO.teacherName} can now access your 24Vertex student data as an independent teacher.`,
 			title: "Teacher linked",
 			paragraphs: [
-				`<strong>${teacher}</strong> linked to your EduAI student account using your link code.`,
-				"If this was not expected, contact your parent, school administrator, or EduAI support.",
+				`<strong>${teacher}</strong> linked to your 24Vertex student account using your link code.`,
+				"If this was not expected, contact your parent, school administrator, or 24Vertex support.",
 			],
 			ctaHref: u.studentSettings,
 			ctaLabel: "Open account settings",
 		},
 		teacher_student_link_confirmed: {
-			subject: `Connected to ${DEMO.studentName} on EduAI`,
-			preheader: `You can now access ${DEMO.studentName}'s EduAI student data as an independent teacher.`,
+			subject: `Connected to ${DEMO.studentName} on 24Vertex`,
+			preheader: `You can now access ${DEMO.studentName}'s 24Vertex student data as an independent teacher.`,
 			title: "Student linked",
 			paragraphs: [
 				`You are now linked to <strong>${student}</strong> as an independent teacher.`,
-				"If you later join a school or tuition center on EduAI, independent student links will be revoked.",
+				"If you later join a school or tuition center on 24Vertex, independent student links will be revoked.",
 			],
 			ctaHref: u.teacherSettings,
 			ctaLabel: "Open teacher settings",
@@ -185,7 +185,7 @@ function supabaseAuthPreview(
 		title: opts.title,
 		paragraphs: opts.paragraphs,
 		primaryCta: { label: opts.ctaLabel, href: opts.ctaHref },
-		signOff: "— EduAI (via Supabase Auth)",
+		signOff: "— 24Vertex (via Supabase Auth)",
 	});
 	return sample({
 		slug,
@@ -222,11 +222,11 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 				title: `Your ${DEMO.subjectName} report is ready`,
 				paragraphs: [
 					`We just finished grading your <strong>${subjectName}</strong> practice test — you scored <strong>78%</strong>.`,
-					"Open the PDF for the full printable report. You don't need to sign in to EduAI to use this link, and it stays valid for 90 days.",
-					"For topic breakdowns and your next recommended practice inside the app, use <em>View in EduAI</em>.",
+					"Open the PDF for the full printable report. You don't need to sign in to 24Vertex to use this link, and it stays valid for 90 days.",
+					"For topic breakdowns and your next recommended practice inside the app, use <em>View in 24Vertex</em>.",
 				],
 				primaryCta: { label: "Open PDF report", href: DEMO.pdfUrl },
-				secondaryCta: { label: "View in EduAI", href: u.studentReports },
+				secondaryCta: { label: "View in 24Vertex", href: u.studentReports },
 			}),
 		}),
 		sample({
@@ -242,7 +242,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 				title: `${DEMO.childName} — ${DEMO.subjectName} report ready`,
 				paragraphs: [
 					`We just finished grading <strong>${cn}</strong>'s ${subjectName} practice test — they scored <strong>78%</strong>.`,
-					"Open the PDF for the full printable report. You don't need to sign in to EduAI to use this link, and it stays valid for 90 days.",
+					"Open the PDF for the full printable report. You don't need to sign in to 24Vertex to use this link, and it stays valid for 90 days.",
 					"For the interactive parent portal version, use <em>Open parent portal</em>.",
 				],
 				primaryCta: { label: "Open PDF report", href: DEMO.pdfUrl },
@@ -396,14 +396,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Parent portal",
 			displayName: "Parent–child link confirmed",
 			description: "Sent right after parent account links to a student.",
-			subject: `Connected to ${DEMO.childName} on EduAI`,
+			subject: `Connected to ${DEMO.childName} on 24Vertex`,
 			source: "app",
 			html: renderEmailShell({
-				preheader: `You're now linked to ${DEMO.childName} in EduAI.`,
+				preheader: `You're now linked to ${DEMO.childName} in 24Vertex.`,
 				greeting: `Hi ${pn},`,
-				title: `Connected to ${DEMO.childName} on EduAI`,
+				title: `Connected to ${DEMO.childName} on 24Vertex`,
 				paragraphs: [
-					`Your parent account is now linked to <strong>${cn}</strong> in EduAI.`,
+					`Your parent account is now linked to <strong>${cn}</strong> in 24Vertex.`,
 					"Open the parent portal to follow their progress, view test reports, and switch between children if you have more than one.",
 				],
 				primaryCta: { label: "Open parent portal", href: u.parentDashboard },
@@ -415,12 +415,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Parent portal",
 			displayName: "Parent linked (student notice)",
 			description: "Student notified when a parent links to their profile.",
-			subject: "A parent account was linked to your EduAI profile",
+			subject: "A parent account was linked to your 24Vertex profile",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "Heads up — a parent account is now linked to your EduAI profile.",
+				preheader: "Heads up — a parent account is now linked to your 24Vertex profile.",
 				greeting: `Hi ${sn},`,
-				title: "A parent account was linked to your EduAI profile",
+				title: "A parent account was linked to your 24Vertex profile",
 				paragraphs: [
 					`Parent or guardian: <strong>${pn}</strong>.`,
 					"They can use the parent portal for updates you share with them. If something looks off, open Account settings.",
@@ -435,12 +435,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Trial ending (3 days left)",
 			description: "Cron trial reminder (daysLeft > 0).",
-			subject: "Only 3 days left on your EduAI trial",
+			subject: "Only 3 days left on your 24Vertex trial",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "3 days left — add a payment method now.",
 				greeting: `Hi ${sn},`,
-				title: "Only 3 days left on your EduAI trial",
+				title: "Only 3 days left on your 24Vertex trial",
 				paragraphs: [
 					"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause — you won't be charged until the trial actually ends.",
 					"Switch to <strong>Pro Monthly</strong> or <strong>Pro Annual</strong> in one tap.",
@@ -453,12 +453,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Trial ending (today)",
 			description: "Same slug trial-ending when daysLeft <= 0.",
-			subject: "Your EduAI trial ends today",
+			subject: "Your 24Vertex trial ends today",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "Add a payment method today to keep practicing without interruption.",
 				greeting: `Hi ${sn},`,
-				title: "Your EduAI trial ends today",
+				title: "Your 24Vertex trial ends today",
 				paragraphs: [
 					"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause — you won't be charged until the trial actually ends.",
 					"Switch to <strong>Pro Monthly</strong> or <strong>Pro Annual</strong> in one tap.",
@@ -471,12 +471,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Payment receipt",
 			description: "After successful Razorpay charge.",
-			subject: "Payment received — EduAI",
+			subject: "Payment received — 24Vertex",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "₹499 paid for Pro Monthly.",
 				greeting: `Hi ${sn},`,
-				title: "Payment received — EduAI",
+				title: "Payment received — 24Vertex",
 				paragraphs: [
 					"Thanks for your payment. We've recorded it and your subscription remains active.",
 					"Your hosted Razorpay invoice is available below.",
@@ -505,7 +505,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 					"Your <strong>Pro Monthly</strong> subscription is now active. Enjoy unlimited practice and the expanded AI output allowance for doubt chat.",
 				],
 				stats: [{ label: "Next renewal", value: DEMO.renewal }],
-				primaryCta: { label: "Open EduAI", href: `${DEMO.appUrl}/student/dashboard` },
+				primaryCta: { label: "Open 24Vertex", href: `${DEMO.appUrl}/student/dashboard` },
 			}),
 		}),
 		sample({
@@ -513,14 +513,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Payment failed",
 			description: "Initial dunning when charge is declined.",
-			subject: "We couldn't collect your EduAI payment",
+			subject: "We couldn't collect your 24Vertex payment",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "Your payment was declined. Razorpay will retry — update your method to avoid an interruption.",
 				greeting: `Hi ${sn},`,
-				title: "We couldn't collect your EduAI payment",
+				title: "We couldn't collect your 24Vertex payment",
 				paragraphs: [
-					"We tried to charge your payment method for your EduAI subscription but it was declined. Razorpay will retry automatically.",
+					"We tried to charge your payment method for your 24Vertex subscription but it was declined. Razorpay will retry automatically.",
 					"To avoid an interruption, please check your UPI or card mandate status, or update your payment method.",
 				],
 				callout: {
@@ -535,12 +535,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Dunning day 3",
 			description: "Follow-up when payment still pending.",
-			subject: "Reminder: payment still pending on EduAI",
+			subject: "Reminder: payment still pending on 24Vertex",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "It's been 3 days since we couldn't collect your subscription payment.",
 				greeting: `Hi ${sn},`,
-				title: "Reminder: payment still pending on EduAI",
+				title: "Reminder: payment still pending on 24Vertex",
 				paragraphs: [
 					"It's been 3 days since we couldn't collect your subscription payment.",
 					"Common causes are an expired card, paused UPI mandate, or insufficient balance at the time of charge.",
@@ -554,12 +554,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Dunning day 7",
 			description: "Final reminder before cancellation.",
-			subject: "Final reminder: your EduAI subscription will be cancelled in 7 days",
+			subject: "Final reminder: your 24Vertex subscription will be cancelled in 7 days",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "It's been a week since your last successful payment.",
 				greeting: `Hi ${sn},`,
-				title: "Final reminder: your EduAI subscription will be cancelled in 7 days",
+				title: "Final reminder: your 24Vertex subscription will be cancelled in 7 days",
 				paragraphs: [
 					"It's been a week since your last successful payment.",
 					"Common causes are an expired card, paused UPI mandate, or insufficient balance at the time of charge.",
@@ -578,14 +578,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Account & security",
 			displayName: "Password changed",
 			description: "Security notice after password update.",
-			subject: "Your EduAI password was changed",
+			subject: "Your 24Vertex password was changed",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "Confirming a password change on your EduAI account.",
+				preheader: "Confirming a password change on your 24Vertex account.",
 				greeting: `Hi ${sn},`,
-				title: "Your EduAI password was changed",
+				title: "Your 24Vertex password was changed",
 				paragraphs: [
-					"This confirms the password for your EduAI account was just changed.",
+					"This confirms the password for your 24Vertex account was just changed.",
 					"If you did not make this change, reset your password from Account settings or contact support right away.",
 				],
 				callout: { tone: "info", text: "We'll always email you when something important changes on your account." },
@@ -597,14 +597,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Account & security",
 			displayName: "Sign-in email changed",
 			description: "After login email update (app-sent, not Supabase OTP).",
-			subject: "Your EduAI sign-in email was updated",
+			subject: "Your 24Vertex sign-in email was updated",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "Confirming a sign-in email change on your EduAI account.",
+				preheader: "Confirming a sign-in email change on your 24Vertex account.",
 				greeting: `Hi ${sn},`,
-				title: "Your EduAI sign-in email was updated",
+				title: "Your 24Vertex sign-in email was updated",
 				paragraphs: [
-					"The email address you use to sign in to EduAI was updated.",
+					"The email address you use to sign in to 24Vertex was updated.",
 					"New address: <strong>new.address@example.com</strong>.",
 					"If you did not request this, contact support immediately.",
 				],
@@ -618,15 +618,15 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Teacher",
 			displayName: "Teacher signup received",
 			description: "After teacher profile created, awaiting admin approval.",
-			subject: "We received your EduAI teacher signup",
+			subject: "We received your 24Vertex teacher signup",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "The 24vertex team will review your account shortly.",
+				preheader: "The 24Vertex team will review your account shortly.",
 				greeting: `Hi ${tn},`,
-				title: "We received your EduAI teacher signup",
+				title: "We received your 24Vertex teacher signup",
 				paragraphs: [
-					"Thanks for signing up as a teacher on EduAI.",
-					"The 24vertex team will review and approve your account within 24–48 hours. We'll email you again when you can sign in and use the full teacher workspace.",
+					"Thanks for signing up as a teacher on 24Vertex.",
+					"The 24Vertex team will review and approve your account within 24–48 hours. We'll email you again when you can sign in and use the full teacher workspace.",
 					"If you have questions, reply to this email or contact your school administrator.",
 				],
 			}),
@@ -639,11 +639,11 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			subject: "Your teacher account is approved",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "Your EduAI teacher account is ready to sign in.",
+				preheader: "Your 24Vertex teacher account is ready to sign in.",
 				greeting: `Hi ${tn},`,
 				title: "Your teacher account is approved",
-				paragraphs: ["Your EduAI teacher account has been approved. You can sign in below."],
-				primaryCta: { label: "Sign in to EduAI", href: u.teacherLogin },
+				paragraphs: ["Your 24Vertex teacher account has been approved. You can sign in below."],
+				primaryCta: { label: "Sign in to 24Vertex", href: u.teacherLogin },
 			}),
 		}),
 
@@ -653,14 +653,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Compliance",
 			displayName: "Parental consent rerequest",
 			description: "Compliance flow for renewed parental consent.",
-			subject: "Action needed: parental consent for EduAI",
+			subject: "Action needed: parental consent for 24Vertex",
 			source: "app",
 			html: renderEmailShell({
 				preheader: `We need renewed parental consent for ${DEMO.studentName}.`,
 				greeting: "Hello,",
-				title: "Action needed: parental consent for EduAI",
+				title: "Action needed: parental consent for 24Vertex",
 				paragraphs: [
-					`We need renewed parental consent for the EduAI student account belonging to <strong>${sn}</strong>.`,
+					`We need renewed parental consent for the 24Vertex student account belonging to <strong>${sn}</strong>.`,
 					"Please review and complete consent using your usual parent account flow.",
 					"If you did not expect this message, contact support.",
 				],
@@ -672,14 +672,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Compliance",
 			displayName: "DSR fulfilled",
 			description: "Data subject request completed.",
-			subject: "Your EduAI privacy request update",
+			subject: "Your 24Vertex privacy request update",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "Your data export request has been fulfilled.",
 				greeting: "Hello,",
-				title: "Your EduAI privacy request update",
+				title: "Your 24Vertex privacy request update",
 				paragraphs: [
-					"Your data subject request (<strong>data export</strong>) for EduAI has been marked fulfilled by our team.",
+					"Your data subject request (<strong>data export</strong>) for 24Vertex has been marked fulfilled by our team.",
 					"If you need further assistance, reply to this email.",
 				],
 			}),
@@ -691,16 +691,16 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Admin & broadcasts",
 			displayName: "Broadcast (email channel)",
 			description: "Markdown body via broadcastBodyToEmailHtml — not renderEmailShell.",
-			subject: "Important update from EduAI",
+			subject: "Important update from 24Vertex",
 			source: "admin",
-			html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f5f5f4;font-family:system-ui,sans-serif"><div style="font-family:system-ui,sans-serif;line-height:1.55;color:#111;max-width:560px;"><p style="margin:0 0 12px;">Hi everyone,</p><p style="margin:0 0 12px;">We're rolling out improved report PDFs this week. No action needed unless your school asked you to verify roster links.</p><p style="margin:0 0 12px;">— The EduAI team</p></div></body></html>`,
+			html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f5f5f4;font-family:system-ui,sans-serif"><div style="font-family:system-ui,sans-serif;line-height:1.55;color:#111;max-width:560px;"><p style="margin:0 0 12px;">Hi everyone,</p><p style="margin:0 0 12px;">We're rolling out improved report PDFs this week. No action needed unless your school asked you to verify roster links.</p><p style="margin:0 0 12px;">— The 24Vertex team</p></div></body></html>`,
 		}),
 		sample({
 			slug: "admin-weekly-digest",
 			category: "Admin & broadcasts",
 			displayName: "Admin weekly digest",
 			description: "Operator cron digest — plain HTML, not renderEmailShell.",
-			subject: "EduAI admin weekly digest · 2026-05-11",
+			subject: "24Vertex admin weekly digest · 2026-05-11",
 			source: "admin",
 			html: `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;padding:24px">
 <p>Summary for the last <strong>7 days</strong> (UTC).</p>
@@ -709,7 +709,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 <li>Logins: <strong>18</strong></li>
 <li>High-friction actions: <strong>3</strong></li>
 </ul>
-<p class="muted" style="color:#666;font-size:12px">Sent automatically for EduAI admin operations.</p>
+<p class="muted" style="color:#666;font-size:12px">Sent automatically for 24Vertex admin operations.</p>
 </body></html>`,
 		}),
 		sample({
@@ -717,7 +717,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Admin & broadcasts",
 			displayName: "Admin panic alert",
 			description: "Sent when all admin JWTs are invalidated.",
-			subject: "EduAI admin panic — all sessions invalidated",
+			subject: "24Vertex admin panic — all sessions invalidated",
 			source: "admin",
 			html: `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px"><p>All admin JWTs were invalidated (version <strong>42</strong>).</p></body></html>`,
 		}),
@@ -747,10 +747,10 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			"Supabase Auth · type=signup · configured in Supabase dashboard",
 			"Confirm your signup",
 			{
-				preheader: "Confirm your email to finish creating your EduAI account.",
+				preheader: "Confirm your email to finish creating your 24Vertex account.",
 				title: "Confirm your email",
 				paragraphs: [
-					"Thanks for signing up for EduAI. Tap the button below to confirm this email address and finish setting up your account.",
+					"Thanks for signing up for 24Vertex. Tap the button below to confirm this email address and finish setting up your account.",
 					"If you didn't create an account, you can ignore this message.",
 				],
 				ctaLabel: "Confirm email",
@@ -763,10 +763,10 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			"Supabase Auth · type=recovery · resetPasswordForEmail redirect",
 			"Reset your password",
 			{
-				preheader: "Reset your EduAI password.",
+				preheader: "Reset your 24Vertex password.",
 				title: "Reset your password",
 				paragraphs: [
-					"We received a request to reset the password for your EduAI account.",
+					"We received a request to reset the password for your 24Vertex account.",
 					"This link expires after a short time. If you didn't request a reset, ignore this email.",
 				],
 				ctaLabel: "Reset password",
@@ -779,8 +779,8 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			"Supabase Auth · type=magiclink · passwordless sign-in",
 			"Your magic link",
 			{
-				preheader: "Sign in to EduAI without a password.",
-				title: "Sign in to EduAI",
+				preheader: "Sign in to 24Vertex without a password.",
+				title: "Sign in to 24Vertex",
 				paragraphs: [
 					"Use the button below to sign in. This link can only be used once and expires soon.",
 				],
@@ -792,12 +792,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			"auth-invite",
 			"Invite user",
 			"Supabase Auth · type=invite · admin or service invite",
-			"You've been invited to EduAI",
+			"You've been invited to 24Vertex",
 			{
-				preheader: "Accept your invitation to join EduAI.",
+				preheader: "Accept your invitation to join 24Vertex.",
 				title: "You've been invited",
 				paragraphs: [
-					"You've been invited to create an account on EduAI. Accept the invitation to set your password and get started.",
+					"You've been invited to create an account on 24Vertex. Accept the invitation to set your password and get started.",
 				],
 				ctaLabel: "Accept invitation",
 				ctaHref: inviteLink,
@@ -809,10 +809,10 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			"Supabase Auth · type=email_change · OTP before new address is active",
 			"Confirm your new email",
 			{
-				preheader: "Confirm the new sign-in email for your EduAI account.",
+				preheader: "Confirm the new sign-in email for your 24Vertex account.",
 				title: "Confirm your new email",
 				paragraphs: [
-					"You requested to change the email address used to sign in to EduAI.",
+					"You requested to change the email address used to sign in to 24Vertex.",
 					"Confirm below to apply the change. If this wasn't you, contact support immediately.",
 				],
 				ctaLabel: "Confirm new email",

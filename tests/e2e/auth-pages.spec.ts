@@ -11,42 +11,42 @@ import { test, expect } from "@playwright/test";
 test.describe("(auth) page shells + metadata", () => {
 	test("/login has the right title and shows the form", async ({ page }) => {
 		await page.goto("/login");
-		await expect(page).toHaveTitle(/Log in · EduAI/);
+		await expect(page).toHaveTitle(/Log in · 24Vertex/);
 		await expect(page.getByLabel(/email/i).first()).toBeVisible();
 		await expect(page.getByLabel(/password/i).first()).toBeVisible();
 	});
 
 	test("/login/educator has the educator-specific title", async ({ page }) => {
 		await page.goto("/login/educator");
-		await expect(page).toHaveTitle(/Educator log in · EduAI/);
+		await expect(page).toHaveTitle(/Educator log in · 24Vertex/);
 	});
 
 	test("/forgot-password renders with title + heading", async ({ page }) => {
 		await page.goto("/forgot-password");
-		await expect(page).toHaveTitle(/Reset password · EduAI/);
+		await expect(page).toHaveTitle(/Reset password · 24Vertex/);
 		await expect(page.getByRole("heading", { name: /reset password/i })).toBeVisible();
 	});
 
 	test("/signup/role-picker has the right title", async ({ page }) => {
 		await page.goto("/signup/role-picker");
-		await expect(page).toHaveTitle(/Choose how to sign up · EduAI/);
+		await expect(page).toHaveTitle(/Choose how to sign up · 24Vertex/);
 	});
 
 	test("/signup/student renders with title + name field", async ({ page }) => {
 		await page.goto("/signup/student");
-		await expect(page).toHaveTitle(/Student sign up · EduAI/);
+		await expect(page).toHaveTitle(/Student sign up · 24Vertex/);
 		await expect(page.getByLabel(/full name/i)).toBeVisible();
 	});
 
 	test("/signup/parent renders with title + link code field", async ({ page }) => {
 		await page.goto("/signup/parent");
-		await expect(page).toHaveTitle(/Parent sign up · EduAI/);
+		await expect(page).toHaveTitle(/Parent sign up · 24Vertex/);
 		await expect(page.getByLabel(/student link code/i)).toBeVisible();
 	});
 
 	test("/signup/teacher renders with title + mobile field", async ({ page }) => {
 		await page.goto("/signup/teacher");
-		await expect(page).toHaveTitle(/Teacher sign up · EduAI/);
+		await expect(page).toHaveTitle(/Teacher sign up · 24Vertex/);
 		await expect(page.getByLabel(/mobile number/i)).toBeVisible();
 	});
 
@@ -115,7 +115,7 @@ test.describe("Forgot password flow", () => {
 test.describe("Update password expired-link screen", () => {
 	test("direct visit without a recovery cookie renders the expired UI", async ({ page }) => {
 		await page.goto("/auth/update-password");
-		await expect(page).toHaveTitle(/Set a new password · EduAI/);
+		await expect(page).toHaveTitle(/Set a new password · 24Vertex/);
 		await expect(page.getByRole("heading", { name: /reset link expired/i })).toBeVisible();
 		// Base UI's Button keeps `role="button"` on the rendered element even when
 		// `render={<Link/>}` polymorphs the underlying tag to `<a>`. Match by

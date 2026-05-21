@@ -76,7 +76,7 @@ export async function notifyPasswordChanged(recipientId: string): Promise<void> 
 		const notificationId = await insertInAppNotification({
 			recipientId,
 			title: "Password changed",
-			body: "Your EduAI account password was changed. If you did not do this, sign in and reset your password from Account settings, or contact support.",
+			body: "Your 24Vertex account password was changed. If you did not do this, sign in and reset your password from Account settings, or contact support.",
 			type: "system",
 			category: "account_password_changed",
 			forceInApp: true,
@@ -186,7 +186,7 @@ export async function notifyParentChildLinkConfirmed(input: NotifyParentLinkedIn
 			recipientId: input.parentId,
 			senderId: input.studentId,
 			title: `Connected to ${label}`,
-			body: `You are now linked in EduAI as a parent for ${label}. Open Overview or Test reports to follow their progress (switch children from your account menu when you have more than one).`,
+			body: `You are now linked in 24Vertex as a parent for ${label}. Open Overview or Test reports to follow their progress (switch children from your account menu when you have more than one).`,
 			type: "system",
 			category: "parent_child_link_confirmed",
 			referenceType: "student",

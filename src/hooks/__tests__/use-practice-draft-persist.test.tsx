@@ -55,7 +55,7 @@ describe("usePracticeDraftPersist", () => {
 		const h = renderHook(() =>
 			usePracticeDraftPersist({ testId: TEST_ID, answers, flagged }),
 		);
-		const raw = localStorage.getItem(`eduai:practice-answers-draft:${TEST_ID}`);
+		const raw = localStorage.getItem(`vertex24:practice-answers-draft:${TEST_ID}`);
 		expect(raw).toBeTruthy();
 		const parsed = JSON.parse(raw!);
 		expect(parsed).toMatchObject({
@@ -75,7 +75,7 @@ describe("usePracticeDraftPersist", () => {
 		);
 		answers = { q1: ans("text", "second"), q2: ans("text", "added") };
 		h.rerender(() => usePracticeDraftPersist({ testId: TEST_ID, answers, flagged }));
-		const raw = localStorage.getItem(`eduai:practice-answers-draft:${TEST_ID}`);
+		const raw = localStorage.getItem(`vertex24:practice-answers-draft:${TEST_ID}`);
 		const parsed = JSON.parse(raw!);
 		expect(parsed.answers.q1).toEqual({ kind: "text", value: "second" });
 		expect(parsed.answers.q2).toEqual({ kind: "text", value: "added" });
@@ -92,8 +92,8 @@ describe("usePracticeDraftPersist", () => {
 		const hb = renderHook(() =>
 			usePracticeDraftPersist({ testId: TEST_ID_B, answers, flagged }),
 		);
-		expect(localStorage.getItem(`eduai:practice-answers-draft:${TEST_ID}`)).toBeTruthy();
-		expect(localStorage.getItem(`eduai:practice-answers-draft:${TEST_ID_B}`)).toBeTruthy();
+		expect(localStorage.getItem(`vertex24:practice-answers-draft:${TEST_ID}`)).toBeTruthy();
+		expect(localStorage.getItem(`vertex24:practice-answers-draft:${TEST_ID_B}`)).toBeTruthy();
 		ha.cleanup();
 		hb.cleanup();
 	});

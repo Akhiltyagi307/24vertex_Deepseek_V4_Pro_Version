@@ -5,12 +5,19 @@ import {
 	dateKeyToNoonInAppTimeZone,
 } from "@/lib/datetime/app-timezone";
 
-export const ACTIVITY_STREAK_REFRESH_EVENT = "eduai:activity-streak-refresh";
+import { LEGACY_PRODUCT_SLUG, PRODUCT_SLUG } from "@/lib/brand/constants";
+
+export const ACTIVITY_STREAK_REFRESH_EVENT = `${PRODUCT_SLUG}:activity-streak-refresh`;
+
+/** @deprecated Listen shim during transition. */
+export const LEGACY_ACTIVITY_STREAK_REFRESH_EVENT = `${LEGACY_PRODUCT_SLUG}:activity-streak-refresh`;
 
 /** Notify top-bar streak widget to refetch (e.g. after practice submit). */
 export function notifyActivityStreakRefresh(): void {
 	if (typeof window === "undefined") return;
-	window.dispatchEvent(new CustomEvent(ACTIVITY_STREAK_REFRESH_EVENT));
+	for (const name of [ACTIVITY_STREAK_REFRESH_EVENT, LEGACY_ACTIVITY_STREAK_REFRESH_EVENT]) {
+		window.dispatchEvent(new CustomEvent(name));
+	}
 }
 
 const weekdayShortToIso: Record<string, number> = {

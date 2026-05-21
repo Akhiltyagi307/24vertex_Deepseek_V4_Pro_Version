@@ -338,7 +338,7 @@ export async function performComplianceErasure(
 	}
 
 	const auth = createServiceRoleClient().auth.admin;
-	const pseudoEmail = `erased+${userId.replace(/-/g, "").slice(0, 12)}@eduai.invalid`;
+	const pseudoEmail = `erased+${userId.replace(/-/g, "").slice(0, 12)}@vertex24.invalid`;
 	const { error: authErr } = await auth.updateUserById(userId, { email: pseudoEmail });
 	if (authErr) {
 		// DB is already erased; Auth identity still original. Recovery: re-run the

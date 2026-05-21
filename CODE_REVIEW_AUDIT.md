@@ -1,4 +1,4 @@
-# EduAI — Full Code Review Audit
+# 24Vertex — Full Code Review Audit
 
 **Snapshot taken:** 2026-05-17
 **Commit reviewed:** `5e5c58f` (release: v3.4.6 — teacher portal performance and access controls)

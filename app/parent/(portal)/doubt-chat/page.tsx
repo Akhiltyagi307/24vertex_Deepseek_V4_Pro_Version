@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
 	title: "Doubt chats · Parent",
-	description: "Read-only history of your child's doubt-chat conversations with EduAI.",
+	description: "Read-only history of your child's doubt-chat conversations with 24Vertex.",
 	robots: { index: false, follow: false },
 };
 

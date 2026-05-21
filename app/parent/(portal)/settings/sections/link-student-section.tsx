@@ -20,7 +20,7 @@ export function LinkStudentSection() {
 				<p className="text-foreground text-sm font-semibold">Connect a student</p>
 				<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
 					You&apos;ll confirm the link on the next screen. The student must generate the code
-					from their EduAI profile.
+					from their 24Vertex profile.
 				</p>
 				<Button
 					className="mt-4 h-11 text-base"

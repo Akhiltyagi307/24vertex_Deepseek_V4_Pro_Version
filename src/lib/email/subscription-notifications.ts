@@ -13,8 +13,8 @@ export type TrialEndingParams = CommonParams & { daysLeft: number };
 export async function sendTrialEndingEmail(params: TrialEndingParams): Promise<{ error: string | null }> {
 	const subject =
 		params.daysLeft <= 0
-			? "Your EduAI trial ends today"
-			: `Only ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"} left on your EduAI trial`;
+			? "Your 24Vertex trial ends today"
+			: `Only ${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"} left on your 24Vertex trial`;
 	const studentName = escapeHtml(params.studentName ?? "there");
 
 	const html = renderEmailShell({
@@ -54,7 +54,7 @@ export type PaymentReceiptParams = CommonParams & {
 
 /** Sent after a successful charge (webhook). Includes hosted invoice link when available. */
 export async function sendPaymentReceiptEmail(params: PaymentReceiptParams): Promise<{ error: string | null }> {
-	const subject = "Payment received — EduAI";
+	const subject = "Payment received — 24Vertex";
 	const studentName = escapeHtml(params.studentName ?? "there");
 	const stats: { label: string; value: string }[] = [{ label: "Amount", value: params.amountLabel }];
 	if (params.planName) stats.push({ label: "Plan", value: params.planName });
@@ -112,7 +112,7 @@ export async function sendSubscriptionActiveEmail(params: SubscriptionActivePara
 			`Your <strong>${planName}</strong> subscription is now active. Enjoy unlimited practice and the expanded AI output allowance for doubt chat.`,
 		],
 		stats: [{ label: "Next renewal", value: renewal }],
-		primaryCta: { label: "Open EduAI", href: `${getAppUrl()}/student/dashboard` },
+		primaryCta: { label: "Open 24Vertex", href: `${getAppUrl()}/student/dashboard` },
 	});
 
 	return sendHtmlEmailLogged({
@@ -132,7 +132,7 @@ export async function sendSubscriptionActiveEmail(params: SubscriptionActivePara
 
 export type PaymentFailedParams = CommonParams & { dedupKey?: string };
 export async function sendPaymentFailedEmail(params: PaymentFailedParams): Promise<{ error: string | null }> {
-	const subject = "We couldn't collect your EduAI payment";
+	const subject = "We couldn't collect your 24Vertex payment";
 	const studentName = escapeHtml(params.studentName ?? "there");
 
 	const html = renderEmailShell({
@@ -140,7 +140,7 @@ export async function sendPaymentFailedEmail(params: PaymentFailedParams): Promi
 		greeting: `Hi ${studentName},`,
 		title: subject,
 		paragraphs: [
-			"We tried to charge your payment method for your EduAI subscription but it was declined. Razorpay will retry automatically.",
+			"We tried to charge your payment method for your 24Vertex subscription but it was declined. Razorpay will retry automatically.",
 			"To avoid an interruption, please check your UPI or card mandate status, or update your payment method.",
 		],
 		callout: { tone: "warning", text: "Practice continues for a short grace window. Updating payment now keeps things uninterrupted." },
@@ -176,8 +176,8 @@ export async function sendDunningReminderEmail(
 	const studentName = escapeHtml(params.studentName ?? "there");
 	const subject =
 		params.dayNumber === 3
-			? "Reminder: payment still pending on EduAI"
-			: "Final reminder: your EduAI subscription will be cancelled in 7 days";
+			? "Reminder: payment still pending on 24Vertex"
+			: "Final reminder: your 24Vertex subscription will be cancelled in 7 days";
 	const urgency =
 		params.dayNumber === 3
 			? "It's been 3 days since we couldn't collect your subscription payment."

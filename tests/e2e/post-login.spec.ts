@@ -104,7 +104,7 @@ test.describe("Authenticated flow (storageState loaded by auth-setup)", () => {
 		test.skip(await isOnLogin(page), "Account is not a student — dashboard unreachable");
 
 		// Sidebar header brand link is a stable signal that the shell hydrated.
-		await expect(page.getByRole("link", { name: /eduai/i }).first()).toBeVisible({ timeout: 8000 });
+		await expect(page.getByRole("link", { name: /24vertex/i }).first()).toBeVisible({ timeout: 8000 });
 		// Theme toggle present in the topbar.
 		await expect(page.getByLabel(/theme/i).first()).toBeVisible();
 

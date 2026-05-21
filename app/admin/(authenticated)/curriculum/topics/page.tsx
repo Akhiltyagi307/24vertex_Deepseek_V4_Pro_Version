@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 
 export const metadata = {
-	title: "Admin topics · EduAI",
+	title: "Admin topics · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

@@ -18,6 +18,7 @@ export default async function StudentDashboardPage() {
 		elective_subject_id: row.elective_subject_id,
 		role: row.role,
 		full_name: row.full_name,
+		organization_id: row.organization_id ?? null,
 	};
 
 	return (

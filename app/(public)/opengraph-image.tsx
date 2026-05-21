@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "EduAI — Adaptive assessment and practice";
+export const alt = "24Vertex — Adaptive assessment and practice";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -21,7 +21,7 @@ export default function OgImage() {
 					fontFamily: "system-ui, -apple-system, sans-serif",
 				}}
 			>
-				{/* EduAI brand green hex (DESIGN.md §2). OG renders headless — CSS vars don't resolve here. */}
+				{/* 24Vertex brand green hex (DESIGN.md §2). OG renders headless — CSS vars don't resolve here. */}
 				<div
 					style={{
 						color: "#2ea070",
@@ -32,7 +32,7 @@ export default function OgImage() {
 						marginBottom: 24,
 					}}
 				>
-					EduAI
+					24Vertex
 				</div>
 				<div
 					style={{

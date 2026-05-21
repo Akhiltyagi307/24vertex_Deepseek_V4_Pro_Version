@@ -16,7 +16,7 @@ import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
  */
 
 export const metadata = {
-	title: "Practice visual fixture preview (dev only) · EduAI",
+	title: "Practice visual fixture preview (dev only) · 24Vertex",
 };
 
 type FixtureRecord = {

@@ -8,7 +8,7 @@ import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-	title: "Admin assignments · EduAI",
+	title: "Admin assignments · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

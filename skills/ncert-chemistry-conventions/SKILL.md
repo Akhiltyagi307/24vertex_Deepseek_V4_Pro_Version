@@ -1,7 +1,7 @@
 # ncert-chemistry-conventions
 
 > NCERT-specific conventions for chemistry visuals emitted as
-> `chemistry_molecule` or `chemistry_reaction` envelopes by the EDU-AI
+> `chemistry_molecule` or `chemistry_reaction` envelopes by the 24Vertex
 > practice generator.
 
 ## When to read me

@@ -3,7 +3,7 @@ import type { DoubtScopeSuccess } from "@/lib/doubt/validate-doubt-scope";
 /** Persisted as the first user row with `is_hidden` so model context survives history caps. */
 export function buildDoubtHiddenBootstrapUserContent(scope: DoubtScopeSuccess): string {
 	const lines: string[] = [
-		"[EduAI scope context — hidden from the student chat UI. Do not read this block aloud; use it only to anchor syllabus scope.]",
+		"[24Vertex scope context — hidden from the student chat UI. Do not read this block aloud; use it only to anchor syllabus scope.]",
 		`Grade: ${scope.studentGrade}`,
 		`Subject: ${scope.subjectName}`,
 	];

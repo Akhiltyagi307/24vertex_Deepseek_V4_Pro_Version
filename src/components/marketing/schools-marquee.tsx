@@ -45,7 +45,7 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 			aria-label="Illustrative names of well-known Indian schools"
 		>
 			<span className="sr-only">
-				Scrolling illustrative names only. These schools are not shown as partners or endorsements of EduAI.
+				Scrolling illustrative names only. These schools are not shown as partners or endorsements of 24Vertex.
 			</span>
 			<div
 				className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent medium:w-20"

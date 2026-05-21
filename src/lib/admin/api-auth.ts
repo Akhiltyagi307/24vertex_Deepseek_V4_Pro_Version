@@ -44,12 +44,12 @@ const ADMIN_SESSION_CACHE_TTL_MS = 10_000;
 const ADMIN_SESSION_CACHE_MAX = 256;
 
 const globalForAdminCache = globalThis as unknown as {
-	__eduAiAdminSessionCache?: Map<string, AdminSessionCacheEntry>;
+	__vertex24AdminSessionCache?: Map<string, AdminSessionCacheEntry>;
 };
 const adminSessionCache: Map<string, AdminSessionCacheEntry> =
-	globalForAdminCache.__eduAiAdminSessionCache ?? new Map();
-if (!globalForAdminCache.__eduAiAdminSessionCache) {
-	globalForAdminCache.__eduAiAdminSessionCache = adminSessionCache;
+	globalForAdminCache.__vertex24AdminSessionCache ?? new Map();
+if (!globalForAdminCache.__vertex24AdminSessionCache) {
+	globalForAdminCache.__vertex24AdminSessionCache = adminSessionCache;
 }
 
 function evictOldestAdminSessionEntries(): void {

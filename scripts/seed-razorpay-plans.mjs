@@ -39,12 +39,12 @@ const plans = [
 			period: "monthly",
 			interval: 1,
 			item: {
-				name: "EduAI Pro Monthly",
+				name: "24Vertex Pro Monthly",
 				amount: 100000, // paise
 				currency: "INR",
 				description: "30 practice tests/month + generous AI doubt-chat tokens",
 			},
-			notes: { plan_code: "pro_monthly", product: "eduai" },
+			notes: { plan_code: "pro_monthly", product: "vertex24" },
 		},
 	},
 	{
@@ -53,12 +53,12 @@ const plans = [
 			period: "yearly",
 			interval: 1,
 			item: {
-				name: "EduAI Pro Annual",
+				name: "24Vertex Pro Annual",
 				amount: 1000000, // paise (₹10,000)
 				currency: "INR",
 				description: "12-month pool — 360 practice tests + expanded AI doubt-chat",
 			},
-			notes: { plan_code: "pro_annual", product: "eduai" },
+			notes: { plan_code: "pro_annual", product: "vertex24" },
 		},
 	},
 ];

@@ -206,7 +206,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 									)}
 								</p>
 								<p className="max-w-prose text-muted-foreground text-sm leading-relaxed medium:text-[0.9375rem]">
-									Square crop, shown across EduAI. JPEG, PNG, or WebP, up to 5MB — zoom and
+									Square crop, shown across 24Vertex. JPEG, PNG, or WebP, up to 5MB — zoom and
 									reposition before saving.
 								</p>
 							</div>

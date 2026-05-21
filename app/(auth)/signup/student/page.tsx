@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
 	title: "Student sign up",
-	description: "Create your EduAI student account and start adaptive practice in minutes.",
+	description: "Create your 24Vertex student account and start adaptive practice in minutes.",
 };
 
 function isTransientFetchError(error: { message?: string } | null): boolean {

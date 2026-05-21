@@ -2,7 +2,7 @@ import { AdminOrganizationsManager } from "@/components/admin/organizations/admi
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 
 export const metadata = {
-	title: "Organizations · EduAI Admin",
+	title: "Organizations · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Title hover lifts to the EduAI brand green via the `--subject-grid-icon` token (One Voice Rule, DESIGN.md). */
+/** Title hover lifts to the 24Vertex brand green via the `--subject-grid-icon` token (One Voice Rule, DESIGN.md). */
 const featureCardTitleClassName =
 	"text-card-foreground transition-colors duration-200 group-hover:text-[var(--subject-grid-icon)]";
 
@@ -40,12 +40,12 @@ export function Features() {
 						connected workflow.
 					</p>
 				</div>
-				<div className="grid grid-cols-1 gap-3 medium:grid-cols-6">
+				<div className="grid grid-cols-1 gap-3 xl:grid-cols-6">
 					<GlowCard
 						glowColor="green"
 						customSize
 						className={cn(
-							"h-full medium:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
+							"h-full xl:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -79,7 +79,7 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"h-full medium:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
+							"h-full xl:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -113,7 +113,7 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"h-full medium:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
+							"h-full xl:col-span-2 min-h-[300px] medium:min-h-[320px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -140,7 +140,7 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"relative bg-transparent medium:col-span-3 min-h-[240px] medium:min-h-[260px] overflow-hidden rounded-[12px] border",
+							"relative bg-transparent xl:col-span-3 min-h-[240px] medium:min-h-[260px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
@@ -164,11 +164,11 @@ export function Features() {
 						glowColor="green"
 						customSize
 						className={cn(
-							"medium:col-span-3 min-h-[240px] medium:min-h-[260px] overflow-hidden rounded-[12px] border",
+							"xl:col-span-3 min-h-[240px] medium:min-h-[260px] overflow-hidden rounded-[12px] border",
 							featureBentoCardSurfaceClassName,
 						)}
 					>
-						<div className="relative z-10 grid h-full gap-5 medium:grid-cols-2">
+						<div className="relative z-10 grid h-full gap-5 xl:grid-cols-2">
 							<div className="flex flex-col justify-between">
 								<div className={featureBentoCardEyebrowClassName}>
 									<Users className="size-3.5 text-[var(--subject-grid-icon)]" />

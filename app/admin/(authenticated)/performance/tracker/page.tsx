@@ -8,7 +8,7 @@ import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { adminListPerformanceRows } from "@/lib/admin/performance-admin";
 
 export const metadata = {
-	title: "Admin performance tracker · EduAI",
+	title: "Admin performance tracker · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

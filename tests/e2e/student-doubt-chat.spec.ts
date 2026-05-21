@@ -38,7 +38,7 @@ test.describe("Student doubt-chat", () => {
 	test("page metadata sets a sensible title", async ({ page }) => {
 		const ok = await gotoIfStudent(page, "/student/doubt-chat");
 		test.skip(!ok, "No authenticated student session available.");
-		await expect(page).toHaveTitle(/Ask|topic|doubt|EduAI/i);
+		await expect(page).toHaveTitle(/Ask|topic|doubt|24Vertex/i);
 	});
 
 	test("attaches an image file to the composer (validation happy path)", async ({ page }) => {

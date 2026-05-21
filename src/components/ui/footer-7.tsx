@@ -107,13 +107,13 @@ export const Footer7 = ({
   logo = {
     url: "/",
     src: "/brand/logo-icon.avif",
-    alt: "24vertex logo",
-    title: "24vertex",
+    alt: "24Vertex logo",
+    title: "24Vertex",
   },
   sections = defaultSections,
-  description = "EduAI keeps students, parents, and teachers aligned with focused practice, clear assignment workflows, and role-based dashboards.",
+  description = "24Vertex keeps students, parents, and teachers aligned with focused practice, clear assignment workflows, and role-based dashboards.",
   socialLinks = defaultSocialLinks,
-  copyright = `© ${new Date().getFullYear()} 24vertex. All rights reserved.`,
+  copyright = `© ${new Date().getFullYear()} 24Vertex. All rights reserved.`,
   legalLinks = defaultLegalLinks,
 }: Footer7Props) => {
   return (

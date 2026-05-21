@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import {
 	ACTIVITY_STREAK_REFRESH_EVENT,
+	LEGACY_ACTIVITY_STREAK_REFRESH_EVENT,
 	formatLastActiveWeekLabel,
 	formatLongestStreakLabel,
 	formatStreakWeekDeadline,
@@ -212,9 +213,11 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 	React.useEffect(() => {
 		const onRefresh = () => void loadSnapshot();
 		window.addEventListener(ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
+		window.addEventListener(LEGACY_ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
 		window.addEventListener("focus", onRefresh);
 		return () => {
 			window.removeEventListener(ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
+			window.removeEventListener(LEGACY_ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
 			window.removeEventListener("focus", onRefresh);
 		};
 	}, [loadSnapshot]);

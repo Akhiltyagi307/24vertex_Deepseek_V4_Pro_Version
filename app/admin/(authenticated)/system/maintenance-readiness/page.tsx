@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { getMaintenanceReadiness, type MaintenanceReadinessSignal } from "@/lib/admin/maintenance-readiness";
 
 export const metadata = {
-	title: "Admin maintenance readiness · EduAI",
+	title: "Admin maintenance readiness · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

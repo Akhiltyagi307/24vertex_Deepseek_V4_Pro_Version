@@ -12,24 +12,24 @@ import type { Metadata } from "next";
  */
 export const metadata: Metadata = {
 	title: {
-		default: "EduAI — Adaptive practice for grades 6 to 12",
-		template: "%s · EduAI",
+		default: "24Vertex — Adaptive practice for grades 6 to 12",
+		template: "%s · 24Vertex",
 	},
 	description:
 		"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
-	applicationName: "EduAI",
+	applicationName: "24Vertex",
 	openGraph: {
 		type: "website",
-		siteName: "EduAI",
+		siteName: "24Vertex",
 		locale: "en_IN",
 		url: "/",
-		title: "EduAI — Adaptive practice for grades 6 to 12",
+		title: "24Vertex — Adaptive practice for grades 6 to 12",
 		description:
 			"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "EduAI — Adaptive practice for grades 6 to 12",
+		title: "24Vertex — Adaptive practice for grades 6 to 12",
 		description:
 			"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
 	},

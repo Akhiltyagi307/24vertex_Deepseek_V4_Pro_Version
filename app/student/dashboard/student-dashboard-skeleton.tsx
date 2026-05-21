@@ -22,10 +22,13 @@ export function StudentDashboardSkeleton() {
 					))}
 				</div>
 			</section>
-			<div className={cn(cardSurfaceFrameClassName, "flex min-h-[200px] flex-col gap-4 bg-muted/20 p-6")}>
-				<Skeleton className="h-5 w-40" />
-				<Skeleton className="h-[160px] w-full rounded-lg" />
-			</div>
+			<section className="flex flex-col gap-3">
+				<Skeleton className="h-4 w-44" />
+				<div className="grid grid-cols-1 gap-6 medium:grid-cols-2 medium:items-stretch">
+					<Skeleton className={cn("min-h-[320px] rounded-xl medium:min-h-[360px]", cardSurfaceFrameClassName)} />
+					<Skeleton className={cn("min-h-[320px] rounded-xl medium:min-h-[360px]", cardSurfaceFrameClassName)} />
+				</div>
+			</section>
 		</div>
 	);
 }

@@ -1,7 +1,7 @@
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 
 export const metadata = {
-	title: "Job schedules · EduAI Admin",
+	title: "Job schedules · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -15,7 +15,7 @@ const consumeAdminActionRateLimit = vi.fn(async () => ({
 	degraded: false,
 }));
 const generateLink = vi.fn(async () => ({
-	data: { properties: { action_link: "https://eduai.app/magic-link/abc" } },
+	data: { properties: { action_link: "https://24vertex.app/magic-link/abc" } },
 	error: null as { message: string } | null,
 }));
 
@@ -55,7 +55,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
 		});
 		generateLink.mockClear();
 		generateLink.mockResolvedValue({
-			data: { properties: { action_link: "https://eduai.app/magic-link/abc" } },
+			data: { properties: { action_link: "https://24vertex.app/magic-link/abc" } },
 			error: null,
 		});
 	});

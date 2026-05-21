@@ -138,7 +138,7 @@ describe("selectParentStudentAction", () => {
 		);
 		expect(cookiesMock.current.set).toHaveBeenCalledTimes(1);
 		const setCall = (cookiesMock.current.set as ReturnType<typeof vi.fn>).mock.calls[0];
-		expect(setCall?.[0]).toBe("eduai_parent_active_student");
+		expect(setCall?.[0]).toBe("vertex24_parent_active_student");
 		expect(setCall?.[1]).toBe(STUDENT_ID);
 		const opts = setCall?.[2] as { maxAge?: number; httpOnly?: boolean; sameSite?: string };
 		expect(opts.maxAge).toBe(60 * 60 * 24 * 30);

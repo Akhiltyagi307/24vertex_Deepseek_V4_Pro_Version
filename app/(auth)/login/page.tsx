@@ -4,7 +4,7 @@ import { LoginForm } from "@/components/login-form";
 
 export const metadata: Metadata = {
 	title: "Log in",
-	description: "Sign in to EduAI to continue adaptive practice and view your reports.",
+	description: "Sign in to 24Vertex to continue adaptive practice and view your reports.",
 };
 
 type Props = {

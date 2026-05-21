@@ -4,7 +4,7 @@ import { LoginForm } from "@/components/login-form";
 
 export const metadata: Metadata = {
 	title: "Educator log in",
-	description: "Sign in to your EduAI teacher workspace.",
+	description: "Sign in to your 24Vertex teacher workspace.",
 };
 
 type Props = {

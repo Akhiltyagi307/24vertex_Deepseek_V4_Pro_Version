@@ -10,7 +10,7 @@ const path = require("node:path");
 module.exports = {
 	apps: [
 		{
-			name: "edu-ai-dev",
+			name: "vertex24-dev",
 			// Run via `node <file>.mjs` so PM2 does not wrap the ESM entry as CJS.
 			script: "node",
 			args: [path.join(__dirname, "scripts", "next-dev.mjs")],

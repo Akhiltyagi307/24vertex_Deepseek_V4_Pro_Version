@@ -43,19 +43,19 @@ const SQL_PLAN_COST_BUDGET_PER_MIN = 1_000_000;
 const SQL_PLAN_COST_WINDOW_MS = 60_000;
 
 const globalForSqlConsole = globalThis as unknown as {
-	__eduAiAdminSqlInflight?: Map<string, number>;
-	__eduAiAdminSqlPlanCost?: Map<string, { windowStart: number; totalCost: number }>;
+	__vertex24AdminSqlInflight?: Map<string, number>;
+	__vertex24AdminSqlPlanCost?: Map<string, { windowStart: number; totalCost: number }>;
 };
 
-const sqlInflight: Map<string, number> = globalForSqlConsole.__eduAiAdminSqlInflight ?? new Map();
-if (!globalForSqlConsole.__eduAiAdminSqlInflight) {
-	globalForSqlConsole.__eduAiAdminSqlInflight = sqlInflight;
+const sqlInflight: Map<string, number> = globalForSqlConsole.__vertex24AdminSqlInflight ?? new Map();
+if (!globalForSqlConsole.__vertex24AdminSqlInflight) {
+	globalForSqlConsole.__vertex24AdminSqlInflight = sqlInflight;
 }
 
 const sqlPlanCostByJti: Map<string, { windowStart: number; totalCost: number }> =
-	globalForSqlConsole.__eduAiAdminSqlPlanCost ?? new Map();
-if (!globalForSqlConsole.__eduAiAdminSqlPlanCost) {
-	globalForSqlConsole.__eduAiAdminSqlPlanCost = sqlPlanCostByJti;
+	globalForSqlConsole.__vertex24AdminSqlPlanCost ?? new Map();
+if (!globalForSqlConsole.__vertex24AdminSqlPlanCost) {
+	globalForSqlConsole.__vertex24AdminSqlPlanCost = sqlPlanCostByJti;
 }
 
 function sqlWriteEnabled(): boolean {

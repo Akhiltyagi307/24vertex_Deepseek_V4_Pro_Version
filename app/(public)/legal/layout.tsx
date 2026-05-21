@@ -22,7 +22,7 @@ export default function LegalLayout({
 						href="/"
 						className="font-semibold text-foreground underline-offset-4 hover:underline"
 					>
-						EduAI
+						24Vertex
 					</Link>
 					<Link
 						href="/"

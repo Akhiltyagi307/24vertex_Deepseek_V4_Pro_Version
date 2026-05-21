@@ -7,7 +7,7 @@ import { adminGetAssignmentDetail } from "@/lib/admin/assignments-admin";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-	title: "Admin assignment detail · EduAI",
+	title: "Admin assignment detail · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

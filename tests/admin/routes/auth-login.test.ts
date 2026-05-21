@@ -40,7 +40,7 @@ describe("D32 Sprint C · POST /api/admin/auth/login (route handler)", () => {
 			}),
 		);
 		expect(res.status).toBe(415);
-		expect(res.headers.get("X-EduAI-Admin-Login-Handler")).toBe("app-route");
+		expect(res.headers.get("X-24Vertex-Admin-Login-Handler")).toBe("app-route");
 	});
 
 	it("415 when content-type is multipart/form-data", async () => {
@@ -55,7 +55,7 @@ describe("D32 Sprint C · POST /api/admin/auth/login (route handler)", () => {
 			loginRequest({ contentType: "application/json", body: "{ not-json" }),
 		);
 		expect(res.status).toBe(400);
-		expect(res.headers.get("X-EduAI-Login-Code")).toBe("bad_request");
+		expect(res.headers.get("X-24Vertex-Login-Code")).toBe("bad_request");
 	});
 
 	it("rejects when performAdminLogin returns not-ok", async () => {
@@ -73,7 +73,7 @@ describe("D32 Sprint C · POST /api/admin/auth/login (route handler)", () => {
 			}),
 		);
 		expect(res.status).toBe(401);
-		expect(res.headers.get("X-EduAI-Login-Code")).toBe("invalid_credentials");
+		expect(res.headers.get("X-24Vertex-Login-Code")).toBe("invalid_credentials");
 	});
 
 	it("500 when performAdminLogin throws", async () => {
@@ -86,7 +86,7 @@ describe("D32 Sprint C · POST /api/admin/auth/login (route handler)", () => {
 			}),
 		);
 		expect(res.status).toBe(500);
-		expect(res.headers.get("X-EduAI-Login-Code")).toBe("internal_error");
+		expect(res.headers.get("X-24Vertex-Login-Code")).toBe("internal_error");
 	});
 
 	it("happy path: sets cookie on success", async () => {

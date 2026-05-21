@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
+import { VERTEX24_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
 import { getAppUrl } from "@/lib/env";
 
 /**
@@ -68,7 +68,7 @@ export function buildPendingRegistrationMeta<TPayload>(
 	payload: TPayload,
 ): Record<string, string> {
 	return {
-		[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+		[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 			version: 1,
 			role,
 			payload,

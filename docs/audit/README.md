@@ -1,4 +1,4 @@
-# EduAI Audit — Index
+# 24Vertex Audit — Index
 
 **Snapshot:** 2026-05-17 | **Commit:** `5e5c58f` | **Branch:** `main`
 **Aggregate health: 82 / 100**

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Shipping & delivery — EduAI",
-	description: "How EduAI delivers access to digital practice and AI features after purchase.",
+	title: "Shipping & delivery — 24Vertex",
+	description: "How 24Vertex delivers access to digital practice and AI features after purchase.",
 	alternates: {
 		canonical: "/legal/shipping",
 	},
@@ -18,7 +18,7 @@ export default function LegalShippingPage() {
 			<p className="mt-2 text-sm text-muted-foreground">Last updated April 2026</p>
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
 				<p>
-					EduAI provides <strong className="text-foreground">digital educational services</strong> (practice
+					24Vertex provides <strong className="text-foreground">digital educational services</strong> (practice
 					content, AI-assisted features, and related tools). We do not ship physical goods as part of the standard
 					subscription.
 				</p>

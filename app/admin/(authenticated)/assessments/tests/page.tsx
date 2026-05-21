@@ -10,7 +10,7 @@ import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timez
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-	title: "Admin tests · EduAI",
+	title: "Admin tests · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

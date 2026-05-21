@@ -1,6 +1,6 @@
 # Practice visuals — operations runbook
 
-Companion to `docs/EDU-AI-VISUALS-GUIDE-V2.md`. The guide is the design;
+Companion to `docs/24Vertex-VISUALS-GUIDE-V2.md`. The guide is the design;
 this file is the operational checklist for rolling out, tuning, and
 rolling back the structured-visual feature.
 

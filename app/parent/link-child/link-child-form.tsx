@@ -18,7 +18,7 @@ function linkChildReasonMessage(reason: string | null): { title: string; body: s
 		case "guardian_email":
 			return {
 				title: "Guardian email must match",
-				body: "Your parent login email must match the guardian email on your student's EduAI profile. Ask them to open Profile and update it, or use the same email you used at parent signup.",
+				body: "Your parent login email must match the guardian email on your student's 24Vertex profile. Ask them to open Profile and update it, or use the same email you used at parent signup.",
 			};
 		case "invalid_code":
 			return {

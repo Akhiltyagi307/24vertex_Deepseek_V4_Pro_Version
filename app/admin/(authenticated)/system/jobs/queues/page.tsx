@@ -2,7 +2,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { BULK_TRACKER_QUEUE, HEALTH_QUEUE, INTEGRITY_QUEUE } from "@/lib/jobs/queue-names";
 
 export const metadata = {
-	title: "Job queues · EduAI Admin",
+	title: "Job queues · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

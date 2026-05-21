@@ -9,7 +9,7 @@ import path from "node:path";
 const root = process.cwd();
 const outDir = path.join(root, ".mcp-github-push-batches");
 const OWNER = "Akhiltyagi307";
-const REPO = "EDU-AI-main";
+const REPO = "24Vertex-main";
 const BRANCH = "main";
 /** Approx max JSON size per batch (MCP / message limits). */
 /** Keep each batch JSON under ~95k so it fits in one Read tool call (100k cap). */
@@ -64,7 +64,7 @@ batches.forEach((files, i) => {
     owner: OWNER,
     repo: REPO,
     branch: BRANCH,
-    message: `chore: import EduAI sources (part ${i + 1}/${batches.length})`,
+    message: `chore: import 24Vertex sources (part ${i + 1}/${batches.length})`,
     files,
   };
   const name = `batch-${String(i + 1).padStart(3, "0")}.json`;

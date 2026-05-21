@@ -5,7 +5,7 @@ import { primeEmailLogoForPreview } from "@/lib/email/email-brand-logo";
 import { buildEmailPreviewSamples } from "@/lib/email/email-preview-samples";
 
 export const metadata = {
-	title: "Email template preview (dev only) · EduAI",
+	title: "Email template preview (dev only) · 24Vertex",
 };
 
 /**
@@ -44,6 +44,10 @@ export default function EmailTemplatesPreviewPage(): React.ReactElement {
 					Other dev galleries:{" "}
 					<a className="underline" href="/dev/practice/visuals/fixture-gallery">
 						practice visual fixtures
+					</a>
+					{" · "}
+					<a className="underline" href="/dev/marketing/portals">
+						marketing portal mocks
 					</a>
 				</p>
 			</header>

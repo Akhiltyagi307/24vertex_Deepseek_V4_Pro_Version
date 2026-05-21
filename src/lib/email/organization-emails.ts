@@ -45,11 +45,11 @@ function emailCopy(params: OrganizationEventEmailParams): {
 	switch (params.event) {
 		case "student_organization_linked":
 			return {
-				subject: `Connected to ${org} on EduAI`,
-				preheader: `Your EduAI account is now connected to ${org}.`,
+				subject: `Connected to ${org} on 24Vertex`,
+				preheader: `Your 24Vertex account is now connected to ${org}.`,
 				title: "Organization connected",
 				paragraphs: [
-					`Your student account is now connected to <strong>${escapeHtml(org)}</strong>. Teachers associated with this organization may be able to view the student data EduAI makes available to them.`,
+					`Your student account is now connected to <strong>${escapeHtml(org)}</strong>. Teachers associated with this organization may be able to view the student data 24Vertex makes available to them.`,
 					"You can unlink from Account settings anytime.",
 				],
 				ctaHref: `${getAppUrl()}/student/settings`,
@@ -57,8 +57,8 @@ function emailCopy(params: OrganizationEventEmailParams): {
 			};
 		case "student_organization_unlinked":
 			return {
-				subject: `Disconnected from ${org} on EduAI`,
-				preheader: `Your EduAI account is no longer connected to ${org}.`,
+				subject: `Disconnected from ${org} on 24Vertex`,
+				preheader: `Your 24Vertex account is no longer connected to ${org}.`,
 				title: "Organization disconnected",
 				paragraphs: [
 					`Your student account is no longer connected to <strong>${escapeHtml(org)}</strong>. Organization teachers will no longer get roster access through that organization.`,
@@ -69,23 +69,23 @@ function emailCopy(params: OrganizationEventEmailParams): {
 			};
 		case "student_organization_deactivated":
 			return {
-				subject: `${org} was removed from EduAI`,
+				subject: `${org} was removed from 24Vertex`,
 				preheader: `Your account was disconnected from ${org}.`,
 				title: "Organization removed",
 				paragraphs: [
-					`<strong>${escapeHtml(org)}</strong> is no longer active on EduAI, so your student account was disconnected from it.`,
-					"You can continue using EduAI without an organization, or connect to another active school or tuition center from Account settings.",
+					`<strong>${escapeHtml(org)}</strong> is no longer active on 24Vertex, so your student account was disconnected from it.`,
+					"You can continue using 24Vertex without an organization, or connect to another active school or tuition center from Account settings.",
 				],
 				ctaHref: `${getAppUrl()}/student/settings`,
 				ctaLabel: "Open account settings",
 			};
 		case "teacher_organization_joined":
 			return {
-				subject: `Connected to ${org} on EduAI`,
+				subject: `Connected to ${org} on 24Vertex`,
 				preheader: `Your teacher account is now connected to ${org}.`,
 				title: "Organization connected",
 				paragraphs: [
-					`Your teacher account is now connected to <strong>${escapeHtml(org)}</strong>. You can access students associated with this organization according to EduAI's teacher access rules.${revoked}`,
+					`Your teacher account is now connected to <strong>${escapeHtml(org)}</strong>. You can access students associated with this organization according to 24Vertex's teacher access rules.${revoked}`,
 					"Link-code access is disabled while your account is connected to an organization.",
 				],
 				ctaHref: `${getAppUrl()}/teacher/settings`,
@@ -93,23 +93,23 @@ function emailCopy(params: OrganizationEventEmailParams): {
 			};
 		case "teacher_organization_left":
 			return {
-				subject: `Disconnected from ${org} on EduAI`,
+				subject: `Disconnected from ${org} on 24Vertex`,
 				preheader: `Your teacher account is no longer connected to ${org}.`,
 				title: "Organization disconnected",
 				paragraphs: [
 					`Your teacher account is no longer connected to <strong>${escapeHtml(org)}</strong>.`,
-					"You can now link students independently using their EduAI link code.",
+					"You can now link students independently using their 24Vertex link code.",
 				],
 				ctaHref: `${getAppUrl()}/teacher/settings`,
 				ctaLabel: "Open teacher settings",
 			};
 		case "teacher_organization_deactivated":
 			return {
-				subject: `${org} was removed from EduAI`,
+				subject: `${org} was removed from 24Vertex`,
 				preheader: `Your teacher account was disconnected from ${org}.`,
 				title: "Organization removed",
 				paragraphs: [
-					`<strong>${escapeHtml(org)}</strong> is no longer active on EduAI, so your teacher account was disconnected from it.`,
+					`<strong>${escapeHtml(org)}</strong> is no longer active on 24Vertex, so your teacher account was disconnected from it.`,
 					"You can continue as an independent teacher or connect to another active organization from Teacher settings.",
 				],
 				ctaHref: `${getAppUrl()}/teacher/settings`,
@@ -117,24 +117,24 @@ function emailCopy(params: OrganizationEventEmailParams): {
 			};
 		case "teacher_linked_student":
 			return {
-				subject: `${teacher} linked to your EduAI account`,
-				preheader: `${teacher} can now access your EduAI student data as an independent teacher.`,
+				subject: `${teacher} linked to your 24Vertex account`,
+				preheader: `${teacher} can now access your 24Vertex student data as an independent teacher.`,
 				title: "Teacher linked",
 				paragraphs: [
-					`<strong>${escapeHtml(teacher)}</strong> linked to your EduAI student account using your link code.`,
-					"If this was not expected, contact your parent, school administrator, or EduAI support.",
+					`<strong>${escapeHtml(teacher)}</strong> linked to your 24Vertex student account using your link code.`,
+					"If this was not expected, contact your parent, school administrator, or 24Vertex support.",
 				],
 				ctaHref: `${getAppUrl()}/student/settings`,
 				ctaLabel: "Open account settings",
 			};
 		case "teacher_student_link_confirmed":
 			return {
-				subject: `Connected to ${student} on EduAI`,
-				preheader: `You can now access ${student}'s EduAI student data as an independent teacher.`,
+				subject: `Connected to ${student} on 24Vertex`,
+				preheader: `You can now access ${student}'s 24Vertex student data as an independent teacher.`,
 				title: "Student linked",
 				paragraphs: [
 					`You are now linked to <strong>${escapeHtml(student)}</strong> as an independent teacher.`,
-					"If you later join a school or tuition center on EduAI, independent student links will be revoked.",
+					"If you later join a school or tuition center on 24Vertex, independent student links will be revoked.",
 				],
 				ctaHref: `${getAppUrl()}/teacher/settings`,
 				ctaLabel: "Open teacher settings",

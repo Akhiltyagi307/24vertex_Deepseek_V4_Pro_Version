@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Privacy policy — EduAI",
-	description: "How EduAI collects, uses, and protects your information.",
+	title: "Privacy policy — 24Vertex",
+	description: "How 24Vertex collects, uses, and protects your information.",
 	alternates: {
 		canonical: "/legal/privacy",
 	},
@@ -19,7 +19,7 @@ export default function LegalPrivacyPage() {
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
 				<p>
 					For this policy, <strong className="text-foreground">&quot;we&quot;, &quot;us&quot;, and &quot;our&quot;</strong>{" "}
-					refer to the operator of the EduAI service. <strong className="text-foreground">&quot;You&quot;</strong> means
+					refer to the operator of the 24Vertex service. <strong className="text-foreground">&quot;You&quot;</strong> means
 					anyone who uses the website or app or purchases a subscription.
 				</p>
 				<p>
@@ -28,7 +28,7 @@ export default function LegalPrivacyPage() {
 					jurisdiction before scaling.
 				</p>
 				<p>
-					<strong className="text-foreground">Students, parents, and schools.</strong> EduAI is built for learners.
+					<strong className="text-foreground">Students, parents, and schools.</strong> 24Vertex is built for learners.
 					Accounts may include profile and guardian or school contact details supplied by you or your institution.
 					Where a student is a child, a parent, guardian, or school may create, pay for, or administer access. We
 					treat guardian and school-provided information as part of the account relationship described below.
@@ -80,7 +80,7 @@ export default function LegalPrivacyPage() {
 				</p>
 				<p>
 					<strong className="text-foreground">How we use information.</strong> We use data to provide and improve
-					EduAI, personalize practice where the product supports it, secure accounts, comply with law, operate billing
+					24Vertex, personalize practice where the product supports it, secure accounts, comply with law, operate billing
 					and entitlements, and communicate about your subscription or the service.
 				</p>
 				<p>

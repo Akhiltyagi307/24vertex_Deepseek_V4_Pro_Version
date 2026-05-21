@@ -17,7 +17,7 @@ import {
  */
 
 export const metadata = {
-	title: "Practice visual template catalogue (dev only) · EduAI",
+	title: "Practice visual template catalogue (dev only) · 24Vertex",
 };
 
 export default function TemplateGalleryPage(): React.ReactElement {

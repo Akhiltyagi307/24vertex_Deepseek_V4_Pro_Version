@@ -72,7 +72,7 @@ function parentReportReadyTitle(childLabel: string, input: NotifyTestReportReady
  *
  * Report-ready emails (student + linked parents) are sent from the email job
  * (`handleEmailJob` in `app/api/internal/practice/run-jobs/route.ts`) with a
- * Supabase signed URL so recipients can open the PDF without EduAI login.
+ * Supabase signed URL so recipients can open the PDF without 24Vertex login.
  */
 export async function notifyTestReportReady(input: NotifyTestReportReadyInput): Promise<void> {
 	try {
@@ -168,7 +168,7 @@ export type NotifyTestReportPdfReadyEmailsResult =
 
 /**
  * Sends student + parent "report ready" emails after the PDF is in Storage.
- * Uses a time-limited signed URL so the PDF opens without EduAI authentication.
+ * Uses a time-limited signed URL so the PDF opens without 24Vertex authentication.
  *
  * Subject line, score, PDF storage path, and submission label are **resolved
  * from Postgres at send time** (`tests`, `subjects`, `test_reports`) so queued

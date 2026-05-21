@@ -36,7 +36,7 @@ export function hashSqlStatement(sqlText: string): string {
  *     verbatim against `ADMIN_SQL_WRITE_ALLOWLIST_TABLES`.
  *
  * Schema is captured but not currently used for allowlisting — schemas in
- * EduAI's admin context are always `public`, so we ignore it. If we ever
+ * 24Vertex's admin context are always `public`, so we ignore it. If we ever
  * allow non-public schemas, extend the allowlist key to `schema.table`.
  */
 const VERB_PATTERN = /^(?:update|delete\s+from|insert\s+into)\s+(?:only\s+)?(?:(?:"((?:[^"]|"")+)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*\.\s*)?(?:"((?:[^"]|"")+)"|([a-zA-Z_][a-zA-Z0-9_]*))/i;

@@ -1,7 +1,7 @@
 import { AdminEmailSuppressionsClient } from "./suppressions-client";
 
 export const metadata = {
-	title: "Email suppressions · EduAI Admin",
+	title: "Email suppressions · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

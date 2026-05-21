@@ -38,13 +38,17 @@ test.describe("public landing", () => {
 			.textContent();
 		expect(jsonLd, "JSON-LD script tag missing").toBeTruthy();
 
-		const parsed = JSON.parse(jsonLd ?? "null") as unknown;
-		expect(Array.isArray(parsed) || typeof parsed === "object").toBe(true);
+		const parsed = JSON.parse(jsonLd ?? "null") as {
+			"@context"?: string;
+			"@graph"?: unknown[];
+		};
+		expect(parsed["@context"]).toBe("https://schema.org");
+		expect(Array.isArray(parsed["@graph"])).toBe(true);
 
 		const blob = JSON.stringify(parsed);
 		expect(blob).toContain('"Organization"');
 		expect(blob).toContain('"WebSite"');
-		expect(blob).toContain('"EduAI"');
+		expect(blob).toContain('"24Vertex"');
 	});
 
 	test("primary CTA navigates to /signup/role-picker", async ({ page }) => {

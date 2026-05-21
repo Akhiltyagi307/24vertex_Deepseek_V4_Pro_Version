@@ -108,8 +108,8 @@ Auth/AuthZ and Validation are `n/a` for this surface (no auth, no input forms).
   import type { MetadataRoute } from 'next';
   export default function sitemap(): MetadataRoute.Sitemap {
     return [
-      { url: 'https://eduai.example.com/', lastModified: new Date(), changeFrequency: 'monthly', priority: 1 },
-      { url: 'https://eduai.example.com/legal/terms', lastModified: new Date(), changeFrequency: 'yearly', priority: 0.5 },
+      { url: 'https://app.24vertex.example.com/', lastModified: new Date(), changeFrequency: 'monthly', priority: 1 },
+      { url: 'https://app.24vertex.example.com/legal/terms', lastModified: new Date(), changeFrequency: 'yearly', priority: 0.5 },
       // … one per legal page
     ];
   }
@@ -124,7 +124,7 @@ Auth/AuthZ and Validation are `n/a` for this surface (no auth, no input forms).
       rules: [
         { userAgent: '*', allow: ['/', '/legal/'], disallow: ['/admin/', '/api/', '/student/', '/teacher/', '/parent/'] },
       ],
-      sitemap: 'https://eduai.example.com/sitemap.xml',
+      sitemap: 'https://app.24vertex.example.com/sitemap.xml',
     };
   }
   ```

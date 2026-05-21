@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { HomeMarketingShell } from "@/components/marketing/home-marketing-shell";
 import { LandingMarketingBody } from "@/components/marketing/landing-marketing-body";
-import { getAppUrl } from "@/lib/env";
-import { CSP_NONCE_REQUEST_HEADER } from "@/lib/security/csp";
+import { getAppUrl, getPublicSupportEmail } from "@/lib/env";
 
 export const metadata: Metadata = {
 	alternates: {
@@ -31,27 +29,37 @@ export default async function HomePage() {
 	// Stamped on the landing page only (not the (public) layout) so we emit a
 	// single Organization node for the site root, not one per legal subpath.
 	const landingBaseUrl = resolveLandingBaseUrl();
-	const organizationLd = {
+	const supportEmail = getPublicSupportEmail();
+	// Root must be a single object with `@context` — Safari throws when the
+	// document is a top-level array (`r["@context"]` is undefined on Array).
+	const landingJsonLd = {
 		"@context": "https://schema.org",
-		"@type": "Organization",
-		name: "EduAI",
-		url: landingBaseUrl,
-		logo: `${landingBaseUrl}/brand/logo-icon.png`,
-		description:
-			"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
-		contactPoint: {
-			"@type": "ContactPoint",
-			contactType: "customer support",
-			email: "support@eduai.in",
-			availableLanguage: ["English", "Hindi"],
-		},
-	};
-	const websiteLd = {
-		"@context": "https://schema.org",
-		"@type": "WebSite",
-		name: "EduAI",
-		url: landingBaseUrl,
-		inLanguage: "en-IN",
+		"@graph": [
+			{
+				"@type": "Organization",
+				name: "24Vertex",
+				url: landingBaseUrl,
+				logo: `${landingBaseUrl}/brand/logo-icon.png`,
+				description:
+					"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
+				...(supportEmail
+					? {
+							contactPoint: {
+								"@type": "ContactPoint",
+								contactType: "customer support",
+								email: supportEmail,
+								availableLanguage: ["English", "Hindi"],
+							},
+						}
+					: {}),
+			},
+			{
+				"@type": "WebSite",
+				name: "24Vertex",
+				url: landingBaseUrl,
+				inLanguage: "en-IN",
+			},
+		],
 	};
 
 	// `getServerUser` is React-cached so `resolvePostAuthPath` (also calls it)
@@ -66,18 +74,15 @@ export default async function HomePage() {
 		}
 	}
 
-	// The per-request nonce is what `proxy.ts` stamps on the CSP header. Without
-	// it, the inline JSON-LD script below would be blocked because `'unsafe-inline'`
-	// is ignored whenever a nonce is present in `script-src` (CSP spec).
-	const nonce = (await headers()).get(CSP_NONCE_REQUEST_HEADER) ?? undefined;
-
 	return (
 		<HomeMarketingShell className="min-h-screen w-full bg-background">
+			{/* JSON-LD is not executable JS — CSP `script-src` does not apply, and
+			    attaching a per-request `nonce` causes a React hydration mismatch
+			    because browsers hide nonce values from DOM APIs during hydration. */}
 			<script
 				type="application/ld+json"
-				nonce={nonce}
 				dangerouslySetInnerHTML={{
-					__html: JSON.stringify([organizationLd, websiteLd]),
+					__html: JSON.stringify(landingJsonLd),
 				}}
 			/>
 			<a

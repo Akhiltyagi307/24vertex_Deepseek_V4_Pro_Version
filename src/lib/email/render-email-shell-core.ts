@@ -166,7 +166,7 @@ function renderCtas(primary: EmailCta | undefined, secondary: EmailCta | undefin
 }
 
 function renderSignOff(signOff: string | undefined): string {
-	const text = signOff ?? "— The EduAI team";
+	const text = signOff ?? "— The 24Vertex team";
 	return `
 <tr>
   <td style="padding:24px 32px 8px;">
@@ -182,7 +182,7 @@ function renderFooter(preferencesHref: string | undefined): string {
 <tr>
   <td style="padding:32px 32px 36px;border-top:1px solid ${BORDER};">
     <p style="margin:0 0 6px;font-family:${FONT_STACK};font-size:12px;line-height:1.55;color:${TEXT_MUTED};">
-      You received this from <strong style="color:${TEXT_FOREGROUND};">EduAI</strong> because of activity on your account.
+      You received this from <strong style="color:${TEXT_FOREGROUND};">24Vertex</strong> because of activity on your account.
       <a href="${escapeHtml(prefs)}" style="color:${BRAND_GREEN};text-decoration:underline;">Manage notification preferences</a>.
     </p>
     <p style="margin:0;font-family:${FONT_STACK};font-size:12px;line-height:1.55;color:${TEXT_MUTED};">
@@ -211,7 +211,7 @@ export function renderEmailShell(opts: EmailShellOptions): string {
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="color-scheme" content="light only" />
 <meta name="supported-color-schemes" content="light" />
-<title>EduAI</title>
+<title>24Vertex</title>
 </head>
 <body style="margin:0;padding:0;background:${PAGE_BG};font-family:${FONT_STACK};color:${TEXT_FOREGROUND};">
 ${renderPreheader(opts.preheader)}

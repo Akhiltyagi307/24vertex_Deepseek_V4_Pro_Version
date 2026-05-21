@@ -14,11 +14,11 @@ export async function sendTeacherApprovedEmail(
 		const safeName = escapeHtml(teacherName);
 
 		const html = renderEmailShell({
-			preheader: "Your EduAI teacher account is ready to sign in.",
+			preheader: "Your 24Vertex teacher account is ready to sign in.",
 			greeting: `Hi ${safeName},`,
 			title: subject,
-			paragraphs: ["Your EduAI teacher account has been approved. You can sign in below."],
-			primaryCta: { label: "Sign in to EduAI", href: loginHref },
+			paragraphs: ["Your 24Vertex teacher account has been approved. You can sign in below."],
+			primaryCta: { label: "Sign in to 24Vertex", href: loginHref },
 		});
 
 		const { error } = await sendHtmlEmailLogged({

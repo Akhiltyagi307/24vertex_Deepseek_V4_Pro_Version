@@ -27,13 +27,13 @@ export function TeacherAppSidebar({
 		email: string;
 		avatar: string | null;
 	};
-	/** Shown under EduAI (e.g. organization type or “Teacher”). */
+	/** Shown under 24Vertex (e.g. organization type or “Teacher”). */
 	contextLabel: string;
 }) {
 	const { state, isMobile } = useSidebar();
 	const collapsedDesktop = state === "collapsed" && !isMobile;
-	const homeTooltip = collapsedDesktop ? `EduAI · ${contextLabel}` : undefined;
-	const homeAriaLabel = collapsedDesktop ? `EduAI, ${contextLabel}. Dashboard.` : undefined;
+	const homeTooltip = collapsedDesktop ? `24Vertex · ${contextLabel}` : undefined;
+	const homeAriaLabel = collapsedDesktop ? `24Vertex, ${contextLabel}. Dashboard.` : undefined;
 
 	return (
 		<Sidebar collapsible="icon" className="!top-12 h-auto">
@@ -50,7 +50,7 @@ export function TeacherAppSidebar({
 								<PresentationIcon className="size-4" />
 							</div>
 							<div className="grid flex-1 text-left text-sm leading-tight">
-								<span className="truncate font-semibold">EduAI</span>
+								<span className="truncate font-semibold">24Vertex</span>
 								<span className="truncate text-xs text-muted-foreground">{contextLabel}</span>
 							</div>
 						</SidebarMenuButton>

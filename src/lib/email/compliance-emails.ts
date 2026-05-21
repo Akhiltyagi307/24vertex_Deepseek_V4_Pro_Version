@@ -9,7 +9,7 @@ export async function sendParentalConsentRerequestEmail(params: {
 	studentName: string;
 	studentId: string;
 }): Promise<{ error: string | null }> {
-	const subject = "Action needed: parental consent for EduAI";
+	const subject = "Action needed: parental consent for 24Vertex";
 	const safeName = escapeHtml(params.studentName);
 	const parentHref = `${getAppUrl()}/parent`;
 
@@ -18,7 +18,7 @@ export async function sendParentalConsentRerequestEmail(params: {
 		greeting: "Hello,",
 		title: subject,
 		paragraphs: [
-			`We need renewed parental consent for the EduAI student account belonging to <strong>${safeName}</strong>.`,
+			`We need renewed parental consent for the 24Vertex student account belonging to <strong>${safeName}</strong>.`,
 			"Please review and complete consent using your usual parent account flow.",
 			"If you did not expect this message, contact support.",
 		],
@@ -41,7 +41,7 @@ export async function sendComplianceDsrFulfilledEmail(params: {
 	to: string;
 	requestType: string;
 }): Promise<{ error: string | null }> {
-	const subject = "Your EduAI privacy request update";
+	const subject = "Your 24Vertex privacy request update";
 	const safeType = escapeHtml(params.requestType);
 
 	const html = renderEmailShell({
@@ -49,7 +49,7 @@ export async function sendComplianceDsrFulfilledEmail(params: {
 		greeting: "Hello,",
 		title: subject,
 		paragraphs: [
-			`Your data subject request (<strong>${safeType}</strong>) for EduAI has been marked fulfilled by our team.`,
+			`Your data subject request (<strong>${safeType}</strong>) for 24Vertex has been marked fulfilled by our team.`,
 			"If you need further assistance, reply to this email.",
 		],
 	});

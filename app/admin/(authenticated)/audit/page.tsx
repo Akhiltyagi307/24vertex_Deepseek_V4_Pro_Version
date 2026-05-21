@@ -8,7 +8,7 @@ import { adminActionLog } from "@/db/schema/admin-action-log";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
 export const metadata = {
-	title: "Admin audit · EduAI",
+	title: "Admin audit · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

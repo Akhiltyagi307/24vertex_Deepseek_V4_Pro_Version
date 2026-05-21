@@ -10,12 +10,12 @@ const TTL_MS = 1_500;
 const MAX_ENTRIES = 1_000;
 
 const globalForLru = globalThis as unknown as {
-	__eduAiRlDenials?: Map<string, number>;
+	__vertex24RlDenials?: Map<string, number>;
 };
 
-const denials: Map<string, number> = globalForLru.__eduAiRlDenials ?? new Map();
-if (!globalForLru.__eduAiRlDenials) {
-	globalForLru.__eduAiRlDenials = denials;
+const denials: Map<string, number> = globalForLru.__vertex24RlDenials ?? new Map();
+if (!globalForLru.__vertex24RlDenials) {
+	globalForLru.__vertex24RlDenials = denials;
 }
 
 function evict() {

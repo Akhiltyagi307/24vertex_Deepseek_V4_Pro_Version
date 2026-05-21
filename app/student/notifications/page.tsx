@@ -16,7 +16,7 @@ export default async function StudentNotificationsPage() {
 			<header className="flex flex-col gap-1">
 				<h1 className="font-heading text-xl font-semibold text-foreground">Notifications</h1>
 				<p className="text-sm text-muted-foreground">
-					Report updates, plan alerts, and announcements from EduAI.
+					Report updates, plan alerts, and announcements from 24Vertex.
 				</p>
 			</header>
 			<Suspense fallback={<NotificationsSkeleton />}>

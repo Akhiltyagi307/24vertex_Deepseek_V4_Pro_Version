@@ -32,8 +32,8 @@ const PARENT_GREETING_TEMPLATES = [
 			: `${name}'s activity at a glance: scores, subjects, and what to watch next.`,
 	(name: string) =>
 		name === "there"
-			? "EduAI progress for your linked student: recent tests, topic coverage, and trends below."
-			: `EduAI progress for ${name}: recent tests, topic coverage, and trends below.`,
+			? "24Vertex progress for your linked student: recent tests, topic coverage, and trends below."
+			: `24Vertex progress for ${name}: recent tests, topic coverage, and trends below.`,
 	(name: string) =>
 		name === "there"
 			? "Snapshot of your student: strengths, gaps, and recent timed tests below."

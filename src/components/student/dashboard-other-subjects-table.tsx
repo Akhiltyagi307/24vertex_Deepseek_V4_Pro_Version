@@ -133,33 +133,35 @@ export function DashboardOtherSubjectsTable({
 			)}
 		>
 			<table
-				className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm medium:min-w-0"
+				className="w-full table-fixed border-separate border-spacing-0 text-sm min-w-[32rem] medium:min-w-0"
 				aria-label="Other subjects and quick links to practice"
 			>
+				<colgroup>
+					<col className="w-[28%]" />
+					<col className="w-[17%]" />
+					<col className="w-[33%]" />
+					<col className="w-[10%]" />
+					<col className="w-[8%]" />
+					<col className="w-[4%]" />
+				</colgroup>
 				<thead>
 					<tr>
-						<th
-							scope="col"
-							className={cn(th, thHeaderBg, thSticky, "rounded-tl-lg", "w-[24%] min-w-[7.5rem] medium:w-[22%]")}
-						>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "rounded-tl-lg")}>
 							Subject
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-[18%] min-w-[5.5rem]")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky)}>
 							Status
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-[30%] min-w-[9rem]")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky)}>
 							Progress
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, thSticky, "w-14 text-right tabular-nums medium:w-16")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "text-right tabular-nums")}>
 							Coverage
 						</th>
-						<th
-							scope="col"
-							className={cn(th, thHeaderBg, thSticky, "w-[3.5rem] text-right tabular-nums medium:w-16")}
-						>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "text-right tabular-nums")}>
 							Avg score
 						</th>
-						<th scope="col" className={cn(th, thHeaderBg, thSticky, "rounded-tr-lg", "w-9 text-right")}>
+						<th scope="col" className={cn(th, thHeaderBg, thSticky, "rounded-tr-lg", "text-right")}>
 							<span className="sr-only">Open practice</span>
 						</th>
 					</tr>
@@ -207,7 +209,7 @@ function NoTopicsRow({ s, rowVariants }: { s: DashboardSubjectCompactModel; rowV
 				</div>
 			</td>
 			<td className={commonTd}>
-				<div className="h-1.5 w-full max-w-[8rem] rounded-full bg-white/[0.04]" aria-hidden />
+				<div className="h-1.5 w-full rounded-full bg-white/[0.04]" aria-hidden />
 			</td>
 			<td className={cn(commonTd, "text-right text-sm tabular-nums text-muted-foreground")}>—</td>
 			<td className={cn(commonTd, "text-right text-sm tabular-nums text-muted-foreground")}>—</td>
@@ -264,11 +266,11 @@ function DataRow({ s, rowVariants }: { s: DashboardSubjectCompactModel; rowVaria
 				</div>
 			</td>
 			<td className={commonTd}>
-				<div className="min-w-0 max-w-sm">
+				<div className="min-w-0 w-full">
 					<div className="mb-0.5 text-xs text-muted-foreground tabular-nums">
 						<span className="truncate">{progressLabel}</span>
 					</div>
-					<div className="h-1.5 w-full min-w-[6rem] overflow-hidden rounded-full bg-white/[0.06]" aria-hidden>
+					<div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]" aria-hidden>
 						{hasAttempts && coveragePct > 0 ? (
 							<div
 								className={cn("h-full rounded-full transition-[width]", BAR[visual])}

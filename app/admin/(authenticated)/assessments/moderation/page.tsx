@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { moderationFlags } from "@/db/schema/moderation-flags";
 
 export const metadata = {
-	title: "Moderation · EduAI Admin",
+	title: "Moderation · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

@@ -10,7 +10,7 @@ import { QuestionVisualPdf } from "@/lib/student/practice-grading-pdf-visual";
 
 /**
  * Print theme: refined editorial PDF design — strong typographic hierarchy,
- * EduAI brand (#2ea070) accents, semantic verdict colors, hero score on cover,
+ * 24Vertex brand (#2ea070) accents, semantic verdict colors, hero score on cover,
  * accent bars on section labels, and zebra-striped tables.
  * Tight radii, hairline borders, top accent rule — Supabase Studio inspired.
  */
@@ -562,7 +562,7 @@ function BrandedTopRight({ logoSrc }: { logoSrc: string | Buffer | null }) {
 		// eslint-disable-next-line jsx-a11y/alt-text -- PDF logo, decorative in document
 		return <Image src={logoSrc} style={styles.logo} />;
 	}
-	return <Text style={styles.wordmark}>EduAI</Text>;
+	return <Text style={styles.wordmark}>24Vertex</Text>;
 }
 
 function QHeaderRight({ logoSrc }: { logoSrc: string | Buffer | null }) {
@@ -570,7 +570,7 @@ function QHeaderRight({ logoSrc }: { logoSrc: string | Buffer | null }) {
 		// eslint-disable-next-line jsx-a11y/alt-text -- PDF logo, decorative in document
 		return <Image src={logoSrc} style={styles.logoSm} />;
 	}
-	return <Text style={[styles.wordmark, { fontSize: 12 }]}>EduAI</Text>;
+	return <Text style={[styles.wordmark, { fontSize: 12 }]}>24Vertex</Text>;
 }
 
 function TagChipList({ items }: { items: string[] }) {
@@ -612,7 +612,7 @@ function GlobalFooter() {
 			style={styles.footer}
 			fixed
 			render={({ pageNumber, totalPages }) =>
-				`EduAI  ·  Confidential practice report  ·  ${pageNumber} / ${totalPages}`
+				`24Vertex  ·  Confidential practice report  ·  ${pageNumber} / ${totalPages}`
 			}
 		/>
 	);

@@ -56,7 +56,7 @@ const DEFAULT_MESSAGES: Record<PaywallReason, string> = {
 	quota_tokens:
 		"Upgrade to Pro for up to 400k AI output tokens per month for doubt chat (more for grades 11–12).",
 	trial_expired: "Your 14-day trial is up. Choose a Pro plan to keep practising.",
-	expired: "Pick a plan to re-activate EduAI and continue where you left off.",
+	expired: "Pick a plan to re-activate 24Vertex and continue where you left off.",
 	past_due: "Update your payment method on the subscription page to restore access.",
 	no_subscription: "Pick a plan to start generating practice tests and chatting with the AI tutor.",
 };

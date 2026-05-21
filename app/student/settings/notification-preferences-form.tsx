@@ -34,7 +34,7 @@ const PREF_LABELS: Record<PrefKey, { title: string; description: string }> = {
 	},
 	announcement: {
 		title: "Announcements",
-		description: "Product updates and important EduAI news.",
+		description: "Product updates and important 24Vertex news.",
 	},
 	reminder: {
 		title: "Reminders",

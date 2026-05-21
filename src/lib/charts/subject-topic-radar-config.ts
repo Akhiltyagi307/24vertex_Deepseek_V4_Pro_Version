@@ -7,7 +7,7 @@ export type SubjectTopicRadarDatum = {
 };
 
 /**
- * Marketing and dashboard topic radar accent. Resolves to the EduAI brand green
+ * Marketing and dashboard topic radar accent. Resolves to the 24Vertex brand green
  * via the `--subject-grid-icon` token so the chart inherits theme switches
  * (One Voice Rule, DESIGN.md §2).
  */

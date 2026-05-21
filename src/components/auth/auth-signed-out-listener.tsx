@@ -3,6 +3,9 @@
 import { useEffect } from "react";
 
 import { AUTH_CHANNEL, AUTH_SIGNED_OUT_MESSAGE } from "@/lib/auth/sign-out";
+import { LEGACY_PRODUCT_SLUG } from "@/lib/brand/constants";
+
+const LEGACY_AUTH_CHANNEL = `${LEGACY_PRODUCT_SLUG}-auth`;
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -13,7 +16,7 @@ import { createClient } from "@/lib/supabase/client";
  *   1. `supabase.auth.onAuthStateChange("SIGNED_OUT")` — Supabase fires this
  *      via its shared localStorage backing store, so even tabs that never
  *      received the BroadcastChannel message still react.
- *   2. `BroadcastChannel("eduai-auth")` — explicit message from the active
+ *   2. `BroadcastChannel` — explicit message from the active
  *      tab's `signOutEverywhere()` covers browsers where storage events get
  *      throttled (e.g. Safari background tabs).
  */
@@ -28,23 +31,26 @@ export function AuthSignedOutListener() {
 			}
 		});
 
-		let bc: BroadcastChannel | null = null;
+		const channels: BroadcastChannel[] = [];
 		if (typeof BroadcastChannel !== "undefined") {
-			try {
-				bc = new BroadcastChannel(AUTH_CHANNEL);
-				bc.onmessage = (ev) => {
-					if (ev.data === AUTH_SIGNED_OUT_MESSAGE) {
-						window.location.href = "/login";
-					}
-				};
-			} catch {
-				// ignore — fallback to onAuthStateChange path
+			for (const name of [AUTH_CHANNEL, LEGACY_AUTH_CHANNEL]) {
+				try {
+					const bc = new BroadcastChannel(name);
+					bc.onmessage = (ev) => {
+						if (ev.data === AUTH_SIGNED_OUT_MESSAGE) {
+							window.location.href = "/login";
+						}
+					};
+					channels.push(bc);
+				} catch {
+					// ignore — fallback to onAuthStateChange path
+				}
 			}
 		}
 
 		return () => {
 			subscription.unsubscribe();
-			bc?.close();
+			for (const bc of channels) bc.close();
 		};
 	}, []);
 

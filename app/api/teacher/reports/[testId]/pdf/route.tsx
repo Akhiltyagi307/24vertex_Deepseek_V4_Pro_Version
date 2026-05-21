@@ -120,7 +120,7 @@ export async function GET(request: Request, context: RouteContext) {
 		if (!dlErr && fileBlob) {
 			const buf = await fileBlob.arrayBuffer();
 			const short = testId.replace(/-/g, "").slice(0, 8);
-			const filename = `eduai-report-${short}.pdf`;
+			const filename = `24vertex-report-${short}.pdf`;
 			const contentDisposition = contentDispositionWithFilename(
 				inline ? "inline" : "attachment",
 				filename,
@@ -149,7 +149,7 @@ export async function GET(request: Request, context: RouteContext) {
 				});
 			}
 			const short = testId.replace(/-/g, "").slice(0, 8);
-			const filename = `eduai-report-${short}.pdf`;
+			const filename = `24vertex-report-${short}.pdf`;
 			const contentDisposition = contentDispositionWithFilename(
 				inline ? "inline" : "attachment",
 				filename,
@@ -172,7 +172,7 @@ export async function GET(request: Request, context: RouteContext) {
 			<TestReportPdfDocument subjectName={subjectName} test={test} hasAiReport={Boolean(reportRow)} />,
 		);
 		const short = testId.replace(/-/g, "").slice(0, 8);
-		const filename = `eduai-report-${short}.pdf`;
+		const filename = `24vertex-report-${short}.pdf`;
 		const contentDisposition = contentDispositionWithFilename(
 			inline ? "inline" : "attachment",
 			filename,

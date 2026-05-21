@@ -4,7 +4,7 @@ import { AdminActiveSessionsClient } from "./active-sessions-client";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 
 export const metadata = {
-	title: "Admin active sessions · EduAI",
+	title: "Admin active sessions · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

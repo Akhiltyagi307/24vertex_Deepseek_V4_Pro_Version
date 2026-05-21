@@ -4,7 +4,7 @@ import { AdminSqlConsoleClient } from "./sql-console-client";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 
 export const metadata = {
-	title: "Admin SQL console · EduAI",
+	title: "Admin SQL console · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

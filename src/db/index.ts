@@ -8,8 +8,8 @@ if (!connectionString) {
 }
 
 const globalForPg = globalThis as unknown as {
-	__eduAiPostgres?: ReturnType<typeof postgres>;
-	__eduAiRateLimitPostgres?: ReturnType<typeof postgres>;
+	__vertex24Postgres?: ReturnType<typeof postgres>;
+	__vertex24RateLimitPostgres?: ReturnType<typeof postgres>;
 };
 
 function parsePoolMax(envVar: string, fallback: number, ceiling = 10): number {
@@ -44,7 +44,7 @@ function createPostgres(url: string) {
 		max_lifetime: isProd ? 60 * 60 : 60 * 5,
 		connect_timeout: 15,
 		connection: {
-			application_name: "edu-ai-next",
+			application_name: "vertex24-next",
 		},
 	});
 }
@@ -66,23 +66,23 @@ function createRateLimitPostgres(url: string) {
 		max_lifetime: isProd ? 30 * 60 : 60 * 5,
 		connect_timeout: 5,
 		connection: {
-			application_name: "edu-ai-ratelimit",
+			application_name: "vertex24-ratelimit",
 			statement_timeout: 200,
 		},
 	});
 }
 
-if (!globalForPg.__eduAiPostgres) {
-	globalForPg.__eduAiPostgres = createPostgres(connectionString);
+if (!globalForPg.__vertex24Postgres) {
+	globalForPg.__vertex24Postgres = createPostgres(connectionString);
 }
 
-if (!globalForPg.__eduAiRateLimitPostgres) {
+if (!globalForPg.__vertex24RateLimitPostgres) {
 	const rlUrl = process.env.DATABASE_RATELIMIT_URL?.trim() || connectionString;
-	globalForPg.__eduAiRateLimitPostgres = createRateLimitPostgres(rlUrl);
+	globalForPg.__vertex24RateLimitPostgres = createRateLimitPostgres(rlUrl);
 }
 
-const client = globalForPg.__eduAiPostgres;
-const rateLimitClient = globalForPg.__eduAiRateLimitPostgres;
+const client = globalForPg.__vertex24Postgres;
+const rateLimitClient = globalForPg.__vertex24RateLimitPostgres;
 
 export const db = drizzle(client, { schema });
 export type Db = typeof db;

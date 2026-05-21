@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { AdminLoginForm } from "./admin-login-form";
 
 export const metadata = {
-	title: "Admin sign in · EduAI",
+	title: "Admin sign in · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

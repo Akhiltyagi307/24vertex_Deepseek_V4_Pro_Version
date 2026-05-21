@@ -89,7 +89,7 @@ export default async function ParentSelectStudentPage() {
 							<UsersRoundIcon className="size-7 text-muted-foreground" aria-hidden />
 						</div>
 						<p className="text-foreground text-sm leading-relaxed">
-							You haven&apos;t linked a child yet. Ask them for their six-character link code from their EduAI
+							You haven&apos;t linked a child yet. Ask them for their six-character link code from their 24Vertex
 							Profile (student app).
 						</p>
 						<div className="mt-6">

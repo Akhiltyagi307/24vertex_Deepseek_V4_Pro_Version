@@ -3,7 +3,11 @@ import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
+import {
+	EDUAI_PENDING_REGISTRATION_META_KEY,
+	PENDING_REGISTRATION_META_KEYS,
+	VERTEX24_PENDING_REGISTRATION_META_KEY,
+} from "@/lib/auth/pending-registration-meta";
 import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { classifyLinkParentRpc } from "@/lib/auth/link-parent-rpc-errors";
@@ -117,8 +121,16 @@ type PendingParseResult =
  * `user.user_metadata`. Only accepting strings caused pending registration to be skipped after
  * email confirmation (users stuck on role picker with a session but no profile).
  */
+function pendingMetaRaw(user: User): unknown {
+	for (const key of PENDING_REGISTRATION_META_KEYS) {
+		const raw = user.user_metadata?.[key];
+		if (raw != null) return raw;
+	}
+	return null;
+}
+
 function parsePendingEnvelopeFromUser(user: User): PendingParseResult {
-	const raw = user.user_metadata?.[EDUAI_PENDING_REGISTRATION_META_KEY];
+	const raw = pendingMetaRaw(user);
 	if (raw == null) {
 		return { status: "none" };
 	}
@@ -213,15 +225,14 @@ function mergeUserFromHandshake(apiUser: User, handshake?: User | null): User {
 		merged = { ...merged, email: handshake.email };
 	}
 
-	const key = EDUAI_PENDING_REGISTRATION_META_KEY;
-	const apiMeta = merged.user_metadata?.[key];
-	const handshakeMeta = handshake.user_metadata?.[key];
+	const apiMeta = pendingMetaRaw(merged);
+	const handshakeMeta = pendingMetaRaw(handshake);
 	if (apiMeta == null && handshakeMeta != null) {
 		merged = {
 			...merged,
 			user_metadata: {
 				...(merged.user_metadata ?? {}),
-				[key]: handshakeMeta,
+				[VERTEX24_PENDING_REGISTRATION_META_KEY]: handshakeMeta,
 			},
 		};
 	}

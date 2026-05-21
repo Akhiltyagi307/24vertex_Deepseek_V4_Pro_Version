@@ -166,10 +166,13 @@ export function PracticeTestSession({
 	React.useEffect(() => {
 		let fp = "";
 		try {
-			const key = "eduai_practice_fp_v1";
-			fp = sessionStorage.getItem(key) ?? "";
+			const key = "vertex24_practice_fp_v1";
+			const legacyKey = "vertex24_practice_fp_v1";
+			fp = sessionStorage.getItem(key) ?? sessionStorage.getItem(legacyKey) ?? "";
 			if (!fp) {
 				fp = crypto.randomUUID().replace(/-/g, "").slice(0, 40);
+				sessionStorage.setItem(key, fp);
+			} else {
 				sessionStorage.setItem(key, fp);
 			}
 		} catch {

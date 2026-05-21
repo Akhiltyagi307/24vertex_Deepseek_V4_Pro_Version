@@ -7,7 +7,7 @@ import { listTopicsWithZeroContextChunks } from "@/lib/admin/context-chunk-cover
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
 export const metadata = {
-	title: "Context chunk tools · EduAI Admin",
+	title: "Context chunk tools · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

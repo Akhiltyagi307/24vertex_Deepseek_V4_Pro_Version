@@ -7,7 +7,7 @@ import { insertInAppNotification } from "@/lib/notifications/insert";
 
 /**
  * Flip `profiles.is_verified` for a teacher via `admin_set_teacher_verified`,
- * which sets `eduai.bypass_profile_update_guard` and updates in one server-side
+ * which sets `vertex24.bypass_profile_update_guard` and updates in one server-side
  * call so transaction poolers cannot lose the session flag between statements.
  */
 export async function setTeacherVerified(teacherId: string, verified: boolean): Promise<boolean> {

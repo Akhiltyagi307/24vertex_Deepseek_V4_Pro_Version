@@ -9,7 +9,7 @@ import { subjects } from "@/db/schema/academic";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
 export const metadata = {
-	title: "Subjects · EduAI Admin",
+	title: "Subjects · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

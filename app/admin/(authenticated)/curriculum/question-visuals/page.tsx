@@ -5,7 +5,7 @@ import { adminListRecentQuestionsWithVisuals } from "@/lib/admin/visuals-gallery
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 
 export const metadata = {
-	title: "Question visuals · EduAI",
+	title: "Question visuals · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

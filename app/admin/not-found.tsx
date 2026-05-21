@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-	title: "Page not found · EduAI Admin",
+	title: "Page not found · 24Vertex Admin",
 	robots: { index: false, follow: false },
 };
 

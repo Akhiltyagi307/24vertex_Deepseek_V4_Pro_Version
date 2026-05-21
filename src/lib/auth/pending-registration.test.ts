@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { EDUAI_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
+import { VERTEX24_PENDING_REGISTRATION_META_KEY } from "@/lib/auth/pending-registration-meta";
 import { consumePendingRegistration } from "@/lib/auth/pending-registration";
 
 vi.mock("server-only", () => ({}));
@@ -89,7 +89,7 @@ describe("consumePendingRegistration", () => {
 							id: "teacher-uid",
 							email: "teacher@example.com",
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "teacher",
 									payload: {
@@ -138,7 +138,7 @@ describe("consumePendingRegistration", () => {
 			id: "teacher-uid",
 			email: "teacher@example.com",
 			user_metadata: {
-				[EDUAI_PENDING_REGISTRATION_META_KEY]: handshakeMeta,
+				[VERTEX24_PENDING_REGISTRATION_META_KEY]: handshakeMeta,
 			},
 		};
 		const supabase = {
@@ -180,7 +180,7 @@ describe("consumePendingRegistration", () => {
 			id: "teacher-uid",
 			email: "teacher@example.com",
 			user_metadata: {
-				[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+				[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 					version: 1,
 					role: "teacher",
 					payload: {
@@ -245,7 +245,7 @@ describe("consumePendingRegistration", () => {
 								},
 							],
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "teacher",
 									payload: {
@@ -285,7 +285,7 @@ describe("consumePendingRegistration", () => {
 							id: "teacher-uid",
 							email: "teacher@example.com",
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "teacher",
 									payload: {
@@ -321,7 +321,7 @@ describe("consumePendingRegistration", () => {
 							id: "teacher-legacy",
 							email: "teacher@example.com",
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "teacher",
 									payload: {
@@ -363,7 +363,7 @@ describe("consumePendingRegistration", () => {
 							id: "parent-auth-id",
 							email: "parent@example.com",
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "parent",
 									payload: {
@@ -412,7 +412,7 @@ describe("consumePendingRegistration", () => {
 							id: "p2-auth-id",
 							email: "p2@example.com",
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "parent",
 									payload: {
@@ -469,7 +469,7 @@ describe("consumePendingRegistration", () => {
 							id: "orphan-parent",
 							email: "orph@example.com",
 							user_metadata: {
-								[EDUAI_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
+								[VERTEX24_PENDING_REGISTRATION_META_KEY]: JSON.stringify({
 									version: 1,
 									role: "parent",
 									payload: {

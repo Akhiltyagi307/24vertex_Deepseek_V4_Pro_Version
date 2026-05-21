@@ -33,9 +33,9 @@ describe("getAppUrl", () => {
 
 	it("normalizes a configured URL", () => {
 		vi.stubEnv("NODE_ENV", "development");
-		vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://eduai.example.com/");
+		vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.24vertex.example.com/");
 
-		expect(getAppUrl()).toBe("https://eduai.example.com");
+		expect(getAppUrl()).toBe("https://app.24vertex.example.com");
 	});
 
 	it("throws in production when the app URL is missing", () => {

@@ -1,5 +1,5 @@
 export const metadata = {
-	title: "Maintenance · EduAI",
+	title: "Maintenance · 24Vertex",
 	robots: { index: false, follow: false },
 };
 

@@ -6,7 +6,7 @@ import { getServerUser } from "@/lib/auth/get-server-user";
 
 export const metadata: Metadata = {
 	title: "Choose how to sign up",
-	description: "Pick your role to start an EduAI account: student, parent, or teacher.",
+	description: "Pick your role to start an 24Vertex account: student, parent, or teacher.",
 };
 
 export default async function RolePickerPage() {
