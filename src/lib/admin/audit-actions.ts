@@ -137,6 +137,7 @@ export const ADMIN_ACTIONS = {
 	MODERATION_BLACKLIST_ADD: "moderation_blacklist_add",
 	MODERATION_BLACKLIST_DELETE: "moderation_blacklist_delete",
 	MODERATION_FLAG_RESOLVE: "moderation_flag_resolve",
+	FEEDBACK_REPORT_UPDATE: "feedback_report_update",
 	IDENTITY_BLOCKLIST_UPSERT: "identity_blocklist_upsert",
 
 	// Compliance / DPDP

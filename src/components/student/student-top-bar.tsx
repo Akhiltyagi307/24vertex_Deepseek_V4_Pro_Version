@@ -5,6 +5,7 @@ import {
 	HeaderBreadcrumbSlash,
 	type HeaderPortal,
 } from "@/components/layout/app-header-brand-trail";
+import { FeedbackReportTopBarButton } from "@/components/feedback/feedback-report-top-bar-button";
 import { ActivityStreakWidget } from "@/components/student/activity-streak-widget";
 import { StudentNotificationsBell } from "@/components/student/notifications/notifications-bell";
 import type { StudentActivityStreakSnapshot } from "@/lib/student/activity-streak";
@@ -71,6 +72,9 @@ export function StudentTopBar({
 						portal="parent"
 					/>
 				) : null}
+				<FeedbackReportTopBarButton
+					portal={headerPortal === "parent" ? "parent" : "student"}
+				/>
 				<ThemeToggle />
 			</div>
 		</header>

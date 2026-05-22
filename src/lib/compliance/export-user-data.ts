@@ -16,6 +16,7 @@ import { auditLogs, emailLog, notifications, userPreferences } from "@/db/schema
 import { doubtConversations, doubtMessageAttachments, doubtMessages } from "@/db/schema/doubt";
 import { parentalConsents } from "@/db/schema/parental-consents";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
+import { userFeedbackReports } from "@/db/schema/user-feedback-reports";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 /**
@@ -62,6 +63,11 @@ export async function buildComplianceExportZip(input: {
 	}
 
 	const qFlagRows = await db.select().from(questionFlags).where(eq(questionFlags.studentId, userId)).limit(50_000);
+	const feedbackRows = await db
+		.select()
+		.from(userFeedbackReports)
+		.where(eq(userFeedbackReports.userId, userId))
+		.limit(10_000);
 	const submissionRows = await db
 		.select()
 		.from(assignmentSubmissions)
@@ -157,6 +163,7 @@ export async function buildComplianceExportZip(input: {
 		{ name: "test_reports.json", rows: reportRows },
 		{ name: "admin_test_messages.json", rows: adminMsgRows },
 		{ name: "question_flags.json", rows: qFlagRows },
+		{ name: "user_feedback_reports.json", rows: feedbackRows },
 		{ name: "assignment_submissions.json", rows: submissionRows },
 		{ name: "notifications.json", rows: notifRows },
 		{ name: "user_preferences.json", rows: prefRows },

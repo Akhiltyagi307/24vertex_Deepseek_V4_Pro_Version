@@ -146,6 +146,7 @@ const groups: SidebarGroup[] = [
 			{ href: "/admin/system/integrity", label: "Integrity" },
 			{ href: "/admin/system/active-sessions", label: "Sessions" },
 			{ href: "/admin/system/maintenance-readiness", label: "Maintenance" },
+			{ href: "/admin/system/feedback", label: "User feedback" },
 		],
 	},
 ];

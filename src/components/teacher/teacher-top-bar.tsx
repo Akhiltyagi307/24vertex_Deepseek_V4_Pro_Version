@@ -1,5 +1,6 @@
 "use client";
 
+import { FeedbackReportTopBarButton } from "@/components/feedback/feedback-report-top-bar-button";
 import {
 	AppHeaderBrandTrail,
 	HeaderBreadcrumbSlash,
@@ -36,6 +37,7 @@ export function TeacherTopBar({ organizationName, userDisplayName }: TeacherTopB
 				/>
 			</div>
 			<div className="flex items-center gap-2">
+				<FeedbackReportTopBarButton portal="teacher" />
 				<ThemeToggle />
 			</div>
 		</header>

@@ -11,6 +11,7 @@ import { notifications, userPreferences } from "@/db/schema/comms-audit";
 import { complianceRequests } from "@/db/schema/compliance-requests";
 import { doubtConversations, doubtMessageAttachments, doubtMessages } from "@/db/schema/doubt";
 import { profiles, parentStudentLinks } from "@/db/schema/profiles";
+import { userFeedbackReports } from "@/db/schema/user-feedback-reports";
 import { recordComplianceEvent } from "@/lib/compliance/events";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -62,6 +63,12 @@ export async function countErasureImpact(userId: string): Promise<ErasureCounts>
 		.from(questionFlags)
 		.where(eq(questionFlags.studentId, userId));
 	counts.question_flags_deleted = Number(qf ?? 0);
+
+	const [{ c: ufr }] = await db
+		.select({ c: sql<number>`count(*)::int` })
+		.from(userFeedbackReports)
+		.where(eq(userFeedbackReports.userId, userId));
+	counts.user_feedback_reports_deleted = Number(ufr ?? 0);
 
 	const [{ c: perf }] = await db
 		.select({ c: sql<number>`count(*)::int` })
@@ -227,6 +234,7 @@ export async function performComplianceErasure(
 				await tx.delete(adminTestMessages).where(inArray(adminTestMessages.testId, testIds));
 			}
 			await tx.delete(questionFlags).where(eq(questionFlags.studentId, userId));
+			await tx.delete(userFeedbackReports).where(eq(userFeedbackReports.userId, userId));
 			await tx.delete(performanceTracker).where(eq(performanceTracker.studentId, userId));
 			await tx.delete(assignmentSubmissions).where(eq(assignmentSubmissions.studentId, userId));
 			await tx.delete(notifications).where(eq(notifications.recipientId, userId));

@@ -28,3 +28,4 @@ export * from "./profiles";
 export * from "./teacher-approval-history";
 export * from "./teaching";
 export * from "./topic-context-chunks";
+export * from "./user-feedback-reports";
