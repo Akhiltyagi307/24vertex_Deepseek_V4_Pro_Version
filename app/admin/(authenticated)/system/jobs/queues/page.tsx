@@ -22,7 +22,7 @@ export default function AdminJobQueuesPage() {
 			<ul className="list-inside list-disc space-y-2 text-sm">
 				{queues.map((q) => (
 					<li key={q}>
-						<code className="rounded bg-muted px-1 py-0.5">{q}</code> — POST{" "}
+						<code className="rounded bg-muted px-1 py-0.5">{q}</code>: POST{" "}
 						<code className="rounded bg-muted px-1 py-0.5">/api/admin/jobs/queues/{q}/pause</code> or{" "}
 						<code className="rounded bg-muted px-1 py-0.5">/resume</code>
 					</li>

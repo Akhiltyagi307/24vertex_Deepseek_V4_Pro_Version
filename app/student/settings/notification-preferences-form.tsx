@@ -190,7 +190,7 @@ export function NotificationPreferencesForm({
 						<CardTitle className="text-lg">Notification preferences</CardTitle>
 						<CardDescription className="text-base leading-relaxed">
 							Choose where you want to be notified and which types you care about. Use{" "}
-							<strong className="font-medium text-foreground">Save preferences</strong> on this tab—not
+							<strong className="font-medium text-foreground">Save preferences</strong> on this tab, not
 							“Save changes” at the bottom.
 						</CardDescription>
 					</CardHeader>

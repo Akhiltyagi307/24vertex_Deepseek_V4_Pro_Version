@@ -24,10 +24,10 @@ function resolveLandingBaseUrl(): string {
 	}
 }
 
+const PARENT_FIRST_DESCRIPTION =
+	"24Vertex helps Indian families catch weak chapters before report-card day, with adaptive AI practice, a private Explain and Solve-with-me tutor, and a chapter-level parent dashboard. Built for grades 6 to 10, aligned to CBSE, ICSE, and state boards.";
+
 export default async function HomePage() {
-	// Schema.org JSON-LD: declares the organization + the canonical website.
-	// Stamped on the landing page only (not the (public) layout) so we emit a
-	// single Organization node for the site root, not one per legal subpath.
 	const landingBaseUrl = resolveLandingBaseUrl();
 	const supportEmail = getPublicSupportEmail();
 	// Root must be a single object with `@context` — Safari throws when the
@@ -36,12 +36,12 @@ export default async function HomePage() {
 		"@context": "https://schema.org",
 		"@graph": [
 			{
-				"@type": "Organization",
+				"@type": "EducationalOrganization",
 				name: "24Vertex",
 				url: landingBaseUrl,
 				logo: `${landingBaseUrl}/brand/logo-icon.png`,
-				description:
-					"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
+				description: PARENT_FIRST_DESCRIPTION,
+				sameAs: [],
 				...(supportEmail
 					? {
 							contactPoint: {
@@ -58,6 +58,44 @@ export default async function HomePage() {
 				name: "24Vertex",
 				url: landingBaseUrl,
 				inLanguage: "en-IN",
+				description: PARENT_FIRST_DESCRIPTION,
+			},
+			{
+				"@type": "Product",
+				name: "24Vertex parent plan",
+				description:
+					"Adaptive AI practice, private Explain and Solve-with-me tutor, and chapter-level analytics for grades 6 to 10. 14-day free trial.",
+				brand: { "@type": "Brand", name: "24Vertex" },
+				offers: [
+					{
+						"@type": "Offer",
+						name: "Monthly",
+						price: "1000",
+						priceCurrency: "INR",
+						priceSpecification: {
+							"@type": "UnitPriceSpecification",
+							price: "1000",
+							priceCurrency: "INR",
+							referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" },
+						},
+						availability: "https://schema.org/InStock",
+						url: `${landingBaseUrl}/signup/parent`,
+					},
+					{
+						"@type": "Offer",
+						name: "Yearly",
+						price: "10000",
+						priceCurrency: "INR",
+						priceSpecification: {
+							"@type": "UnitPriceSpecification",
+							price: "10000",
+							priceCurrency: "INR",
+							referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "ANN" },
+						},
+						availability: "https://schema.org/InStock",
+						url: `${landingBaseUrl}/signup/parent`,
+					},
+				],
 			},
 		],
 	};
@@ -98,7 +136,7 @@ export default async function HomePage() {
 				<div className="box-border min-h-screen min-w-0 w-full bg-background">
 					<MotionPageEnter>
 						<main id="main-content" tabIndex={-1} className="min-w-0 outline-none">
-							<LandingMarketingBody />
+							<LandingMarketingBody supportEmail={supportEmail} />
 						</main>
 					</MotionPageEnter>
 				</div>

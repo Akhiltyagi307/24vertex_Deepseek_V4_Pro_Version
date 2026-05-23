@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Shipping & delivery — 24Vertex",
+	title: "Shipping & delivery · 24Vertex",
 	description: "How 24Vertex delivers access to digital practice and AI features after purchase.",
 	alternates: {
 		canonical: "/legal/shipping",

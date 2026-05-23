@@ -33,7 +33,7 @@ export function ProfileEditorPanel({
 				<CardHeader className="px-0 pt-0">
 					<CardTitle className="text-lg">Profile</CardTitle>
 					<CardDescription className="text-base">
-						Name, photo, and phone—what classmates and reports see as you.
+						Name, photo, and phone: what classmates and reports see as you.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="px-0">

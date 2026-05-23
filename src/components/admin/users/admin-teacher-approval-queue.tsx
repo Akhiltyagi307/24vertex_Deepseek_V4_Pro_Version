@@ -48,7 +48,7 @@ export function AdminTeacherApprovalQueue() {
 			toast.success("Teacher approved.");
 			await load();
 		} catch {
-			toast.error("Network error — try again.");
+			toast.error("Network error. Try again.");
 		} finally {
 			setBusy(null);
 		}
@@ -72,7 +72,7 @@ export function AdminTeacherApprovalQueue() {
 			toast.success("Teacher rejected.");
 			await load();
 		} catch {
-			toast.error("Network error — try again.");
+			toast.error("Network error. Try again.");
 		} finally {
 			setBusy(null);
 		}
@@ -98,7 +98,7 @@ export function AdminTeacherApprovalQueue() {
 			toast.success("Request sent to teacher.");
 			await load();
 		} catch {
-			toast.error("Network error — try again.");
+			toast.error("Network error. Try again.");
 		} finally {
 			setBusy(null);
 		}

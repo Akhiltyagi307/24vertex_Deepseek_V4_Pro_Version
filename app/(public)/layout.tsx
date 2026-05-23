@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 
+const PARENT_FIRST_TITLE =
+	"24Vertex: Catch your child's weak chapters before report-card day";
+const PARENT_FIRST_DESCRIPTION =
+	"For parents of grade 6 to 10 students. 24Vertex is the layer your child's school does not have time to give: adaptive AI practice on the chapters they actually missed, a private Explain and Solve-with-me tutor for the doubts they would never raise in class, and a chapter-level dashboard you, your child, and their teacher all read from.";
+
 /**
  * Public/marketing surface layout. Carries the metadata previously hosted on
  * the root layout, but stays static-friendly (no `dynamic = 'force-dynamic'`)
@@ -12,26 +17,23 @@ import type { Metadata } from "next";
  */
 export const metadata: Metadata = {
 	title: {
-		default: "24Vertex — Adaptive practice for grades 6 to 12",
+		default: PARENT_FIRST_TITLE,
 		template: "%s · 24Vertex",
 	},
-	description:
-		"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
+	description: PARENT_FIRST_DESCRIPTION,
 	applicationName: "24Vertex",
 	openGraph: {
 		type: "website",
 		siteName: "24Vertex",
 		locale: "en_IN",
 		url: "/",
-		title: "24Vertex — Adaptive practice for grades 6 to 12",
-		description:
-			"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
+		title: PARENT_FIRST_TITLE,
+		description: PARENT_FIRST_DESCRIPTION,
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "24Vertex — Adaptive practice for grades 6 to 12",
-		description:
-			"Adaptive assessment, parent visibility, and class-level signals — one product for students, parents, and teachers.",
+		title: PARENT_FIRST_TITLE,
+		description: PARENT_FIRST_DESCRIPTION,
 	},
 	robots: {
 		index: true,

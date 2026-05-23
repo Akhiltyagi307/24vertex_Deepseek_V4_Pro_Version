@@ -660,7 +660,7 @@ export function PracticeTestSession({
 			}
 		} catch {
 			setReportSubmitting(false);
-			setFlagNotice("Network error — try again.");
+			setFlagNotice("Network error. Try again.");
 		}
 	}, [active, reportReason]);
 

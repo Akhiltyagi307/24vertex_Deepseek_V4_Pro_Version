@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, cardSurfaceFrameClassName } from "@/components/ui/card"
 import CustomersTableCard from "@/components/ui/features"
 import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge"
+import {
+  marketingSectionIntroWrapClassName,
+  marketingSectionLeadClassName,
+} from "@/lib/marketing/marketing-section-rhythm"
 import { cn } from "@/lib/utils"
 
 const featurePreviewShell = cn(
@@ -20,16 +24,16 @@ const COUNSELOR_AVATAR = "https://images.unsplash.com/photo-1494790108377-be9c29
 
 export default function FeaturesSection() {
   return (
-    <section id="benefits" className="bg-background py-16 medium:py-20">
+    <section id="benefits" className="bg-background py-16 medium:py-20 xl:py-24">
       <div className="mx-auto w-full max-w-7xl px-4 medium:px-6 xl:px-8">
-        <div className="mx-auto max-w-3xl text-center">
+        <div className={marketingSectionIntroWrapClassName}>
           <Badge variant="outline" className={cn("mb-4", landingMarketingSectionEyebrowBadgeClassName)}>
             Benefits
           </Badge>
           <h2 className="text-3xl font-semibold tracking-tight text-foreground medium:text-4xl">
             Benefits that compound across student, parent, and teacher workflows
           </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground medium:text-lg">
+          <p className={marketingSectionLeadClassName}>
             Every role sees what matters next, so follow-ups stay timely and progress does not stall.
           </p>
         </div>

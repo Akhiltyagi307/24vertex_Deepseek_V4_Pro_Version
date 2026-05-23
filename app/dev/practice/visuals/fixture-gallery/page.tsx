@@ -109,7 +109,7 @@ export default function FixtureGalleryPage(): React.ReactElement {
 					<code>PRACTICE_VISUAL_TEMPLATE_ENGINE</code> on.
 				</p>
 				<p className="mt-2 text-sm text-muted-foreground">
-					Fixtures loaded: <strong>{fixtures.length}</strong> — of which{" "}
+					Fixtures loaded: <strong>{fixtures.length}</strong>, of which{" "}
 					<strong>{grade9Count}</strong> are Grade 9 and{" "}
 					<strong>{grade10Count}</strong> are Grade 10.
 				</p>

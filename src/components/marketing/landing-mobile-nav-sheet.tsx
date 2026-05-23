@@ -17,13 +17,18 @@ import {
 } from "@/components/ui/sheet";
 import {
 	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
+	LANDING_PARENT_PRIMARY_CTA_HREF,
+	MARKETING_NAV,
 } from "@/lib/marketing/landing-copy";
 import { cn } from "@/lib/utils";
 
 const landingMobileNavLinks = [
-	{ href: "#features", label: "Features" },
-	{ href: "#benefits", label: "Benefits" },
-	{ href: "#pricing", label: "Pricing" },
+	{ href: "/#problem", label: "Why marks slip" },
+	{ href: "/#how-it-works", label: "How it works" },
+	{ href: MARKETING_NAV.aiTutor.href, label: MARKETING_NAV.aiTutor.label },
+	{ href: MARKETING_NAV.pricing.href, label: MARKETING_NAV.pricing.label },
+	{ href: MARKETING_NAV.help.href, label: MARKETING_NAV.help.label },
+	{ href: MARKETING_NAV.schools.href, label: MARKETING_NAV.schools.label },
 ] as const;
 
 const mobileNavLinkClassName =
@@ -71,7 +76,7 @@ export function LandingMobileNavSheet({ className }: LandingMobileNavSheetProps)
 						<span>24Vertex</span>
 					</Link>
 					<p className="text-muted-foreground mt-1 text-sm leading-snug">
-						Practice, visibility, and class signals for grades 6 to 12.
+						Catch weak chapters before report-card day. Grades 6 to 10.
 					</p>
 				</SheetHeader>
 
@@ -107,7 +112,7 @@ export function LandingMobileNavSheet({ className }: LandingMobileNavSheetProps)
 							<LandingPrimaryCtaButton
 								visual="minimal"
 								className="h-11 w-full justify-center rounded-full text-sm font-semibold"
-								render={<Link href="/signup/role-picker" />}
+								render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />}
 							/>
 						}
 					/>

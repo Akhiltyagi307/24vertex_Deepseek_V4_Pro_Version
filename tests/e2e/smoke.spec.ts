@@ -45,8 +45,10 @@ test.describe("Landing page (perf-optimized)", () => {
 		await page.goto("/");
 		await expect(page).toHaveURL(/\/$|^http/);
 
-		// Hero CTA copy is part of the H1 — confirms the CSS-only stagger landed without breaking layout.
-		await expect(page.getByRole("heading", { name: /Practice smarter/i })).toBeVisible();
+		// Hero H1 — confirms the parent-first homepage rewrite renders without
+		// breaking layout. Matches "Stop finding out on report-card day." which
+		// the H1 splits across two visual lines.
+		await expect(page.getByRole("heading", { name: /Stop finding out/i })).toBeVisible();
 
 		// Logo (next/image with priority on landing).
 		await expect(page.locator('img[alt*="logo" i]').first()).toBeVisible();
@@ -63,17 +65,21 @@ test.describe("Landing page (perf-optimized)", () => {
 		expect(errors, `Unexpected console errors: ${errors.join("\n")}`).toHaveLength(0);
 	});
 
-	test("optimized assets are referenced (subjects hero image, AVIF logo via next/image)", async ({ page }) => {
+	test("optimized assets are referenced (portal preview, AVIF logo via next/image)", async ({ page }) => {
 		await page.goto("/");
-		// Scroll to features to trigger the lazy-loaded marketing image, then wait
+		// Scroll past the hero so the lazy-loaded portal previews mount, then wait
 		// for the network to settle rather than a fixed sleep — the previous 800 ms
 		// sleep was both flaky on slow CI and slow on fast local runs.
 		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
 		await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
-		// Raw <img> in features block (path may be .gif or .webp depending on marketing asset).
-		const subjectsHero = page.locator('img[src*="subjects.webp"], img[src*="subjects.gif"]');
-		await expect(subjectsHero.first()).toBeAttached({ timeout: 15_000 });
+		// Portal preview image (rendered inside RuixenFeaturedImageSection's
+		// `<picture>`). Path may be .png/.webp/.avif depending on the negotiated
+		// type; match the dashboard slug instead of an extension.
+		const portalPreview = page.locator(
+			'img[src*="parent-portal-dashboard"], img[src*="student-portal-dashboard"]',
+		);
+		await expect(portalPreview.first()).toBeAttached({ timeout: 15_000 });
 	});
 });
 
@@ -129,6 +135,26 @@ test.describe("Student auth (optional env)", () => {
 		await page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click();
 		await page.waitForURL((url) => !/\/login/.test(url.pathname), { timeout: 15_000 });
 	});
+});
+
+test.describe("Marketing subpages", () => {
+	const marketingPaths = [
+		{ path: "/about", heading: /built the layer/i },
+		{ path: "/contact", heading: /read every message/i },
+		{ path: "/schools", heading: /whole class/i },
+		{ path: "/pricing", heading: /one plan/i },
+		{ path: "/boards/cbse", heading: /CBSE/i },
+		{ path: "/help", heading: /actually ask/i },
+	] as const;
+
+	for (const { path, heading } of marketingPaths) {
+		test(`${path} renders without console errors`, async ({ page }) => {
+			const { errors } = attachConsoleCollector(page);
+			await page.goto(path);
+			await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+			expect(errors, `Console errors on ${path}: ${errors.join("\n")}`).toHaveLength(0);
+		});
+	}
 });
 
 test.describe("Static metadata routes", () => {

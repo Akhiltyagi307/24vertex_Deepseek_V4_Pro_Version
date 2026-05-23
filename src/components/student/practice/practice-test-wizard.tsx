@@ -486,7 +486,7 @@ export function PracticeTestWizard({
 			toast.success(`Added ${toAdd.length} topic${toAdd.length === 1 ? "" : "s"}`, {
 				description:
 					droppedAtCap > 0 ?
-						`${droppedAtCap} skipped — limit is ${PRACTICE_MAX_TOPICS}.`
+						`${droppedAtCap} skipped. Limit is ${PRACTICE_MAX_TOPICS}.`
 					:	`Focus area: ${FOCUS_AREA_OPTIONS.find((o) => o.value === area)?.label ?? area}.`,
 				action: {
 					label: "Undo",

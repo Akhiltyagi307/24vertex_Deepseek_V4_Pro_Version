@@ -30,7 +30,7 @@ export function AdminImpersonationBanner() {
 			role="status"
 			className="flex flex-wrap items-center justify-center gap-3 border-b border-destructive/40 bg-destructive/15 px-4 py-2 text-center text-sm font-medium text-destructive"
 		>
-			<span>ADMIN VIEW — impersonation session</span>
+			<span>ADMIN VIEW: impersonation session</span>
 			<Button type="button" size="sm" variant="outline" className="border-destructive/40" onClick={dismiss}>
 				Dismiss banner
 			</Button>

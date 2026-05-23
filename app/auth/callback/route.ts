@@ -174,7 +174,7 @@ export async function GET(request: Request) {
 		const u = new URL("/signup/teacher", origin);
 		u.searchParams.set(
 			"error",
-			"We couldn't finish your teacher account setup — the signup data may be outdated. Please sign up again.",
+			"We couldn't finish your teacher account setup. The signup data may be outdated. Please sign up again.",
 		);
 		return NextResponse.redirect(u);
 	}

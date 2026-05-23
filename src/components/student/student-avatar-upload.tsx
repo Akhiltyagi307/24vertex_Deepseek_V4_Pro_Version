@@ -206,7 +206,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 									)}
 								</p>
 								<p className="max-w-prose text-muted-foreground text-sm leading-relaxed medium:text-[0.9375rem]">
-									Square crop, shown across 24Vertex. JPEG, PNG, or WebP, up to 5MB — zoom and
+									Square crop, shown across 24Vertex. JPEG, PNG, or WebP, up to 5MB. Zoom and
 									reposition before saving.
 								</p>
 							</div>
@@ -253,7 +253,7 @@ export function StudentAvatarUpload({ userId, displayName, initialAvatarUrl }: P
 				) : null}
 
 				<FieldDescription className="mt-4 text-xs leading-relaxed text-muted-foreground medium:mt-5 medium:text-sm">
-					Tip: use a clear, well-lit face or logo — it appears small in navigation and lists.
+					Tip: use a clear, well-lit face or logo. It appears small in navigation and lists.
 				</FieldDescription>
 			</FieldContent>
 

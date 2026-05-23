@@ -37,7 +37,7 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 
 	const paragraphs: string[] = [];
 	paragraphs.push(
-		`We just finished grading your <strong>${subjectName}</strong> practice test${pct ? ` — you scored <strong>${pct}</strong>.` : "."}`,
+		`We just finished grading your <strong>${subjectName}</strong> practice test${pct ? `. You scored <strong>${pct}</strong>.` : "."}`,
 	);
 	if (pdfUrl) {
 		paragraphs.push(
@@ -53,7 +53,7 @@ export async function sendReportReadyEmail(params: ReportReadyEmailParams): Prom
 	const html = renderEmailShell({
 		preheader:
 			pct ?
-				`${pct} on your ${params.subjectName} report${dateChunk} — open it now.`
+				`${pct} on your ${params.subjectName} report${dateChunk}. Open it now.`
 			:	`Your ${params.subjectName} report is ready${dateChunk}.`,
 		greeting: `Hi ${studentName},`,
 		title: subject,
@@ -105,7 +105,7 @@ export async function sendParentPortalReportReadyEmail(
 ): Promise<{ error: string | null }> {
 	const pct = pctLabel(params.overallPercent);
 	const dateChunk = params.submittedLabel ? ` (${params.submittedLabel})` : "";
-	const subject = `${params.childDisplayName} — ${params.subjectName} report ready${dateChunk}`;
+	const subject = `${params.childDisplayName}: ${params.subjectName} report ready${dateChunk}`;
 	const portalHref = `${getAppUrl()}/parent/open-report?student=${encodeURIComponent(params.studentId)}&test=${encodeURIComponent(params.testId)}`;
 	const pdfUrl = params.pdfSignedUrl?.trim() || null;
 
@@ -115,7 +115,7 @@ export async function sendParentPortalReportReadyEmail(
 
 	const paragraphs: string[] = [];
 	paragraphs.push(
-		`We just finished grading <strong>${childName}</strong>'s ${subjectName} practice test${pct ? ` — they scored <strong>${pct}</strong>.` : "."}`,
+		`We just finished grading <strong>${childName}</strong>'s ${subjectName} practice test${pct ? `. They scored <strong>${pct}</strong>.` : "."}`,
 	);
 	if (pdfUrl) {
 		paragraphs.push(
@@ -230,8 +230,8 @@ export async function sendParentPortalUsageThresholdEmail(
 	const label = isTests ? "practice tests" : "doubt-chat tokens";
 	const hundred = params.threshold === 100;
 	const subject = hundred
-		? `${params.childDisplayName}'s plan — 100% of ${label} used`
-		: `${params.childDisplayName}'s plan — 80% of ${label} used`;
+		? `${params.childDisplayName}'s plan: 100% of ${label} used`
+		: `${params.childDisplayName}'s plan: 80% of ${label} used`;
 	const href = `${getAppUrl()}/parent/subscription`;
 
 	const childName = escapeHtml(params.childDisplayName);
@@ -471,7 +471,7 @@ export async function sendParentLinkedStudentEmail(
 		: "A parent or guardian account is now linked.";
 
 	const html = renderEmailShell({
-		preheader: "Heads up — a parent account is now linked to your 24Vertex profile.",
+		preheader: "Heads up: a parent account is now linked to your 24Vertex profile.",
 		greeting: `Hi ${displayName},`,
 		title: subject,
 		paragraphs: [

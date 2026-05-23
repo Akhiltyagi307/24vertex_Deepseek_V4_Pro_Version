@@ -32,9 +32,9 @@ const CATEGORY_LABELS: Record<FeedbackCategory, string> = {
 };
 
 const IMPACT_LABELS: Record<FeedbackImpact, string> = {
-	blocked: "Blocked — I can't continue",
-	major: "Major — very disruptive",
-	minor: "Minor — annoying but workable",
+	blocked: "Blocked. I can't continue",
+	major: "Major. Very disruptive",
+	minor: "Minor. Annoying but workable",
 };
 
 export type FeedbackReportDialogProps = {
@@ -155,7 +155,7 @@ export function FeedbackReportDialog({
 					{successReportId ?
 						<div className="space-y-4">
 							<p className="text-emerald-700 dark:text-emerald-400 text-sm" role="status">
-								Thanks — we received your report.
+								Thanks. We received your report.
 								{shortRef ?
 									<>
 										{" "}

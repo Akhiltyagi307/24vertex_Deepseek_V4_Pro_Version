@@ -166,7 +166,7 @@ function renderCtas(primary: EmailCta | undefined, secondary: EmailCta | undefin
 }
 
 function renderSignOff(signOff: string | undefined): string {
-	const text = signOff ?? "— The 24Vertex team";
+	const text = signOff ?? "The 24Vertex team";
 	return `
 <tr>
   <td style="padding:24px 32px 8px;">

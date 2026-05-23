@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { getPublicSitemapPaths } from "@/lib/marketing/public-routes";
 import { getAppUrl } from "@/lib/env";
 
 /**
@@ -8,14 +9,9 @@ import { getAppUrl } from "@/lib/env";
  * gated behind login and would otherwise leak the URL surface to indexers.
  * The companion `robots.ts` `Disallow` rules keep crawlers off those paths.
  *
- * Update this list when adding a new public marketing or legal page.
+ * Update `getPublicSitemapPaths()` when adding a new public marketing or legal page.
  */
 function resolvePublicBaseUrl(): string {
-	// `getAppUrl()` throws when `NEXT_PUBLIC_APP_URL` is a loopback host while
-	// `NODE_ENV === "production"` — which is exactly the case during the CI
-	// bundle-budget build (uses placeholder `http://localhost:3000`). Fall back
-	// to the raw env so the static prerender doesn't fail; in any real
-	// production deploy `NEXT_PUBLIC_APP_URL` points to the live origin.
 	try {
 		return getAppUrl();
 	} catch {
@@ -27,38 +23,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
 	const base = resolvePublicBaseUrl();
 	const now = new Date();
 
-	const entries: MetadataRoute.Sitemap = [
-		{
-			url: `${base}/`,
-			lastModified: now,
-			changeFrequency: "weekly",
-			priority: 1,
-		},
-		{
-			url: `${base}/legal/terms`,
-			lastModified: now,
-			changeFrequency: "yearly",
-			priority: 0.4,
-		},
-		{
-			url: `${base}/legal/privacy`,
-			lastModified: now,
-			changeFrequency: "yearly",
-			priority: 0.4,
-		},
-		{
-			url: `${base}/legal/refund`,
-			lastModified: now,
-			changeFrequency: "yearly",
-			priority: 0.3,
-		},
-		{
-			url: `${base}/legal/shipping`,
-			lastModified: now,
-			changeFrequency: "yearly",
-			priority: 0.3,
-		},
-	];
-
-	return entries;
+	return getPublicSitemapPaths().map((path) => ({
+		url: `${base}${path}`,
+		lastModified: now,
+		changeFrequency: path === "/" ? "weekly" : path.startsWith("/legal/") ? "yearly" : "monthly",
+		priority: path === "/" ? 1 : path.startsWith("/legal/") ? 0.4 : path.includes("/boards/") || path.includes("/grades/") ? 0.5 : 0.7,
+	}));
 }

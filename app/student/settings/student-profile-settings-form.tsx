@@ -147,7 +147,7 @@ export function StudentProfileSettingsForm({
 				</Button>
 			</div>
 			<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
-				Give this code to a parent—they’ll use it in their app to connect to your account.
+				Give this code to a parent. They’ll use it in their app to connect to your account.
 			</p>
 		</div>
 	);

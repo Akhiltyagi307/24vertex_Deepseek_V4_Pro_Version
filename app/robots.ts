@@ -32,7 +32,27 @@ export default function robots(): MetadataRoute.Robots {
 		rules: [
 			{
 				userAgent: "*",
-				allow: ["/", "/legal/"],
+				allow: [
+					"/",
+					"/legal/",
+					"/about",
+					"/contact",
+					"/security",
+					"/parents",
+					"/schools",
+					"/teachers",
+					"/ai-tutor",
+					"/adaptive-practice",
+					"/parent-dashboard",
+					"/pricing",
+					"/help",
+					"/guides",
+					"/blog",
+					"/boards/",
+					"/grades/",
+					"/subjects/",
+					"/vs/",
+				],
 				disallow: [
 					"/admin/",
 					"/student/",

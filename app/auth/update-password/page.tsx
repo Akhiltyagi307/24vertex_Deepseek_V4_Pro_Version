@@ -27,7 +27,7 @@ export default async function UpdatePasswordPage() {
 					<AlertTitle>Need a new link?</AlertTitle>
 					<AlertDescription>
 						Recovery links expire ten minutes after they are issued. Reopening this page in a
-						stale tab also counts as expired — request a fresh email to continue.
+						stale tab also counts as expired. Request a fresh email to continue.
 					</AlertDescription>
 				</Alert>
 				<Button render={<Link href="/forgot-password" />} className="w-full">

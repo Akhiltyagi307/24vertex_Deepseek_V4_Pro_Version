@@ -87,7 +87,7 @@ export function AdminCouponListRow({
 				description={
 					<>
 						This permanently deletes the coupon and removes its redemption history. Students who already
-						redeemed it <strong>keep their access</strong> — their subscription and quota are preserved.
+						redeemed it <strong>keep their access</strong>. Their subscription and quota are preserved.
 						Type the coupon code to confirm.
 					</>
 				}

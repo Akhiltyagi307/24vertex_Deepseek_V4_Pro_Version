@@ -20,7 +20,7 @@ export default function AdminNotFound() {
 			id="admin-not-found"
 			className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-6 text-center"
 		>
-			<h1 className="text-3xl font-semibold">404 — Admin page not found</h1>
+			<h1 className="text-3xl font-semibold">404. Admin page not found</h1>
 			<p className="max-w-prose text-muted-foreground">
 				The admin route you visited does not exist. It may have been moved or
 				renamed during a recent release.

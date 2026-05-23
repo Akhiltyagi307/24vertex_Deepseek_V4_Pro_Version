@@ -100,7 +100,7 @@ export function PasswordChangeForm({ loginEmail, fieldIdPrefix = "student" }: Pr
 				<CardHeader className="px-0 pt-0">
 					<CardTitle className="text-lg">Change password</CardTitle>
 					<CardDescription className="text-base leading-relaxed">
-						Update the password for this email login. This uses the button on this tab — not
+						Update the password for this email login. This uses the button on this tab, not
 						“Save changes” at the bottom.
 					</CardDescription>
 				</CardHeader>

@@ -20,7 +20,13 @@ import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/la
 import {
 	LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
 	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
+	LANDING_PARENT_PRIMARY_CTA_HREF,
+	MARKETING_NAV,
 } from "@/lib/marketing/landing-copy";
+import {
+	MARKETING_SECTION_INTRO_MAX_CLASSNAME,
+	MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+} from "@/lib/marketing/marketing-section-rhythm";
 import { cn } from "@/lib/utils";
 
 export function AcmeHero() {
@@ -59,23 +65,29 @@ export function AcmeHero() {
           </div>
           <div className="hidden flex-1 items-center justify-center gap-6 xl:flex">
             <a
-              href="#features"
+              href="/#how-it-works"
               className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
             >
-              Features
+              How it works
             </a>
-            <a
-              href="#pricing"
+            <Link
+              href={MARKETING_NAV.aiTutor.href}
               className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
             >
-              Pricing
-            </a>
-            <a
-              href="#benefits"
-              className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 hidden rounded-lg px-2 py-1 text-sm transition-colors xl:inline-flex"
+              {MARKETING_NAV.aiTutor.label}
+            </Link>
+            <Link
+              href={MARKETING_NAV.pricing.href}
+              className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
             >
-              Benefits
-            </a>
+              {MARKETING_NAV.pricing.label}
+            </Link>
+            <Link
+              href={MARKETING_NAV.schools.href}
+              className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
+            >
+              {MARKETING_NAV.schools.label}
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <div className="border-border bg-muted/40 inline-flex shrink-0 items-center justify-center rounded-lg border p-1 shadow-sm">
@@ -110,7 +122,7 @@ export function AcmeHero() {
                 LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
               )}
             >
-              <LandingPrimaryCtaButton render={<Link href="/signup/role-picker" />} />
+              <LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />
               <Button
                 variant="marketingSecondary"
                 className={LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME}
@@ -128,9 +140,6 @@ export function AcmeHero() {
         <section className="w-full overflow-x-hidden py-16 medium:py-24 xl:py-28">
           <motion.div
             className="mx-auto flex w-full max-w-5xl flex-col items-center px-4 medium:px-6"
-            // `initial={false}` keeps SSR + no-JS first paint readable. Opacity-0 `initial`
-            // left the hero blank whenever hydration/chunks failed (same window as a “missing”
-            // theme toggle that never reaches `mounted`).
             initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -150,13 +159,13 @@ export function AcmeHero() {
                   )}
                   render={
                     <Link
-                      href="#features"
+                      href="#problem"
                       className="inline-flex max-w-full items-center justify-center gap-1.5 text-pretty"
                     />
                   }
                 >
                   <GraduationCap className="shrink-0 opacity-90" aria-hidden />
-                  <span>Grades 6 to 12: practice, parent visibility, and class signals in one place</span>
+                  <span>For parents of grade 6 to 10 students. CBSE, ICSE, and state boards.</span>
                   <ChevronRight
                     className="size-3.5 shrink-0 opacity-70 transition-transform duration-200 ease-out group-hover/badge:translate-x-px"
                     aria-hidden
@@ -164,30 +173,31 @@ export function AcmeHero() {
                 </Badge>
               </motion.div>
               <motion.h1
-                className="mx-auto w-full max-w-4xl text-center text-pretty text-4xl font-medium leading-[1.08] tracking-tight text-foreground medium:text-6xl medium:leading-[1.06] medium:text-7xl medium:leading-[1.05]"
+                className={cn(
+                  "text-foreground mx-auto w-full text-center text-pretty text-4xl font-medium leading-[1.08] tracking-tight medium:text-6xl medium:leading-[1.06] medium:text-7xl medium:leading-[1.05]",
+                  MARKETING_SECTION_INTRO_MAX_CLASSNAME,
+                )}
                 initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
-                <span className="block whitespace-nowrap">Practice smarter</span>
-                <span className="mt-2 block whitespace-nowrap text-[var(--subject-grid-icon)] medium:mt-2.5">
-                  <span className="medium:hidden">Stay aligned, every role</span>
-                  <span className="hidden medium:inline">Stay aligned across every role</span>
+                <span className="block">Find the weak chapter</span>
+                <span className="mt-2 block text-[var(--subject-grid-icon)] medium:mt-2.5">
+                  before report-card day.
                 </span>
               </motion.h1>
               <motion.p
-                className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-2.5 text-center text-[0.9375rem] leading-relaxed text-muted-foreground medium:gap-3 medium:text-lg medium:leading-[1.65] medium:text-[1.0625rem]"
+                className={cn(
+                  "text-muted-foreground mx-auto w-full text-center text-pretty text-[0.9375rem] leading-relaxed medium:text-lg medium:leading-[1.65] medium:text-[1.0625rem]",
+                  MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+                )}
                 initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.18, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
-                <span className="text-pretty">
-                  Parents see progress as it happens, not buried in tutor threads and screenshots.
-                </span>
-                <span className="text-pretty">
-                  Schools get dependable class-level signals instead of stitching together homework{"\u00a0"}apps and
-                  one-off reports.
-                </span>
+                24Vertex spots your child&rsquo;s weak chapters (chapter by chapter, in their
+                actual textbook), while a private AI tutor handles the questions they would
+                never raise in class.
               </motion.p>
               <motion.div
                 className={cn(
@@ -198,15 +208,23 @@ export function AcmeHero() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.24, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
-                <LandingPrimaryCtaButton render={<Link href="/signup/role-picker" />} />
+                <LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />
                 <Button
                   variant="marketingSecondary"
                   className={LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME}
-                  render={<Link href="#features" />}
+                  render={<Link href="#how-it-works" />}
                 >
-                  Explore features first
+                  See how it works
                 </Button>
               </motion.div>
+              <motion.p
+                className="mx-auto max-w-xl text-center text-xs text-muted-foreground/85 medium:text-sm"
+                initial={false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              >
+                14 days free. 5 practice tests, the AI tutor included. No card needed.
+              </motion.p>
             </div>
           </motion.div>
 
@@ -217,7 +235,12 @@ export function AcmeHero() {
             transition={{ delay: 0.32, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           >
             <SchoolsMarquee />
-            <div className="mx-auto mt-10 flex w-full max-w-2xl justify-center px-1 medium:mt-12">
+            <div
+              className={cn(
+                "mx-auto mt-10 flex w-full justify-center px-1 medium:mt-12",
+                MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+              )}
+            >
               <AuthTrustedStudentsGlassStrip
                 prominence="hero"
                 surface="soft"

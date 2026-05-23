@@ -168,7 +168,7 @@ async function handlePanic(request: NextRequest): Promise<NextResponse> {
 				try {
 					await sendHtmlEmailLogged({
 						to,
-						subject: "24Vertex admin panic — all sessions invalidated",
+						subject: "24Vertex admin panic: all sessions invalidated",
 						html: `<p>All admin JWTs were invalidated (version ${v}).</p>`,
 						templateSlug: "admin-panic",
 						templateVariables: { jwt_version: String(v) },

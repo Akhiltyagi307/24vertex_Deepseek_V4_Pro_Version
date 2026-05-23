@@ -15,7 +15,7 @@ export function AdminCouponBulkForm() {
 	return (
 		<div className="max-w-xl space-y-3 rounded-lg border border-border p-4">
 			<h3 className="text-sm font-semibold">Bulk-generate coupons</h3>
-			<p className="text-xs text-muted-foreground">POST /api/admin/coupons/bulk-generate — each code is unique (max 200).</p>
+			<p className="text-xs text-muted-foreground">POST /api/admin/coupons/bulk-generate. Each code is unique (max 200).</p>
 			<div className="flex flex-wrap gap-2">
 				<Input className="h-9 w-20" value={count} onChange={(e) => setCount(e.target.value.replace(/\D/g, ""))} />
 				<Input className="h-9 w-40 font-mono" placeholder="plan code" value={plan} onChange={(e) => setPlan(e.target.value)} />

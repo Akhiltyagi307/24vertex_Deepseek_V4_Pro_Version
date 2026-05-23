@@ -13,7 +13,7 @@ const DEMO = {
 	parentName: "Sushma",
 	childName: "Akhil",
 	teacherName: "Priya Sharma",
-	orgName: "Delhi Public School — Rohini",
+	orgName: "Delhi Public School, Rohini",
 	subjectName: "Mathematics",
 	testId: "demo-test-id",
 	studentId: "demo-student-id",
@@ -185,7 +185,7 @@ function supabaseAuthPreview(
 		title: opts.title,
 		paragraphs: opts.paragraphs,
 		primaryCta: { label: opts.ctaLabel, href: opts.ctaHref },
-		signOff: "— 24Vertex (via Supabase Auth)",
+		signOff: "24Vertex (via Supabase Auth)",
 	});
 	return sample({
 		slug,
@@ -217,11 +217,11 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			subject: `Your ${DEMO.subjectName} report is ready`,
 			source: "app",
 			html: renderEmailShell({
-				preheader: `78% on your ${DEMO.subjectName} report — open it now.`,
+				preheader: `78% on your ${DEMO.subjectName} report. Open it now.`,
 				greeting: `Hi ${sn},`,
 				title: `Your ${DEMO.subjectName} report is ready`,
 				paragraphs: [
-					`We just finished grading your <strong>${subjectName}</strong> practice test — you scored <strong>78%</strong>.`,
+					`We just finished grading your <strong>${subjectName}</strong> practice test. You scored <strong>78%</strong>.`,
 					"Open the PDF for the full printable report. You don't need to sign in to 24Vertex to use this link, and it stays valid for 90 days.",
 					"For topic breakdowns and your next recommended practice inside the app, use <em>View in 24Vertex</em>.",
 				],
@@ -234,14 +234,14 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Reports & practice",
 			displayName: "Report ready (parent)",
 			description: "Linked parent when child's report is ready.",
-			subject: `${DEMO.childName} — ${DEMO.subjectName} report ready`,
+			subject: `${DEMO.childName}: ${DEMO.subjectName} report ready`,
 			source: "app",
 			html: renderEmailShell({
 				preheader: `${DEMO.childName} scored 78% on ${DEMO.subjectName}.`,
 				greeting: `Hi ${pn},`,
-				title: `${DEMO.childName} — ${DEMO.subjectName} report ready`,
+				title: `${DEMO.childName}: ${DEMO.subjectName} report ready`,
 				paragraphs: [
-					`We just finished grading <strong>${cn}</strong>'s ${subjectName} practice test — they scored <strong>78%</strong>.`,
+					`We just finished grading <strong>${cn}</strong>'s ${subjectName} practice test. They scored <strong>78%</strong>.`,
 					"Open the PDF for the full printable report. You don't need to sign in to 24Vertex to use this link, and it stays valid for 90 days.",
 					"For the interactive parent portal version, use <em>Open parent portal</em>.",
 				],
@@ -349,12 +349,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Parent portal",
 			displayName: "Child usage 80% (tests)",
 			description: "Parent notified when linked child nears test quota.",
-			subject: `${DEMO.childName}'s plan — 80% of practice tests used`,
+			subject: `${DEMO.childName}'s plan: 80% of practice tests used`,
 			source: "app",
 			html: renderEmailShell({
 				preheader: `${DEMO.childName}: 80% of practice tests used this period.`,
 				greeting: `Hi ${pn},`,
-				title: `${DEMO.childName}'s plan — 80% of practice tests used`,
+				title: `${DEMO.childName}'s plan: 80% of practice tests used`,
 				paragraphs: [
 					`<strong>${cn}</strong> is approaching the limit for practice tests on their current plan period.`,
 					"You may want to review their plan soon so practice doesn't pause at 100%.",
@@ -372,12 +372,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Parent portal",
 			displayName: "Child usage 100% (tests)",
 			description: "Parent notified when child hits test cap.",
-			subject: `${DEMO.childName}'s plan — 100% of practice tests used`,
+			subject: `${DEMO.childName}'s plan: 100% of practice tests used`,
 			source: "app",
 			html: renderEmailShell({
 				preheader: `${DEMO.childName}: 100% of practice tests used this period.`,
 				greeting: `Hi ${pn},`,
-				title: `${DEMO.childName}'s plan — 100% of practice tests used`,
+				title: `${DEMO.childName}'s plan: 100% of practice tests used`,
 				paragraphs: [
 					`<strong>${cn}</strong> has reached the limit for practice tests on their current plan period.`,
 					"Upgrade or top up in the parent portal so their practice doesn't pause.",
@@ -418,7 +418,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			subject: "A parent account was linked to your 24Vertex profile",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "Heads up — a parent account is now linked to your 24Vertex profile.",
+				preheader: "Heads up: a parent account is now linked to your 24Vertex profile.",
 				greeting: `Hi ${sn},`,
 				title: "A parent account was linked to your 24Vertex profile",
 				paragraphs: [
@@ -438,11 +438,11 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			subject: "Only 3 days left on your 24Vertex trial",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "3 days left — add a payment method now.",
+				preheader: "3 days left. Add a payment method now.",
 				greeting: `Hi ${sn},`,
 				title: "Only 3 days left on your 24Vertex trial",
 				paragraphs: [
-					"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause — you won't be charged until the trial actually ends.",
+					"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause. You won't be charged until the trial actually ends.",
 					"Switch to <strong>Pro Monthly</strong> or <strong>Pro Annual</strong> in one tap.",
 				],
 				primaryCta: { label: "Continue with Pro", href: u.studentPlan },
@@ -460,7 +460,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 				greeting: `Hi ${sn},`,
 				title: "Your 24Vertex trial ends today",
 				paragraphs: [
-					"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause — you won't be charged until the trial actually ends.",
+					"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause. You won't be charged until the trial actually ends.",
 					"Switch to <strong>Pro Monthly</strong> or <strong>Pro Annual</strong> in one tap.",
 				],
 				primaryCta: { label: "Continue with Pro", href: u.studentPlan },
@@ -471,12 +471,12 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Usage & billing",
 			displayName: "Payment receipt",
 			description: "After successful Razorpay charge.",
-			subject: "Payment received — 24Vertex",
+			subject: "Payment received · 24Vertex",
 			source: "app",
 			html: renderEmailShell({
 				preheader: "₹499 paid for Pro Monthly.",
 				greeting: `Hi ${sn},`,
-				title: "Payment received — 24Vertex",
+				title: "Payment received · 24Vertex",
 				paragraphs: [
 					"Thanks for your payment. We've recorded it and your subscription remains active.",
 					"Your hosted Razorpay invoice is available below.",
@@ -516,7 +516,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			subject: "We couldn't collect your 24Vertex payment",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "Your payment was declined. Razorpay will retry — update your method to avoid an interruption.",
+				preheader: "Your payment was declined. Razorpay will retry. Update your method to avoid an interruption.",
 				greeting: `Hi ${sn},`,
 				title: "We couldn't collect your 24Vertex payment",
 				paragraphs: [
@@ -693,7 +693,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			description: "Markdown body via broadcastBodyToEmailHtml — not renderEmailShell.",
 			subject: "Important update from 24Vertex",
 			source: "admin",
-			html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f5f5f4;font-family:system-ui,sans-serif"><div style="font-family:system-ui,sans-serif;line-height:1.55;color:#111;max-width:560px;"><p style="margin:0 0 12px;">Hi everyone,</p><p style="margin:0 0 12px;">We're rolling out improved report PDFs this week. No action needed unless your school asked you to verify roster links.</p><p style="margin:0 0 12px;">— The 24Vertex team</p></div></body></html>`,
+			html: `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f5f5f4;font-family:system-ui,sans-serif"><div style="font-family:system-ui,sans-serif;line-height:1.55;color:#111;max-width:560px;"><p style="margin:0 0 12px;">Hi everyone,</p><p style="margin:0 0 12px;">We're rolling out improved report PDFs this week. No action needed unless your school asked you to verify roster links.</p><p style="margin:0 0 12px;">The 24Vertex team</p></div></body></html>`,
 		}),
 		sample({
 			slug: "admin-weekly-digest",
@@ -717,7 +717,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			category: "Admin & broadcasts",
 			displayName: "Admin panic alert",
 			description: "Sent when all admin JWTs are invalidated.",
-			subject: "24Vertex admin panic — all sessions invalidated",
+			subject: "24Vertex admin panic: all sessions invalidated",
 			source: "admin",
 			html: `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px"><p>All admin JWTs were invalidated (version <strong>42</strong>).</p></body></html>`,
 		}),

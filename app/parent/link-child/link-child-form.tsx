@@ -70,7 +70,7 @@ export function LinkChildForm() {
 					<InfoIcon className="mt-0.5 size-4 shrink-0 text-primary/90" aria-hidden />
 					<p>
 						If their profile already lists a guardian email, sign in with that same email on your parent
-						account—or linking will fail.
+						account, or linking will fail.
 					</p>
 				</div>
 			),

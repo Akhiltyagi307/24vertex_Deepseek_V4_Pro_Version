@@ -17,7 +17,7 @@ const REVIEWS = [
 	},
 	{
 		quote:
-			"Assignments from me and self-practice show up in one timeline—fewer \"which app is this?\" moments.",
+			"Assignments from me and self-practice show up in one timeline, fewer \"which app is this?\" moments.",
 		attribution: "Mr. Patel, Mathematics",
 	},
 	{

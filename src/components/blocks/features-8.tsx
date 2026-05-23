@@ -6,6 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { featureBentoCardSurfaceClassName } from "@/lib/marketing/landing-feature-surface";
 import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
 import {
+	marketingSectionIntroWrapClassName,
+	marketingSectionLeadClassName,
+} from "@/lib/marketing/marketing-section-rhythm";
+import { cn } from "@/lib/utils";
+import {
 	BarChart3,
 	GraduationCap,
 	Presentation,
@@ -14,7 +19,6 @@ import {
 	UserRound,
 	Users,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 /** Title hover lifts to the 24Vertex brand green via the `--subject-grid-icon` token (One Voice Rule, DESIGN.md). */
 const featureCardTitleClassName =
@@ -26,16 +30,16 @@ const featureBentoCardEyebrowClassName =
 
 export function Features() {
 	return (
-		<section id="features" className="bg-background py-16 medium:py-20">
+		<section id="features" className="bg-background py-16 medium:py-20 xl:py-24">
 			<div className="w-full px-4 medium:px-6 xl:px-8">
-				<div className="mx-auto mb-12 max-w-3xl text-center">
+				<div className={cn("mb-12", marketingSectionIntroWrapClassName)}>
 					<Badge variant="outline" className={cn("mb-4", landingMarketingSectionEyebrowBadgeClassName)}>
 						Features
 					</Badge>
 					<h2 className="text-3xl font-semibold tracking-tight text-foreground medium:text-4xl">
 						Platform features built for measurable learning outcomes
 					</h2>
-					<p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground medium:text-lg">
+					<p className={marketingSectionLeadClassName}>
 						Designed to improve student clarity, parent visibility, and teacher action with one
 						connected workflow.
 					</p>

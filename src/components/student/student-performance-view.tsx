@@ -418,8 +418,8 @@ export function StudentPerformanceView({
 					</h1>
 					<PageHeaderSubtext>
 						{parentViewer
-							? "We couldn’t load their topic tracker this time — try again shortly."
-							: "We couldn’t load your performance tracker this time — try again shortly."}
+							? "We couldn’t load their topic tracker this time. Try again shortly."
+							: "We couldn’t load your performance tracker this time. Try again shortly."}
 					</PageHeaderSubtext>
 				</div>
 				<Alert variant="destructive" className="mt-6">
@@ -1196,7 +1196,7 @@ export function StudentPerformanceView({
 																		}
 																	}}
 																	tabIndex={0}
-																	title={`${row.subjectName} — ${statusLabel(row.status)}. Average ${formatScore(row.averageScore)}, ${row.testsTaken} tests taken.`}
+																	title={`${row.subjectName}: ${statusLabel(row.status)}. Average ${formatScore(row.averageScore)}, ${row.testsTaken} tests taken.`}
 																>
 																	<td className="border-border border-e px-2 py-2 align-middle text-center">
 																		<input
@@ -1257,7 +1257,7 @@ export function StudentPerformanceView({
 																		{formatLastTest(row.lastTestDate)}
 																	</td>
 																	<td className="px-3 py-2 text-center align-middle text-muted-foreground text-xs">
-																		— {trendLabel(row.trend)}
+																		· {trendLabel(row.trend)}
 																	</td>
 																</tr>
 															);

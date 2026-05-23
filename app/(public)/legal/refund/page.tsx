@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Refund & cancellation policy — 24Vertex",
+	title: "Refund & cancellation policy · 24Vertex",
 	description: "How refunds and subscription cancellations work for 24Vertex.",
 	alternates: {
 		canonical: "/legal/refund",

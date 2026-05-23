@@ -50,7 +50,7 @@ function renderConfirmationHtml(state: "ok" | "expired" | "invalid"): string {
 <html lang="en"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>${title} — 24Vertex</title>
+<title>${title} · 24Vertex</title>
 </head>
 <body style="margin:0;background:#f5f5f4;font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#0f172a;">
 <main style="max-width:520px;margin:48px auto;background:#ffffff;border:1px solid #e6e8eb;border-radius:18px;padding:36px;">

@@ -21,7 +21,7 @@ export function ActionFailureRetryButton({ failureId }: Props) {
 				});
 				const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; code?: string } | null;
 				if (res.ok && data?.ok) {
-					toast.success("Retry succeeded — failure resolved.");
+					toast.success("Retry succeeded. Failure resolved.");
 					router.refresh();
 					return;
 				}

@@ -89,7 +89,7 @@ export function TeacherOrganizationSection({
 								placeholder="8 characters from your administrator"
 							/>
 							<p className="text-muted-foreground text-xs leading-relaxed">
-								This code is unique to your school or tuition center. Paste or type it exactly as shared — letters are not
+								This code is unique to your school or tuition center. Paste or type it exactly as shared. Letters are not
 								case-sensitive.
 							</p>
 						</div>

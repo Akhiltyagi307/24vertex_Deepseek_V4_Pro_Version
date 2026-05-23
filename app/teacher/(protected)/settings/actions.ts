@@ -33,7 +33,7 @@ const organizationIdSchema = z.string().uuid();
 
 function messageForTeacherLinkError(message: string): string {
 	if (/organization roster/i.test(message)) {
-		return "You're connected to an organization — manage students from Link Student, not link codes.";
+		return "You're connected to an organization. Manage students from Link Student, not link codes.";
 	}
 	if (/organization/i.test(message)) {
 		return "Teachers connected to a school or tuition center cannot link students by code.";

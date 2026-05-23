@@ -19,7 +19,7 @@ export interface ErrorScreenProps {
 
 export function ErrorScreen({
 	title = "Something went wrong.",
-	description = "We hit an unexpected error. The team has been notified — try again, or head back to where you were.",
+	description = "We hit an unexpected error. The team has been notified. Try again, or head back to where you were.",
 	error,
 	reset,
 	homeHref,

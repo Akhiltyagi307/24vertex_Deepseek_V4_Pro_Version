@@ -21,11 +21,11 @@ export async function sendTrialEndingEmail(params: TrialEndingParams): Promise<{
 		preheader:
 			params.daysLeft <= 0
 				? "Add a payment method today to keep practicing without interruption."
-				: `${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"} left — add a payment method now.`,
+				: `${params.daysLeft} day${params.daysLeft === 1 ? "" : "s"} left. Add a payment method now.`,
 		greeting: `Hi ${studentName},`,
 		title: subject,
 		paragraphs: [
-			"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause — you won't be charged until the trial actually ends.",
+			"Your 14-day free trial is wrapping up. Add a payment method now so your practice doesn't pause. You won't be charged until the trial actually ends.",
 			"Switch to <strong>Pro Monthly</strong> or <strong>Pro Annual</strong> in one tap.",
 		],
 		primaryCta: { label: "Continue with Pro", href: `${getAppUrl()}/student/subscription` },
@@ -54,7 +54,7 @@ export type PaymentReceiptParams = CommonParams & {
 
 /** Sent after a successful charge (webhook). Includes hosted invoice link when available. */
 export async function sendPaymentReceiptEmail(params: PaymentReceiptParams): Promise<{ error: string | null }> {
-	const subject = "Payment received — 24Vertex";
+	const subject = "Payment received · 24Vertex";
 	const studentName = escapeHtml(params.studentName ?? "there");
 	const stats: { label: string; value: string }[] = [{ label: "Amount", value: params.amountLabel }];
 	if (params.planName) stats.push({ label: "Plan", value: params.planName });
@@ -136,7 +136,7 @@ export async function sendPaymentFailedEmail(params: PaymentFailedParams): Promi
 	const studentName = escapeHtml(params.studentName ?? "there");
 
 	const html = renderEmailShell({
-		preheader: "Your payment was declined. Razorpay will retry — update your method to avoid an interruption.",
+		preheader: "Your payment was declined. Razorpay will retry. Update your method to avoid an interruption.",
 		greeting: `Hi ${studentName},`,
 		title: subject,
 		paragraphs: [

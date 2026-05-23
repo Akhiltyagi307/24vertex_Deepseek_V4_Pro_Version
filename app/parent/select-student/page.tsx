@@ -159,7 +159,7 @@ export default async function ParentSelectStudentPage() {
 								<div className="flex gap-3 rounded-lg border border-border/80 bg-muted/25 p-3.5 text-muted-foreground text-xs leading-relaxed">
 									<InfoIcon className="mt-0.5 size-4 shrink-0 text-primary/90" aria-hidden />
 									<p>
-										Use their link code from the student Profile—if they already had a guardian email saved,
+										Use their link code from the student Profile. If they already had a guardian email saved,
 										yours must match it.
 									</p>
 								</div>

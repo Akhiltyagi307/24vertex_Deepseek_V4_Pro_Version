@@ -45,7 +45,7 @@ function studentReportReadyTitle(input: NotifyTestReportReadyInput): string {
 
 function parentReportReadyTitle(childLabel: string, input: NotifyTestReportReadyInput): string {
 	const label = formatPracticeReportSubmittedLabel(input.submittedAtIso);
-	const base = `${childLabel} — ${input.subjectName} report ready`;
+	const base = `${childLabel}: ${input.subjectName} report ready`;
 	const withWhen = label ? `${base} (${label})` : base;
 	return trimTitle(withWhen);
 }

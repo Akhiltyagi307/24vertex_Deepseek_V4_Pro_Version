@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Terms of use — 24Vertex",
+	title: "Terms of use · 24Vertex",
 	description: "Terms of use for the 24Vertex service.",
 	alternates: {
 		canonical: "/legal/terms",
@@ -20,7 +20,7 @@ export default function LegalTermsPage() {
 			<div className="mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground">
 				<p>
 					These terms govern your access to 24Vertex. They are a <strong className="text-foreground">working draft</strong>{" "}
-					for early use and payment integration—they are <strong className="text-foreground">not legal advice</strong>.
+					for early use and payment integration. They are <strong className="text-foreground">not legal advice</strong>.
 					Before accepting payments at scale, publish terms reviewed by qualified counsel for your jurisdiction and
 					entity. By using 24Vertex or subscribing, you agree to these terms and to our{" "}
 					<Link href="/legal/privacy" className="font-medium text-link underline-offset-4 hover:underline">

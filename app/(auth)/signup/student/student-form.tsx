@@ -267,7 +267,7 @@ export function StudentSignupForm({ electives }: Props) {
 				</div>
 				<p className="text-xs text-muted-foreground">
 					Step {step + 1} of {STEP_LABELS.length}
-					<span className="text-foreground"> — {STEP_LABELS[step]}</span>
+					<span className="text-foreground"> · {STEP_LABELS[step]}</span>
 				</p>
 			</div>
 
@@ -396,7 +396,7 @@ export function StudentSignupForm({ electives }: Props) {
 						</>
 					) : null}
 					<p className="rounded-lg border border-border/90 bg-muted/40 px-3 py-2.5 text-muted-foreground text-sm leading-relaxed">
-						A parent connects later using the link code shown on your Profile after signup—they don’t need
+						A parent connects later using the link code shown on your Profile after signup. They don’t need
 						your signup details besides that code.
 					</p>
 				</div>

@@ -18,6 +18,11 @@ import { GraduationCap, Presentation, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
+import {
+	MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+	marketingSectionIntroWrapClassName,
+	marketingSectionLeadClassName,
+} from "@/lib/marketing/marketing-section-rhythm";
 import { cn } from "@/lib/utils";
 
 const PORTAL_PREVIEW_SIZES = "(max-width: 1280px) 100vw, 1280px";
@@ -58,10 +63,20 @@ function PortalPreviewImage({
 
 const tabs = [
 	{
-		icon: GraduationCap,
-		title: "Student portal",
+		icon: UserRound,
+		title: "Parent view",
 		description:
-			"Adaptive practice, topic mastery, and exam readiness in one dashboard built for daily study.",
+			"See exactly what your child practised, where they are improving, and what to revise this weekend. Updated within minutes of every test. No chasing, no screenshots, no guesswork.",
+		isNew: false,
+		previewBase: "/marketing/parent-portal-dashboard",
+		previewWidth: 3420,
+		previewHeight: 1968,
+	},
+	{
+		icon: GraduationCap,
+		title: "Student view",
+		description:
+			"A daily focus list of the chapters that need attention, plus the AI tutor for the questions they would never bring to class. Built for short, sharp study sessions.",
 		isNew: false,
 		previewBase: "/marketing/student-portal-dashboard",
 		previewWidth: 3414,
@@ -69,23 +84,13 @@ const tabs = [
 	},
 	{
 		icon: Presentation,
-		title: "Teacher portal",
+		title: "Teacher view",
 		description:
-			"Assign work by class, monitor completion, and spot intervention signals before gaps widen.",
+			"For the teacher in the loop. Class-level signals, not just one student's snapshot, so the school sees what is going well and what is slipping, in time to do something about it.",
 		isNew: false,
 		previewBase: "/marketing/teacher-portal-dashboard",
 		previewWidth: 3414,
 		previewHeight: 1970,
-	},
-	{
-		icon: UserRound,
-		title: "Parent portal",
-		description:
-			"Read-only visibility into assignments, progress, and alerts—without noisy guesswork.",
-		isNew: false,
-		previewBase: "/marketing/parent-portal-dashboard",
-		previewWidth: 3420,
-		previewHeight: 1968,
 	},
 ] as const;
 
@@ -173,21 +178,21 @@ export default function RuixenFeaturedImageSection() {
 	const activeTab = tabs[selectedTab];
 
 	return (
-		<section id="portals" className="bg-background py-16 medium:py-20">
+		<section id="portals" className="bg-background py-16 medium:py-20 xl:py-24">
 			<div className="mx-auto w-full max-w-7xl px-4 medium:px-6 xl:px-8">
-				<div className="mx-auto max-w-3xl text-center">
+				<div className={marketingSectionIntroWrapClassName}>
 					<Badge
 						variant="outline"
 						className={cn("mb-4", landingMarketingSectionEyebrowBadgeClassName)}
 					>
-						Portals
+						One product, three views
 					</Badge>
-					<h2 className="text-3xl font-semibold tracking-tight text-foreground medium:text-4xl">
-						One platform, three role-built dashboards
+					<h2 className="text-3xl font-semibold tracking-tight text-foreground medium:text-4xl text-balance">
+						One truth, three views. No more screenshots in WhatsApp groups.
 					</h2>
-					<p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground medium:text-lg">
-						Students practice with clarity, teachers act on class signals, and parents
-						stay aligned—each portal tuned to what that role needs next.
+					<p className={cn(marketingSectionLeadClassName, "text-pretty")}>
+						You, your child, and their teacher finally look at the same picture, tuned to
+						what each of you needs to see, and nothing more.
 					</p>
 				</div>
 
@@ -228,7 +233,12 @@ export default function RuixenFeaturedImageSection() {
 					<p className="text-muted-foreground sr-only">{activeTab.description}</p>
 				</div>
 
-				<p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-center text-sm medium:text-base">
+				<p
+					className={cn(
+						"text-muted-foreground mx-auto mt-6 text-center text-sm medium:text-base",
+						MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+					)}
+				>
 					{activeTab.description}
 				</p>
 			</div>

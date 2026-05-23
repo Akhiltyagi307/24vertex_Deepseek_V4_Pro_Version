@@ -49,8 +49,8 @@ export default async function TeacherStudentPerformanceDirectoryPage({ searchPar
 	});
 
 	const workspaceDescription = activeOrg
-		? `Review subject-level performance for students at ${activeOrg.name} that your teacher account can reach. Filter by grade, section, or subject (grades 11–12 respect stream and elective), then open a student to see detailed progress—the same subject view families see in the parent portal.`
-		: `Review subject-level performance for students linked to your account with a six-character code while you’re outside an organization. Filter by class placement or subject, then open a student to see detailed progress—the same subject view families see in the parent portal.`;
+		? `Review subject-level performance for students at ${activeOrg.name} that your teacher account can reach. Filter by grade, section, or subject (grades 11–12 respect stream and elective), then open a student to see detailed progress. The same subject view families see in the parent portal.`
+		: `Review subject-level performance for students linked to your account with a six-character code while you’re outside an organization. Filter by class placement or subject, then open a student to see detailed progress. The same subject view families see in the parent portal.`;
 
 	return (
 		<TeacherPerformanceDirectoryPanel

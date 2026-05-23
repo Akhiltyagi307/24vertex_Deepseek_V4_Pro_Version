@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
 	title: "Notifications · Parent",
-	description: "Updates for your linked students — each card shows which child it refers to.",
+	description: "Updates for your linked students. Each card shows which child it refers to.",
 	robots: { index: false, follow: false },
 };
 
@@ -30,7 +30,7 @@ export default async function ParentNotificationsPage() {
 			<header className="flex flex-col gap-1">
 				<h1 className="font-heading text-xl font-semibold text-foreground">Notifications</h1>
 				<p className="text-sm text-muted-foreground">
-					Updates for your linked students — each card shows which child it refers to.
+					Updates for your linked students. Each card shows which child it refers to.
 				</p>
 			</header>
 			<Suspense fallback={<NotificationsSkeleton />}>

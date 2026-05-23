@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Privacy policy — 24Vertex",
+	title: "Privacy policy · 24Vertex",
 	description: "How 24Vertex collects, uses, and protects your information.",
 	alternates: {
 		canonical: "/legal/privacy",
@@ -71,7 +71,7 @@ export default function LegalPrivacyPage() {
 						privacy policy
 					</a>
 					. We receive limited transaction metadata (such as status, amount, and references) needed to activate and
-					manage your plan—not your full card number or UPI PIN.
+					manage your plan, not your full card number or UPI PIN.
 				</p>
 				<p>
 					<strong className="text-foreground">Cookies and similar technologies.</strong> We and our vendors may use

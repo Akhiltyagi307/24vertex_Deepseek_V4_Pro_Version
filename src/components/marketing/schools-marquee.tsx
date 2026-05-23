@@ -1,28 +1,33 @@
+import { MARKETING_SECTION_LEAD_MAX_CLASSNAME } from "@/lib/marketing/marketing-section-rhythm";
 import { cn } from "@/lib/utils";
 
-/** Well-known independent and legacy Indian schools (public names only; decorative marquee). */
-const INDIAN_SCHOOLS = [
-	"The Doon School",
-	"Mayo College, Ajmer",
-	"Welham Boys' School",
-	"Welham Girls' School",
-	"Scindia School, Gwalior",
-	"The Lawrence School, Sanawar",
-	"Bishop Cotton School, Shimla",
-	"Cathedral and John Connon School, Mumbai",
-	"Campion School, Mumbai",
-	"La Martiniere for Boys, Kolkata",
-	"La Martiniere for Girls, Kolkata",
-	"Modern School, Barakhamba Road",
-	"The Shri Ram School, Moulsari",
-	"Sanskriti School, Chanakyapuri",
-	"Bombay Scottish School, Mahim",
-	"St. Columba's School, Delhi",
-	"The Valley School, Bangalore",
-	"National Public School, Indiranagar",
-	"Delhi Public School, R.K. Puram",
-	"Step by Step School, Noida",
-	"Pathways World School, Aravali",
+/**
+ * Indian school boards covered by the 24Vertex content engine. Used as a
+ * scrolling trust strip under the hero; replaces the previous static list of
+ * named independent schools so the marquee never reads as a partner-school
+ * endorsement.
+ */
+const INDIAN_SCHOOL_BOARDS = [
+	"CBSE",
+	"ICSE",
+	"ISC",
+	"IB MYP",
+	"IGCSE",
+	"Cambridge",
+	"NCERT",
+	"Maharashtra State Board",
+	"Karnataka State Board",
+	"Tamil Nadu State Board",
+	"Gujarat State Board",
+	"Rajasthan State Board",
+	"Madhya Pradesh State Board",
+	"Uttar Pradesh State Board",
+	"West Bengal State Board",
+	"Haryana State Board",
+	"Punjab State Board",
+	"Andhra Pradesh State Board",
+	"Telangana State Board",
+	"Kerala State Board",
 ] as const;
 
 type SchoolsMarqueeProps = {
@@ -32,7 +37,7 @@ type SchoolsMarqueeProps = {
 };
 
 export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
-	const looped = [...INDIAN_SCHOOLS, ...INDIAN_SCHOOLS];
+	const looped = [...INDIAN_SCHOOL_BOARDS, ...INDIAN_SCHOOL_BOARDS];
 
 	return (
 		<div
@@ -42,11 +47,16 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 				className,
 			)}
 			role="region"
-			aria-label="Illustrative names of well-known Indian schools"
+			aria-label="Indian school boards covered by 24Vertex content"
 		>
-			<span className="sr-only">
-				Scrolling illustrative names only. These schools are not shown as partners or endorsements of 24Vertex.
-			</span>
+			<p
+				className={cn(
+					"text-muted-foreground/80 mx-auto mb-6 px-4 text-center text-xs font-medium uppercase tracking-[0.2em] medium:mb-8 medium:text-[0.75rem]",
+					MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+				)}
+			>
+				Built for every Indian school board
+			</p>
 			<div
 				className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent medium:w-20"
 				aria-hidden
@@ -61,7 +71,7 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 					{looped.map((name, index) => (
 						<span
 							key={`${name}-${index}`}
-							className="me-10 shrink-0 whitespace-nowrap text-sm font-medium tracking-tight text-muted-foreground/50 medium:me-14 medium:text-[0.9375rem]"
+							className="me-8 shrink-0 whitespace-nowrap rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-xs font-medium tracking-tight text-muted-foreground/80 medium:me-10 medium:px-4 medium:py-1.5 medium:text-[0.8125rem]"
 						>
 							{name}
 						</span>
@@ -69,7 +79,12 @@ export function SchoolsMarquee({ className, caption }: SchoolsMarqueeProps) {
 				</div>
 			</div>
 			{caption != null && caption.length > 0 ? (
-				<p className="text-muted-foreground mx-auto mt-8 max-w-2xl px-4 text-center text-xs leading-relaxed medium:text-[0.8125rem]">
+				<p
+					className={cn(
+						"text-muted-foreground mx-auto mt-8 px-4 text-center text-xs leading-relaxed medium:text-[0.8125rem]",
+						MARKETING_SECTION_LEAD_MAX_CLASSNAME,
+					)}
+				>
 					{caption}
 				</p>
 			) : null}

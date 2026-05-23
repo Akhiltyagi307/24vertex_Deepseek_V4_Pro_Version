@@ -32,11 +32,11 @@ export default function EmailTemplatesPreviewPage(): React.ReactElement {
 				<p className="mt-3 max-w-3xl text-sm text-muted-foreground">
 					Live HTML from <code>renderEmailShell()</code> and the same builders used in production senders.
 					App templates can be overridden by active rows in <code>email_templates</code> (admin
-					Communications). Supabase Auth mail is configured in each Supabase project dashboard — previews
+					Communications). Supabase Auth mail is configured in each Supabase project dashboard. Previews
 					here show branded stand-ins for layout review.
 				</p>
 				<p className="mt-2 text-sm text-muted-foreground">
-					<strong>{samples.length}</strong> templates — {appCount} app, {authCount} auth, {adminCount}{" "}
+					<strong>{samples.length}</strong> templates: {appCount} app, {authCount} auth, {adminCount}{" "}
 					admin. Static export:{" "}
 					<code className="text-xs">pnpm exec tsx scripts/preview-emails.ts</code>
 				</p>
