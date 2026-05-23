@@ -36,6 +36,8 @@ export default function OgImage() {
 				</div>
 				<div
 					style={{
+						display: "flex",
+						flexDirection: "column",
 						fontSize: 76,
 						fontWeight: 700,
 						lineHeight: 1.05,
@@ -43,9 +45,8 @@ export default function OgImage() {
 						maxWidth: 980,
 					}}
 				>
-					Stop finding out on
-					<br />
-					<span style={{ color: "#2ea070" }}>report-card day.</span>
+					<div>Stop finding out on</div>
+					<div style={{ color: "#2ea070" }}>report-card day.</div>
 				</div>
 				<div
 					style={{
