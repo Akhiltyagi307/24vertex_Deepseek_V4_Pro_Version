@@ -1,7 +1,6 @@
 import {
 	bigint,
 	boolean,
-	decimal,
 	index,
 	inet,
 	integer,
@@ -13,7 +12,6 @@ import {
 	varchar,
 } from "drizzle-orm/pg-core";
 
-import { topics } from "./academic";
 import { broadcasts } from "./broadcasts";
 
 export const notifications = pgTable(
@@ -66,22 +64,6 @@ export const emailLog = pgTable(
 	},
 	(t) => [index("idx_email_log_created").on(t.createdAt), index("idx_email_log_broadcast").on(t.broadcastId)],
 );
-
-export const resources = pgTable("resources", {
-	id: uuid("id").defaultRandom().primaryKey(),
-	topicId: uuid("topic_id")
-		.notNull()
-		.references(() => topics.id, { onDelete: "cascade" }),
-	resourceType: varchar("resource_type", { length: 20 }),
-	title: varchar("title", { length: 255 }).notNull(),
-	description: text("description"),
-	url: varchar("url", { length: 1000 }).notNull(),
-	difficultyLevel: varchar("difficulty_level", { length: 20 }),
-	durationMinutes: integer("duration_minutes"),
-	source: varchar("source", { length: 100 }),
-	rating: decimal("rating", { precision: 3, scale: 2 }),
-	createdAt: timestamp("created_at").defaultNow(),
-});
 
 export const userPreferences = pgTable("user_preferences", {
 	id: uuid("id").defaultRandom().primaryKey(),

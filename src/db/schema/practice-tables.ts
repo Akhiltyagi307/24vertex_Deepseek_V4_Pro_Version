@@ -3,19 +3,6 @@ import { check, index, integer, jsonb, pgTable, text, timestamp, uuid, varchar, 
 
 import { tests } from "./assessment";
 
-export const practiceRateLimits = pgTable(
-	"practice_rate_limits",
-	{
-		studentId: uuid("student_id").notNull(),
-		bucket: text("bucket").notNull(),
-		windowStart: timestamp("window_start").notNull(),
-		count: integer("count").notNull().default(0),
-	},
-	(t) => [
-		index("idx_practice_rate_limits_student_bucket").on(t.studentId, t.bucket, t.windowStart),
-	],
-);
-
 export const practiceJobs = pgTable(
 	"practice_jobs",
 	{

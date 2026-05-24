@@ -38,7 +38,7 @@ function buildQuestion(
 
 const summary: PracticeGradingSummary = {
 	overall_summary:
-		"You attempted all four items. Strong MCQ reasoning on gravitation; written answers need clearer definitions and one worked numerical step.",
+		"Strong on MCQ; written answers need units and orbit reasoning.",
 	strengths: [
 		"Gravitation MCQ: correct inverse-square reasoning",
 		"Short answer: named the right quantity (acceleration due to gravity)",
@@ -233,6 +233,15 @@ async function main() {
 	const doc = (
 		<PracticeGradingPdfDocument
 			subjectName="Physics (Class 11)"
+			studentDetails={{
+				fullName: "Sample Student",
+				grade: 11,
+				section: "A",
+				stream: "science_pcb",
+				schoolName: "Delhi Public School",
+				electiveSubjectName: "Computer Science",
+				studentLinkCode: "XK7P2M",
+			}}
 			studentDisplayName="Sample Student"
 			difficulty="medium"
 			timeLimitSeconds={3600}

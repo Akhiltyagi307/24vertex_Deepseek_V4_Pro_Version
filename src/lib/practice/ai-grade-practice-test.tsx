@@ -39,6 +39,10 @@ import {
 } from "@/lib/practice/student-answer-write";
 import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { PracticeGradingPdfDocument } from "@/lib/student/practice-grading-pdf-document";
+import {
+	practiceGradingPdfStudentDisplayName,
+	type PracticeGradingPdfStudentDetails,
+} from "@/lib/student/practice-grading-pdf-student-details";
 import { formatTrackerStatusLabel, isTrackerStatus } from "@/lib/student/tracker-status-labels";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 import { createPhaseTimer, logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
@@ -861,7 +865,11 @@ export async function buildPracticeGradingReportPdfBuffer(
 	const [subjectRes, reportRes, profileRes, questionsRes] = await Promise.all([
 		admin.from("subjects").select("name").eq("id", subjectId).maybeSingle(),
 		admin.from("test_reports").select("summary_report, topic_performance").eq("test_id", testId).maybeSingle(),
-		admin.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+		admin
+			.from("profiles")
+			.select("full_name, grade, section, stream, school_name, student_link_code, elective_subject_id")
+			.eq("id", userId)
+			.maybeSingle(),
 		admin
 			.from("questions")
 			.select(
@@ -886,7 +894,25 @@ export async function buildPracticeGradingReportPdfBuffer(
 		return { ok: false, message: "Report is missing summary data." };
 	}
 
-	const studentDisplayName = String(profileRes.data?.full_name ?? "").trim() || null;
+	const profileRow = profileRes.data;
+	let electiveSubjectName: string | null = null;
+	const electiveId = profileRow?.elective_subject_id as string | null | undefined;
+	if (electiveId) {
+		const { data: electiveRow } = await admin.from("subjects").select("name").eq("id", electiveId).maybeSingle();
+		electiveSubjectName = String(electiveRow?.name ?? "").trim() || null;
+	}
+
+	const studentDetails: PracticeGradingPdfStudentDetails = {
+		fullName: String(profileRow?.full_name ?? "").trim() || null,
+		grade: typeof profileRow?.grade === "number" ? profileRow.grade : null,
+		section: profileRow?.section != null ? String(profileRow.section).trim() || null : null,
+		stream: profileRow?.stream != null ? String(profileRow.stream).trim() || null : null,
+		schoolName: profileRow?.school_name != null ? String(profileRow.school_name).trim() || null : null,
+		electiveSubjectName,
+		studentLinkCode:
+			profileRow?.student_link_code != null ? String(profileRow.student_link_code).trim() || null : null,
+	};
+	const studentDisplayName = practiceGradingPdfStudentDisplayName(studentDetails);
 
 	const { data: questionRows, error: qErr } = questionsRes;
 	if (qErr || !questionRows?.length) {
@@ -1060,6 +1086,7 @@ export async function buildPracticeGradingReportPdfBuffer(
 		const raw = await renderToBuffer(
 			<PracticeGradingPdfDocument
 				subjectName={subjectName}
+				studentDetails={studentDetails}
 				studentDisplayName={studentDisplayName}
 				difficulty={(testRow.difficulty as string | null) ?? null}
 				timeLimitSeconds={testRow.time_limit_seconds as number | null}
