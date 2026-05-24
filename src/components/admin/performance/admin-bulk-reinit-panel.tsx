@@ -11,7 +11,7 @@ import {
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { Progress, ProgressLabel, ProgressTrack, ProgressValue } from "@/components/ui/progress";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
 
 type BulkReinitJobState = {
@@ -156,14 +156,13 @@ export function AdminBulkReinitPanel({ grade: gradeProp, onGradeChange, onJobFin
 							<span className="ml-1 font-normal text-destructive">({poll.error})</span>
 						:	null}
 					</p>
-					<Progress value={progressPct}>
+					<Progress value={progressPct} className="w-full flex-col gap-2">
 						<div className="flex w-full items-center gap-2">
 							<ProgressLabel className="text-xs text-muted-foreground">Students processed</ProgressLabel>
 							<ProgressValue>
-								{poll.processed} / {poll.total || "?"}
+								{() => `${poll.processed} / ${poll.total || "?"}`}
 							</ProgressValue>
 						</div>
-						<ProgressTrack />
 					</Progress>
 					<Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
 						<CollapsibleTrigger
