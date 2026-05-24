@@ -14,7 +14,7 @@ import { marketingPageMetadata } from "@/lib/marketing/pages/metadata";
 export const metadata = marketingPageMetadata({
 	title: "Pricing",
 	description:
-		"24Vertex parent plan: monthly and yearly pricing, 14-day free trial with 5 practice tests and AI tutor. Less than a week of many home tuitions.",
+		"24Vertex student subscription: monthly and yearly pricing, 14-day free trial with 5 practice tests (1 hour or 3 hours) and AI tutor. Only student accounts are paid.",
 	path: "/pricing",
 });
 
@@ -36,8 +36,8 @@ export default function PricingPage() {
 	const jsonLd = {
 		"@context": "https://schema.org",
 		"@type": "Product",
-		name: "24Vertex parent plan",
-		description: "Adaptive AI practice, tutor, and parent dashboard for grades 6 to 10.",
+		name: "24Vertex student subscription",
+		description: "Adaptive AI practice, tutor, and chapter radar charts for grades 6 to 10. Only student accounts are paid.",
 		brand: { "@type": "Brand", name: "24Vertex" },
 		offers: [
 			{
@@ -65,8 +65,8 @@ export default function PricingPage() {
 			/>
 			<MarketingHero
 				eyebrow="Pricing"
-				title="One plan. Monthly to try, yearly to save two months."
-				lead="Less than the cost of one week of most home tuitions, for a private AI tutor and a parent dashboard your child's school does not give you."
+				title="One student subscription. Monthly to try, yearly to save two months."
+				lead="Less than the cost of one week of most home tuitions, for a private AI tutor and a parent dashboard your child's school does not give you. Parent and teacher accounts are free. You pay only for each student who practises."
 				actions={<LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />}
 			/>
 

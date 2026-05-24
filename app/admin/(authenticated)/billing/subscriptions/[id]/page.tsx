@@ -47,7 +47,7 @@ export default async function AdminBillingSubscriptionDetailPage({ params }: Pro
 
 			<div className="grid max-w-3xl gap-3 rounded-lg border border-border p-4 text-sm">
 				<Row label="Subscription id" value={<span className="font-mono text-xs">{s.id}</span>} />
-				<Row label="Plan" value={`${s.plan_code} — ${detail.plan_name}`} />
+				<Row label="Plan" value={`${s.plan_code}: ${detail.plan_name}`} />
 				<Row label="Status" value={s.status} />
 				<Row
 					label="Current period"

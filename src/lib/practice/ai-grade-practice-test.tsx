@@ -10,6 +10,14 @@ import { consumeTest } from "@/lib/billing/entitlements";
 import { notifyTestReportReady } from "@/lib/notifications/report-ready";
 import { getOpenAIChatModel } from "@/lib/env";
 import {
+	formatGradingFeedbackForStorage,
+	gradedItemFromStoredFeedback,
+} from "@/lib/practice/grading-feedback-format";
+import {
+	normalizeGradedQuestionItem,
+	validateGradingBreakdown,
+} from "@/lib/practice/grading-normalize";
+import {
 	buildPracticeGradingSystemPrompt,
 	buildPracticeGradingUserPrompt,
 	stringifyStudentAnswer,
@@ -31,6 +39,7 @@ import {
 } from "@/lib/practice/student-answer-write";
 import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { PracticeGradingPdfDocument } from "@/lib/student/practice-grading-pdf-document";
+import { formatTrackerStatusLabel, isTrackerStatus } from "@/lib/student/tracker-status-labels";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 import { createPhaseTimer, logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -87,11 +96,35 @@ function verdictToIsCorrect(v: GradedQuestionItem["verdict"]): boolean | null {
 }
 
 function buildAiFeedback(g: GradedQuestionItem): string {
-	const parts = [g.analysis.trim()];
-	if (g.step_by_step_solution?.trim()) {
-		parts.push(`\n\nStep-by-step:\n${g.step_by_step_solution.trim()}`);
-	}
-	return parts.filter(Boolean).join("");
+	return formatGradingFeedbackForStorage(g);
+}
+
+function normalizeGradedChunk(
+	part: GradingQuestionInput[],
+	graded: GradedQuestionItem[],
+	ctx: { testId: string; correlationId: string; chunkIndex: number },
+): GradedQuestionItem[] {
+	const inputById = new Map(part.map((q) => [q.question_id, q]));
+	return graded.map((item, index) => {
+		const question = inputById.get(item.question_id) ?? part[index];
+		if (!question) return item;
+		const normalized = normalizeGradedQuestionItem(question, item);
+		const issues = validateGradingBreakdown(question, normalized);
+		if (issues.length > 0) {
+			logServerError(
+				"gradePracticeTestWithAi.validateGradingBreakdown",
+				`Grading breakdown gaps for Q${question.question_number}`,
+				{
+					testId: ctx.testId,
+					correlationId: ctx.correlationId,
+					chunkIndex: ctx.chunkIndex,
+					questionId: question.question_id,
+					issues: issues.join("; "),
+				},
+			);
+		}
+		return normalized;
+	});
 }
 
 function normalizeGradedChunkIds(
@@ -150,7 +183,7 @@ async function runGradingChunk(
 ): Promise<{ questions: GradedQuestionItem[] }> {
 	// Hard-cap output tokens at 12k. CHUNK_SIZE=5 means at most ~6k expected
 	// tokens per chunk (~1.2k per question grading payload), well within budget.
-	const maxOutputTokens = Math.min(12_000, Math.max(4_000, nQuestions * 1_200));
+	const maxOutputTokens = Math.min(14_000, Math.max(4_500, nQuestions * 1_500));
 	const modelId = getOpenAIChatModel();
 	return withPracticeAiAttempts("gradePracticeTest.chunk", async () => {
 		const t0 = Date.now();
@@ -189,16 +222,22 @@ async function runSummaryObject(
 		nCorrect: number;
 		nPartial: number;
 		nIncorrect: number;
+		partialHighlights: string[];
 	},
 	userId: string,
 ): Promise<PracticeGradingSummary> {
 	const prompt = [
 		"You write concise student-facing summaries for a graded practice test.",
-		"Use plain language. No markdown.",
+		"Supportive practice tone (not exam strict). Use plain language. No markdown.",
 		`Overall percent (mean of question scores): ${stats.overallPercent.toFixed(1)}`,
-		`Counts — correct: ${stats.nCorrect}, partially correct: ${stats.nPartial}, incorrect: ${stats.nIncorrect}`,
+		`Counts: correct ${stats.nCorrect}, partially correct ${stats.nPartial}, incorrect ${stats.nIncorrect}`,
 		"Topics:",
 		...stats.topicLines.map((l) => ` - ${l}`),
+		"",
+		"Questions that need the most attention (reference these in improvement_areas and recommendations):",
+		...(stats.partialHighlights.length > 0 ?
+			stats.partialHighlights.map((l) => ` - ${l}`)
+		:	[" - (none)"]),
 	].join("\n");
 
 	return withPracticeAiAttempts("gradePracticeTest.summary", async () => {
@@ -207,10 +246,14 @@ async function runSummaryObject(
 		const { object, usage } = await generateObject({
 			model: getOpenAIProvider()(modelId),
 			schema: practiceGradingSummarySchema,
-			system:
-				"Return structured summary fields only. strengths, improvement_areas, and recommendations should be short bullet phrases (each array item one bullet).",
+			system: [
+				"Return structured summary fields only.",
+				"strengths, improvement_areas, recommendations: short bullet phrases (one idea per array item).",
+				"Mention specific question numbers or topics from the partial highlights when relevant.",
+				"recommendations must be actionable study steps, not generic advice.",
+			].join(" "),
 			prompt,
-			maxOutputTokens: 2_000,
+			maxOutputTokens: 2_500,
 			maxRetries: 2,
 			providerOptions: {
 				openai: { strictJsonSchema: isStrictJsonSchemaForGradingEnabled() },
@@ -375,6 +418,7 @@ async function gradePracticeTestWithAiInner(
 			question_number: q.question_number as number,
 			question_type: q.question_type as GradingQuestionInput["question_type"],
 			question_text: q.question_text as string,
+			question_difficulty: (q.difficulty_level as string | null) ?? null,
 			options: (q.options as Record<string, string> | null) ?? null,
 			answer_key: q.answer_key,
 			student_answer_raw: raw,
@@ -403,15 +447,20 @@ async function gradePracticeTestWithAiInner(
 			if (graded.length !== part.length) {
 				throw new Error(`AI grading returned ${graded.length}/${part.length} questions for ${label}.`);
 			}
-			const normalized = normalizeGradedChunkIds(part, graded);
-			if (normalized.correctionCount > 0) {
+			const idNormalized = normalizeGradedChunkIds(part, graded);
+			if (idNormalized.correctionCount > 0) {
 				logServerError(
 					"gradePracticeTestWithAi.normalizeGradedChunkIds",
-					`Corrected ${normalized.correctionCount} grading question id(s) by chunk position.`,
+					`Corrected ${idNormalized.correctionCount} grading question id(s) by chunk position.`,
 					{ testId, correlationId: ctx.correlationId, chunkIndex: ci },
 				);
 			}
-			return { ok: true, index: ci, graded: normalized.graded, ms: Date.now() - c0 };
+			const gradedNormalized = normalizeGradedChunk(part, idNormalized.graded, {
+				testId,
+				correlationId: ctx.correlationId,
+				chunkIndex: ci,
+			});
+			return { ok: true, index: ci, graded: gradedNormalized, ms: Date.now() - c0 };
 		} catch (error) {
 			return { ok: false, index: ci, error };
 		}
@@ -518,6 +567,17 @@ async function gradePracticeTestWithAiInner(
 		else nIncorrect++;
 	}
 
+	const partialHighlights = [...merged]
+		.filter((g) => g.score < 100)
+		.sort((a, b) => a.score - b.score)
+		.slice(0, 5)
+		.map((g) => {
+			const qMeta = questionById.get(g.question_id);
+			const qNum = qMeta?.question_number ?? "?";
+			const gap = g.where_marks_were_lost[0] ?? g.analysis.trim().slice(0, 100);
+			return `Q${qNum} (${Math.round(g.score)}%): ${gap}`;
+		});
+
 	let summary: PracticeGradingSummary;
 	try {
 		summary = await runSummaryObject(
@@ -530,6 +590,7 @@ async function gradePracticeTestWithAiInner(
 				nCorrect,
 				nPartial,
 				nIncorrect,
+				partialHighlights,
 			},
 			userId,
 		);
@@ -917,7 +978,8 @@ export async function buildPracticeGradingReportPdfBuffer(
 			unitName: unitNameById.get(tid) || null,
 			grade: topicGradeById.get(tid) ?? null,
 			averageScore: p != null ? p.average_score : null,
-			statusLabel: p != null ? p.status : "—",
+			statusLabel:
+				p != null && isTrackerStatus(p.status) ? formatTrackerStatusLabel(p.status) : "—",
 		};
 	});
 
@@ -933,10 +995,17 @@ export async function buildPracticeGradingReportPdfBuffer(
 			a?.is_correct === true ? "correct"
 			: scoreNum > 0 && scoreNum < 100 ? "partially_correct"
 			: "incorrect";
-		const aiText = (a?.ai_feedback as string | null) ?? "";
-		const [analysis, stepsMarker] = aiText.split("\n\nStep-by-step:\n");
 		const userSummary = a?.ai_user_answer_summary as string | null | undefined;
 		const refSummary = a?.ai_reference_answer_summary as string | null | undefined;
+		const gradedFields = gradedItemFromStoredFeedback({
+			question_id: q.id as string,
+			topic_id: q.topic_id as string,
+			score: Number.isFinite(scoreNum) ? scoreNum : 0,
+			verdict,
+			user_answer_summary: (userSummary ?? "").trim(),
+			reference_answer_summary: (refSummary ?? "").trim(),
+			ai_feedback: (a?.ai_feedback as string | null) ?? null,
+		});
 		const rawAnswer = a?.student_answer ?? null;
 		const optionsRaw = q.options as Record<string, string> | null | undefined;
 		const generationDisplay = formatGenerationAnswerForPdf({
@@ -960,12 +1029,17 @@ export async function buildPracticeGradingReportPdfBuffer(
 			chapter_name: chapterNameById.get(q.topic_id as string) ?? "—",
 			unit_name: unitNameById.get(q.topic_id as string) || null,
 			grade: topicGradeById.get(q.topic_id as string) ?? null,
-			verdict,
-			score: Number.isFinite(scoreNum) ? scoreNum : 0,
-			analysis: (analysis ?? aiText).trim(),
-			step_by_step_solution: stepsMarker?.trim() ? stepsMarker.trim() : undefined,
-			user_answer_summary: (userSummary ?? "").trim(),
-			reference_answer_summary: (refSummary ?? "").trim(),
+			verdict: gradedFields.verdict,
+			score: gradedFields.score,
+			analysis: gradedFields.analysis,
+			step_by_step_solution: gradedFields.step_by_step_solution,
+			band_label: gradedFields.band_label,
+			what_was_correct: gradedFields.what_was_correct,
+			where_marks_were_lost: gradedFields.where_marks_were_lost,
+			to_reach_next_band: gradedFields.to_reach_next_band,
+			criterion_scores: gradedFields.criterion_scores,
+			user_answer_summary: gradedFields.user_answer_summary,
+			reference_answer_summary: gradedFields.reference_answer_summary,
 			student_answer_display: stringifyStudentAnswer(rawAnswer),
 			question_number: q.question_number as number,
 			question_text: q.question_text as string,

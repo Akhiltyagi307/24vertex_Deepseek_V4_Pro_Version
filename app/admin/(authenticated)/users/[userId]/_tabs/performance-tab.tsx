@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AdminServerRowsToolbar } from "@/components/admin/admin-server-rows-toolbar";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
+import { formatTrackerStatusFromRaw } from "@/lib/student/tracker-status-labels";
 
 import type { PerformanceRow, UserDetailRow, UserDetailStats } from "./types";
 
@@ -17,7 +18,7 @@ export function PerformanceTab({ row, userId, perfPreview, stats }: PerformanceT
 		id: r.id,
 		subject_name: r.subjectName,
 		topic_name: r.topicName,
-		status: r.status,
+		status: formatTrackerStatusFromRaw(r.status),
 		average_score: r.averageScore ?? "",
 		tests_taken: r.testsTaken ?? "",
 	}));
@@ -74,7 +75,7 @@ export function PerformanceTab({ row, userId, perfPreview, stats }: PerformanceT
 								<tr key={r.id} className="border-b border-border/80">
 									<td className="px-3 py-2">{r.subjectName}</td>
 									<td className="px-3 py-2">{r.topicName}</td>
-									<td className="px-3 py-2">{r.status}</td>
+									<td className="px-3 py-2">{formatTrackerStatusFromRaw(r.status)}</td>
 									<td className="px-3 py-2 tabular-nums">{r.averageScore ?? "—"}</td>
 									<td className="px-3 py-2 tabular-nums">{r.testsTaken ?? "—"}</td>
 								</tr>

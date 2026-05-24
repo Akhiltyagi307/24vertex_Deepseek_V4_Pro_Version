@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 type SidebarItem = { href: string; label: string };
@@ -68,6 +69,7 @@ const groups: SidebarGroup[] = [
 			{ href: "/admin/curriculum/context-chunks", label: "Chunks" },
 			{ href: "/admin/curriculum/context-chunks/tools", label: "Chunk tools" },
 			{ href: "/admin/curriculum/import", label: "Import" },
+			{ href: "/admin/curriculum/question-visuals", label: "Question visuals" },
 		],
 	},
 	{
@@ -97,6 +99,7 @@ const groups: SidebarGroup[] = [
 		items: [
 			{ href: "/admin/communications/broadcasts", label: "Broadcasts" },
 			{ href: "/admin/communications/email-log", label: "Email log" },
+			{ href: "/admin/communications/email-log/suppressions", label: "Suppressions" },
 			{ href: "/admin/communications/templates", label: "Email templates" },
 		],
 	},
@@ -142,6 +145,8 @@ const groups: SidebarGroup[] = [
 		items: [
 			{ href: "/admin/system/sql-console", label: "SQL" },
 			{ href: "/admin/system/jobs", label: "Jobs" },
+			{ href: "/admin/system/jobs/queues", label: "Job queues" },
+			{ href: "/admin/system/jobs/schedules", label: "Job schedules" },
 			{ href: "/admin/system/health", label: "Health" },
 			{ href: "/admin/system/integrity", label: "Integrity" },
 			{ href: "/admin/system/active-sessions", label: "Sessions" },
@@ -162,7 +167,7 @@ function getActiveGroupId(pathname: string): string | null {
 	return null;
 }
 
-export function AdminSidebar({ pathname }: { pathname: string }) {
+function useSidebarGroupState(pathname: string) {
 	const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 	const [hydrated, setHydrated] = useState(false);
 
@@ -196,8 +201,91 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
 		setOpenGroups((prev) => ({ ...prev, [id]: open }));
 	};
 
+	return { openGroups, toggle };
+}
+
+function AdminSidebarNav({
+	pathname,
+	onNavigate,
+}: {
+	pathname: string;
+	onNavigate?: () => void;
+}) {
+	const { openGroups, toggle } = useSidebarGroupState(pathname);
 	const dashboardActive = isActive(pathname, dashboard.href);
 
+	return (
+		<nav aria-label="Admin" className="space-y-0.5 p-2">
+			<Link
+				href={dashboard.href}
+				onClick={onNavigate}
+				aria-current={dashboardActive ? "page" : undefined}
+				className={cn(
+					"flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted",
+					dashboardActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground",
+				)}
+			>
+				<LayoutDashboard className="h-4 w-4" aria-hidden />
+				{dashboard.label}
+			</Link>
+			{groups.map((group) => {
+				const hasActiveChild = group.items.some((i) => isActive(pathname, i.href));
+				const open = openGroups[group.id] ?? false;
+				const Icon = group.icon;
+				return (
+					<Collapsible key={group.id} open={open} onOpenChange={(o) => toggle(group.id, o)}>
+						<CollapsibleTrigger
+							type="button"
+							aria-expanded={open}
+							className={cn(
+								"flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted",
+								hasActiveChild ? "text-foreground" : "text-muted-foreground",
+							)}
+						>
+							<span className="flex items-center gap-2">
+								<Icon className="h-4 w-4" aria-hidden />
+								{group.label}
+								{hasActiveChild && !open ?
+									<span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary" />
+								:	null}
+							</span>
+							<ChevronDown
+								className={cn(
+									"h-4 w-4 shrink-0 transition-transform duration-200",
+									open && "rotate-180",
+								)}
+								aria-hidden
+							/>
+						</CollapsibleTrigger>
+						<CollapsibleContent className="mt-0.5 space-y-0.5">
+							{group.items.map((item) => {
+								const itemActive = isActive(pathname, item.href);
+								return (
+									<Link
+										key={item.href}
+										href={item.href}
+										onClick={onNavigate}
+										aria-current={itemActive ? "page" : undefined}
+										className={cn(
+											"block rounded-md py-1.5 pl-9 pr-3 text-sm transition-colors hover:bg-muted",
+											itemActive ?
+												"bg-muted font-medium text-foreground"
+											:	"text-muted-foreground",
+										)}
+									>
+										{item.label}
+									</Link>
+								);
+							})}
+						</CollapsibleContent>
+					</Collapsible>
+				);
+			})}
+		</nav>
+	);
+}
+
+export function AdminSidebar({ pathname }: { pathname: string }) {
 	return (
 		<aside className="hidden w-52 shrink-0 border-r border-border bg-muted/20 medium:block">
 			<div className="flex h-14 items-center border-b border-border px-4">
@@ -205,67 +293,31 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
 					24Vertex Admin
 				</Link>
 			</div>
-			<nav className="space-y-0.5 p-2">
-				<Link
-					href={dashboard.href}
-					className={cn(
-						"flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted",
-						dashboardActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground",
-					)}
-				>
-					<LayoutDashboard className="h-4 w-4" />
-					{dashboard.label}
-				</Link>
-				{groups.map((group) => {
-					const hasActiveChild = group.items.some((i) => isActive(pathname, i.href));
-					const open = openGroups[group.id] ?? false;
-					const Icon = group.icon;
-					return (
-						<Collapsible key={group.id} open={open} onOpenChange={(o) => toggle(group.id, o)}>
-							<CollapsibleTrigger
-								type="button"
-								className={cn(
-									"flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted",
-									hasActiveChild ? "text-foreground" : "text-muted-foreground",
-								)}
-							>
-								<span className="flex items-center gap-2">
-									<Icon className="h-4 w-4" />
-									{group.label}
-									{hasActiveChild && !open ? (
-										<span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary" />
-									) : null}
-								</span>
-								<ChevronDown
-									className={cn(
-										"h-4 w-4 shrink-0 transition-transform duration-200",
-										open && "rotate-180",
-									)}
-								/>
-							</CollapsibleTrigger>
-							<CollapsibleContent className="mt-0.5 space-y-0.5">
-								{group.items.map((item) => {
-									const itemActive = isActive(pathname, item.href);
-									return (
-										<Link
-											key={item.href}
-											href={item.href}
-											className={cn(
-												"block rounded-md py-1.5 pl-9 pr-3 text-sm transition-colors hover:bg-muted",
-												itemActive
-													? "bg-muted font-medium text-foreground"
-													: "text-muted-foreground",
-											)}
-										>
-											{item.label}
-										</Link>
-									);
-								})}
-							</CollapsibleContent>
-						</Collapsible>
-					);
-				})}
-			</nav>
+			<AdminSidebarNav pathname={pathname} />
 		</aside>
+	);
+}
+
+export function AdminMobileNav({
+	pathname,
+	open,
+	onOpenChange,
+}: {
+	pathname: string;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	return (
+		<Sheet open={open} onOpenChange={onOpenChange}>
+			<SheetContent side="left" className="w-[min(18rem,88vw)] gap-0 p-0 medium:max-w-xs" showCloseButton>
+				<SheetHeader className="border-b border-border">
+					<SheetTitle className="text-sm font-semibold tracking-tight">24Vertex Admin</SheetTitle>
+					<SheetDescription className="sr-only">Admin section navigation</SheetDescription>
+				</SheetHeader>
+				<div className="overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+					<AdminSidebarNav pathname={pathname} onNavigate={() => onOpenChange(false)} />
+				</div>
+			</SheetContent>
+		</Sheet>
 	);
 }

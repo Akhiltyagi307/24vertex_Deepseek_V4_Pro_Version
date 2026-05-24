@@ -29,18 +29,7 @@ export function performanceStatusBadgeClass(status: TrackerStatus): string {
 	return "h-6 px-2.5 text-[13px] font-semibold";
 }
 
-export function statusLabel(status: TrackerStatus): string {
-	switch (status) {
-		case "good":
-			return "Good";
-		case "satisfactory":
-			return "Satisfactory";
-		case "bad":
-			return "Needs improvement";
-		default:
-			return "Not tested";
-	}
-}
+export { formatTrackerStatusLabel as statusLabel } from "@/lib/student/tracker-status-labels";
 
 export function trendLabel(t: PerformanceRowSerialized["trend"]): string {
 	if (t === "improving") return "Improving";

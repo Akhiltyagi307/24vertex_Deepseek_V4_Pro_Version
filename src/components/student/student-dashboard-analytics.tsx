@@ -296,19 +296,19 @@ export function StudentDashboardAnalytics({
 		() => [
 			{
 				key: "good",
-				label: "Good",
+				label: "Strong",
 				value: payload.distribution.good,
 				fill: AP.topicGood,
 			},
 			{
 				key: "satisfactory",
-				label: "Satisfactory",
+				label: "On track",
 				value: payload.distribution.satisfactory,
 				fill: AP.topicOk,
 			},
 			{
 				key: "bad",
-				label: "Needs work",
+				label: "Strengthen",
 				value: payload.distribution.bad,
 				fill: AP.topicNeeds,
 			},

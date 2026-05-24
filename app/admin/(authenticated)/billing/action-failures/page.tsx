@@ -132,9 +132,21 @@ export default async function AdminBillingActionFailuresPage({ searchParams }: P
 						{rows.map((r) => (
 							<tr key={r.id} className="border-b border-border/80">
 								<td className="px-3 py-2 text-muted-foreground">
-									{formatDateTimeMediumShortInAppTimeZone(r.createdAt)}
+									<Link
+										className="text-primary underline-offset-4 hover:underline"
+										href={`/admin/billing/action-failures/${r.id}`}
+									>
+										{formatDateTimeMediumShortInAppTimeZone(r.createdAt)}
+									</Link>
 								</td>
-								<td className="px-3 py-2">{r.kind}</td>
+								<td className="px-3 py-2">
+									<Link
+										className="font-mono text-xs text-primary underline-offset-4 hover:underline"
+										href={`/admin/billing/action-failures/${r.id}`}
+									>
+										{r.kind}
+									</Link>
+								</td>
 								<td className="px-3 py-2">
 									{r.profileId ?
 										<Link className="text-primary underline-offset-4 hover:underline" href={`/admin/users/${r.profileId}`}>
@@ -167,6 +179,7 @@ export default async function AdminBillingActionFailuresPage({ searchParams }: P
 					:	null}
 					<span className="text-muted-foreground">
 						Page {page} / {totalPages}
+						{total > 0 ? ` · ${total} total` : ""}
 					</span>
 					{page < totalPages ?
 						<Link className="text-primary underline-offset-4 hover:underline" href={`/admin/billing/action-failures${qs(page + 1)}`}>

@@ -397,54 +397,47 @@ export async function resolvePracticeAssignmentEligibleStudentIds(
 		}
 	}
 
-	if (uniqueStudentIds.length === 0 || requiredTopicIds.length === 0) {
-		return { ok: true, eligibleStudentIds: uniqueStudentIds };
-	}
+	return { ok: true, eligibleStudentIds: uniqueStudentIds };
+}
 
-	const trackerRows = await db
-		.select({
-			studentId: performanceTracker.studentId,
-			topicId: performanceTracker.topicId,
-		})
-		.from(performanceTracker)
+/** Creates missing tracker rows for assignment topics so generation can resolve topic config. */
+export async function ensurePerformanceTrackerRowsForAssignmentTopics(
+	studentId: string,
+	subjectId: string,
+	topicIds: string[],
+): Promise<void> {
+	const uniqueTopicIds = [...new Set(topicIds)];
+	if (uniqueTopicIds.length === 0) return;
+
+	const topicRows = await db
+		.select({ id: topics.id, subjectId: topics.subjectId })
+		.from(topics)
 		.where(
-			and(
-				inArray(performanceTracker.studentId, uniqueStudentIds),
-				eq(performanceTracker.subjectId, input.config.subject_id),
-				inArray(performanceTracker.topicId, requiredTopicIds),
-			),
+			and(eq(topics.isActive, true), eq(topics.subjectId, subjectId), inArray(topics.id, uniqueTopicIds)),
 		);
-	const required = new Set(requiredTopicIds);
-	const topicsByStudent = new Map<string, Set<string>>();
-	for (const row of trackerRows) {
-		if (!row.studentId || !row.topicId) continue;
-		const studentTopics = topicsByStudent.get(row.studentId) ?? new Set<string>();
-		studentTopics.add(row.topicId);
-		topicsByStudent.set(row.studentId, studentTopics);
-	}
+	if (topicRows.length === 0) return;
 
-	return {
-		ok: true,
-		eligibleStudentIds: uniqueStudentIds.filter((studentId) => {
-			const studentTopics = topicsByStudent.get(studentId);
-			if (!studentTopics) return false;
-			for (const topicId of required) {
-				if (!studentTopics.has(topicId)) return false;
-			}
-			return true;
-		}),
-	};
+	const now = new Date();
+	await db
+		.insert(performanceTracker)
+		.values(
+			topicRows.map((topic) => ({
+				studentId,
+				topicId: topic.id,
+				subjectId: topic.subjectId,
+				status: "not_tested",
+				createdAt: now,
+				updatedAt: now,
+			})),
+		)
+		.onConflictDoNothing();
 }
 
 export async function validatePracticeAssignmentConfigForStudents(
 	input: PracticeAssignmentEligibilityInput,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
 	const eligibility = await resolvePracticeAssignmentEligibleStudentIds(input);
-	if (!eligibility.ok) return eligibility;
-	if (eligibility.eligibleStudentIds.length !== new Set(input.studentIds).size) {
-		return { ok: false, message: "Selected students are missing tracker rows for one or more selected topics." };
-	}
-	return { ok: true };
+	return eligibility.ok ? { ok: true } : eligibility;
 }
 
 export async function listStudentAssignments(studentId: string): Promise<StudentAssignmentCard[]> {

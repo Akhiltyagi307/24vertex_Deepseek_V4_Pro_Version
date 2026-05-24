@@ -33,7 +33,7 @@ export type CommandPaletteConfirmFetchAction = {
 export type CommandPaletteAction = CommandPaletteNavAction | CommandPaletteConfirmFetchAction;
 
 export const COMMAND_PALETTE_JUMPS: CommandPaletteJump[] = [
-	{ id: "dash", label: "Dashboard", href: "/admin/dashboard", shortcut: "⌘1" },
+	{ id: "dash", label: "Dashboard", href: "/admin/dashboard" },
 	{ id: "compliance_requests", label: "Compliance · Requests", href: "/admin/compliance/requests" },
 	{ id: "compliance_consents", label: "Compliance · Consents", href: "/admin/compliance/consents" },
 	{ id: "compliance_retention", label: "Compliance · Retention", href: "/admin/compliance/retention" },
@@ -42,6 +42,7 @@ export const COMMAND_PALETTE_JUMPS: CommandPaletteJump[] = [
 	{ id: "teachers", label: "Users · Teachers", href: "/admin/users/teachers" },
 	{ id: "tests", label: "Assessments · Tests", href: "/admin/assessments/tests" },
 	{ id: "live", label: "Assessments · Live", href: "/admin/assessments/live" },
+	{ id: "question_visuals", label: "Curriculum · Question visuals", href: "/admin/curriculum/question-visuals" },
 	{ id: "billing_plans", label: "Billing · Plans", href: "/admin/billing/plans" },
 	{ id: "billing_subs", label: "Billing · Subscriptions", href: "/admin/billing/subscriptions" },
 	{ id: "billing_payments", label: "Billing · Payments", href: "/admin/billing/payments" },
@@ -51,6 +52,8 @@ export const COMMAND_PALETTE_JUMPS: CommandPaletteJump[] = [
 	{ id: "sql", label: "System · SQL console", href: "/admin/system/sql-console" },
 	{ id: "sessions", label: "System · Active sessions", href: "/admin/system/active-sessions" },
 	{ id: "maintenance", label: "System · Maintenance readiness", href: "/admin/system/maintenance-readiness" },
+	{ id: "performance_tracker", label: "Performance · Tracker", href: "/admin/performance/tracker" },
+	{ id: "performance_tools", label: "Performance · Tools", href: "/admin/performance/tools" },
 ];
 
 export const COMMAND_PALETTE_ACTIONS: CommandPaletteAction[] = [

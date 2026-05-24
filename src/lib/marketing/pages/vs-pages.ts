@@ -21,11 +21,11 @@ export const VS_PAGES: Record<string, VsPageContent> = {
 		ourRole:
 			"24Vertex does not try to replace your child's textbook. We find weak chapters from practice, run 20-minute adaptive sets, and give you a parent dashboard plus a private tutor for doubts at home.",
 		comparisonRows: [
-			{ label: "Primary offer", vertex: "Weak-chapter practice + parent heatmap", other: "Video courses and test series" },
+			{ label: "Primary offer", vertex: "Weak-chapter practice + chapter radar chart", other: "Video courses and test series" },
 			{ label: "Session length", vertex: "~20 minutes targeted", other: "Often longer video blocks" },
 			{ label: "Parent visibility", vertex: "Chapter-level dashboard", other: "Varies by product bundle" },
 			{ label: "Tutor chat privacy", vertex: "Chat private to student", other: "Depends on product" },
-			{ label: "Pricing", vertex: "Monthly / yearly parent plan", other: "Course and bundle pricing" },
+			{ label: "Pricing", vertex: "Monthly / yearly student subscription", other: "Course and bundle pricing" },
 		],
 		whoShouldPickThem: "You want a video-first course library and are comfortable with that study style.",
 		whoShouldPickUs:
@@ -42,9 +42,9 @@ export const VS_PAGES: Record<string, VsPageContent> = {
 		comparisonRows: [
 			{ label: "Primary offer", vertex: "Adaptive practice on school chapters", other: "Live classes and programs" },
 			{ label: "Practice adaptivity", vertex: "Targets 3 to 5 weak chapters", other: "Program-driven schedule" },
-			{ label: "Parent visibility", vertex: "Weekly chapter heatmap", other: "Varies by enrollment" },
+			{ label: "Parent visibility", vertex: "Chapter mastery radar chart", other: "Varies by enrollment" },
 			{ label: "Solve doubts at home", vertex: "Explain + Solve-with-me AI", other: "Live teacher dependent" },
-			{ label: "Pricing", vertex: "Single parent subscription", other: "Program / batch pricing" },
+			{ label: "Pricing", vertex: "Monthly / yearly student subscription", other: "Program / batch pricing" },
 		],
 		whoShouldPickThem: "You want scheduled live teaching in a batch.",
 		whoShouldPickUs: "You want chapter-level signal and short practice between school and tuition.",
@@ -60,7 +60,7 @@ export const VS_PAGES: Record<string, VsPageContent> = {
 		comparisonRows: [
 			{ label: "Focus grades", vertex: "Grades 6 to 10 school sync", other: "Broader, incl. competitive prep" },
 			{ label: "Content model", vertex: "Practice on current chapters", other: "Video + test series" },
-			{ label: "Parent dashboard", vertex: "Chapter mastery heatmap", other: "Not the core product" },
+			{ label: "Parent dashboard", vertex: "Chapter mastery radar chart", other: "Not the core product" },
 			{ label: "Session style", vertex: "Short adaptive sets", other: "Video-first study" },
 			{ label: "Board alignment", vertex: "NCERT + ICSE + state variants", other: "Exam-prep oriented" },
 		],

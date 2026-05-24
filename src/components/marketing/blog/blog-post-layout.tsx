@@ -5,7 +5,7 @@ import { MarketingCtaBand } from "@/components/marketing/blocks/marketing-cta-ba
 
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
 import type { BlogPostMeta } from "@/lib/marketing/blog/types";
-import { LANDING_PARENT_PRIMARY_CTA_HREF } from "@/lib/marketing/landing-copy";
+import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_TRIAL_LEAD_FULL } from "@/lib/marketing/landing-copy";
 import { MARKETING_SECTION_INTRO_MAX_CLASSNAME } from "@/lib/marketing/marketing-section-rhythm";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +62,7 @@ export function BlogPostLayout({ post, children }: BlogPostLayoutProps) {
 
 			<MarketingCtaBand
 				title="Put these ideas into practice"
-				lead="14 days free on your child's chapters. 5 practice tests. No card needed."
+				lead={LANDING_TRIAL_LEAD_FULL}
 				actions={<LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />}
 			/>
 		</article>

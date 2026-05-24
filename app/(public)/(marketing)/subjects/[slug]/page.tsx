@@ -31,7 +31,7 @@ function subjectFaq(name: string): MarketingFaqItem[] {
 		{
 			id: "1",
 			question: `How does ${name} practice adapt?`,
-			answer: "Sets focus on chapters flagged weak in your child's heatmap, with difficulty that responds to correct and incorrect attempts.",
+			answer: "Sets focus on chapters flagged weak on your child's radar chart, with difficulty that responds to correct and incorrect attempts.",
 		},
 		{
 			id: "2",

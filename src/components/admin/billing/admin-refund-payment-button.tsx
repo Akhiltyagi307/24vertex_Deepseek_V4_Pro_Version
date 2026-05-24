@@ -21,7 +21,7 @@ export function AdminRefundPaymentButton({ paymentId, amountPaise, refundedAt, r
 	if (refundedAt || !razorpayPaymentId) {
 		return (
 			<p className="text-sm text-muted-foreground">
-				{!razorpayPaymentId ? "No Razorpay payment id — refund unavailable." : "Already refunded."}
+				{!razorpayPaymentId ? "No Razorpay payment id; refund unavailable." : "Already refunded."}
 			</p>
 		);
 	}
@@ -68,7 +68,7 @@ export function AdminRefundPaymentButton({ paymentId, amountPaise, refundedAt, r
 						});
 						const j = (await res.json().catch(() => ({}))) as { error?: string; detail?: string; deduped?: boolean };
 						if (!res.ok) throw new Error(j.detail ?? j.error ?? res.statusText);
-						if (j.deduped) alert("Idempotent replay — refund already recorded for this key.");
+						if (j.deduped) alert("Idempotent replay: refund already recorded for this key.");
 						router.refresh();
 					} catch (e) {
 						alert(e instanceof Error ? e.message : "Failed");

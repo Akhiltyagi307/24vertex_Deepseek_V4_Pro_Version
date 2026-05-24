@@ -16,7 +16,11 @@ import {
 	BookOpenIcon,
 } from "lucide-react";
 
-import { NotificationUnreadPill } from "@/components/student/notifications/notification-unread-pill";
+import {
+	NotificationUnreadPill,
+	SidebarAttentionDot,
+} from "@/components/student/notifications/notification-unread-pill";
+import { useOpenAssignmentsIndicator } from "@/lib/assignments/use-open-assignments-indicator";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -56,6 +60,43 @@ const groupLabelClass =
 	"font-mono text-2xs uppercase tracking-wider text-muted-foreground";
 
 const STUDENT_NOTIFICATIONS_HREF = "/student/notifications";
+const STUDENT_ASSIGNMENTS_HREF = "/student/assignments";
+
+function SidebarAssignmentsRow({
+	item,
+	pathname,
+	initialHasOpen,
+}: {
+	item: NavItem;
+	pathname: string;
+	initialHasOpen: boolean;
+}) {
+	const Icon = item.icon;
+	const { hasOpen } = useOpenAssignmentsIndicator({
+		apiBasePath: "/api/student/assignments",
+		initialHasOpen,
+		routeKey: pathname,
+	});
+	const isActive =
+		pathname === item.href || pathname.startsWith(`${item.href}/`);
+	const ariaLabel = hasOpen ? `${item.title}, open assignments` : item.title;
+
+	return (
+		<SidebarMenuItem key={item.href}>
+			<SidebarMenuButton
+				isActive={isActive}
+				tooltip={item.title}
+				render={<Link href={item.href} aria-label={ariaLabel} />}
+			>
+				<span className="relative inline-flex shrink-0">
+					<Icon />
+					<SidebarAttentionDot show={hasOpen} />
+				</span>
+				<span>{item.title}</span>
+			</SidebarMenuButton>
+		</SidebarMenuItem>
+	);
+}
 
 function SidebarNotificationsRow({
 	userId,
@@ -101,10 +142,12 @@ function SidebarNotificationsRow({
 function NavMenuItems({
 	items,
 	userId,
+	initialHasOpenAssignments = false,
 }: {
 	items: NavItem[];
 	/** When set, the Notifications row shows the same unread pill as the top bar. */
 	userId?: string | null;
+	initialHasOpenAssignments?: boolean;
 }) {
 	const pathname = usePathname();
 
@@ -114,6 +157,16 @@ function NavMenuItems({
 				const Icon = item.icon;
 				const isActive =
 					pathname === item.href || pathname.startsWith(`${item.href}/`);
+				if (item.href === STUDENT_ASSIGNMENTS_HREF) {
+					return (
+						<SidebarAssignmentsRow
+							key={item.href}
+							item={item}
+							pathname={pathname}
+							initialHasOpen={initialHasOpenAssignments}
+						/>
+					);
+				}
 				if (userId && item.href === STUDENT_NOTIFICATIONS_HREF) {
 					return (
 						<SidebarNotificationsRow
@@ -141,7 +194,13 @@ function NavMenuItems({
 	);
 }
 
-export function StudentNavMain({ userId }: { userId?: string | null }) {
+export function StudentNavMain({
+	userId,
+	initialHasOpenAssignments = false,
+}: {
+	userId?: string | null;
+	initialHasOpenAssignments?: boolean;
+}) {
 	return (
 		<>
 			<SidebarGroup>
@@ -151,7 +210,11 @@ export function StudentNavMain({ userId }: { userId?: string | null }) {
 			<SidebarSeparator />
 			<SidebarGroup className="pt-0">
 				<SidebarGroupLabel className={groupLabelClass}>Progress</SidebarGroupLabel>
-				<NavMenuItems items={progressItems} userId={userId} />
+				<NavMenuItems
+					items={progressItems}
+					userId={userId}
+					initialHasOpenAssignments={initialHasOpenAssignments}
+				/>
 			</SidebarGroup>
 			<SidebarSeparator />
 			<SidebarGroup className="pt-0">

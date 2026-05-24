@@ -1,10 +1,24 @@
 import { createServer } from "node:net";
-import { spawn, execFile } from "node:child_process";
+import { spawn, execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
 import fs from "node:fs";
 
 const execFileAsync = promisify(execFile);
+
+/** iCloud-synced Documents folders can evict or duplicate `.next/dev` mid-compile → ENOENT on manifests. */
+function excludeNextFromICloudIfDarwin() {
+	if (process.platform !== "darwin") return;
+	const nextRoot = resolve(process.cwd(), ".next");
+	try {
+		fs.mkdirSync(nextRoot, { recursive: true });
+		execFileSync("xattr", ["-w", "com.apple.fileprovider.ignore#P", "1", nextRoot], {
+			stdio: "ignore",
+		});
+	} catch {
+		/* not on iCloud or xattr unavailable */
+	}
+}
 
 const port = Number(process.env.PORT) || 3001;
 
@@ -184,6 +198,7 @@ const devArgs = ["dev", "-H", "127.0.0.1", "-p", String(port)];
 const useWebpack =
 	process.env.NEXT_DEV_WEBPACK === "1" || process.env.NEXT_DEV_WEBPACK === "true";
 removeStaleNextDevArtifacts();
+excludeNextFromICloudIfDarwin();
 if (useWebpack) {
 	console.warn(
 		"\n[next-dev] NEXT_DEV_WEBPACK: webpack dev can serve HTML without Tailwind/global CSS " +
@@ -242,21 +257,18 @@ function spawnNextDev() {
 
 const child = spawnNextDev();
 
-/** When true, exit if `routes-manifest.json` vanishes after we know a good compile (PM2 can restart clean). */
+/** Exit if `routes-manifest.json` vanishes after a good compile so PM2 can restart with a clean `.next/dev`. */
 const routesManifestWatchdog =
-	process.env.NEXT_DEV_ROUTES_WATCHDOG === "1" ||
-	process.env.NEXT_DEV_ROUTES_WATCHDOG === "true" ||
-	process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "1" ||
-	process.env.NEXT_DEV_WEBPACK_CLEAR_DEV === "true";
+	process.env.NEXT_DEV_ROUTES_WATCHDOG !== "0" &&
+	process.env.NEXT_DEV_ROUTES_WATCHDOG !== "false";
 
 /**
- * Next throws "Cannot find the middleware module" when `proxy.ts` exists but
- * `.next/dev/server/middleware.js` (or its Turbopack chunks) is missing — common
- * after interrupted compiles or stale `.next/dev`. Opt out with NEXT_DEV_MIDDLEWARE_WATCHDOG=0.
+ * Legacy check for missing middleware output. Turbopack HMR can briefly drop chunk files and
+ * cause false restarts; prefer the routes-manifest watchdog. Opt in with NEXT_DEV_MIDDLEWARE_WATCHDOG=1.
  */
 const middlewareWatchdog =
-	process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG !== "0" &&
-	process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG !== "false";
+	process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG === "1" ||
+	process.env.NEXT_DEV_MIDDLEWARE_WATCHDOG === "true";
 const hasRootProxy = fs.existsSync(resolve(process.cwd(), "proxy.ts"));
 
 if (middlewareWatchdog && hasRootProxy) {

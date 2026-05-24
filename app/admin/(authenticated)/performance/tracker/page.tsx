@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { requireAdmin } from "@/lib/admin/guards";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { adminListPerformanceRows } from "@/lib/admin/performance-admin";
+import { formatTrackerStatusFromRaw } from "@/lib/student/tracker-status-labels";
 
 export const metadata = {
 	title: "Admin performance tracker · 24Vertex",
@@ -41,6 +42,11 @@ export default async function AdminPerformanceTrackerPage({
 					</Link>{" "}
 					then open{" "}
 					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/admin/performance/tracker?student=UUID</code>
+					. For grade-wide re-init jobs, use{" "}
+					<Link className="text-primary underline-offset-2 hover:underline" href="/admin/performance/tools">
+						Performance tools
+					</Link>
+					.
 				</p>
 			:	null}
 			{studentId && rows.length === 0 ?
@@ -58,7 +64,7 @@ export default async function AdminPerformanceTrackerPage({
 							subject_id: r.subjectId,
 							subject_name: r.subjectName,
 							topic_name: r.topicName,
-							status: r.status ?? "",
+							status: formatTrackerStatusFromRaw(r.status),
 							average_score: r.averageScore ?? "",
 							tests_taken: r.testsTaken ?? "",
 							trend: r.trend ?? "",
@@ -84,7 +90,7 @@ export default async function AdminPerformanceTrackerPage({
 								<tr key={r.id} className="border-b border-border/70">
 									<td className="px-2 py-1.5">{r.subjectName}</td>
 									<td className="px-2 py-1.5">{r.topicName}</td>
-									<td className="px-2 py-1.5">{r.status}</td>
+									<td className="px-2 py-1.5">{formatTrackerStatusFromRaw(r.status)}</td>
 									<td className="px-2 py-1.5 tabular-nums">{r.averageScore ?? "—"}</td>
 									<td className="px-2 py-1.5 tabular-nums">{r.testsTaken ?? "—"}</td>
 									<td className="px-2 py-1.5">{r.trend}</td>

@@ -30,6 +30,7 @@ export function StudentAppSidebar({
 	gradeLabel,
 	entitlement,
 	userId,
+	initialHasOpenAssignments = false,
 }: {
 	user: {
 		name: string;
@@ -40,6 +41,8 @@ export function StudentAppSidebar({
 	entitlement: EntitlementSnapshot | null;
 	/** Auth user id — sidebar notification tab unread pill + Realtime. */
 	userId?: string | null;
+	/** SSR hint for the Assignments sidebar attention dot. */
+	initialHasOpenAssignments?: boolean;
 }) {
 	const { state, isMobile } = useSidebar();
 	const collapsedDesktop = state === "collapsed" && !isMobile;
@@ -101,7 +104,10 @@ export function StudentAppSidebar({
 			</SidebarHeader>
 			<SidebarSeparator />
 			<SidebarContent>
-				<StudentNavMain userId={userId ?? null} />
+				<StudentNavMain
+					userId={userId ?? null}
+					initialHasOpenAssignments={initialHasOpenAssignments}
+				/>
 			</SidebarContent>
 			<SidebarFooter className="gap-2">
 				{entitlement ? <SidebarPlanCard entitlement={entitlement} /> : null}

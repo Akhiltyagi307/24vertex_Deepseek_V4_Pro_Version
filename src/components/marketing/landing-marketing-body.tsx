@@ -17,7 +17,6 @@ import FeaturesSection from "@/components/ui/demo";
 import RuixenFeaturedImageSection from "@/components/ui/ruixen-featured-image-section";
 import { Pricing } from "@/components/ui/single-pricing-card-1";
 import Testimonials from "@/components/ui/testimonials";
-import { Footer7 } from "@/components/ui/footer-7";
 import { Badge } from "@/components/ui/badge";
 import { landingFeatureBentoShell } from "@/lib/marketing/landing-feature-surface";
 import {
@@ -34,6 +33,7 @@ import { HELP_FAQ_CATEGORIES } from "@/lib/marketing/pages/help-faq";
 import {
 	LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
 	LANDING_PARENT_PRIMARY_CTA_HREF,
+	LANDING_TRIAL_LEAD_FULL,
 	MARKETING_NAV,
 } from "@/lib/marketing/landing-copy";
 import { cn } from "@/lib/utils";
@@ -187,8 +187,7 @@ export function LandingMarketingBody({ supportEmail }: LandingMarketingBodyProps
 							This weekend, find out the three chapters dragging your child&rsquo;s marks down.
 						</h2>
 						<p className={cn(sectionLead, "text-pretty")}>
-							14 days free. 5 practice tests. The Explain and Solve-with-me tutor included.
-							No card needed. No school onboarding to wait for.
+							{LANDING_TRIAL_LEAD_FULL} No school onboarding to wait for.
 						</p>
 						<div
 							className={cn(
@@ -205,11 +204,6 @@ export function LandingMarketingBody({ supportEmail }: LandingMarketingBodyProps
 				</div>
 			</section>
 
-			{/* Footer7 already declares its own `<section className="py-16 medium:py-20">` —
-			    use horizontal-only padding here so the page doesn't double-pad the closing band. */}
-			<footer className="bg-background w-full px-4 medium:px-6 xl:px-8">
-				<Footer7 />
-			</footer>
 		</>
 	);
 }

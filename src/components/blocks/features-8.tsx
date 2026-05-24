@@ -183,7 +183,7 @@ export function Features() {
 										Shared accountability
 									</h3>
 									<p className="text-muted-foreground mt-2 text-sm">
-										Everyone sees what matters, without noisy dashboards or guesswork.
+										Students, parents, and teachers share the same chapter radar chart. Everyone sees what matters, without noisy dashboards or guesswork.
 									</p>
 								</div>
 							</div>

@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
+import { AdminJobSchedulesTable } from "@/components/admin/system/admin-job-schedules-table";
 
 export const metadata = {
 	title: "Job schedules · 24Vertex Admin",
@@ -15,11 +18,17 @@ export default function AdminJobSchedulesPage() {
 					{ label: "Schedules" },
 				]}
 				title="Schedules"
-				description="Schedules are Supabase pg_cron jobs (see migration `20260516100000_internal_http_routes_pg_cron.sql`); Vault secrets `app_base_url` + `cron_secret`."
+				description="Supabase pg_cron jobs that call internal admin routes (Vault `app_base_url` + `cron_secret`)."
 			/>
-			<p className="text-sm text-muted-foreground">
-				See <code className="rounded bg-muted px-1">GET /api/admin/jobs/schedules</code> for JSON.
-			</p>
+			<div className="flex flex-wrap gap-3 text-sm">
+				<Link className="text-primary underline" href="/admin/system/jobs">
+					Operator jobs
+				</Link>
+				<Link className="text-primary underline" href="/admin/system/jobs/queues">
+					Queues
+				</Link>
+			</div>
+			<AdminJobSchedulesTable />
 		</div>
 	);
 }

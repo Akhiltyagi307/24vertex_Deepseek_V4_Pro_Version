@@ -29,7 +29,7 @@ const VISIBILITY_ROWS = [
 		ai: "No",
 	},
 	{
-		data: "Chapter mastery heatmap",
+		data: "Chapter mastery radar chart",
 		parent: "Yes",
 		child: "Yes",
 		teacher: "If linked",

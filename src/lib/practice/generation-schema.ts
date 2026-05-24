@@ -12,6 +12,12 @@ export const practiceAnswerKeySchema = z.object({
 	explanation: z.string(),
 	common_mistakes: z.array(z.string()),
 	related_concept: z.string(),
+	/** Optional: point-wise hints for AI grading (long_answer / multi-part). */
+	marking_points: z.array(z.string()).optional(),
+	/** Optional: alternate acceptable answers (fill_in_blank / short_answer). */
+	acceptable_variants: z.array(z.string()).optional(),
+	/** Optional: checklist for full-credit band. */
+	full_credit_requires: z.array(z.string()).optional(),
 });
 
 export const practiceQuestionGeneratedSchema = z.object({

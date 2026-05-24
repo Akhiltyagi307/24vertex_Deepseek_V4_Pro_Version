@@ -44,6 +44,119 @@ export function AdminSubscriptionActions({
 
 	return (
 		<div className="space-y-6 rounded-lg border border-border p-4">
+			{razorpayLinked && currentStatus === "active" ?
+				<div>
+					<h3 className="text-sm font-semibold">Change plan</h3>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Switch between <span className="font-mono">pro_monthly</span> and{" "}
+						<span className="font-mono">pro_annual</span> via Razorpay.
+					</p>
+					<div className="mt-2 flex flex-wrap items-center gap-2">
+						<select
+							id="admin-change-plan"
+							className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+							defaultValue="pro_annual"
+						>
+							<option value="pro_monthly">pro_monthly</option>
+							<option value="pro_annual">pro_annual</option>
+						</select>
+						<select
+							id="admin-change-when"
+							className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+							defaultValue="cycle_end"
+						>
+							<option value="cycle_end">At cycle end</option>
+							<option value="now">Now</option>
+						</select>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={busy !== null}
+							onClick={async () => {
+								const plan = (
+									document.getElementById("admin-change-plan") as HTMLSelectElement
+								)?.value;
+								const when = (document.getElementById("admin-change-when") as HTMLSelectElement)?.value;
+								if (!confirm(`Change plan to ${plan} (${when})?`)) return;
+								setBusy("change_plan");
+								try {
+									await post(`/api/admin/subscriptions/${subscriptionId}/change-plan`, {
+										new_plan_code: plan,
+										when,
+									});
+									router.refresh();
+								} catch (e) {
+									alert(e instanceof Error ? e.message : "Failed");
+								} finally {
+									setBusy(null);
+								}
+							}}
+						>
+							Change plan…
+						</Button>
+					</div>
+				</div>
+			:	null}
+
+			{razorpayLinked && currentStatus === "active" ?
+				<div>
+					<h3 className="text-sm font-semibold">Pause subscription</h3>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Pauses billing in Razorpay and zeros open usage quotas until resume.
+					</p>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="mt-2"
+						disabled={busy !== null}
+						onClick={async () => {
+							if (!confirm("Pause this subscription now?")) return;
+							setBusy("pause");
+							try {
+								await post(`/api/admin/subscriptions/${subscriptionId}/pause`);
+								router.refresh();
+							} catch (e) {
+								alert(e instanceof Error ? e.message : "Failed");
+							} finally {
+								setBusy(null);
+							}
+						}}
+					>
+						Pause…
+					</Button>
+				</div>
+			:	null}
+
+			{razorpayLinked && currentStatus === "paused" ?
+				<div>
+					<h3 className="text-sm font-semibold">Resume subscription</h3>
+					<p className="mt-1 text-sm text-muted-foreground">Resumes billing and restores pre-pause quotas when stored.</p>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="mt-2"
+						disabled={busy !== null}
+						onClick={async () => {
+							if (!confirm("Resume this subscription now?")) return;
+							setBusy("resume");
+							try {
+								await post(`/api/admin/subscriptions/${subscriptionId}/resume`);
+								router.refresh();
+							} catch (e) {
+								alert(e instanceof Error ? e.message : "Failed");
+							} finally {
+								setBusy(null);
+							}
+						}}
+					>
+						Resume…
+					</Button>
+				</div>
+			:	null}
+
 			<div>
 				<h3 className="text-sm font-semibold">Cancel at period end</h3>
 				<p className="mt-1 text-sm text-muted-foreground">

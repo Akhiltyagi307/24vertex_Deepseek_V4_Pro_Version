@@ -36,6 +36,7 @@ export const ADMIN_ACTIONS = {
 	USER_HARD_DELETE_DONE: "user_hard_delete_done",
 	USER_SUSPEND: "user_suspend",
 	USER_UNSUSPEND: "user_unsuspend",
+	USER_SESSIONS_REVOKE_ALL: "user_sessions_revoke_all",
 
 	// Teachers
 	TEACHER_APPROVE: "teacher_approve",
@@ -98,6 +99,7 @@ export const ADMIN_ACTIONS = {
 	SUBSCRIPTION_COUPON_AUTO_EXPIRED: "subscription_coupon_auto_expired",
 	COUPON_REDEMPTION_REFUND_ROLLBACK: "coupon_redemption_refund_rollback",
 	BILLING_RECONCILIATION_RUN: "billing_reconciliation_run",
+	BILLING_RECONCILIATION_DRIFT_RESOLVE: "billing_reconciliation_drift_resolve",
 	SUBSCRIPTION_CHANGE_PLAN: "subscription_change_plan",
 	SUBSCRIPTION_PAUSE: "subscription_pause",
 	SUBSCRIPTION_RESUME: "subscription_resume",

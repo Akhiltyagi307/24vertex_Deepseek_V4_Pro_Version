@@ -84,6 +84,11 @@
     --primary-foreground: #000000;
     /* Subject tile Lucide icons only — full brand green (not the soft --primary mix). */
     --subject-grid-icon: #2ea070;
+    /* Marketing preview mocks + radar legend (chapter mastery semantics) */
+    --mastery-strong: #2ea070;
+    --mastery-attention: #d89c2f;
+    --mastery-attention-foreground: #b88227;
+    --mastery-critical: #c63a3a;
     /* Inline body-text links and brand-text-on-mint badges: brand-faithful but
        darker so contrast meets WCAG AA (4.5:1) on white AND on `bg-primary/10`
        (which renders ~#e6f4ee). `--primary` is the soft mint surface color
@@ -132,6 +137,10 @@
     --primary: #2ea070;
     --primary-foreground: #000000;
     --subject-grid-icon: #2ea070;
+    --mastery-strong: #2ea070;
+    --mastery-attention: #d89c2f;
+    --mastery-attention-foreground: #c9a04a;
+    --mastery-critical: #e55353;
     /* Dark-theme inline links — full brand green is already AA-compliant on the dark background. */
     --link: #2ea070;
     --secondary: oklch(0.269 0 0);

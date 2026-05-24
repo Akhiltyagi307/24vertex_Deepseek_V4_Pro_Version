@@ -1,5 +1,7 @@
 import { and, count, desc, isNotNull, isNull, type SQL } from "drizzle-orm";
+import Link from "next/link";
 
+import { ReconciliationResolveButton } from "@/components/admin/billing/reconciliation-resolve-button";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { db } from "@/db";
@@ -50,8 +52,15 @@ export default async function AdminBillingReconciliationPage({ searchParams }: P
 			.offset(offset),
 		countFiltered,
 	]);
-	const total = totalRows[0]?.total ?? 0;
-	const totalPages = Math.max(1, Math.ceil(Number(total) / pageSize));
+	const total = Number(totalRows[0]?.total ?? 0);
+	const totalPages = Math.max(1, Math.ceil(total / pageSize));
+	const qs = (p: number) => {
+		const u = new URLSearchParams();
+		if (resolved) u.set("resolved", resolved);
+		if (p > 1) u.set("page", String(p));
+		const s = u.toString();
+		return s ? `?${s}` : "";
+	};
 
 	return (
 		<div className="space-y-4">
@@ -97,6 +106,7 @@ export default async function AdminBillingReconciliationPage({ searchParams }: P
 							<th className="px-3 py-2">Subscription</th>
 							<th className="px-3 py-2">Payment / Key</th>
 							<th className="px-3 py-2">Status</th>
+							<th className="px-3 py-2"></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -108,9 +118,30 @@ export default async function AdminBillingReconciliationPage({ searchParams }: P
 								<td className="px-3 py-2 font-mono">{r.field}</td>
 								<td className="max-w-xs truncate px-3 py-2">{r.localValue ?? "—"}</td>
 								<td className="max-w-xs truncate px-3 py-2">{r.razorpayValue ?? "—"}</td>
-								<td className="px-3 py-2 font-mono text-xs">{r.subscriptionId?.slice(0, 8) ?? "—"}</td>
-								<td className="px-3 py-2 font-mono text-xs">{r.paymentId?.slice(0, 8) ?? r.idempotencyKey?.slice(0, 16) ?? "—"}</td>
+								<td className="px-3 py-2 font-mono text-xs">
+									{r.subscriptionId ?
+										<Link
+											className="text-primary underline-offset-4 hover:underline"
+											href={`/admin/billing/subscriptions/${r.subscriptionId}`}
+										>
+											{r.subscriptionId.slice(0, 8)}…
+										</Link>
+									:	"—"}
+								</td>
+								<td className="px-3 py-2 font-mono text-xs">
+									{r.paymentId ?
+										<Link
+											className="text-primary underline-offset-4 hover:underline"
+											href={`/admin/billing/payments/${r.paymentId}`}
+										>
+											{r.paymentId.slice(0, 8)}…
+										</Link>
+									:	r.idempotencyKey?.slice(0, 16) ?? "—"}
+								</td>
 								<td className="px-3 py-2">{r.resolvedAt ? "resolved" : "open"}</td>
+								<td className="px-3 py-2 text-right">
+									{!r.resolvedAt ? <ReconciliationResolveButton driftId={r.id} /> : null}
+								</td>
 							</tr>
 						))}
 					</tbody>
@@ -118,13 +149,30 @@ export default async function AdminBillingReconciliationPage({ searchParams }: P
 				{rows.length === 0 ? <p className="p-4 text-sm text-muted-foreground">No drift recorded.</p> : null}
 			</div>
 
-			{totalPages > 1 ? (
-				<nav className="flex gap-2 text-sm text-muted-foreground">
-					<span>
+			{totalPages > 1 || total > 0 ?
+				<nav className="flex flex-wrap items-center gap-2 text-sm">
+					{page > 1 ?
+						<Link
+							className="text-primary underline-offset-4 hover:underline"
+							href={`/admin/billing/reconciliation${qs(page - 1)}`}
+						>
+							Previous
+						</Link>
+					:	null}
+					<span className="text-muted-foreground">
 						Page {page} / {totalPages}
+						{total > 0 ? ` · ${total} total` : ""}
 					</span>
+					{page < totalPages ?
+						<Link
+							className="text-primary underline-offset-4 hover:underline"
+							href={`/admin/billing/reconciliation${qs(page + 1)}`}
+						>
+							Next
+						</Link>
+					:	null}
 				</nav>
-			) : null}
+			:	null}
 		</div>
 	);
 }

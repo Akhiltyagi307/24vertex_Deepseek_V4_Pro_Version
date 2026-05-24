@@ -5,6 +5,8 @@ import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { HomeMarketingShell } from "@/components/marketing/home-marketing-shell";
 import { LandingMarketingBody } from "@/components/marketing/landing-marketing-body";
+import { MarketingSiteHeader } from "@/components/marketing/marketing-site-header";
+import { MarketingSiteFooter } from "@/components/marketing/marketing-site-footer";
 import { getAppUrl, getPublicSupportEmail } from "@/lib/env";
 
 export const metadata: Metadata = {
@@ -62,9 +64,9 @@ export default async function HomePage() {
 			},
 			{
 				"@type": "Product",
-				name: "24Vertex parent plan",
+				name: "24Vertex student subscription",
 				description:
-					"Adaptive AI practice, private Explain and Solve-with-me tutor, and chapter-level analytics for grades 6 to 10. 14-day free trial.",
+					"Adaptive AI practice, private Explain and Solve-with-me tutor, and chapter mastery radar charts for grades 6 to 10. 14-day free trial. Only student accounts are paid.",
 				brand: { "@type": "Brand", name: "24Vertex" },
 				offers: [
 					{
@@ -113,7 +115,7 @@ export default async function HomePage() {
 	}
 
 	return (
-		<HomeMarketingShell className="min-h-screen w-full bg-background">
+		<HomeMarketingShell className="flex min-h-screen w-full flex-col bg-background">
 			{/* JSON-LD is not executable JS — CSP `script-src` does not apply, and
 			    attaching a per-request `nonce` causes a React hydration mismatch
 			    because browsers hide nonce values from DOM APIs during hydration. */}
@@ -129,18 +131,18 @@ export default async function HomePage() {
 			>
 				Skip to main content
 			</a>
+			<MarketingSiteHeader />
 			<div
-				className="box-border min-h-screen min-w-0 w-full"
+				className="box-border flex min-h-0 w-full min-w-0 flex-1 flex-col"
 				style={{ paddingInline: "10%" }}
 			>
-				<div className="box-border min-h-screen min-w-0 w-full bg-background">
-					<MotionPageEnter>
-						<main id="main-content" tabIndex={-1} className="min-w-0 outline-none">
-							<LandingMarketingBody supportEmail={supportEmail} />
-						</main>
-					</MotionPageEnter>
-				</div>
+				<MotionPageEnter className="flex min-h-0 flex-1 flex-col">
+					<main id="main-content" tabIndex={-1} className="min-w-0 flex-1 outline-none">
+						<LandingMarketingBody supportEmail={supportEmail} />
+					</main>
+				</MotionPageEnter>
 			</div>
+			<MarketingSiteFooter />
 		</HomeMarketingShell>
 	);
 }

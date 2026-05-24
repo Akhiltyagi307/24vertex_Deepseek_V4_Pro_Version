@@ -6,7 +6,7 @@ import { HelpFaqSearch } from "@/components/marketing/help/help-faq-search";
 import { MarketingSubpageShell } from "@/components/marketing/marketing-subpage-shell";
 import { getAllHelpFaqItems } from "@/lib/marketing/pages/help-faq";
 import { marketingPageMetadata } from "@/lib/marketing/pages/metadata";
-import { LANDING_PARENT_PRIMARY_CTA_HREF } from "@/lib/marketing/landing-copy";
+import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_PARENT_PRIMARY_CTA_LABEL } from "@/lib/marketing/landing-copy";
 
 export const metadata = marketingPageMetadata({
 	title: "Help",
@@ -54,7 +54,7 @@ export default function HelpPage() {
 					</Link>{" "}
 					or{" "}
 					<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} className="text-link font-medium hover:underline">
-						start the free trial
+						{LANDING_PARENT_PRIMARY_CTA_LABEL.toLowerCase()}
 					</Link>
 					.
 				</p>

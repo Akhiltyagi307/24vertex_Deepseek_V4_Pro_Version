@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 
+import { AdminContextChunksEditor } from "@/components/admin/curriculum/admin-context-chunks-editor";
 import { AdminTopicEditForm } from "@/components/admin/curriculum/admin-topic-edit-form";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
@@ -31,6 +32,7 @@ export default async function AdminTopicDetailPage({ params }: { params: Promise
 				description={`Grade ${t.grade} · Unit ${t.unitNumber} · Chapter ${t.chapterNumber}`}
 			/>
 			<AdminTopicEditForm topic={t} />
+			<AdminContextChunksEditor topicId={t.id} />
 			<p className="text-center text-sm text-muted-foreground">
 				<Link href="/admin/curriculum/topics" className="hover:underline">
 					← Back to topics

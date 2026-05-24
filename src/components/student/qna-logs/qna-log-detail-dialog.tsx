@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import {
 	CheckCircle2Icon,
@@ -184,26 +185,105 @@ function VerdictBlock({ detail, voice }: { detail: QnaLogDetail; voice: QnaLogVo
 	);
 }
 
-function CoachNotes({ feedback }: { feedback: NonNullable<QnaLogDetail["aiFeedback"]> }) {
+function ReportSection({
+	label,
+	children,
+	tone = "default",
+}: {
+	label: string;
+	children: ReactNode;
+	tone?: "default" | "student" | "answerKey" | "scored";
+}) {
+	const surface =
+		tone === "student" ? "border-border/70 bg-muted/30"
+		: tone === "answerKey" ? "border-primary/25 bg-primary/5"
+		: tone === "scored" ? "border-border bg-muted/20"
+		: "border-border/60 bg-card";
 	return (
-		<section className="space-y-3">
-			<h3 className="text-xs font-medium uppercase tracking-[0.04em] text-muted-foreground">
-				Coach notes
-			</h3>
-			<p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-				{feedback.analysis}
-			</p>
-			{feedback.stepByStep ? (
-				<div className="space-y-2 border-t border-border/60 pt-3">
-					<h4 className="text-xs font-medium uppercase tracking-[0.04em] text-muted-foreground">
-						Walk through it
-					</h4>
-					<p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-						{feedback.stepByStep}
+		<section className="space-y-2 border-t border-border/60 pt-5">
+			<h3 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</h3>
+			<div className={cn("rounded-lg border px-4 py-3.5", surface)}>{children}</div>
+		</section>
+	);
+}
+
+function GradingBreakdownSection({
+	breakdown,
+}: {
+	breakdown: NonNullable<NonNullable<QnaLogDetail["aiFeedback"]>["breakdown"]>;
+}) {
+	return (
+		<section className="space-y-4">
+			<div className="space-y-1">
+				<h3 className="text-xs font-medium uppercase tracking-[0.04em] text-muted-foreground">
+					How you were scored
+				</h3>
+				<p className="text-sm font-medium text-foreground">{breakdown.bandLabel}</p>
+			</div>
+			{breakdown.whatWasCorrect.length > 0 ? (
+				<div className="space-y-1.5">
+					<p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+						What you got right
 					</p>
+					<ul className="list-disc space-y-1 pl-4 text-sm leading-relaxed text-foreground/90">
+						{breakdown.whatWasCorrect.map((item) => (
+							<li key={item}>{item}</li>
+						))}
+					</ul>
+				</div>
+			) : null}
+			{breakdown.whereMarksWereLost.length > 0 ? (
+				<div className="space-y-1.5">
+					<p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+						Why not full marks
+					</p>
+					<ul className="list-disc space-y-1 pl-4 text-sm leading-relaxed text-foreground/90">
+						{breakdown.whereMarksWereLost.map((item) => (
+							<li key={item}>{item}</li>
+						))}
+					</ul>
+				</div>
+			) : null}
+			{breakdown.toReachNextBand.trim() ? (
+				<div className="space-y-1 border-t border-border/50 pt-3">
+					<p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+						Next step
+					</p>
+					<p className="text-sm leading-relaxed text-foreground/90">{breakdown.toReachNextBand}</p>
+				</div>
+			) : null}
+			{breakdown.criterionScores.length > 0 ? (
+				<div className="space-y-2 border-t border-border/50 pt-3">
+					<p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+						Marking breakdown
+					</p>
+					<ul className="space-y-2 text-sm leading-relaxed text-foreground/90">
+						{breakdown.criterionScores.map((c) => (
+							<li key={c.name}>
+								<span className="font-medium text-foreground">{c.name}</span>
+								<span className="text-muted-foreground"> · {c.points}/20</span>
+								<span className="text-foreground/85"> — {c.note}</span>
+							</li>
+						))}
+					</ul>
 				</div>
 			) : null}
 		</section>
+	);
+}
+
+function AnswerKeySection({ detail }: { detail: QnaLogDetail }) {
+	if (detail.testStatus !== "graded" || !detail.correctAnswerDisplay?.trim()) return null;
+	return (
+		<ReportSection label="Answer key (practice set)" tone="answerKey">
+			<p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{detail.correctAnswerDisplay}</p>
+			{detail.correctAnswerSummary?.trim() &&
+			detail.correctAnswerSummary.trim() !== detail.correctAnswerDisplay.trim() ? (
+				<p className="mt-3 border-t border-border/50 pt-3 text-sm italic leading-relaxed text-muted-foreground">
+					At a glance: {detail.correctAnswerSummary.trim()}
+				</p>
+			) : null}
+		</ReportSection>
 	);
 }
 
@@ -238,39 +318,65 @@ export function QnaLogDetailDialog({
 						<>
 							<VerdictHeader detail={detail} voice={voice} />
 
-							<section className="space-y-2 border-t border-border/60 pt-5">
-								<h3 className="text-xs font-medium uppercase tracking-[0.04em] text-muted-foreground">
-									Question
-								</h3>
+							<ReportSection label="Question" tone="default">
 								<div className="text-base leading-relaxed text-foreground">
 									<LazyLatexText text={detail.questionText} />
 								</div>
 								{detail.visual ? (
-									<div className="pt-1">
+									<div className="pt-3">
 										<LazyQuestionVisual visual={detail.visual} />
 									</div>
 								) : null}
-							</section>
+							</ReportSection>
 
 							{detail.questionType === "multiple_choice" ? (
-								<div className="border-t border-border/60 pt-5">
+								<section className="space-y-2 border-t border-border/60 pt-5">
+									<h3 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
+										Options
+									</h3>
 									<McqOptionsReadonly
 										options={detail.options}
 										selectedKey={detail.studentSelectedKey}
 										correctKey={detail.correctOptionKey}
 										testStatus={detail.testStatus}
 									/>
-								</div>
+								</section>
 							) : null}
 
-							<div className="border-t border-border/60 pt-5">
+							<section className="space-y-2 border-t border-border/60 pt-5">
+								<h3 className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
+									Your answer
+								</h3>
 								<VerdictBlock detail={detail} voice={voice} />
-							</div>
+								{detail.aiUserAnswerSummary?.trim() ? (
+									<p className="text-sm italic leading-relaxed text-muted-foreground">
+										At a glance: {detail.aiUserAnswerSummary.trim()}
+									</p>
+								) : null}
+							</section>
 
-							{detail.aiFeedback ? (
-								<div className="border-t border-border/60 pt-5">
-									<CoachNotes feedback={detail.aiFeedback} />
-								</div>
+							<AnswerKeySection detail={detail} />
+
+							{detail.aiFeedback?.breakdown ? (
+								<ReportSection label="How you were scored" tone="scored">
+									<GradingBreakdownSection breakdown={detail.aiFeedback.breakdown} />
+								</ReportSection>
+							) : null}
+
+							{detail.aiFeedback?.analysis.trim() ? (
+								<ReportSection label="Coach note" tone="default">
+									<p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+										{detail.aiFeedback.analysis}
+									</p>
+								</ReportSection>
+							) : null}
+
+							{detail.aiFeedback?.stepByStep ? (
+								<ReportSection label="Walk through it" tone="answerKey">
+									<p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+										{detail.aiFeedback.stepByStep}
+									</p>
+								</ReportSection>
 							) : null}
 						</>
 					)}

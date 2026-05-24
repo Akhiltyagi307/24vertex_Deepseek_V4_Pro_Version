@@ -1,5 +1,6 @@
 import { desc } from "drizzle-orm";
 
+import { AdminModerationQueue } from "@/components/admin/moderation/admin-moderation-queue";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
 import { moderationFlags } from "@/db/schema/moderation-flags";
@@ -21,43 +22,20 @@ export default async function AdminModerationPage() {
 					{ label: "Moderation" },
 				]}
 				title="Moderation queue"
-				description="User reports and heuristic flags. Blacklist: /api/admin/moderation/blacklist"
+				description="User reports and heuristic flags. Resolve from this page or manage blacklist via API."
 			/>
-			<div className="overflow-x-auto rounded-md border border-border">
-				<table className="w-full min-w-[900px] text-left text-sm">
-					<thead className="border-b border-border bg-muted/40">
-						<tr>
-							<th className="px-3 py-2 font-medium">Created</th>
-							<th className="px-3 py-2 font-medium">Entity</th>
-							<th className="px-3 py-2 font-medium">Source</th>
-							<th className="px-3 py-2 font-medium">Severity</th>
-							<th className="px-3 py-2 font-medium">Status</th>
-							<th className="px-3 py-2 font-medium">Reason</th>
-						</tr>
-					</thead>
-					<tbody>
-						{rows.length === 0 ?
-							<tr>
-								<td colSpan={6} className="px-3 py-6 text-muted-foreground">
-									No flags yet.
-								</td>
-							</tr>
-						:	rows.map((r) => (
-								<tr key={r.id} className="border-b border-border/80">
-									<td className="px-3 py-2 text-muted-foreground">{r.createdAt?.toISOString() ?? ""}</td>
-									<td className="px-3 py-2 font-mono text-xs">
-										{r.entityType} · {r.entityId}
-									</td>
-									<td className="px-3 py-2">{r.source}</td>
-									<td className="px-3 py-2">{r.severity}</td>
-									<td className="px-3 py-2">{r.status}</td>
-									<td className="px-3 py-2 max-w-md truncate">{r.reason ?? ""}</td>
-								</tr>
-							))
-						}
-					</tbody>
-				</table>
-			</div>
+			<AdminModerationQueue
+				flags={rows.map((r) => ({
+					id: r.id,
+					entityType: r.entityType,
+					entityId: r.entityId,
+					source: r.source,
+					severity: r.severity,
+					status: r.status,
+					reason: r.reason,
+					createdAt: r.createdAt?.toISOString() ?? "",
+				}))}
+			/>
 		</div>
 	);
 }

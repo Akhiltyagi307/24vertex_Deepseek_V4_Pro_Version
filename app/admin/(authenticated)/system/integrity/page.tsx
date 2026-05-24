@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 
+import { AdminIntegrityChecksPanel } from "@/components/admin/system/admin-integrity-checks-panel";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
 import { integrityCheckResults } from "@/db/schema/integrity-check-results";
@@ -32,50 +33,15 @@ export default async function AdminIntegrityPage() {
 					{ label: "Integrity" },
 				]}
 				title="Integrity checks"
-				description="Run checks on demand via API, or daily via Supabase pg_cron → `/api/internal/admin/integrity-checks`."
+				description="Run checks on demand, or daily via Supabase pg_cron → `/api/internal/admin/integrity-checks`."
 			/>
-			{/*
-			 * D25: explicit `scope="col"` so screen readers announce the column
-			 * header when navigating each cell. The table is read-only and
-			 * already keyboard-accessible via the browser's native table
-			 * navigation; roving tabindex is unnecessary here.
-			 */}
-			<div className="overflow-x-auto rounded-md border border-border">
-				<table className="w-full min-w-[640px] text-left text-sm">
-					<caption className="sr-only">Last result for each integrity check</caption>
-					<thead className="border-b border-border bg-muted/40">
-						<tr>
-							<th scope="col" className="px-3 py-2 font-medium">
-								Check
-							</th>
-							<th scope="col" className="px-3 py-2 font-medium">
-								Last rows
-							</th>
-							<th scope="col" className="px-3 py-2 font-medium">
-								Last run
-							</th>
-							<th scope="col" className="px-3 py-2 font-medium">
-								Actions
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						{summaries.map(({ name, last }) => (
-							<tr key={name} className="border-b border-border/80">
-								<th scope="row" className="px-3 py-2 text-left font-mono text-xs font-normal">
-									{name}
-								</th>
-								<td className="px-3 py-2">{last?.rowsFound ?? "—"}</td>
-								<td className="px-3 py-2 text-muted-foreground">{last?.ranAt?.toISOString() ?? "—"}</td>
-								<td className="px-3 py-2 text-muted-foreground">POST /api/admin/system/integrity/checks/{name}/run</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
-			<p className="text-xs text-muted-foreground">
-				Use curl or the operator CLI: POST /api/admin/system/integrity/checks/&lt;name&gt;/run with admin cookie.
-			</p>
+			<AdminIntegrityChecksPanel
+				checks={summaries.map(({ name, last }) => ({
+					name,
+					lastRows: last?.rowsFound ?? null,
+					lastRanAt: last?.ranAt?.toISOString() ?? null,
+				}))}
+			/>
 		</div>
 	);
 }

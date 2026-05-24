@@ -3,6 +3,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
+import { parseStoredGradingFeedback } from "@/lib/practice/grading-feedback-format";
 import { stringifyStudentAnswer } from "@/lib/practice/grading-prompts";
 import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
@@ -10,7 +11,7 @@ import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/pa
 import { practiceAnswerKeySchema } from "@/lib/practice/generation-schema";
 
 import { qnaLogPerformanceFromScore, qnaLogScorePercent } from "./qna-log-performance";
-import type { QnaLogDetail, QnaLogQuestionType } from "./types";
+import type { QnaLogAiFeedback, QnaLogDetail, QnaLogQuestionType } from "./types";
 
 type RawDetailRow = {
 	answer_id: string;
@@ -84,13 +85,32 @@ function extractCorrectOptionKey(questionType: QnaLogQuestionType, answerKey: un
 	return key.length > 0 ? key : null;
 }
 
-function parseAiFeedback(text: string | null): { analysis: string; stepByStep: string | null } | null {
+function parseAiFeedback(text: string | null): QnaLogAiFeedback | null {
 	const raw = text?.trim();
 	if (!raw) return null;
-	const [analysisPart, stepPart] = raw.split("\n\nStep-by-step:\n");
-	const analysis = (analysisPart ?? raw).trim();
-	const stepByStep = stepPart?.trim() ? stepPart.trim() : null;
-	return { analysis, stepByStep };
+	const parsed = parseStoredGradingFeedback(raw);
+	if (!parsed.analysis && !parsed.stepByStep && !parsed.meta) return null;
+
+	const breakdown =
+		parsed.meta ?
+			{
+				bandLabel: parsed.meta.band_label,
+				whatWasCorrect: parsed.meta.what_was_correct,
+				whereMarksWereLost: parsed.meta.where_marks_were_lost,
+				toReachNextBand: parsed.meta.to_reach_next_band,
+				criterionScores: (parsed.meta.criterion_scores ?? []).map((c) => ({
+					name: c.name,
+					points: c.points,
+					note: c.note,
+				})),
+			}
+		:	null;
+
+	return {
+		analysis: parsed.analysis,
+		stepByStep: parsed.stepByStep,
+		breakdown,
+	};
 }
 
 export async function getQnaLogDetail(args: {
@@ -177,7 +197,7 @@ export async function getQnaLogDetail(args: {
 		studentAnswerDisplay: stringifyStudentAnswer(row.student_answer),
 		studentSelectedKey: extractStudentSelectedKey(questionType, row.student_answer),
 		correctOptionKey: status === "graded" ? extractCorrectOptionKey(questionType, row.answer_key) : null,
-		correctAnswerDisplay: status === "graded" ? (refSummary ?? fallbackCorrectAnswer ?? "—") : null,
+		correctAnswerDisplay: status === "graded" ? (fallbackCorrectAnswer ?? refSummary ?? "—") : null,
 		correctAnswerSummary: refSummary,
 		aiFeedback: feedback,
 		aiUserAnswerSummary: row.ai_user_answer_summary?.trim() || null,

@@ -1,7 +1,27 @@
 import { cn } from "@/lib/utils";
 
 /** iOS system red for notification badges (matches top-bar bell) */
-const IOS_BADGE = "bg-[#FF3B30] text-white ring-2 ring-sidebar dark:ring-sidebar";
+export const IOS_SIDEBAR_BADGE =
+	"bg-[#FF3B30] text-white ring-2 ring-sidebar dark:ring-sidebar";
+
+const IOS_BADGE = IOS_SIDEBAR_BADGE;
+
+/**
+ * Red dot (no count) for sidebar attention states (e.g. open assignments).
+ * Parent should be `position: relative` on the icon wrapper.
+ */
+export function SidebarAttentionDot({ show }: { show: boolean }) {
+	if (!show) return null;
+	return (
+		<span
+			aria-hidden
+			className={cn(
+				"pointer-events-none absolute -right-0.5 -top-0.5 z-10 size-2.5 rounded-full shadow-sm",
+				IOS_SIDEBAR_BADGE,
+			)}
+		/>
+	);
+}
 
 /**
  * Red count pill for unread notifications. Parent should be `position: relative`

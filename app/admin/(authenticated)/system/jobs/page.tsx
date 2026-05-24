@@ -4,6 +4,22 @@ import { desc } from "drizzle-orm";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
 import { operatorJobs } from "@/db/schema/operator-jobs";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
+
+function operatorJobStatusClass(status: string): string {
+	switch (status) {
+		case "completed":
+			return "rounded bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400";
+		case "failed":
+			return "rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive";
+		case "running":
+			return "rounded bg-primary/10 px-2 py-0.5 text-xs text-primary";
+		case "queued":
+			return "rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground";
+		default:
+			return "rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground";
+	}
+}
 
 export const metadata = {
 	title: "Operator jobs · 24Vertex Admin",
@@ -34,31 +50,50 @@ export default async function AdminOperatorJobsPage() {
 			</div>
 			<div className="overflow-x-auto rounded-md border border-border">
 				<table className="w-full min-w-[720px] text-left text-sm">
+					<caption className="sr-only">Recent operator jobs from Postgres</caption>
 					<thead className="border-b border-border bg-muted/40">
 						<tr>
-							<th className="px-3 py-2 font-medium">Id</th>
-							<th className="px-3 py-2 font-medium">Queue</th>
-							<th className="px-3 py-2 font-medium">Name</th>
-							<th className="px-3 py-2 font-medium">Status</th>
-							<th className="px-3 py-2 font-medium">Progress</th>
-							<th className="px-3 py-2 font-medium">Created</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Id
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Queue
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Name
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Status
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Progress
+							</th>
+							<th scope="col" className="px-3 py-2 font-medium">
+								Created
+							</th>
 						</tr>
 					</thead>
 					<tbody>
 						{rows.length === 0 ?
 							<tr>
-								<td colSpan={6} className="px-3 py-6 text-muted-foreground">
+								<td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
 									No jobs yet. Trigger bulk re-init from Performance tools.
 								</td>
 							</tr>
 						:	rows.map((r) => (
 								<tr key={r.id} className="border-b border-border/80">
-									<td className="px-3 py-2 font-mono text-xs">{r.id.slice(0, 8)}…</td>
-									<td className="px-3 py-2">{r.queue}</td>
+									<td className="px-3 py-2 font-mono text-xs" title={r.id}>
+										{r.id.slice(0, 8)}…
+									</td>
+									<td className="px-3 py-2 font-mono text-xs">{r.queue}</td>
 									<td className="px-3 py-2">{r.name}</td>
-									<td className="px-3 py-2">{r.status}</td>
-									<td className="px-3 py-2">{r.progress}%</td>
-									<td className="px-3 py-2 text-muted-foreground">{r.createdAt?.toISOString() ?? ""}</td>
+									<td className="px-3 py-2">
+										<span className={operatorJobStatusClass(r.status)}>{r.status}</span>
+									</td>
+									<td className="px-3 py-2 tabular-nums">{r.progress}%</td>
+									<td className="px-3 py-2 text-muted-foreground">
+										{r.createdAt ? formatDateTimeMediumShortInAppTimeZone(r.createdAt) : "—"}
+									</td>
 								</tr>
 							))
 						}

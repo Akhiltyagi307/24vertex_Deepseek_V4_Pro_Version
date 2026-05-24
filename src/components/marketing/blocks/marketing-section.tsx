@@ -9,11 +9,29 @@ import {
 } from "@/lib/marketing/marketing-section-rhythm";
 import { cn } from "@/lib/utils";
 
-const sectionShell =
-	"w-full px-4 py-16 medium:px-6 medium:py-20 xl:px-8 xl:py-24";
+type MarketingSectionPad = "tight" | "default" | "generous";
+type MarketingSectionSurface = "default" | "muted";
+
+/**
+ * Three padding intents so the same page can breathe differently across its
+ * sections (shared design law: vary spacing for rhythm).
+ *
+ * - `tight`: glue a follow-up paragraph to the section above.
+ * - `default`: standard section rhythm.
+ * - `generous`: give the proof block the air it needs to land.
+ */
+const SECTION_PAD_CLASSNAMES = {
+	tight: "px-4 py-10 medium:px-6 medium:py-14 xl:px-8 xl:py-16",
+	default: "px-4 py-16 medium:px-6 medium:py-20 xl:px-8 xl:py-24",
+	generous: "px-4 py-20 medium:px-6 medium:py-24 xl:px-8 xl:py-28",
+} satisfies Record<MarketingSectionPad, string>;
+
+const SECTION_SURFACE_CLASSNAMES = {
+	default: "bg-background",
+	muted: "bg-muted/40 dark:bg-muted/20",
+} satisfies Record<MarketingSectionSurface, string>;
+
 const sectionContentMax = "max-w-7xl mx-auto w-full";
-const sectionTitle = marketingSectionTitleClassName;
-const sectionLead = marketingSectionLeadClassName;
 
 type MarketingSectionProps = {
 	id?: string;
@@ -23,6 +41,8 @@ type MarketingSectionProps = {
 	children: ReactNode;
 	className?: string;
 	centered?: boolean;
+	pad?: MarketingSectionPad;
+	surface?: MarketingSectionSurface;
 };
 
 export function MarketingSection({
@@ -33,9 +53,19 @@ export function MarketingSection({
 	children,
 	className,
 	centered = true,
+	pad = "default",
+	surface = "default",
 }: MarketingSectionProps) {
 	return (
-		<section id={id} className={cn("relative overflow-hidden bg-background", sectionShell, className)}>
+		<section
+			id={id}
+			className={cn(
+				"relative overflow-hidden",
+				SECTION_SURFACE_CLASSNAMES[surface],
+				SECTION_PAD_CLASSNAMES[pad],
+				className,
+			)}
+		>
 			<div className={sectionContentMax}>
 				{(eyebrow || title || lead) && (
 					<div
@@ -52,10 +82,14 @@ export function MarketingSection({
 							</div>
 						) : null}
 						{title ? (
-							<h2 className={cn(sectionTitle, centered && "text-balance text-center")}>{title}</h2>
+							<h2 className={cn(marketingSectionTitleClassName, centered && "text-balance text-center")}>
+								{title}
+							</h2>
 						) : null}
 						{lead ? (
-							<p className={cn(sectionLead, centered && "text-pretty text-center")}>{lead}</p>
+							<p className={cn(marketingSectionLeadClassName, centered && "text-pretty text-center")}>
+								{lead}
+							</p>
 						) : null}
 					</div>
 				)}
@@ -65,4 +99,4 @@ export function MarketingSection({
 	);
 }
 
-export { sectionShell, sectionContentMax, sectionTitle, sectionLead };
+export { sectionContentMax };

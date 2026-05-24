@@ -9,8 +9,12 @@ function parseInquiryType(value: string | null): ContactInquiryType {
 	return "parent";
 }
 
-export function ContactPageForm() {
+type ContactPageFormProps = {
+	supportEmail?: string | null;
+};
+
+export function ContactPageForm({ supportEmail = null }: ContactPageFormProps) {
 	const params = useSearchParams();
 	const type = parseInquiryType(params.get("type"));
-	return <ContactForm defaultInquiryType={type} />;
+	return <ContactForm defaultInquiryType={type} supportEmail={supportEmail} />;
 }

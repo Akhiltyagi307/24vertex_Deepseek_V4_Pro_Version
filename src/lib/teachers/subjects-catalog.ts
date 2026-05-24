@@ -5,11 +5,10 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 
-export type SubjectCatalogRow = {
-	id: string;
-	name: string;
-	grade: number;
-};
+export type { SubjectCatalogRow } from "./subject-catalog-label";
+export { formatSubjectCatalogOptionLabel } from "./subject-catalog-label";
+
+import type { SubjectCatalogRow } from "./subject-catalog-label";
 
 /** Active subjects for grade-based dropdowns (teacher roster filters). */
 export async function listActiveSubjectsCatalog(): Promise<SubjectCatalogRow[]> {
@@ -18,10 +17,16 @@ export async function listActiveSubjectsCatalog(): Promise<SubjectCatalogRow[]> 
 			id: subjects.id,
 			name: subjects.name,
 			grade: subjects.grade,
+			stream: subjects.stream,
 		})
 		.from(subjects)
 		.where(and(eq(subjects.isActive, true)))
-		.orderBy(asc(subjects.grade), asc(subjects.sortOrder), asc(subjects.name));
+		.orderBy(
+			asc(subjects.grade),
+			asc(subjects.stream),
+			asc(subjects.sortOrder),
+			asc(subjects.name),
+		);
 
 	return rows;
 }

@@ -7,7 +7,7 @@ import { MarketingHero } from "@/components/marketing/blocks/marketing-hero";
 import { MarketingSection } from "@/components/marketing/blocks/marketing-section";
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
 import { MarketingSubpageShell } from "@/components/marketing/marketing-subpage-shell";
-import { LANDING_PARENT_PRIMARY_CTA_HREF, MARKETING_NAV } from "@/lib/marketing/landing-copy";
+import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_TRIAL_LEAD_FULL, MARKETING_NAV } from "@/lib/marketing/landing-copy";
 import { marketingPageMetadata } from "@/lib/marketing/pages/metadata";
 import { getAllVsSlugs, getVsPageContent } from "@/lib/marketing/pages/vs-pages";
 
@@ -75,7 +75,7 @@ export default async function VsComparePage({ params }: PageProps) {
 
 			<MarketingCtaBand
 				title="Try 24Vertex on your child's actual chapters"
-				lead="14 days free. 5 practice tests. No card needed."
+				lead={LANDING_TRIAL_LEAD_FULL}
 				actions={
 					<>
 						<LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />

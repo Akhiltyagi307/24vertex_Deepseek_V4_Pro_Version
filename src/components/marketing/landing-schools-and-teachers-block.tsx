@@ -5,8 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
+	LANDING_SCHOOLS_OVERVIEW_CTA_LABEL,
 	MARKETING_NAV,
 	MARKETING_SCHOOL_DEMO_CTA_HREF,
+	MARKETING_SCHOOL_DEMO_CTA_LABEL,
 } from "@/lib/marketing/landing-copy";
 import { landingFeatureBentoShell } from "@/lib/marketing/landing-feature-surface";
 import { landingMarketingSectionEyebrowBadgeClassName } from "@/lib/marketing/landing-marketing-badge";
@@ -69,7 +71,7 @@ export function LandingSchoolsAndTeachersBlock(
 						render={<Link href={MARKETING_NAV.schools.href} />}
 					>
 						<Building2 aria-hidden className="size-4" />
-						See school workspace
+						{LANDING_SCHOOLS_OVERVIEW_CTA_LABEL}
 					</Button>
 					<Button
 						variant="marketingSecondary"
@@ -79,7 +81,7 @@ export function LandingSchoolsAndTeachersBlock(
 						)}
 						render={<Link href={MARKETING_SCHOOL_DEMO_CTA_HREF} />}
 					>
-						Book a walkthrough
+						{MARKETING_SCHOOL_DEMO_CTA_LABEL}
 					</Button>
 				</div>
 			</div>

@@ -69,6 +69,7 @@ import {
 	type SubjectCardTrackerStats,
 	type TrackerStatus,
 } from "@/lib/student/performance-matrix";
+import { formatTrackerStatusLabel } from "@/lib/student/tracker-status-labels";
 import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
 import {
 	activePerformanceFilterCount as computeActiveFilterCount,
@@ -146,19 +147,6 @@ function usePageTransitionVariants() {
 			},
 		};
 	}, [reduceMotion]);
-}
-
-function statusLabel(status: TrackerStatus): string {
-	switch (status) {
-		case "good":
-			return "Good";
-		case "satisfactory":
-			return "Satisfactory";
-		case "bad":
-			return "Needs improvement";
-		default:
-			return "Not tested";
-	}
 }
 
 function normalizeTopicSearchText(s: string): string {
@@ -737,19 +725,19 @@ export function StudentPerformanceView({
 										[
 											["Total topics", summary.total, LayoutListIcon, "text-muted-foreground"],
 											[
-												"Mastered",
+												"Strong",
 												summary.good,
 												LineChartIcon,
 												"text-emerald-600 dark:text-emerald-400",
 											],
 											[
-												"Satisfactory",
+												"On track",
 												summary.satisfactory,
 												ListFilterIcon,
 												"text-amber-600 dark:text-amber-400",
 											],
 											[
-												"Needs improvement",
+												"Strengthen",
 												summary.bad,
 												TrendingDownIcon,
 												"text-red-600 dark:text-red-400",
@@ -979,7 +967,7 @@ export function StudentPerformanceView({
 																					? "All"
 																					: s === "not_tested"
 																						? "Not tested"
-																						: statusLabel(s);
+																						: formatTrackerStatusLabel(s);
 																			return (
 																				<Button
 																					key={s}
@@ -1196,7 +1184,7 @@ export function StudentPerformanceView({
 																		}
 																	}}
 																	tabIndex={0}
-																	title={`${row.subjectName}: ${statusLabel(row.status)}. Average ${formatScore(row.averageScore)}, ${row.testsTaken} tests taken.`}
+																	title={`${row.subjectName}: ${formatTrackerStatusLabel(row.status)}. Average ${formatScore(row.averageScore)}, ${row.testsTaken} tests taken.`}
 																>
 																	<td className="border-border border-e px-2 py-2 align-middle text-center">
 																		<input
@@ -1239,7 +1227,7 @@ export function StudentPerformanceView({
 																				variant={statusBadgeVariant(row.status)}
 																				className={performanceStatusBadgeClass(row.status)}
 																			>
-																				{statusLabel(row.status)}
+																				{formatTrackerStatusLabel(row.status)}
 																			</Badge>
 																		</div>
 																	</td>
@@ -1326,7 +1314,7 @@ export function StudentPerformanceView({
 												variant={statusBadgeVariant(sheetRow.status)}
 												className={cn("mt-2", performanceStatusBadgeClass(sheetRow.status))}
 											>
-												{statusLabel(sheetRow.status)}
+												{formatTrackerStatusLabel(sheetRow.status)}
 											</Badge>
 										</div>
 										<div className="rounded-lg border border-border bg-muted/25 px-3 py-3">

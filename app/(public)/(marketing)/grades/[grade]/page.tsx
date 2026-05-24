@@ -41,7 +41,7 @@ function gradeFaq(classLabel: string): MarketingFaqItem[] {
 		{
 			id: "3",
 			question: "What do parents see?",
-			answer: "A chapter mastery heatmap updated as your child practises.",
+			answer: "A chapter mastery radar chart updated as your child practises. Parents, students, and linked teachers see the same view.",
 		},
 	];
 }

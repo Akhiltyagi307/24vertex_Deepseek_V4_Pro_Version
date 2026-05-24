@@ -3,6 +3,8 @@
  * including items that were previously auto-keyed for MCQ — we re-grade in context for a unified rubric.
  */
 
+import { LONG_ANSWER_CRITERION_NAMES } from "@/lib/practice/grading-schema";
+
 export type GradingQuestionInput = {
 	question_id: string;
 	topic_id: string;
@@ -15,6 +17,7 @@ export type GradingQuestionInput = {
 		| "fill_in_blank"
 		| "long_answer";
 	question_text: string;
+	question_difficulty: string | null;
 	options: Record<string, string> | null;
 	/** Full answer key JSON from DB — server only. */
 	answer_key: unknown;
@@ -39,42 +42,42 @@ export function stringifyStudentAnswer(payload: unknown): string {
 	return JSON.stringify(payload);
 }
 
-/**
- * Per-question-type scoring rubric. Anchors each type to a fixed set of
- * allowed scores so the same answer earns the same score across grading
- * runs — this is the predictable mechanism behind grading consistency.
- *
- * Verdict is always derived from score (see VERDICT_FROM_SCORE block):
- *   - correct           ≥ 85
- *   - partially_correct 25–84
- *   - incorrect         ≤ 24
- */
 const SCORING_RUBRIC = [
-	"SCORING RUBRIC (predictable, type-anchored — pick a band, do not free-score):",
-	"  • multiple_choice: BINARY only. Allowed scores: 100 (matches answer_key.correct_answer) or 0 (anything else). No partial credit. Verdict = correct or incorrect. Even though MCQ is binary, ALWAYS produce a full analysis explaining why the chosen option is right or wrong, and a reference_answer_summary.",
-	"  • fill_in_blank: TERNARY. Allowed scores: 100 (exact / accepted synonym), 50 (right concept, wrong form — minor spelling, plural/singular, units mismatch), 0 (wrong concept).",
-	"  • numerical: TERNARY. Allowed scores: 100 (correct value within accepted tolerance, units consistent), 50 (correct method but arithmetic slip OR right magnitude wrong sign / units), 0 (wrong method or no work shown when method matters).",
-	"  • short_answer: 5-band rubric. Allowed scores: 100 (complete + accurate + correct terminology), 75 (complete + accurate but missing a term or one minor inaccuracy), 50 (one key idea correct, second idea missing or wrong), 25 (relevant attempt with major gap), 0 (off-topic or empty).",
-	"  • long_answer: 5-criteria rubric, 20 points each → score = sum (always a multiple of 10). Criteria: (1) Conceptual accuracy, (2) Coverage of all parts asked, (3) Use of correct terminology / formulae, (4) Logical structure / reasoning shown, (5) Worked example or supporting detail. Award 20 / 10 / 0 per criterion (full / partial / none).",
+	"SCORING RUBRIC (practice mode — pick ONE allowed score per question; do not invent other numbers):",
+	"  • multiple_choice: 100 or 0 only. 100 = student letter matches answer_key.correct_answer (ignore case). 0 = anything else.",
+	"  • fill_in_blank: 100 | 50 | 0 — 100 exact/accepted synonym; 50 right idea wrong form (spelling, units, plural); 0 wrong idea.",
+	"  • numerical: 100 | 50 | 0 — 100 value within tolerance and units OK; 50 right method minor slip or units/sign error; 0 wrong method.",
+	"  • short_answer: 100 | 75 | 50 | 25 | 0 — see band meanings in OUTPUT section.",
+	"  • long_answer: score = sum of five criteria (each 0, 10, or 20). Total must be 0, 10, 20, … 100.",
+	`  • long_answer criteria names (use exactly in criterion_scores): ${LONG_ANSWER_CRITERION_NAMES.map((n) => `"${n}"`).join(", ")}.`,
 ].join("\n");
 
 const VERDICT_FROM_SCORE = [
-	"VERDICT FROM SCORE (derive deterministically — must agree with the rubric):",
+	"VERDICT (must match score):",
 	"  • score ≥ 85 → verdict = correct",
 	"  • 25 ≤ score ≤ 84 → verdict = partially_correct",
 	"  • score ≤ 24 → verdict = incorrect",
-	"  multiple_choice cannot be partially_correct (score is 100 or 0).",
+	"  • multiple_choice: only correct or incorrect (never partially_correct).",
+].join("\n");
+
+const PRACTICE_GRADER_TONE = [
+	"PRACTICE GRADER TONE (formative, not board-exam strict):",
+	"  • Purpose: helpful practice feedback, not certification.",
+	"  • If two score bands are both reasonable, choose the HIGHER band and say it was borderline in where_marks_were_lost.",
+	"  • Do not drop short_answer or long_answer below 75 for grammar/spelling alone unless meaning is wrong.",
+	"  • Empty answers: score 0, verdict incorrect, encouraging tone in analysis (no shaming).",
+	"  • Use plain, supportive language: \"next step\", \"not yet\", \"to reach the next band\".",
 ].join("\n");
 
 const SUBJECT_GUIDANCE: Record<string, string> = {
 	math:
-		"Mathematics: prioritize correct method and unit consistency. A right answer with no work shown for a multi-step problem is at most partially_correct on numerical/short_answer; full credit only when the rubric allows.",
+		"Mathematics: method and units matter. A correct final value with no work on a multi-step item is at most 50 on numerical/short_answer unless the rubric allows 100.",
 	science:
-		"Science (Physics/Chemistry/Biology): prioritize accurate terminology, correct units, and stated assumptions. Penalize a right number with wrong units to the partially_correct band.",
+		"Science: terminology and units matter. Right number with wrong units → 50 band, not 100.",
 	english:
-		"English / Languages: prioritize content over grammar — a grammatically imperfect answer that captures the intended idea earns full credit on short_answer / long_answer if all criteria are met. Spelling and grammar matter most for fill_in_blank.",
+		"English / Languages: grade content over grammar on short_answer and long_answer. Grammar alone is not a reason for 25 or 0 if the idea is right.",
 	social:
-		"Social Science / Humanities: prioritize evidence and named examples. A correct general claim without a specific example is partially_correct on long_answer (criterion 5).",
+		"Social Science: named examples matter for long_answer criterion 5 (Worked example or supporting detail). General claim without example → 10 on that criterion, not 0 on the whole answer.",
 };
 
 function pickSubjectGuidance(subjectName: string): string {
@@ -86,20 +89,99 @@ function pickSubjectGuidance(subjectName: string): string {
 	return "";
 }
 
+function allowedScoresLine(questionType: GradingQuestionInput["question_type"]): string {
+	switch (questionType) {
+		case "multiple_choice":
+			return "Allowed scores: 100 or 0.";
+		case "fill_in_blank":
+		case "numerical":
+			return "Allowed scores: 100, 50, or 0.";
+		case "short_answer":
+			return "Allowed scores: 100, 75, 50, 25, or 0.";
+		case "long_answer":
+			return "Allowed scores: multiples of 10 from 0 to 100 (sum of five criteria).";
+		default:
+			return "";
+	}
+}
+
+type AnswerKeyBrief = {
+	common_mistakes?: string[];
+	marking_points?: string[];
+	acceptable_variants?: string[];
+	full_credit_requires?: string[];
+	related_concept?: string;
+};
+
+function parseAnswerKeyBrief(answer_key: unknown): AnswerKeyBrief {
+	if (!answer_key || typeof answer_key !== "object") return {};
+	const o = answer_key as Record<string, unknown>;
+	const asStrings = (v: unknown): string[] | undefined =>
+		Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : undefined;
+	return {
+		common_mistakes: asStrings(o.common_mistakes),
+		marking_points: asStrings(o.marking_points),
+		acceptable_variants: asStrings(o.acceptable_variants),
+		full_credit_requires: asStrings(o.full_credit_requires),
+		related_concept: typeof o.related_concept === "string" ? o.related_concept.trim() : undefined,
+	};
+}
+
+function buildQuestionGraderBrief(q: GradingQuestionInput): string {
+	const brief = parseAnswerKeyBrief(q.answer_key);
+	const lines: string[] = [`Grader brief: ${allowedScoresLine(q.question_type)}`];
+
+	if (q.question_difficulty) {
+		lines.push(`Difficulty: ${q.question_difficulty}.`);
+	}
+
+	if (brief.full_credit_requires?.length) {
+		lines.push(`Full credit requires: ${brief.full_credit_requires.join("; ")}`);
+	}
+	if (brief.acceptable_variants?.length) {
+		lines.push(`Acceptable variants: ${brief.acceptable_variants.join("; ")}`);
+	}
+	if (brief.marking_points?.length) {
+		lines.push("Marking points:");
+		for (const p of brief.marking_points) lines.push(`  - ${p}`);
+	}
+	if (brief.common_mistakes?.length) {
+		lines.push("Common mistakes (map where_marks_were_lost when applicable):");
+		for (const m of brief.common_mistakes) lines.push(`  - ${m}`);
+	}
+	if (brief.related_concept) {
+		lines.push(`Related concept (tie to_reach_next_band when helpful): ${brief.related_concept}`);
+	}
+
+	if (q.question_type === "long_answer") {
+		lines.push(
+			"long_answer: fill criterion_scores with exactly 5 objects (names as in system prompt). points must be 0, 10, or 20 each; sum must equal score.",
+		);
+	}
+
+	lines.push(
+		"If score < 100: state the band in band_label, list deductions in where_marks_were_lost, and one actionable to_reach_next_band (e.g. \"To move from 50 to 75, add …\").",
+	);
+
+	return lines.join("\n");
+}
+
 export function buildPracticeGradingSystemPrompt(params: {
 	subjectName: string;
 	requireMathSteps: boolean;
 }): string {
 	const mathRule = params.requireMathSteps ?
-			"For EVERY numerical question, and for any Mathematics subject question where a worked solution is appropriate, include a clear step_by_step_solution (numbered steps)."
-		:	"For EVERY numerical question, include step_by_step_solution with numbered steps.";
+			"For EVERY numerical question, and for any Mathematics subject question where a worked solution is appropriate, include step_by_step_solution (numbered steps)."
+		:	"For EVERY numerical question, include step_by_step_solution (numbered steps).";
 
 	const subjectGuidance = pickSubjectGuidance(params.subjectName);
 
 	const lines: string[] = [
-		"You are an expert educator grading a student's practice test.",
+		"You are an expert educator grading a student's practice test for formative feedback.",
 		`Subject: ${params.subjectName}.`,
-		"You receive the full question list with official answer keys and the student's responses.",
+		"You receive official answer keys and student responses per question.",
+		"",
+		PRACTICE_GRADER_TONE,
 		"",
 		SCORING_RUBRIC,
 		"",
@@ -112,14 +194,20 @@ export function buildPracticeGradingSystemPrompt(params: {
 
 	lines.push(
 		"",
-		"OUTPUT FIELDS (every question — including multiple_choice — must include all fields):",
-		"  • analysis: a brief, actionable explanation of why credit was or wasn't awarded — focus on the misconception or missing step. Plain text, no markdown.",
-		`  • step_by_step_solution: numbered steps showing the correct working. ${mathRule}`,
-		"  • user_answer_summary: 1–2 sentences paraphrasing what the student wrote, suitable for a PDF.",
-		"  • reference_answer_summary: 1–2 sentences paraphrasing the official answer, suitable for a PDF.",
-		"  • Echo question_id and topic_id EXACTLY as provided. Never invent IDs.",
+		"REQUIRED JSON FIELDS (every question):",
+		"  • question_id, topic_id: copy EXACTLY from input.",
+		"  • score: one allowed value for that question_type.",
+		"  • verdict: must match score (see VERDICT).",
+		"  • band_label: short label, e.g. \"Partial credit (50% band)\" or \"Full credit\".",
+		"  • what_was_correct: array of 1–3 short bullets (what the student got right). At score 100 use e.g. \"Full credit on this item.\"",
+		"  • where_marks_were_lost: array of bullets; MUST be [] when score is 100. When score < 100, at least one bullet naming the main gap (tie to rubric or common_mistakes).",
+		"  • to_reach_next_band: one sentence; empty string only when score is 100. Name the next band up (e.g. \"To move from 50 to 75, state …\").",
+		"  • analysis: 1–3 sentence coach wrap-up ONLY. Do NOT repeat the bullet lists from what_was_correct / where_marks_were_lost.",
+		"  • user_answer_summary, reference_answer_summary: 1–2 sentences each for PDF.",
+		`  • step_by_step_solution: ${mathRule} Omit only for pure MCQ if nothing to show.`,
+		"  • criterion_scores: REQUIRED for long_answer when score < 100 — exactly 5 rows, points 0|10|20, sum = score.",
 		"",
-		"Return only structured data matching the schema — no markdown fences or commentary outside JSON.",
+		"Return only structured JSON matching the schema. No markdown fences.",
 	);
 	return lines.join("\n");
 }
@@ -131,7 +219,7 @@ export function buildPracticeGradingUserPrompt(
 	const lines: string[] = [
 		`Grade this batch: ${chunkLabel}`,
 		"",
-		...questions.map((q) => {
+		...questions.flatMap((q) => {
 			const opts =
 				q.options && Object.keys(q.options).length > 0 ?
 					JSON.stringify(q.options)
@@ -148,7 +236,8 @@ export function buildPracticeGradingUserPrompt(
 				`answer_key (official): ${JSON.stringify(q.answer_key)}`,
 				`student_answer (raw json): ${JSON.stringify(q.student_answer_raw)}`,
 				`student_answer (readable): ${q.student_answer_text}`,
-			].join("\n");
+				buildQuestionGraderBrief(q),
+			];
 		}),
 	];
 	return lines.join("\n");

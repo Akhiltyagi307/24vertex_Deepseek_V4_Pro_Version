@@ -24,6 +24,7 @@ export type StudentShellProps = {
 	entitlement: EntitlementSnapshot | null;
 	/** Auth user id — used to subscribe the top-bar bell to Realtime inserts. */
 	userId?: string | null;
+	initialHasOpenAssignments?: boolean;
 	activityStreak?: StudentActivityStreakSnapshot | null;
 	children: React.ReactNode;
 };
@@ -37,6 +38,7 @@ export function StudentShell({
 	gradeLabel,
 	entitlement,
 	userId,
+	initialHasOpenAssignments = false,
 	activityStreak = null,
 	children,
 }: StudentShellProps) {
@@ -66,6 +68,7 @@ export function StudentShell({
 						gradeLabel={gradeLabel}
 						entitlement={entitlement}
 						userId={userId ?? null}
+						initialHasOpenAssignments={initialHasOpenAssignments}
 					/>
 				}
 			>

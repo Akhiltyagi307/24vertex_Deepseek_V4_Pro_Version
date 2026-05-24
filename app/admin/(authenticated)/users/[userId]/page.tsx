@@ -17,6 +17,7 @@ import { getAdminUserDetailStats } from "@/lib/admin/user-detail-queries";
 import { adminGetUserById } from "@/lib/admin/users-list";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
+import { adminActionLog } from "@/db/schema/admin-action-log";
 import { complianceRequests } from "@/db/schema/compliance-requests";
 
 import { AssignmentsTab } from "./_tabs/assignments-tab";
@@ -112,6 +113,22 @@ export default async function AdminUserDetailPage({
 						? X
 						: never[]
 					: never[]);
+	const auditRowsPromise =
+		tab === "audit"
+			? db
+					.select({
+						id: adminActionLog.id,
+						action: adminActionLog.action,
+						targetType: adminActionLog.targetType,
+						targetId: adminActionLog.targetId,
+						payload: adminActionLog.payload,
+						createdAt: adminActionLog.createdAt,
+					})
+					.from(adminActionLog)
+					.where(eq(adminActionLog.targetId, userId))
+					.orderBy(desc(adminActionLog.id))
+					.limit(50)
+			: Promise.resolve([]);
 
 	const [
 		stats,
@@ -122,6 +139,7 @@ export default async function AdminUserDetailPage({
 		notificationsList,
 		perfRowsAll,
 		complianceDsrs,
+		auditRows,
 	] = await Promise.all([
 		getAdminUserDetailStats(userId, row.role),
 		linkedStudentsPromise,
@@ -131,6 +149,7 @@ export default async function AdminUserDetailPage({
 		notificationsPromise,
 		perfRowsPromise,
 		complianceDsrsPromise,
+		auditRowsPromise,
 	]);
 	const perfPreview = perfRowsAll.slice(0, 15);
 
@@ -146,6 +165,7 @@ export default async function AdminUserDetailPage({
 		return (
 			<Link
 				key={id}
+				aria-current={active ? "page" : undefined}
 				className={cn(
 					"rounded-md border px-3 py-1.5",
 					active ? "border-primary bg-primary/5 font-medium" : "border-border hover:bg-muted",
@@ -171,7 +191,7 @@ export default async function AdminUserDetailPage({
 				description={row.email ?? "No email"}
 			/>
 
-			<div className="flex flex-wrap gap-2 text-sm">
+			<nav aria-label="User sections" className="flex flex-wrap gap-2 text-sm">
 				{tabLink("profile", "Profile")}
 				{tabLink("performance", "Performance")}
 				{tabLink("tests", "Tests")}
@@ -180,7 +200,7 @@ export default async function AdminUserDetailPage({
 				{tabLink("sessions", "Sessions")}
 				{tabLink("audit", "Audit log")}
 				{tabLink("compliance", "Compliance")}
-			</div>
+			</nav>
 
 			{tab === "profile" ? (
 				<ProfileTab row={row} linkedStudents={linkedStudents} />
@@ -207,10 +227,21 @@ export default async function AdminUserDetailPage({
 					pagination={pagination}
 				/>
 			) : null}
-			{tab === "sessions" ? <SessionsTab /> : null}
-			{tab === "audit" ? (
-				<AuditTab auditHref={`/admin/audit?targetId=${encodeURIComponent(userId)}`} />
-			) : null}
+			{tab === "sessions" ? <SessionsTab userId={userId} /> : null}
+			{tab === "audit" ?
+				<AuditTab
+					auditHref={`/admin/audit?targetId=${encodeURIComponent(userId)}`}
+					sessionRevokeAuditHref={`/admin/audit?targetId=${encodeURIComponent(userId)}&action=user_sessions_revoke_all`}
+					rows={auditRows.map((r) => ({
+						id: r.id,
+						action: r.action,
+						targetType: r.targetType,
+						targetId: r.targetId,
+						payload: r.payload,
+						createdAt: r.createdAt?.toISOString() ?? "",
+					}))}
+				/>
+			:	null}
 			{tab === "compliance" ? <ComplianceTab dsrs={complianceDsrs} /> : null}
 
 			<section className="space-y-2">

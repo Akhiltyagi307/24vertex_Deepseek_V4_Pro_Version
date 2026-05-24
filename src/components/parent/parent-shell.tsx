@@ -20,6 +20,7 @@ export type ParentShellProps = {
 	parentAvatarUrl: string | null;
 	childGradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
+	initialHasOpenAssignments?: boolean;
 	children: React.ReactNode;
 };
 
@@ -33,6 +34,7 @@ export function ParentShell({
 	parentAvatarUrl,
 	childGradeLabel,
 	entitlement,
+	initialHasOpenAssignments = false,
 	children,
 }: ParentShellProps) {
 	return (
@@ -57,6 +59,7 @@ export function ParentShell({
 					}}
 					childGradeLabel={childGradeLabel}
 					entitlement={entitlement}
+					initialHasOpenAssignments={initialHasOpenAssignments}
 				/>
 			}
 		>

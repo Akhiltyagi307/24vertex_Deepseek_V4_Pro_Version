@@ -4,8 +4,8 @@ const path = require("node:path");
  *  Uses **default Turbopack** (`pnpm dev`). Next.js 16.2 + Webpack dev (`NEXT_DEV_WEBPACK=1`) can emit HTML that
  *  references `/_next/static/css/app/layout.css` which never resolves → totally unstyled pages (Tailwind absent).
  *  `scripts/next-dev.mjs` clears `.next/dev` on each start unless `NEXT_DEV_PRESERVE_DEV_CACHE=true`.
- *  Middleware watchdog (default on) restarts PM2 if `proxy.ts` compiles but `.next/dev/server/middleware.js` is missing.
- *  Optional: `NEXT_DEV_ROUTES_WATCHDOG=1` in env helps PM2 exit/restart if `.next/dev` corrupts (was webpack-centric).
+ *  Routes-manifest watchdog (default on) exits when `.next/dev/routes-manifest.json` vanishes so PM2 auto-restarts clean.
+ *  Keep the repo outside iCloud-synced Documents when possible; `.next` is marked ignore-for-sync on macOS.
  */
 module.exports = {
 	apps: [
@@ -23,6 +23,10 @@ module.exports = {
 			env: {
 				NODE_ENV: "development",
 				PORT: "3001",
+				// Auto-restart when Turbopack leaves dev output corrupt (500 on every route).
+				NEXT_DEV_ROUTES_WATCHDOG: "1",
+				// Middleware chunk checks false-positive during HMR; routes watchdog covers corruption.
+				NEXT_DEV_MIDDLEWARE_WATCHDOG: "0",
 			},
 		},
 	],

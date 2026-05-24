@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ParentShell } from "@/components/parent/parent-shell";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { hasOpenAssignmentsForStudent } from "@/lib/assignments/has-open-assignments";
 import { getCachedEntitlementsForProfile } from "@/lib/billing/entitlements";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
@@ -47,7 +48,10 @@ export default async function ParentPortalLayout({ children }: { children: React
 		redirect("/parent/select-student");
 	}
 
-	const entitlement = await getCachedEntitlementsForProfile(activeId);
+	const [entitlement, initialHasOpenAssignments] = await Promise.all([
+		getCachedEntitlementsForProfile(activeId),
+		hasOpenAssignmentsForStudent(activeId).catch(() => false),
+	]);
 
 	const org = childRow.school_name?.trim() || "Your school";
 	const childName = formatPersonDisplayName(childRow.full_name ?? "") || "Your child";
@@ -64,6 +68,7 @@ export default async function ParentPortalLayout({ children }: { children: React
 			parentAvatarUrl={parentRow.avatar_url}
 			childGradeLabel={gradeLabel(childRow.grade, childRow.section)}
 			entitlement={entitlement}
+			initialHasOpenAssignments={initialHasOpenAssignments}
 		>
 			{children}
 		</ParentShell>

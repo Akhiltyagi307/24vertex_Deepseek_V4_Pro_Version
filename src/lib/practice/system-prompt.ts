@@ -417,7 +417,7 @@ Rules:
 
 ## Output shape
 
-Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`estimated_time_seconds\` (positive integer), \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept }), and \`visual\` (envelope or null). Multiple-choice items also include \`options\` ({A,B,C,D}). \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
+Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`estimated_time_seconds\` (positive integer), \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept; optional marking_points[], acceptable_variants[], full_credit_requires[] for grading hints }), and \`visual\` (envelope or null). Multiple-choice items also include \`options\` ({A,B,C,D}). For long_answer and multi-step short_answer, add \`marking_points\` (3–6 short bullets) when it helps downstream grading. \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
 ${exemplarsBlock}
 ${finalChecklist}
 

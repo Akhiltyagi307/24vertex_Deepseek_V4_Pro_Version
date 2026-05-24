@@ -51,13 +51,13 @@ function rowVisualForCard(s: DashboardSubjectCompactModel): {
 	if (!hasAttempts) {
 		return { visual: "idle", statusLabel: "Not started" };
 	}
-	if (s.status === "Bad") {
-		return { visual: "bad", statusLabel: "Needs attention" };
+	if (s.status === "Strengthen") {
+		return { visual: "bad", statusLabel: "Strengthen" };
 	}
-	if (s.status === "Satisfactory") {
-		return { visual: "warn", statusLabel: "In progress" };
+	if (s.status === "On track") {
+		return { visual: "warn", statusLabel: "On track" };
 	}
-	return { visual: "good", statusLabel: "On track" };
+	return { visual: "good", statusLabel: "Strong" };
 }
 
 const DOT: Record<RowVisual, string> = {

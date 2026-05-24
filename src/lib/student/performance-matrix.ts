@@ -1,4 +1,19 @@
-export type TrackerStatus = "good" | "satisfactory" | "bad" | "not_tested";
+import {
+	DEFAULT_SUBJECT_STATUS_LABEL,
+	TRACKER_STATUS_LABELS,
+	type SubjectStatusLabel,
+	type TrackerStatus,
+} from "@/lib/student/tracker-status-labels";
+
+export type { SubjectStatusLabel, TrackerStatus } from "@/lib/student/tracker-status-labels";
+export {
+	DEFAULT_SUBJECT_STATUS_LABEL,
+	formatTrackerStatusFromRaw,
+	formatTrackerStatusLabel,
+	isTrackerStatus,
+	subjectStatusLabelRank,
+	TRACKER_STATUS_LABELS,
+} from "@/lib/student/tracker-status-labels";
 export type TrackerTrend = "improving" | "declining" | "stable";
 
 export type PerformanceRowSerialized = {
@@ -306,15 +321,13 @@ export const emptySubjectCardTrackerStats: SubjectCardTrackerStats = {
 	testsTakenTotal: 0,
 };
 
-export type SubjectStatusLabel = "Good" | "Satisfactory" | "Bad";
-
 /** Pick a single status label for dashboard/hero cards from tracker bucket counts. */
 export function dominantStatusFromTrackerStats(st: SubjectCardTrackerStats): SubjectStatusLabel {
 	const tested = st.good + st.satisfactory + st.bad;
-	if (tested === 0) return "Satisfactory";
-	if (st.good >= st.satisfactory && st.good >= st.bad) return "Good";
-	if (st.bad > st.good && st.bad > st.satisfactory) return "Bad";
-	return "Satisfactory";
+	if (tested === 0) return DEFAULT_SUBJECT_STATUS_LABEL;
+	if (st.good >= st.satisfactory && st.good >= st.bad) return TRACKER_STATUS_LABELS.good;
+	if (st.bad > st.good && st.bad > st.satisfactory) return TRACKER_STATUS_LABELS.bad;
+	return TRACKER_STATUS_LABELS.satisfactory;
 }
 
 /** Mean of per-topic average scores for a subject (tested topics only). */

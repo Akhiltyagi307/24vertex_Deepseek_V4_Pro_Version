@@ -34,53 +34,38 @@ export default function ContactPage() {
 			/>
 
 			<MarketingSection className="!pt-0">
-				<div className="grid gap-10 xl:grid-cols-[1fr_280px]">
-					<Suspense fallback={<div className="text-muted-foreground text-sm">Loading form…</div>}>
-						<ContactPageForm />
-					</Suspense>
+				<Suspense fallback={<div className="text-muted-foreground text-sm">Loading form…</div>}>
+					<ContactPageForm supportEmail={supportEmail} />
+				</Suspense>
 
-					<aside className="space-y-6 text-sm">
-						{supportEmail ? (
-							<div>
-								<p className="font-semibold text-foreground">Email</p>
-								<a
-									href={`mailto:${supportEmail}`}
-									className="text-link mt-1 inline-block underline-offset-4 hover:underline"
-								>
-									{supportEmail}
-								</a>
-							</div>
-						) : null}
-						<div>
-							<p className="font-semibold text-foreground">More help</p>
-							<ul className="text-muted-foreground mt-2 space-y-2">
-								<li>
-									<Link href={MARKETING_NAV.help.href} className="text-link hover:underline">
-										Help centre
-									</Link>
-								</li>
-								<li>
-									<Link href={MARKETING_NAV.security.href} className="text-link hover:underline">
-										Security
-									</Link>
-								</li>
-								<li>
-									<Link href="/legal/privacy" className="text-link hover:underline">
-										Privacy policy
-									</Link>
-								</li>
-							</ul>
-						</div>
-						{entity || address ? (
-							<div>
-								<p className="font-semibold text-foreground">Registered entity</p>
-								{entity ? <p className="text-muted-foreground mt-1">{entity}</p> : null}
-								{address ? (
-									<p className="text-muted-foreground mt-1 text-pretty leading-relaxed">{address}</p>
-								) : null}
-							</div>
-						) : null}
-					</aside>
+				<div className="border-border/40 text-muted-foreground mt-16 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-t pt-6 text-xs">
+					<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+						<Link
+							href={MARKETING_NAV.help.href}
+							className="hover:text-foreground underline-offset-4 hover:underline"
+						>
+							Help centre
+						</Link>
+						<Link
+							href={MARKETING_NAV.security.href}
+							className="hover:text-foreground underline-offset-4 hover:underline"
+						>
+							Security
+						</Link>
+						<Link
+							href="/legal/privacy"
+							className="hover:text-foreground underline-offset-4 hover:underline"
+						>
+							Privacy policy
+						</Link>
+					</div>
+					{entity || address ? (
+						<p className="text-pretty leading-relaxed">
+							{entity ? <span className="text-foreground/80 font-medium">{entity}</span> : null}
+							{entity && address ? <span aria-hidden> · </span> : null}
+							{address}
+						</p>
+					) : null}
 				</div>
 			</MarketingSection>
 		</MarketingSubpageShell>

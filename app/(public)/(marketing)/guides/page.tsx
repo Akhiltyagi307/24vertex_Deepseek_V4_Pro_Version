@@ -6,7 +6,7 @@ import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-
 import { MarketingSubpageShell } from "@/components/marketing/marketing-subpage-shell";
 import { BOARD_ENTRIES, GRADE_ENTRIES } from "@/lib/marketing/seo/registry";
 import { featureBentoCardSurfaceClassName } from "@/lib/marketing/landing-feature-surface";
-import { LANDING_PARENT_PRIMARY_CTA_HREF, MARKETING_NAV } from "@/lib/marketing/landing-copy";
+import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_PARENT_PRIMARY_CTA_LABEL, MARKETING_NAV } from "@/lib/marketing/landing-copy";
 import { marketingPageMetadata } from "@/lib/marketing/pages/metadata";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export default function GuidesPage() {
 			<MarketingHero
 				eyebrow="Guides"
 				title="Sample chapter checks by board and class"
-				lead="We do not ship generic PDF dumps. Start a free trial to practise on the chapters your child's school is teaching, with a heatmap you can read."
+				lead="We do not ship generic PDF dumps. Start a free trial to practise on the chapters your child's school is teaching, with a radar chart you can read."
 			/>
 
 			<MarketingSection title="Pick your board and class">
@@ -49,7 +49,7 @@ export default function GuidesPage() {
 									{board.name} · {grade.classLabel}
 								</span>
 								<span className="text-muted-foreground text-sm">
-									Start free trial for chapter practice
+									{LANDING_PARENT_PRIMARY_CTA_LABEL}
 								</span>
 							</Link>
 						)),

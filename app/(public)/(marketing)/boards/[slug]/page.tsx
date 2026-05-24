@@ -58,7 +58,7 @@ export default async function BoardSeoPage({ params }: PageProps) {
 				title={`${board.name} practice that follows the textbook`}
 				lead={board.shortDescription}
 				coverageTitle={`Built for ${board.name} classes 6 to 10`}
-				coverageBody="Adaptive sets, parent heatmaps, and tutor modes use the chapter names your child sees in school."
+				coverageBody="Adaptive sets, parent radar charts, and tutor modes use the chapter names your child sees in school."
 				exampleChapters={["Fractions", "Light", "The French Revolution"]}
 				mapTitle={`How we map to ${board.name}`}
 				mapBody={`Questions reflect ${board.name} terminology and typical unit-test patterns.`}

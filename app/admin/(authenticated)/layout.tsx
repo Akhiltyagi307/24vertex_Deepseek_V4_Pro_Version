@@ -10,14 +10,7 @@ export default async function AdminAuthenticatedLayout({ children }: { children:
 	return (
 		<>
 			<SkipToContent />
-			<AdminShellClient
-				breadcrumbs={[
-					{ label: "Admin", href: "/admin/dashboard" },
-					{ label: "Console" },
-				]}
-			>
-				{children}
-			</AdminShellClient>
+			<AdminShellClient>{children}</AdminShellClient>
 		</>
 	);
 }

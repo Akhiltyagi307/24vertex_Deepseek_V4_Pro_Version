@@ -29,6 +29,7 @@ export function ParentAppSidebar({
 	user,
 	childGradeLabel,
 	entitlement,
+	initialHasOpenAssignments = false,
 }: {
 	user: {
 		name: string;
@@ -38,6 +39,7 @@ export function ParentAppSidebar({
 	/** Shown under 24Vertex (child's grade / section). */
 	childGradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
+	initialHasOpenAssignments?: boolean;
 }) {
 	const { state, isMobile } = useSidebar();
 	const collapsedDesktop = state === "collapsed" && !isMobile;
@@ -99,7 +101,7 @@ export function ParentAppSidebar({
 			</SidebarHeader>
 			<SidebarSeparator />
 			<SidebarContent>
-				<ParentNavMain />
+				<ParentNavMain initialHasOpenAssignments={initialHasOpenAssignments} />
 			</SidebarContent>
 			<SidebarFooter className="gap-2">
 				{entitlement ? (

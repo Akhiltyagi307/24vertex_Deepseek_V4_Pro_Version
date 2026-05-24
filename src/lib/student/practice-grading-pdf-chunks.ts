@@ -120,6 +120,70 @@ export function splitFeedbackForTwoQuestionPages(
 	return { page1, page2, wasTruncated: true };
 }
 
+/** Max plain-text length for coach note in PDF (single flowing block; react-pdf wraps pages). */
+export const PDF_COACH_NOTE_MAX = 6000;
+/** Max plain-text length for walkthrough in PDF. */
+export const PDF_WALKTHROUGH_MAX = 6000;
+/** Side-by-side coach + walk only when both bodies are short (fits one row). */
+export const PDF_COACH_WALK_SIDEBYSIDE_MAX = 420;
+
+/**
+ * Truncates long text for PDF without forcing an extra logical page break.
+ */
+export function clampPdfPlainText(
+	text: string,
+	maxChars: number,
+): { text: string; wasTruncated: boolean } {
+	const t = text.trim();
+	if (!t) return { text: "", wasTruncated: false };
+	if (t.length <= maxChars) return { text: t, wasTruncated: false };
+	const cap = Math.max(0, maxChars - TRUNCATION_NOTE.length);
+	return {
+		text: `${t.slice(0, cap).trimEnd()}${TRUNCATION_NOTE}`,
+		wasTruncated: true,
+	};
+}
+
+/** Coach note only (analysis), separate from step-by-step walkthrough. */
+export function splitCoachNoteForPdf(coach: string): TwoPageFeedbackSplit {
+	const t = coach.trim();
+	if (!t) return { page1: "", page2: null, wasTruncated: false };
+	const chunks = chunkTextByMaxChars(t, PDF_PAGE1_FEEDBACK_MAX);
+	if (chunks.length === 0) return { page1: "", page2: null, wasTruncated: false };
+	const page1 = chunks[0] ?? "";
+	const remainder = chunks.length > 1 ? chunks.slice(1).join("\n\n").trim() : "";
+	if (!remainder) return { page1, page2: null, wasTruncated: false };
+	if (remainder.length <= PDF_PAGE2_FEEDBACK_MAX) {
+		return { page1, page2: remainder, wasTruncated: false };
+	}
+	const cap = Math.max(0, PDF_PAGE2_FEEDBACK_MAX - TRUNCATION_NOTE.length);
+	return {
+		page1,
+		page2: `${remainder.slice(0, cap).trimEnd()}${TRUNCATION_NOTE}`,
+		wasTruncated: true,
+	};
+}
+
+/** Step-by-step solution overflow page. */
+export function splitWalkthroughForPdf(steps: string): TwoPageFeedbackSplit {
+	const t = steps.trim();
+	if (!t) return { page1: "", page2: null, wasTruncated: false };
+	const chunks = chunkTextByMaxChars(t, PDF_PAGE2_FEEDBACK_MAX);
+	if (chunks.length === 0) return { page1: "", page2: null, wasTruncated: false };
+	const page1 = chunks[0] ?? "";
+	const remainder = chunks.length > 1 ? chunks.slice(1).join("\n\n").trim() : "";
+	if (!remainder) return { page1, page2: null, wasTruncated: false };
+	if (remainder.length <= PDF_PAGE2_FEEDBACK_MAX) {
+		return { page1, page2: remainder, wasTruncated: false };
+	}
+	const cap = Math.max(0, PDF_PAGE2_FEEDBACK_MAX - TRUNCATION_NOTE.length);
+	return {
+		page1,
+		page2: `${remainder.slice(0, cap).trimEnd()}${TRUNCATION_NOTE}`,
+		wasTruncated: true,
+	};
+}
+
 /**
  * Truncates long generation / answer key text to fit the first question page.
  */

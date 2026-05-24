@@ -10,6 +10,7 @@ import { SubscriptionBanner } from "@/components/student/subscription/subscripti
 import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { mapAppProfileToStudentLayoutContext } from "@/lib/auth/student-layout";
 import { getCachedEntitlements } from "@/lib/billing/entitlements";
+import { hasOpenAssignmentsForStudent } from "@/lib/assignments/has-open-assignments";
 import { getStudentActivityStreakSnapshot } from "@/lib/student/activity-streak";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -21,9 +22,10 @@ function gradeLabel(grade: number | null, section: string | null) {
 }
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
-	const [{ user, profile: row }, entitlement] = await Promise.all([
-		requireVerifiedStudent(),
+	const { user, profile: row } = await requireVerifiedStudent();
+	const [entitlement, initialHasOpenAssignments] = await Promise.all([
 		getCachedEntitlements(),
+		hasOpenAssignmentsForStudent(user.id).catch(() => false),
 	]);
 
 	let activityStreak = null;
@@ -55,6 +57,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 			gradeLabel={gradeLabel(ctx.grade, ctx.section)}
 			entitlement={entitlement}
 			userId={user.id}
+			initialHasOpenAssignments={initialHasOpenAssignments}
 			activityStreak={activityStreak}
 		>
 			<SubscriptionBanner entitlement={entitlement} />

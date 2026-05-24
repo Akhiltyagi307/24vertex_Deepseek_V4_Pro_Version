@@ -6,7 +6,7 @@ import { MarketingHero } from "@/components/marketing/blocks/marketing-hero";
 import { MarketingSection } from "@/components/marketing/blocks/marketing-section";
 import { MarketingTrustBullets } from "@/components/marketing/blocks/marketing-trust-bullets";
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
-import { LANDING_PARENT_PRIMARY_CTA_HREF } from "@/lib/marketing/landing-copy";
+import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_TRIAL_LEAD_FULL } from "@/lib/marketing/landing-copy";
 import { MARKETING_SECTION_LEAD_MAX_CLASSNAME } from "@/lib/marketing/marketing-section-rhythm";
 import { cn } from "@/lib/utils";
 import type { MarketingFaqItem } from "@/lib/marketing/pages/types";
@@ -54,7 +54,7 @@ export function SeoLandingTemplate({
 					items={[
 						"Adaptive practice on chapters your school is teaching this term",
 						"Explain and Solve-with-me tutor included in the free trial",
-						"Parent dashboard with chapter-level mastery heatmap",
+						"Parent dashboard with chapter-level mastery radar chart",
 					]}
 				/>
 			</MarketingSection>
@@ -116,7 +116,7 @@ export function SeoLandingTemplate({
 
 			<MarketingCtaBand
 				title="Start with a free trial on your child's actual chapters"
-				lead="14 days free. 5 practice tests. AI tutor included. No card needed."
+				lead={LANDING_TRIAL_LEAD_FULL}
 				actions={<LandingPrimaryCtaButton render={<Link href={trialHref} />} />}
 			/>
 		</>

@@ -10,7 +10,7 @@ import {
   landingMarketingBadgeClassName,
   landingMarketingSectionEyebrowBadgeClassName,
 } from '@/lib/marketing/landing-marketing-badge'
-import { LANDING_PARENT_PRIMARY_CTA_HREF } from '@/lib/marketing/landing-copy'
+import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_PRICING_MONTHLY_CTA_LABEL, LANDING_PRICING_YEARLY_CTA_LABEL } from '@/lib/marketing/landing-copy'
 import {
   MARKETING_SECTION_INTRO_MAX_CLASSNAME,
   marketingSectionLeadClassName,
@@ -41,12 +41,13 @@ export function Pricing() {
             </Badge>
           </div>
           <h2 className="mt-4 text-balance text-center text-3xl font-semibold tracking-tight medium:text-4xl medium:mt-6">
-            One plan. Pay monthly to try it, pay yearly and lock in two free months.
+            One student subscription. Pay monthly to try it, pay yearly and lock in two free months.
           </h2>
           <p className={cn(marketingSectionLeadClassName, 'mt-4 text-pretty text-center leading-relaxed medium:mt-6')}>
             Less than the cost of one week of most home tuitions, for a private AI tutor and a
-            parent dashboard your child&rsquo;s school does not give you. Both plans include full
-            practice tests, the Explain and Solve-with-me tutor, and chapter-level analytics.
+            parent dashboard your child&rsquo;s school does not give you. Parent and teacher accounts
+            are free. You pay only for each student who practises. Both plans include 1-hour and
+            3-hour practice tests, the Explain and Solve-with-me tutor, and chapter radar charts.
           </p>
         </motion.div>
 
@@ -100,7 +101,7 @@ export function Pricing() {
                     variant="marketingSecondary"
                     render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />}
                   >
-                    Start free, then ₹1,000/month
+                    {LANDING_PRICING_MONTHLY_CTA_LABEL}
                   </Button>
                   <p className="text-muted-foreground min-h-0 text-sm leading-relaxed medium:min-h-[3.5rem]">
                     Cancel any time. Auto-renews monthly only after your 14-day free trial ends.
@@ -144,7 +145,7 @@ export function Pricing() {
                       className="h-10 w-full rounded-full px-4 text-sm font-semibold shadow-none"
                       render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />}
                     >
-                      Start free, then ₹10,000/year
+                      {LANDING_PRICING_YEARLY_CTA_LABEL}
                     </Button>
                     <p className="text-muted-foreground min-h-0 text-sm leading-relaxed medium:min-h-[3.5rem]">
                       Cancel any time before renewal. Auto-renews yearly only after the 14-day free trial.
@@ -154,14 +155,20 @@ export function Pricing() {
               </div>
             </div>
 
-            <div className={cn('mx-auto rounded-2xl border border-border/60 bg-muted/25 px-5 py-4 text-center medium:px-7 medium:py-5', MARKETING_SECTION_INTRO_MAX_CLASSNAME)}>
+            <div
+              className={cn(
+                pricingTierCardSurfaceClassName,
+                'border-border/55 mx-auto rounded-2xl px-5 py-4 text-center medium:px-7 medium:py-5',
+                MARKETING_SECTION_INTRO_MAX_CLASSNAME,
+              )}
+            >
               <p className="text-foreground text-pretty text-[0.9375rem] font-semibold leading-relaxed medium:text-base">
-                Free trial: 14 days. 5 full practice tests. The Explain and Solve-with-me tutor
-                included. No card needed to start.
+                Free trial: 14 days. 5 practice tests (1 hour or 3 hours each). The Explain and
+                Solve-with-me tutor included. No card needed to start.
               </p>
               <p className="text-muted-foreground mt-1 text-pretty text-xs leading-relaxed medium:text-sm">
-                One subscription per student account. Sibling? Add a second child at the same plan
-                price. No extra family fee.
+                Only student accounts are paid. Parent and teacher accounts stay free. Sibling? Add
+                a second student at the same plan price. No extra family fee.
               </p>
             </div>
 

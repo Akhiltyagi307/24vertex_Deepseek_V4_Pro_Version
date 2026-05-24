@@ -24,6 +24,10 @@ import {
 import type { groupTopicRowsByChapter } from "@/lib/doubt/chapter-group";
 import type { DoubtChatTopicRow, DoubtPickerPerformance } from "@/lib/doubt/loaders";
 import type { SubjectStatusLabel, TrackerStatus } from "@/lib/student/performance-matrix";
+import {
+	formatTrackerStatusLabel,
+	TRACKER_STATUS_LABELS,
+} from "@/lib/student/tracker-status-labels";
 import { cn } from "@/lib/utils";
 
 import { PickerField, ScopeSteps } from "./picker-field";
@@ -37,18 +41,16 @@ const SUBJECT_SCORE_TOOLTIP =
 	"Average practice score across topics you've attempted in this subject.";
 
 const SUBJECT_MIX_TOOLTIP =
-	"Overall topic mix in this subject from your practice tracker (strong, developing, or needs improvement).";
+	"Overall topic mix in this subject from your practice tracker (strong, on track, or strengthen).";
 
 const SUBJECT_DROPDOWN_HINT =
-	"% is your average practice score on topics you've tried in that subject. The second badge reflects your overall topic mix there (strong, developing, or needs improvement).";
+	"% is your average practice score on topics you've tried in that subject. The second badge reflects your overall topic mix there (strong, on track, or strengthen).";
 
 const pillBase = "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium tabular-nums";
 
 function formatTopicStatus(s: TrackerStatus | undefined): string {
-	if (!s || s === "not_tested") return "Not tested";
-	if (s === "good") return "Strong";
-	if (s === "satisfactory") return "Developing";
-	return "Needs improvement";
+	if (!s) return TRACKER_STATUS_LABELS.not_tested;
+	return formatTrackerStatusLabel(s);
 }
 
 function subjectMixPill(
@@ -57,18 +59,18 @@ function subjectMixPill(
 	if (!label) {
 		return { text: "—", className: cn(pillBase, "bg-muted text-muted-foreground") };
 	}
-	if (label === "Good") {
+	if (label === TRACKER_STATUS_LABELS.good) {
 		return {
-			text: "Strong",
+			text: label,
 			className: cn(
 				pillBase,
 				"bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
 			),
 		};
 	}
-	if (label === "Satisfactory") {
+	if (label === TRACKER_STATUS_LABELS.satisfactory) {
 		return {
-			text: "Developing",
+			text: label,
 			className: cn(
 				pillBase,
 				"bg-amber-500/15 text-amber-900 dark:text-amber-200",
@@ -76,7 +78,7 @@ function subjectMixPill(
 		};
 	}
 	return {
-		text: "Needs improvement",
+		text: label,
 		className: cn(pillBase, "bg-red-500/10 text-red-800 dark:text-red-300"),
 	};
 }

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { MarketingSiteHeader } from "@/components/marketing/marketing-site-header";
-import { Footer7 } from "@/components/ui/footer-7";
+import { MarketingSiteFooter } from "@/components/marketing/marketing-site-footer";
 import { HomeMarketingShell } from "@/components/marketing/home-marketing-shell";
 
 type MarketingSubpageShellProps = {
@@ -11,7 +11,7 @@ type MarketingSubpageShellProps = {
 
 export function MarketingSubpageShell({ children }: MarketingSubpageShellProps) {
 	return (
-		<HomeMarketingShell className="min-h-screen w-full bg-background">
+		<HomeMarketingShell className="flex min-h-screen w-full flex-col bg-background">
 			<a
 				href="#main-content"
 				className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:border focus:border-border focus:bg-background focus:px-4 focus:py-2.5 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md"
@@ -19,14 +19,12 @@ export function MarketingSubpageShell({ children }: MarketingSubpageShellProps) 
 				Skip to main content
 			</a>
 			<MarketingSiteHeader />
-			<MotionPageEnter>
-				<main id="main-content" tabIndex={-1} className="min-w-0 outline-none">
+			<MotionPageEnter className="flex min-h-0 flex-1 flex-col">
+				<main id="main-content" tabIndex={-1} className="min-w-0 flex-1 outline-none">
 					{children}
 				</main>
 			</MotionPageEnter>
-			<footer className="bg-background w-full px-4 medium:px-6 xl:px-8">
-				<Footer7 />
-			</footer>
+			<MarketingSiteFooter />
 		</HomeMarketingShell>
 	);
 }

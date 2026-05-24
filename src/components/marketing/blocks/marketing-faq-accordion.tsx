@@ -47,7 +47,7 @@ export function MarketingFaqAccordion({
 							</span>
 						</summary>
 						<p className="text-muted-foreground mt-3 pl-10 text-sm leading-relaxed medium:text-[15px]">
-							<span className="block max-w-[68ch] text-pretty">{item.answer}</span>
+							<span className="block w-full text-pretty">{item.answer}</span>
 						</p>
 					</details>
 				))}

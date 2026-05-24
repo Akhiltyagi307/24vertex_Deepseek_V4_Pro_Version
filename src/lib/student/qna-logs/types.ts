@@ -74,9 +74,18 @@ export type QnaLogListResult = {
 	subjectOptions: Array<{ id: string; name: string; sortOrder: number }>;
 };
 
+export type QnaLogGradingBreakdown = {
+	bandLabel: string;
+	whatWasCorrect: string[];
+	whereMarksWereLost: string[];
+	toReachNextBand: string;
+	criterionScores: Array<{ name: string; points: number; note: string }>;
+};
+
 export type QnaLogAiFeedback = {
 	analysis: string;
 	stepByStep: string | null;
+	breakdown: QnaLogGradingBreakdown | null;
 };
 
 export type QnaLogDetail = {

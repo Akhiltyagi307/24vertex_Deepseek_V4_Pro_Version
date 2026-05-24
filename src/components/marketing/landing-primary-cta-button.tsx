@@ -10,8 +10,13 @@ import { cn } from "@/lib/utils";
 type LandingPrimaryCtaButtonProps = {
 	className?: string;
 	render?: React.ComponentProps<typeof Button>["render"];
-	/** Flat green + white label (e.g. marketing hero). Default keeps the sliding icon treatment. */
-	visual?: "rich" | "minimal";
+	/**
+	 * `rich` (default): sliding-icon green pill on neutral surfaces.
+	 * `minimal`: flat green + white label for inline use.
+	 * `on-committed`: white pill with brand-green text, for use on top of a
+	 * `tone="committed"` CTA band where green-on-green would disappear.
+	 */
+	visual?: "rich" | "minimal" | "on-committed";
 	/** Override the button label. Defaults to the parent-direct CTA copy. */
 	label?: React.ReactNode;
 };
@@ -32,6 +37,23 @@ export function LandingPrimaryCtaButton({
 				)}
 			>
 				{label}
+			</Button>
+		);
+	}
+
+	if (visual === "on-committed") {
+		return (
+			<Button
+				render={render}
+				className={cn(
+					"group relative h-11 w-fit cursor-pointer overflow-hidden rounded-full border border-white/0 bg-white px-6 text-sm font-semibold text-[#1f7350] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)] transition-all duration-300 hover:bg-white/95 hover:text-[#1a5e44] focus-visible:bg-white/95",
+					className,
+				)}
+			>
+				<span className="relative z-10 inline-flex items-center gap-2">
+					{label}
+					<ArrowUpRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+				</span>
 			</Button>
 		);
 	}

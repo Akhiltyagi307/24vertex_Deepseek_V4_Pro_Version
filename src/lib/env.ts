@@ -74,6 +74,20 @@ export function getPublicSupportEmail(): string | null {
 	return raw;
 }
 
+/**
+ * Inbox that actually receives contact-form submissions. Server-only.
+ *
+ * Lets the public-facing support email (shown in marketing UI, legal pages,
+ * the contact-form timeline aside) differ from the inbox where notifications
+ * are delivered. Falls back to {@link getPublicSupportEmail} when unset so
+ * existing deployments keep working without any config change.
+ */
+export function getContactNotificationEmail(): string | null {
+	const raw = readTrimmedEnv("CONTACT_NOTIFICATION_EMAIL");
+	if (raw && raw.includes("@")) return raw;
+	return getPublicSupportEmail();
+}
+
 /** Resend API key — required when sending parent contact notifications. */
 export function getResendApiKey(): string {
 	const key = process.env.RESEND_API_KEY?.trim();

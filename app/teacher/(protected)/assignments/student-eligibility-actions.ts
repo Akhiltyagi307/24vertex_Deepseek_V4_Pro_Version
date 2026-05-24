@@ -24,8 +24,8 @@ export type PreviewEligibleStudentIdsResult =
 	| { error: string };
 
 /**
- * Returns the roster student ids that remain eligible for the current assignment config
- * after section/performance filtering.
+ * Returns roster student ids that pass org scope and topic validation for the current
+ * assignment config (after section/performance filtering). Does not require prior practice.
  */
 export async function previewEligibleStudentIdsForPracticeAssignment(
 	raw: unknown,

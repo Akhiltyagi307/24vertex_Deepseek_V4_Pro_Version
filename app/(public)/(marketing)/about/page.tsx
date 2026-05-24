@@ -9,6 +9,7 @@ import { MarketingSubpageShell } from "@/components/marketing/marketing-subpage-
 import { featureBentoCardSurfaceClassName } from "@/lib/marketing/landing-feature-surface";
 import {
 	LANDING_PARENT_PRIMARY_CTA_HREF,
+	LANDING_TRIAL_LEAD_FULL,
 	MARKETING_NAV,
 } from "@/lib/marketing/landing-copy";
 import {
@@ -98,7 +99,7 @@ export default function AboutPage() {
 
 			<MarketingCtaBand
 				title="See the product on your child's chapters"
-				lead="14 days free. 5 practice tests. AI tutor included. No card needed."
+				lead={LANDING_TRIAL_LEAD_FULL}
 				actions={
 					<>
 						<LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />

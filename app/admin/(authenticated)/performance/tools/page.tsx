@@ -1,6 +1,11 @@
-import { AdminBulkReinitPanel } from "@/components/admin/performance/admin-bulk-reinit-panel";
+import { desc, eq } from "drizzle-orm";
+
+import { AdminPerformanceToolsShell } from "@/components/admin/performance/admin-performance-tools-shell";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { requireAdmin } from "@/lib/admin/guards";
+import { BULK_TRACKER_QUEUE } from "@/lib/jobs/queue-names";
+import { db } from "@/db";
+import { operatorJobs } from "@/db/schema/operator-jobs";
 
 export const metadata = {
 	title: "Admin performance tools · 24Vertex",
@@ -9,6 +14,13 @@ export const metadata = {
 
 export default async function AdminPerformanceToolsPage() {
 	await requireAdmin();
+
+	const recentJobs = await db
+		.select()
+		.from(operatorJobs)
+		.where(eq(operatorJobs.queue, BULK_TRACKER_QUEUE))
+		.orderBy(desc(operatorJobs.createdAt))
+		.limit(20);
 
 	return (
 		<div className="space-y-6">
@@ -19,13 +31,18 @@ export default async function AdminPerformanceToolsPage() {
 					{ label: "Tools" },
 				]}
 				title="Performance tools"
-				description="Bulk operations and job polling (Phase 3)."
+				description="Bulk performance tracker operations and job history."
 			/>
-			<p className="text-sm text-muted-foreground">
-				Saved views and export are not attached to this job panel yet. Use bulk re-init below and audit logs for
-				tracing.
-			</p>
-			<AdminBulkReinitPanel />
+			<AdminPerformanceToolsShell
+				recentJobs={recentJobs.map((r) => ({
+					id: r.id,
+					queue: r.queue,
+					name: r.name,
+					status: r.status,
+					progress: r.progress,
+					createdAt: r.createdAt?.toISOString() ?? null,
+				}))}
+			/>
 		</div>
 	);
 }

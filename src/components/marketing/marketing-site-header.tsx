@@ -3,27 +3,26 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, MoonStarIcon, SunIcon } from "lucide-react";
+import { MoonStarIcon, SunIcon } from "lucide-react";
 
 import AnimatedToggle from "@/components/smoothui/animated-toggle";
 import { useTheme } from "@/components/theme-provider";
 import { LandingMobileNavSheet } from "@/components/marketing/landing-mobile-nav-sheet";
+import { MarketingNavDropdown } from "@/components/marketing/marketing-nav-dropdown";
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { landingFeatureBentoShell } from "@/lib/marketing/landing-feature-surface";
 import {
 	LANDING_MARKETING_HERO_CTA_ROW_GAP_CLASSNAME,
 	LANDING_MARKETING_SECONDARY_CTA_BUTTON_CLASSNAME,
 	LANDING_PARENT_PRIMARY_CTA_HREF,
-	MARKETING_NAV,
 } from "@/lib/marketing/landing-copy";
+import {
+	MARKETING_FEATURES_NAV,
+	MARKETING_SOLUTIONS_NAV,
+	MARKETING_UTILITY_NAV,
+} from "@/lib/marketing/marketing-nav";
 import { cn } from "@/lib/utils";
 
 export function MarketingSiteHeader() {
@@ -49,7 +48,7 @@ export function MarketingSiteHeader() {
 				>
 					<Image
 						src="/brand/logo-icon.png"
-						alt="24Vertex logo"
+						alt="24Vertex logo, the green chapter mastery mark"
 						width={40}
 						height={40}
 						priority
@@ -60,43 +59,17 @@ export function MarketingSiteHeader() {
 				</Link>
 
 				<div className="hidden flex-1 items-center justify-center gap-1 xl:flex">
-					<DropdownMenu>
-						<DropdownMenuTrigger
-							className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm transition-colors"
+					<MarketingNavDropdown label="Features" items={MARKETING_FEATURES_NAV} />
+					<MarketingNavDropdown label="Solutions" items={MARKETING_SOLUTIONS_NAV} />
+					{MARKETING_UTILITY_NAV.map((link) => (
+						<Link
+							key={link.href}
+							href={link.href}
+							className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
 						>
-							Products
-							<ChevronDown className="size-4" aria-hidden />
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="center">
-							<DropdownMenuItem render={<Link href={MARKETING_NAV.aiTutor.href} />}>
-								{MARKETING_NAV.aiTutor.label}
-							</DropdownMenuItem>
-							<DropdownMenuItem render={<Link href={MARKETING_NAV.adaptivePractice.href} />}>
-								{MARKETING_NAV.adaptivePractice.label}
-							</DropdownMenuItem>
-							<DropdownMenuItem render={<Link href={MARKETING_NAV.parentDashboard.href} />}>
-								{MARKETING_NAV.parentDashboard.label}
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-					<Link
-						href={MARKETING_NAV.schools.href}
-						className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
-					>
-						{MARKETING_NAV.schools.label}
-					</Link>
-					<Link
-						href={MARKETING_NAV.pricing.href}
-						className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
-					>
-						{MARKETING_NAV.pricing.label}
-					</Link>
-					<Link
-						href={MARKETING_NAV.help.href}
-						className="text-muted-foreground hover:text-card-foreground hover:bg-muted/40 rounded-lg px-2 py-1 text-sm transition-colors"
-					>
-						{MARKETING_NAV.help.label}
-					</Link>
+							{link.label}
+						</Link>
+					))}
 				</div>
 
 				<div className="flex items-center gap-2 medium:gap-3">
@@ -109,8 +82,8 @@ export function MarketingSiteHeader() {
 								size="sm"
 								label={themeSwitchLabel}
 								icons={{
-									on: <MoonStarIcon />,
-									off: <SunIcon />,
+									on: <MoonStarIcon aria-hidden />,
+									off: <SunIcon aria-hidden />,
 								}}
 							/>
 						) : (

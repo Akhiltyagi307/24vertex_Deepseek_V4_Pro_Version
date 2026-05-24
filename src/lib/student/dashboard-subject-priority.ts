@@ -1,4 +1,5 @@
 import type { SubjectStatusLabel } from "@/lib/student/performance-matrix";
+import { subjectStatusLabelRank } from "@/lib/student/tracker-status-labels";
 
 /**
  * Subset of dashboard subject card fields used for worst-first ordering.
@@ -15,9 +16,7 @@ export type SubjectCardForPriority = {
 };
 
 function statusRank(status: SubjectStatusLabel): number {
-	if (status === "Bad") return 0;
-	if (status === "Satisfactory") return 1;
-	return 2;
+	return subjectStatusLabelRank(status);
 }
 
 /**

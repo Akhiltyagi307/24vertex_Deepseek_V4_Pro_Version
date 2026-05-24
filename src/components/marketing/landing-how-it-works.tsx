@@ -35,7 +35,7 @@ const PILLARS: HowItWorksPillar[] = [
 		bullets: [
 			"Tuned to CBSE, ICSE, and state boards",
 			"Targets the chapters your school is teaching this term",
-			"5 practice tests in the free trial alone",
+			"5 practice tests in the free trial (1 hour or 3 hours each)",
 		],
 		answersTo: "Solves: every child is taught the same way",
 		deepLink: { href: "/adaptive-practice", label: "How adaptive practice works" },
@@ -44,11 +44,11 @@ const PILLARS: HowItWorksPillar[] = [
 		icon: BarChart3,
 		step: "02",
 		title: "Live performance analytics",
-		body: "After every test, you, your child, and their teacher see the same chapter-by-chapter heatmap. Strong, weak, and guessing, in plain language. No more screenshots in WhatsApp groups.",
+		body: "After every test, students, parents, and teachers share the same chapter mastery radar chart. Strong, weak, and guessing, in plain language. Shared accountability without screenshots in WhatsApp groups.",
 		bullets: [
 			"Topic-level mastery, not just an overall percentage",
 			"Refreshed within minutes of every practice session",
-			"One source of truth across home and classroom",
+			"One radar chart across home, parent dashboard, and classroom",
 		],
 		answersTo: "Solves: you find out too late",
 		deepLink: { href: "/parent-dashboard", label: "See the parent dashboard" },

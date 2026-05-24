@@ -12,15 +12,16 @@ import Testimonials from "@/components/ui/testimonials";
 import { Pricing } from "@/components/ui/single-pricing-card-1";
 import {
 	LANDING_PARENT_PRIMARY_CTA_HREF,
+	LANDING_TRIAL_LEAD_FULL,
 	MARKETING_NAV,
 } from "@/lib/marketing/landing-copy";
 import { HELP_FAQ_CATEGORIES } from "@/lib/marketing/pages/help-faq";
 import { marketingPageMetadata } from "@/lib/marketing/pages/metadata";
 
 export const metadata = marketingPageMetadata({
-	title: "For parents",
+	title: "The intelligence that lifts your child's score",
 	description:
-		"Catch your child's weak chapters before report-card day. Adaptive practice, private AI tutor, and a chapter-level parent dashboard for grades 6 to 10.",
+		"Chapter-level intelligence that catches the topics pulling your child's marks down, and the 20-minute plan that pulls them back up before the next report card. Grades 6 to 10, CBSE, ICSE, and state boards.",
 	path: "/parents",
 });
 
@@ -29,18 +30,21 @@ export const revalidate = 86400;
 
 const PARENT_FAQ_PREVIEW = HELP_FAQ_CATEGORIES.find((c) => c.id === "parents")?.items.slice(0, 5) ?? [];
 
+const proseClassName =
+	"text-muted-foreground mx-auto max-w-7xl space-y-4 text-center text-pretty text-base leading-relaxed medium:text-lg";
+
 export default function ParentsPage() {
 	return (
 		<MarketingSubpageShell>
 			<MarketingHero
 				eyebrow="For parents"
-				title="Stop finding out on report-card day."
-				lead="For parents of grade 6 to 10 students. CBSE, ICSE, and state boards. See which chapters need 20 minutes this week, without the nightly interrogation."
+				title="The intelligence your child needs. The scores you've been waiting for."
+				lead="For parents of grade 6 to 10 students on CBSE, ICSE, and state boards. We catch the chapters pulling your child's marks down, and prescribe the 20-minute plan that pulls them back up. Before the next report card, not after."
 				actions={<LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />}
 			/>
 
-			<MarketingSection eyebrow="A Sunday evening" title="What changes when you can see the heatmap">
-				<div className="text-muted-foreground mx-auto max-w-2xl space-y-4 text-pretty text-base leading-relaxed medium:text-lg">
+			<MarketingSection eyebrow="A Sunday evening" title="What changes when everyone shares the same radar chart">
+				<div className={proseClassName}>
 					<p>
 						It is 7 PM. Your child says studies are fine. The unit test is Thursday. Last term, marks
 						slipped in two chapters you did not know were weak until the report card.
@@ -48,7 +52,8 @@ export default function ParentsPage() {
 					<p>
 						With 24Vertex, you open the parent dashboard: three chapters in amber, one in red. Your child
 						runs a 20-minute practice set on the red one. The AI tutor answers the doubt they would not
-						ask in tuition. By Wednesday, the heatmap shifts. You did not nag. You acted on data.
+						ask in tuition. By Wednesday, the radar chart shifts. You did not nag. Shared accountability
+						between you, your child, and their teacher worked.
 					</p>
 				</div>
 			</MarketingSection>
@@ -70,7 +75,7 @@ export default function ParentsPage() {
 
 			<MarketingCtaBand
 				title="This weekend, find out the three chapters dragging marks down"
-				lead="14 days free. 5 practice tests. AI tutor included. No card needed."
+				lead={LANDING_TRIAL_LEAD_FULL}
 				actions={<LandingPrimaryCtaButton render={<Link href={LANDING_PARENT_PRIMARY_CTA_HREF} />} />}
 			/>
 		</MarketingSubpageShell>

@@ -1,10 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, EyeIcon, InboxIcon } from "lucide-react";
+import {
+	BarChart3Icon,
+	ChevronLeftIcon,
+	ChevronRightIcon,
+	DownloadIcon,
+	EyeIcon,
+	InboxIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
@@ -25,7 +33,9 @@ import type {
 	TopicSubmissionAggRow,
 } from "@/lib/assignments/teacher-submissions-hub-types";
 import type { TeacherAssignmentSubmissionRow } from "@/lib/assignments/queries";
+import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import type { TrackerTopicStatus } from "@/lib/practice/topic-rollup";
+import { formatTrackerStatusLabel, TRACKER_STATUS_LABELS } from "@/lib/student/tracker-status-labels";
 import { cn } from "@/lib/utils";
 
 const HANDED_IN = new Set(["submitted", "grading", "graded"]);
@@ -82,16 +92,93 @@ function topicPerfBadgeVariant(status: TrackerTopicStatus): "default" | "seconda
 	return "secondary";
 }
 
-function MetaChip({ label, value }: { label: string; value: string }) {
+type FollowUpTone = "overdue" | "due-soon" | "complete";
+
+function assignmentFollowUpTone(bundle: TeacherSubmissionAssignmentBundle): FollowUpTone | null {
+	if (bundle.counts.assigned === 0) return null;
+	if (bundle.counts.notSubmitted === 0) return "complete";
+	if (!bundle.dueAt) return null;
+	const due = new Date(bundle.dueAt);
+	if (!Number.isFinite(due.getTime())) return null;
+	const now = Date.now();
+	if (due.getTime() < now) return "overdue";
+	const hoursUntilDue = (due.getTime() - now) / 3_600_000;
+	if (hoursUntilDue <= 48) return "due-soon";
+	return null;
+}
+
+function followUpBadge(tone: FollowUpTone) {
+	switch (tone) {
+		case "overdue":
+			return (
+				<Badge variant="destructive" className="shrink-0 font-normal">
+					Needs follow-up
+				</Badge>
+			);
+		case "due-soon":
+			return (
+				<Badge variant="outline" className="shrink-0 border-amber-500/40 bg-amber-500/10 font-normal text-amber-950 dark:text-amber-100">
+					Due soon
+				</Badge>
+			);
+		case "complete":
+			return (
+				<Badge variant="secondary" className="shrink-0 font-normal">
+					All handed in
+				</Badge>
+			);
+	}
+}
+
+function assignmentMetaLine(bundle: TeacherSubmissionAssignmentBundle): string {
+	const parts: string[] = [];
+	if (bundle.subjectName) parts.push(bundle.subjectName);
+	if (bundle.subjectGrade != null) parts.push(`Grade ${bundle.subjectGrade}`);
+	if (bundle.sectionsLabel && bundle.sectionsLabel !== "—") parts.push(`Section ${bundle.sectionsLabel}`);
+	return parts.length > 0 ? parts.join(" · ") : "Class details unavailable";
+}
+
+function SubmissionProgress({
+	submitted,
+	assigned,
+}: {
+	submitted: number;
+	assigned: number;
+}) {
+	const safeAssigned = Math.max(assigned, 0);
+	const safeSubmitted = Math.min(Math.max(submitted, 0), safeAssigned || submitted);
+	const percent = safeAssigned > 0 ? Math.round((safeSubmitted / safeAssigned) * 100) : 0;
+
 	return (
-		<span className="inline-flex max-w-full flex-col gap-0.5 rounded-lg bg-muted/35 px-3 py-2 dark:bg-muted/20">
-			<span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">{label}</span>
-			<span className="truncate font-medium text-foreground text-sm">{value}</span>
-		</span>
+		<div className="space-y-2">
+			<div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+				<p className="text-muted-foreground text-xs font-medium">Hand-in progress</p>
+				<p className="text-foreground text-xs tabular-nums">
+					<span className="font-semibold">{safeSubmitted}</span>
+					<span className="text-muted-foreground"> / {safeAssigned} students</span>
+				</p>
+			</div>
+			<div
+				className="h-1.5 overflow-hidden rounded-full bg-muted/60 dark:bg-muted/30"
+				role="progressbar"
+				aria-valuenow={safeSubmitted}
+				aria-valuemin={0}
+				aria-valuemax={safeAssigned || 1}
+				aria-label={`${safeSubmitted} of ${safeAssigned} students have handed in`}
+			>
+				<div
+					className={cn(
+						"h-full rounded-full transition-[width] duration-200 ease-out",
+						percent >= 100 ? "bg-primary" : percent > 0 ? "bg-primary/80" : "bg-muted-foreground/25",
+					)}
+					style={{ width: `${percent}%` }}
+				/>
+			</div>
+		</div>
 	);
 }
 
-function StatTrigger({
+function StudentListTrigger({
 	label,
 	value,
 	onPress,
@@ -103,11 +190,12 @@ function StatTrigger({
 	return (
 		<button
 			type="button"
-			className="min-w-[7.5rem] rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-left transition-[border-color,background-color] duration-150 ease-out hover:border-primary/40 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-muted/10"
+			className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 			onClick={onPress}
+			aria-label={`${label}: ${value} students. Open list.`}
 		>
-			<div className="text-muted-foreground text-[11px] font-medium tracking-wide">{label}</div>
-			<div className="mt-1 font-mono text-2xl font-semibold text-foreground tabular-nums">{value}</div>
+			<span className="text-muted-foreground text-[11px] font-medium leading-none">{label}</span>
+			<span className="font-medium text-foreground text-base tabular-nums leading-tight">{value}</span>
 		</button>
 	);
 }
@@ -133,7 +221,7 @@ function sheetTitleParts(variant: SheetVariant): { title: string; description: s
 			};
 		default:
 			return {
-				title: "Not submitted yet",
+				title: "Not in yet",
 				description: "Still preparing, in progress, or waiting to start.",
 			};
 	}
@@ -170,64 +258,77 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 
 	return (
 		<>
-			<div className="flex flex-col gap-5">
-				{bundles.map((bundle) => (
-					<article
-						key={bundle.assignmentId}
-						className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm ring-1 ring-border/40"
-					>
-						<div className="flex flex-col gap-5 p-5 medium:flex-row medium:items-start medium:justify-between medium:gap-8 medium:p-6">
-							<div
-								className="min-w-0 flex-1 cursor-pointer rounded-xl outline-none transition-colors hover:bg-muted/15 focus-visible:ring-2 focus-visible:ring-ring medium:-m-2 medium:p-2"
-								role="button"
-								tabIndex={0}
-								onClick={() => setAnalytics({ bundle, step: "pick" })}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										setAnalytics({ bundle, step: "pick" });
-									}
-								}}
-							>
-								<h2 className="font-semibold text-foreground text-lg tracking-tight">{bundle.title}</h2>
-								{bundle.dueAt ?
-									<p className="mt-1 text-muted-foreground text-sm">
-										Due {new Date(bundle.dueAt).toLocaleString()}
-									</p>
-								:	null}
-								<div className="mt-4 flex flex-wrap gap-3">
-									<MetaChip label="Subject" value={bundle.subjectName ?? "—"} />
-									<MetaChip
-										label="Grade"
-										value={bundle.subjectGrade != null ? String(bundle.subjectGrade) : "—"}
-									/>
-									<MetaChip label="Section" value={bundle.sectionsLabel} />
-								</div>
-								<p className="mt-3 text-muted-foreground text-xs leading-relaxed">
-									Click this card for topic or student performance summaries.
-								</p>
-							</div>
+			<div className="flex flex-col gap-4">
+				{bundles.map((bundle) => {
+					const followUp = assignmentFollowUpTone(bundle);
+					return (
+						<article
+							key={bundle.assignmentId}
+							className={cn(cardSurfaceFrameClassName, "overflow-hidden p-0")}
+						>
+							<div className="flex flex-col gap-5 p-5 medium:p-6">
+								<div className="flex flex-col gap-4 medium:flex-row medium:items-start medium:justify-between medium:gap-8">
+									<div className="min-w-0 flex-1 space-y-3">
+										<div className="flex flex-wrap items-start gap-2 gap-y-1">
+											<h2 className="min-w-0 font-semibold text-foreground text-lg tracking-tight">{bundle.title}</h2>
+											{followUp ? followUpBadge(followUp) : null}
+										</div>
+										{bundle.dueAt ?
+											<p className="text-muted-foreground text-sm">
+												Due {formatDateTimeMediumShortInAppTimeZone(bundle.dueAt)}
+											</p>
+										:	<p className="text-muted-foreground text-sm">No due date</p>}
+										<p className="text-muted-foreground text-xs leading-relaxed">{assignmentMetaLine(bundle)}</p>
+										<SubmissionProgress
+											submitted={bundle.counts.submitted}
+											assigned={bundle.counts.assigned}
+										/>
+									</div>
 
-							<div className="flex shrink-0 flex-wrap gap-3 medium:flex-nowrap medium:justify-end">
-								<StatTrigger
-									label="Assigned"
-									value={bundle.counts.assigned}
-									onPress={() => setSheet({ bundle, variant: "assigned" })}
-								/>
-								<StatTrigger
-									label="Submitted"
-									value={bundle.counts.submitted}
-									onPress={() => setSheet({ bundle, variant: "submitted" })}
-								/>
-								<StatTrigger
-									label="Not submitted"
-									value={bundle.counts.notSubmitted}
-									onPress={() => setSheet({ bundle, variant: "notSubmitted" })}
-								/>
+									<div className="flex w-full shrink-0 flex-col gap-3 medium:w-auto medium:min-w-[15rem]">
+										<Button
+											type="button"
+											variant="outline"
+											className="h-auto min-h-10 w-full justify-between gap-2 px-4 py-2.5 text-left font-normal medium:w-full"
+											onClick={() => setAnalytics({ bundle, step: "pick" })}
+										>
+											<span className="flex min-w-0 flex-col gap-0.5">
+												<span className="font-medium text-foreground text-sm">Performance summaries</span>
+												<span className="text-muted-foreground text-xs leading-snug">
+													By topic or by student
+												</span>
+											</span>
+											<BarChart3Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+										</Button>
+
+										<div className="rounded-lg border border-border/80 bg-muted/15 dark:bg-muted/10">
+											<p className="border-border/80 border-b px-3 py-2 text-muted-foreground text-[11px] font-medium">
+												Student lists
+											</p>
+											<div className="flex divide-x divide-border/80">
+												<StudentListTrigger
+													label="Assigned"
+													value={bundle.counts.assigned}
+													onPress={() => setSheet({ bundle, variant: "assigned" })}
+												/>
+												<StudentListTrigger
+													label="Submitted"
+													value={bundle.counts.submitted}
+													onPress={() => setSheet({ bundle, variant: "submitted" })}
+												/>
+												<StudentListTrigger
+													label="Not in yet"
+													value={bundle.counts.notSubmitted}
+													onPress={() => setSheet({ bundle, variant: "notSubmitted" })}
+												/>
+											</div>
+										</div>
+									</div>
+								</div>
 							</div>
-						</div>
-					</article>
-				))}
+						</article>
+					);
+				})}
 			</div>
 
 			<Sheet open={sheet != null} onOpenChange={(open) => !open && setSheet(null)}>
@@ -295,8 +396,8 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 								>
 									<span className="font-semibold text-foreground">Performance by topic</span>
 									<span className="text-muted-foreground text-xs font-normal leading-snug">
-										Cumulative scores and good or satisfactory or bad counts per syllabus topic (graded
-										tests only).
+										Cumulative scores and strengthen, on track, and strong counts per syllabus topic
+										(graded tests only).
 									</span>
 								</Button>
 								<Button
@@ -447,13 +548,13 @@ function TopicPerformancePanel({
 									Cumulative %
 								</th>
 								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									Bad
+									{TRACKER_STATUS_LABELS.bad}
 								</th>
 								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									Satisfactory
+									{TRACKER_STATUS_LABELS.satisfactory}
 								</th>
 								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									Good
+									{TRACKER_STATUS_LABELS.good}
 								</th>
 								<th scope="col" className="px-3 py-3 font-medium text-muted-foreground text-xs">
 									Graded n
@@ -635,8 +736,8 @@ function ReportAnalyticsPreview({ student }: { student: StudentSubmissionPerfRow
 										{t.averagePercent.toFixed(1)}%
 									</td>
 									<td className="px-3 py-2.5 align-middle">
-										<Badge variant={topicPerfBadgeVariant(t.status)} className="font-normal capitalize">
-											{t.status}
+										<Badge variant={topicPerfBadgeVariant(t.status)} className="font-normal">
+											{formatTrackerStatusLabel(t.status)}
 										</Badge>
 									</td>
 								</tr>

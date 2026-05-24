@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { performanceTracker } from "@/db/schema/assessment";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { ensurePerformanceTrackerRowsForAssignmentTopics } from "@/lib/assignments/queries";
 import { assignmentConfigSchema } from "@/lib/assignments/schemas";
 import { notifyAssignmentMaterialized } from "@/lib/notifications/assignment-events";
 import { resolvePracticeConfigForStudent } from "@/lib/practice";
@@ -61,6 +62,12 @@ export async function materializeAssignedPracticeTest(
 		return { ok: false, message };
 	}
 	const config = parsedConfig.data;
+
+	await ensurePerformanceTrackerRowsForAssignmentTopics(
+		row.studentId,
+		config.subject_id,
+		config.topic_ids,
+	);
 
 	const trackerRows = await db
 		.select({

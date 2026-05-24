@@ -157,7 +157,7 @@ function TopicMasteryBar({ counts }: { counts: SubjectCardTopicStatusCounts }) {
 			className: "bg-muted-foreground/25 dark:bg-muted-foreground/30",
 		},
 	] as const;
-	const label = `Topic mix: ${good} mastered, ${satisfactory} satisfactory, ${bad} need work, ${notTested} not tested.`;
+	const label = `Topic mix: ${good} strong, ${satisfactory} on track, ${bad} strengthen, ${notTested} not tested.`;
 	if (total === 0) {
 		return (
 			<div className="flex w-full flex-col gap-1.5">
@@ -666,7 +666,7 @@ export function deriveSubjectStatus(coverage: number, avgScore: number): Subject
 }
 
 export function subjectStatusLabelToDashboardStatus(label: SubjectStatusLabel): SubjectStatus {
-	if (label === "Good") return "on_track";
-	if (label === "Bad") return "needs_attention";
+	if (label === "Strong") return "on_track";
+	if (label === "Strengthen") return "needs_attention";
 	return "in_progress";
 }

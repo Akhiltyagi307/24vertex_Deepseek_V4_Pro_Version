@@ -28,7 +28,10 @@ import {
 import type { AssignmentTopicCatalogRow } from "@/lib/assignments/queries";
 import type { TeacherSubmissionAssignmentBundle } from "@/lib/assignments/teacher-submissions-hub-types";
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import {
+	formatSubjectCatalogOptionLabel,
+	type SubjectCatalogRow,
+} from "@/lib/teachers/subject-catalog-label";
 import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-queries";
 import { cn } from "@/lib/utils";
 
@@ -157,7 +160,6 @@ export function TeacherAssignmentsManager({
 	const eligibleStudentIdsFetchKey = React.useMemo(() => eligibleStudentIds.join(","), [eligibleStudentIds]);
 	const eligibleStudentIdSet = React.useMemo(() => new Set(eligibleStudentIds), [eligibleStudentIds]);
 	const selectedStudentIdSet = React.useMemo(() => new Set(selectedStudentIds), [selectedStudentIds]);
-	const ineligibleFilteredCount = Math.max(0, filteredStudentIds.length - eligibleStudentIds.length);
 	const recipientSyncPending = bandsPending || eligibilityPending;
 	const submitDisabled = recipientSyncPending || selectedStudentIds.length === 0;
 
@@ -421,7 +423,7 @@ export function TeacherAssignmentsManager({
 										>
 											{subjectsCatalog.map((subject) => (
 												<option key={subject.id} value={subject.id}>
-													Grade {subject.grade} · {subject.name}
+													{formatSubjectCatalogOptionLabel(subject)}
 												</option>
 											))}
 										</NativeSelect>
@@ -489,7 +491,8 @@ export function TeacherAssignmentsManager({
 									id="assign-performance-heading"
 									className="shrink-0 font-medium text-foreground text-sm"
 								>
-									Filter students by performance
+									Filter students by performance{" "}
+									<span className="font-normal text-muted-foreground">(optional)</span>
 								</h3>
 								<Separator className="flex-1" />
 							</div>
@@ -622,13 +625,6 @@ export function TeacherAssignmentsManager({
 								{recipientSyncPending ? (
 									<p className="text-muted-foreground text-xs">Syncing recipients from current filters…</p>
 								) : null}
-								{ineligibleFilteredCount > 0 && !recipientSyncPending ? (
-									<p className="text-muted-foreground text-xs">
-										{ineligibleFilteredCount} filtered student
-										{ineligibleFilteredCount === 1 ? "" : "s"} skipped because selected topics are not ready for
-										assignment yet.
-									</p>
-								) : null}
 								<div className="max-h-52 space-y-2 overflow-auto rounded-xl border border-border/70 bg-muted/15 p-3 dark:bg-muted/10">
 									{students.length === 0 ? (
 										<p className="text-muted-foreground text-sm">No reachable students yet.</p>
@@ -658,7 +654,10 @@ export function TeacherAssignmentsManager({
 									{students.length === 0
 										? null
 										: filteredStudents.map((student) => {
-												const isEligible = eligibleStudentIdSet.has(student.id);
+												const isEligible =
+													!eligibilityError &&
+													!recipientSyncPending &&
+													eligibleStudentIdSet.has(student.id);
 												return (
 													<label
 														key={student.id}
@@ -684,11 +683,6 @@ export function TeacherAssignmentsManager({
 															<span className="text-muted-foreground text-xs">
 																Grade {student.grade ?? "—"} · Section {student.section ?? "—"}
 															</span>
-															{!isEligible ? (
-																<span className="block text-muted-foreground text-xs">
-																	Unavailable for selected topics.
-																</span>
-															) : null}
 														</span>
 													</label>
 												);

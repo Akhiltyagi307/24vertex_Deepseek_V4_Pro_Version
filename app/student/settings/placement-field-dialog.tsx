@@ -11,22 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createClient } from "@/lib/supabase/client";
+import { STREAM_LABEL_OPTIONS, formatStreamLabel } from "@/lib/academic/stream-labels";
 import { cn } from "@/lib/utils";
 
-export const PLACEMENT_STREAM_OPTIONS: { value: string; label: string }[] = [
-	{ value: "science", label: "Science" },
-	{ value: "science_pcmb", label: "Science (PCMB)" },
-	{ value: "science_pcm", label: "Science (PCM)" },
-	{ value: "science_pcb", label: "Science (PCB)" },
-	{ value: "commerce", label: "Commerce" },
-	{ value: "commerce_with_maths", label: "Commerce with Mathematics" },
-	{ value: "arts", label: "Arts" },
-];
+export const PLACEMENT_STREAM_OPTIONS = STREAM_LABEL_OPTIONS;
 
 export function formatPlacementStream(stream: string | null): string {
 	if (!stream) return "—";
-	const label = PLACEMENT_STREAM_OPTIONS.find((o) => o.value === stream)?.label;
-	return label ?? stream.charAt(0).toUpperCase() + stream.slice(1);
+	const label = formatStreamLabel(stream);
+	return label || "—";
 }
 
 const GRADE_OPTIONS = [6, 7, 8, 9, 10, 11, 12] as const;

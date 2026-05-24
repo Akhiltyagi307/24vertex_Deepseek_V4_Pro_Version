@@ -29,10 +29,11 @@ export default async function ParentAssignmentsPage() {
 
 	return (
 		<div className="mx-auto w-full max-w-7xl space-y-6 py-6">
-			<div className="space-y-1">
+			<div className="space-y-1.5">
 				<h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
-				<p className="text-sm text-muted-foreground">
-					Follow your child’s teacher-assigned practice tests from “to do” through graded.
+				<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+					Follow teacher practice tests in three columns: to do, in progress, and graded (including
+					submitted work waiting on scores).
 				</p>
 			</div>
 			<AssignmentsKanban assignments={assignments} portal="parent" />
