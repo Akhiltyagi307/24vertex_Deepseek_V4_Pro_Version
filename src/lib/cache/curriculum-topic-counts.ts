@@ -2,16 +2,21 @@ import "server-only";
 
 import { revalidateTag, unstable_cache } from "next/cache";
 
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { createAnonClient } from "@/lib/supabase/anon";
 
 const CURRICULUM_TOPICS_TAG = "curriculum-topics";
 const PAGE_SIZE = 1000;
 
 /**
- * Topic counts per subject for a grade (active topics only). Uses the Supabase
- * service client (same project as auth) with `unstable_cache` — avoids a
- * separate `DATABASE_URL` Postgres session, which often misconfigures locally
- * (pooler user/password) while `SUPABASE_SERVICE_ROLE_KEY` is already required.
+ * Topic counts per subject for a grade (active topics only).
+ *
+ * `unstable_cache` work-units cannot read request cookies, so the per-request
+ * `@/lib/supabase/server` client is unusable here. Previously this used the
+ * service-role client, but `public.topics` is anon-readable via RLS — the
+ * service role added no security benefit and tied the cache to the
+ * service-role key. Switched to anon-key (`createAnonClient`) so the cache
+ * runs at the lowest privilege that can still see the data.
+ *
  * Call from server loaders only.
  */
 export async function getCachedTopicCountsBySubjectForGrade(
@@ -25,7 +30,7 @@ export async function getCachedTopicCountsBySubjectForGrade(
 
 	const record = await unstable_cache(
 		async () => {
-			const supabase = createServiceRoleClient();
+			const supabase = createAnonClient();
 			const out: Record<string, number> = {};
 			let from = 0;
 

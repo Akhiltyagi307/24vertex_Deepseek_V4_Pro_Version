@@ -20,7 +20,6 @@ import {
 	CardDescription,
 	CardHeader,
 	CardTitle,
-	cardSurfaceFrameClassName,
 } from "@/components/ui/card";
 import { DashboardOtherSubjectsTable } from "@/components/student/dashboard-other-subjects-table";
 import { StudentDashboardAssignmentsUrgencyCard } from "@/components/student/student-dashboard-assignments-urgency-card";

@@ -132,7 +132,7 @@ describe("selectParentStudentAction", () => {
 		expect(cookiesMock.current.set).not.toHaveBeenCalled();
 	});
 
-	it("sets active-student cookie with 30d max-age and writes select audit on success", async () => {
+	it("sets active-student cookie with 90d max-age and writes select audit on success", async () => {
 		await expect(selectParentStudentAction(fd({ studentId: STUDENT_ID }))).rejects.toThrow(
 			/NEXT_REDIRECT:\/parent\/dashboard/,
 		);
@@ -141,7 +141,7 @@ describe("selectParentStudentAction", () => {
 		expect(setCall?.[0]).toBe("vertex24_parent_active_student");
 		expect(setCall?.[1]).toBe(STUDENT_ID);
 		const opts = setCall?.[2] as { maxAge?: number; httpOnly?: boolean; sameSite?: string };
-		expect(opts.maxAge).toBe(60 * 60 * 24 * 30);
+		expect(opts.maxAge).toBe(60 * 60 * 24 * 90);
 		expect(opts.httpOnly).toBe(true);
 		expect(opts.sameSite).toBe("lax");
 		expect(auditMock.current).toHaveBeenCalledWith(

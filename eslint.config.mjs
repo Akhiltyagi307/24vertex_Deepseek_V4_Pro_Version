@@ -43,6 +43,7 @@ export default defineConfig([
 		ignores: [
 			"src/lib/supabase/admin.ts",
 			"src/lib/admin/**",
+			"src/lib/billing/**",
 			"src/lib/compliance/**",
 			"src/lib/internal/**",
 			"src/lib/parent/**",
@@ -66,6 +67,26 @@ export default defineConfig([
 							allowTypeImports: true,
 						},
 					],
+				},
+			],
+		},
+	},
+	{
+		// Marketing / legal surface only: forbid raw `<img>` so all images
+		// flow through `next/image` and get AVIF/WebP optimization, lazy
+		// loading, intrinsic-size CLS prevention, and the CSP `img-src`
+		// allowlist. The rule is scoped to `app/(public)/**` because some
+		// authenticated portals (e.g. doubt-chat attachment previews) use
+		// raw `<img>` with a blob URL — that's the intended behavior there.
+		name: "vertex24-no-raw-img-in-public",
+		files: ["app/(public)/**/*.{ts,tsx}", "src/components/marketing/**/*.{ts,tsx}"],
+		rules: {
+			"no-restricted-syntax": [
+				"error",
+				{
+					selector: "JSXOpeningElement[name.name='img']",
+					message:
+						"Use `next/image` (Image) instead of raw <img> in marketing/public surfaces — gets AVIF/WebP, lazy-loading, CLS prevention, and CSP coverage for free.",
 				},
 			],
 		},

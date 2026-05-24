@@ -15,7 +15,6 @@ import { LandingTutorModes } from "@/components/marketing/landing-tutor-modes";
 import { Button } from "@/components/ui/button";
 import {
 	LANDING_PARENT_PRIMARY_CTA_HREF,
-	LANDING_PARENT_PRIMARY_CTA_LABEL,
 	LANDING_STUDENT_PRIMARY_CTA_HREF,
 	LANDING_STUDENT_PRIMARY_CTA_LABEL,
 	LANDING_STUDENT_SHARE_PARENT_CTA_LABEL,

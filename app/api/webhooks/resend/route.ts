@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 
 import { db } from "@/db";
 import { emailLog } from "@/db/schema/comms-audit";
+import { emailWebhookEvents } from "@/db/schema/email-webhook-events";
 
 export const runtime = "nodejs";
 
@@ -23,11 +24,24 @@ function timingSafeEqual(a: string, b: string): boolean {
 /**
  * Resend webhook — updates `email_log` rows by `provider_message_id`.
  *
- * **Production:** Resend signs payloads with Svix. Set `RESEND_WEBHOOK_SECRET` to the
- * signing secret from the Resend dashboard for this endpoint (starts with `whsec_`).
+ * Auth:
+ *   - **Production:** Resend signs payloads with Svix. Set `RESEND_WEBHOOK_SECRET`
+ *     to the signing secret from the Resend dashboard (starts with `whsec_`).
+ *   - **Local / manual:** `Authorization: Bearer <same secret>`. The previous
+ *     `?token=<secret>` query-param fallback was removed (W: 2026-05) because
+ *     query strings leak to proxy access logs.
  *
- * **Local / manual:** `Authorization: Bearer <same secret>` or `?token=<secret>` when
- * not using Svix headers (e.g. curl with a shared random string — not for real Resend traffic).
+ * Idempotency: Svix guarantees at-least-once delivery. The route INSERTs the
+ * `svix-id` into `email_webhook_events` with `ON CONFLICT (svix_id) DO NOTHING
+ * RETURNING id`. If no row is returned, this is a retry of an event we've
+ * already processed — short-circuit with `{ ok: true, deduped: true }` and
+ * leave `email_log` untouched. That keeps an out-of-order `delivered` retry
+ * after a `bounced` from silently clobbering the bounced state.
+ *
+ * The signed-fallback (Authorization: Bearer) path also dedupes via a
+ * `local:<sha256(body)>` synthetic id — manual replays from curl with the
+ * same body return `deduped: true` on the second hit, which matches the
+ * production semantics.
  */
 export async function POST(request: NextRequest) {
 	const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
@@ -42,6 +56,7 @@ export async function POST(request: NextRequest) {
 	const svixSig = request.headers.get("svix-signature");
 
 	let payload: Record<string, unknown>;
+	let dedupId: string;
 
 	if (svixId && svixTs && svixSig) {
 		try {
@@ -54,12 +69,10 @@ export async function POST(request: NextRequest) {
 		} catch {
 			return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
 		}
+		dedupId = svixId;
 	} else {
 		const auth = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-		const qp = request.nextUrl.searchParams.get("token") ?? "";
-		const ok =
-			(auth && timingSafeEqual(auth, secret)) || (qp && timingSafeEqual(qp, secret));
-		if (!ok) {
+		if (!auth || !timingSafeEqual(auth, secret)) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 		try {
@@ -67,9 +80,32 @@ export async function POST(request: NextRequest) {
 		} catch {
 			return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 		}
+		// Manual/curl replays use a synthetic dedup id derived from the body so
+		// re-POSTing the same payload twice is idempotent. The Bearer secret has
+		// already verified the caller's authority.
+		dedupId = `local:${crypto.createHash("sha256").update(body).digest("hex")}`;
 	}
 
 	const type = String(payload.type ?? payload.event ?? "");
+
+	// Idempotency check: insert the event row with `ON CONFLICT DO NOTHING`.
+	// If the INSERT didn't produce a row, this svix_id has already been
+	// processed — return ok+deduped without touching email_log so a retry that
+	// arrives out-of-order can't clobber a later, more-authoritative state.
+	const inserted = await db
+		.insert(emailWebhookEvents)
+		.values({
+			svixId: dedupId,
+			eventType: type || "unknown",
+			payload,
+		})
+		.onConflictDoNothing({ target: emailWebhookEvents.svixId })
+		.returning({ id: emailWebhookEvents.id });
+
+	if (inserted.length === 0) {
+		return NextResponse.json({ ok: true, deduped: true });
+	}
+
 	const data = (payload.data ?? payload.record ?? {}) as Record<string, unknown>;
 	const emailId =
 		(typeof data.email_id === "string" && data.email_id) ||
@@ -77,6 +113,11 @@ export async function POST(request: NextRequest) {
 		null;
 
 	if (!emailId) {
+		// Mark the event row as processed even though we had nothing to update.
+		await db
+			.update(emailWebhookEvents)
+			.set({ processedAt: new Date() })
+			.where(eq(emailWebhookEvents.id, inserted[0].id));
 		return NextResponse.json({ ok: true, skipped: true });
 	}
 
@@ -95,6 +136,11 @@ export async function POST(request: NextRequest) {
 			providerPayload: payload,
 		})
 		.where(eq(emailLog.providerMessageId, emailId));
+
+	await db
+		.update(emailWebhookEvents)
+		.set({ processedAt: sql`now()` })
+		.where(eq(emailWebhookEvents.id, inserted[0].id));
 
 	return NextResponse.json({ ok: true });
 }

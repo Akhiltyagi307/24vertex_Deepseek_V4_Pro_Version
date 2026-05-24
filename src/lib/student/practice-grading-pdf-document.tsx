@@ -948,8 +948,6 @@ function QuestionPageHeader({ q }: { q: PracticeGradingPdfQuestion }) {
 }
 
 function GradingBreakdownPdfView({ q }: { q: PracticeGradingPdfQuestion }) {
-	const hasLists =
-		(q.what_was_correct?.length ?? 0) > 0 || (q.where_marks_were_lost?.length ?? 0) > 0;
 	const listChars =
 		(q.what_was_correct ?? []).join("").length + (q.where_marks_were_lost ?? []).join("").length;
 

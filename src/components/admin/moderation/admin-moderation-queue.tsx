@@ -55,7 +55,7 @@ export function AdminModerationQueue({ flags }: { flags: ModerationFlagRow[] }) 
 					resolution_notes: resolutionNotes.trim() || undefined,
 				}),
 			});
-			const j = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+			await res.json().catch(() => null);
 			if (!res.ok) {
 				setError(await adminHttpErrorMessage(res, res.statusText));
 				return;

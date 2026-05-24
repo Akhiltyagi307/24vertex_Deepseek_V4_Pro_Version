@@ -93,17 +93,38 @@ jobs:
 
           # `npx lighthouse@12` is more reliable than `pnpm add -g lighthouse`
           # in CI — npx is always on PATH and caches the binary in ~/.npm/_npx.
-          LIGHTHOUSE_FLAGS="--quiet --chrome-flags=--headless=new --chrome-flags=--no-sandbox --chrome-flags=--disable-gpu --chrome-flags=--disable-dev-shm-usage --output=json --only-categories=performance,accessibility,best-practices,seo --preset=desktop --max-wait-for-load=45000"
+          #
+          # NO_FCP mitigation: `--headless=new` + `--disable-gpu` on Ubuntu
+          # runners intermittently fails to capture First Contentful Paint
+          # (Chrome bug: the new headless mode plus disabled GPU can leave the
+          # paint timeline empty even though the page renders fully). Mitigated by:
+          #   1. dropping --disable-gpu (headless=new doesn't need it)
+          #   2. adding --ignore-certificate-errors + --ignore-gpu-blocklist
+          #   3. retrying up to 3 times when lighthouse exits non-zero (the
+          #      script still gates on lighthouse-budget.mjs scores, so a flaky
+          #      single attempt won't pass through). On the final retry, dump
+          #      server.log so a real failure is debuggable.
+          LIGHTHOUSE_FLAGS="--quiet --chrome-flags=--headless=new --chrome-flags=--no-sandbox --chrome-flags=--disable-dev-shm-usage --chrome-flags=--ignore-certificate-errors --chrome-flags=--ignore-gpu-blocklist --output=json --only-categories=performance,accessibility,best-practices,seo --preset=desktop --max-wait-for-load=60000"
 
-          npx --yes lighthouse@12 http://localhost:3000/ \
-            $LIGHTHOUSE_FLAGS \
-            --output-path=./lighthouse-landing.json \
-            || (cat server.log && kill "$SERVER_PID" 2>/dev/null || true; exit 1)
+          run_with_retry() {
+            local url="$1"
+            local out="$2"
+            for attempt in 1 2 3; do
+              echo "lighthouse attempt $attempt: $url -> $out"
+              if npx --yes lighthouse@12 "$url" $LIGHTHOUSE_FLAGS --output-path="$out"; then
+                return 0
+              fi
+              echo "attempt $attempt failed; sleeping 5s before retry"
+              sleep 5
+            done
+            echo "lighthouse failed 3 times for $url — server.log:"
+            cat server.log
+            kill "$SERVER_PID" 2>/dev/null || true
+            return 1
+          }
 
-          npx --yes lighthouse@12 http://localhost:3000/legal/privacy \
-            $LIGHTHOUSE_FLAGS \
-            --output-path=./lighthouse-legal-privacy.json \
-            || (cat server.log && kill "$SERVER_PID" 2>/dev/null || true; exit 1)
+          run_with_retry http://localhost:3000/ ./lighthouse-landing.json || exit 1
+          run_with_retry http://localhost:3000/legal/privacy ./lighthouse-legal-privacy.json || exit 1
 
           kill "$SERVER_PID" 2>/dev/null || true
 

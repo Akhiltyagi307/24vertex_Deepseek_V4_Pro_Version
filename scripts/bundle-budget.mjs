@@ -27,11 +27,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NEXT_DIR = path.join(root, ".next");
 
 /** @type {Array<{ route: string; budgetKb: number; tier: "marketing" | "shell" | "feature" | "heavy" }>} */
+// Budgets ratcheted down after recharts was moved behind `next/dynamic` on
+// the landing (FeaturePerformanceRadial) and dashboard (SubjectTopicRadarChart).
+// Conservative cuts — actual gzipped savings will be larger; re-measure after
+// the first prod build and tighten further in a follow-up PR.
 const BUDGETS = [
-	{ route: "/page", budgetKb: 95, tier: "marketing" },
+	{ route: "/page", budgetKb: 85, tier: "marketing" },
 	{ route: "/login/page", budgetKb: 80, tier: "shell" },
 	{ route: "/auth/forgot-password/page", budgetKb: 75, tier: "shell" },
-	{ route: "/student/dashboard/page", budgetKb: 130, tier: "feature" },
+	{ route: "/student/dashboard/page", budgetKb: 115, tier: "feature" },
 	{ route: "/student/practice/page", budgetKb: 200, tier: "feature" },
 	{ route: "/student/practice/[testId]/page", budgetKb: 220, tier: "heavy" },
 	{ route: "/student/doubt-chat/page", budgetKb: 200, tier: "feature" },

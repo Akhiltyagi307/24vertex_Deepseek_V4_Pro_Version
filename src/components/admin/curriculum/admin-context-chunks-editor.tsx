@@ -69,7 +69,8 @@ export function AdminContextChunksEditor({ topicId }: { topicId: string }) {
 					source_ref: sourceRef.trim() || null,
 				}),
 			});
-			const j = (await res.json()) as { error?: string; detail?: string };
+			// Drain the JSON body so the connection isn't held by an unread stream.
+			await res.json().catch(() => null);
 			if (!res.ok) {
 				setError(await adminHttpErrorMessage(res, res.statusText));
 				return;

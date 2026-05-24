@@ -14,9 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm/action-setup@v4 reads its version from package.json's
+      # `packageManager` field — passing `version:` here conflicts with it
+      # (ERR_PNPM_BAD_PM_VERSION).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -39,14 +40,40 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
-      - name: Vitest (admin unit tests)
-        run: pnpm vitest run tests/admin/auth.test.ts tests/admin/proxy-gate.test.ts tests/admin/maintenance-routing.test.ts tests/admin/datatable-export.test.ts tests/admin/admin-data-table-mobile.test.tsx tests/admin/admin-data-table-states.test.tsx tests/admin/csv-import-diff.test.ts tests/admin/sql-read-only.test.ts tests/admin/sql-write-guard.test.ts tests/admin/digest-week-key.test.ts
+      - name: Vitest (full unit + integration suite)
+        # Previously enumerated ~10 admin-only spec files; the other ~340 specs
+        # in tests/ and src/**/__tests__ never gated a merge. Running the full
+        # suite is the merge gate now. Integration specs that need a live DB
+        # (tests/admin/immutability.test.ts, tests/admin/login.test.ts) gate
+        # themselves with `it.skipIf(!process.env.ADMIN_INTEGRATION_TESTS)`
+        # so they no-op without the secrets and are run in the two separate
+        # steps below when secrets are present.
+        run: pnpm vitest run
 
-      - name: Migration drift (local sql files vs remote ledger)
+      - name: Drizzle ↔ Postgres schema parity (advisory until helper RPC ships in prod)
         if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        # Set continue-on-error until the `_drizzle_parity_columns` helper
+        # (migration 20260623002000) is deployed to all projects — the script
+        # WARNs and exits 0 in that case anyway, but this belt-and-suspenders
+        # keeps a transient miss from blocking unrelated PRs.
+        continue-on-error: true
+        run: node scripts/check-drizzle-postgres-parity.mjs
+
+      - name: Migration drift (local sql files vs remote ledger; two-project parity)
+        # The script always runs the local-only lints (duplicate-name +
+        # CONCURRENTLY-on-hot-tables). It runs the drift check when the
+        # primary env is present, and additionally diffs PRIMARY ↔ SECONDARY
+        # when SECONDARY_* secrets are configured — failing CI on any version
+        # present on one project but not the other (the two-Supabase-project
+        # sync rule).
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SECONDARY_SUPABASE_URL: ${{ secrets.SECONDARY_SUPABASE_URL }}
+          SECONDARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SECONDARY_SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/check-migration-drift.mjs
 
       - name: Next build + verify service role not in client static

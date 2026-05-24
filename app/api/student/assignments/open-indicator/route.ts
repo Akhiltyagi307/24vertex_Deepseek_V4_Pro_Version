@@ -5,8 +5,8 @@ import { getServerUser } from "@/lib/auth/get-server-user";
 import { hasOpenAssignmentsForStudent } from "@/lib/assignments/has-open-assignments";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
-	STUDENT_NOTIFICATIONS_LIMIT_N,
-	STUDENT_NOTIFICATIONS_WINDOW_SECONDS,
+	STUDENT_ASSIGNMENT_INDICATOR_LIMIT_N,
+	STUDENT_ASSIGNMENT_INDICATOR_WINDOW_SECONDS,
 	consumeStudentRateLimit,
 } from "@/lib/student/rate-limit";
 
@@ -51,8 +51,8 @@ export async function GET() {
 	const rl = await consumeStudentRateLimit({
 		userId: user.id,
 		bucket: "assignments-open-indicator",
-		limitN: STUDENT_NOTIFICATIONS_LIMIT_N,
-		windowSeconds: STUDENT_NOTIFICATIONS_WINDOW_SECONDS,
+		limitN: STUDENT_ASSIGNMENT_INDICATOR_LIMIT_N,
+		windowSeconds: STUDENT_ASSIGNMENT_INDICATOR_WINDOW_SECONDS,
 	});
 	if (!rl.ok) {
 		return rateLimitedResponse(rl.resetAt);

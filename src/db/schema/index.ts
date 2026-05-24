@@ -13,6 +13,7 @@ export * from "./compliance-requests";
 export * from "./content-blacklist";
 export * from "./comms-audit";
 export * from "./email-templates";
+export * from "./email-webhook-events";
 export * from "./doubt";
 export * from "./feature-flags";
 export * from "./integrity-check-results";

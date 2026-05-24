@@ -24,7 +24,7 @@
  * fail the build — those are informational and don't block deploys.
  */
 
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 function readEnv(...names) {
@@ -47,11 +47,6 @@ const SECONDARY = {
 	key: readEnv("SECONDARY_SUPABASE_SERVICE_ROLE_KEY"),
 };
 
-if (!PRIMARY.url || !PRIMARY.key) {
-	console.log("check-migration-drift: SKIP (primary Supabase env not set)");
-	process.exit(0);
-}
-
 const migrationsDir = join(process.cwd(), "supabase", "migrations");
 
 function readLocalMigrations() {
@@ -60,6 +55,56 @@ function readLocalMigrations() {
 		const m = f.match(/^(\d{14})_(.+)\.sql$/);
 		return { version: m[1], name: m[2], file: f };
 	});
+}
+
+/**
+ * Local-only lint. Two migrations with the same base name (the part after
+ * the timestamp) within a 24-hour window are almost always a contributor
+ * mistake — one was a typo, or a rebase produced a "compensation" file that
+ * should have been a single coherent migration. The existing duplicates at
+ * `20260412/20260413_student_link_code` and
+ * `20260429_*_fix_profiles_select_policy_recursion_again` are grandfathered
+ * (already applied to both projects); skip them by version. New duplicates
+ * fail the check.
+ *
+ * Note: this is a heuristic. Two unrelated migrations on the same day with
+ * the same suffix would false-positive — in practice that hasn't happened in
+ * 158 migrations of repo history, and the alternative (renaming applied
+ * migrations) is strictly more dangerous than fixing the lint locally before
+ * the PR lands.
+ */
+const KNOWN_LEGACY_DUPLICATES = new Set([
+	"20260412212259_student_link_code.sql",
+	"20260413160000_student_link_code.sql",
+	"20260429083824_seed_senior_electives.sql",
+	"20260429150500_seed_senior_electives.sql",
+	"20260429102528_fix_profiles_select_policy_recursion_again.sql",
+	"20260429152000_fix_profiles_select_policy_recursion_again.sql",
+]);
+
+function lintDuplicateMigrationNames(local) {
+	const byName = new Map();
+	for (const m of local) {
+		if (KNOWN_LEGACY_DUPLICATES.has(m.file)) continue;
+		const bucket = byName.get(m.name) ?? [];
+		bucket.push(m);
+		byName.set(m.name, bucket);
+	}
+	const dupes = [...byName.entries()].filter(([, files]) => files.length > 1);
+	if (dupes.length === 0) return false;
+
+	console.error(
+		"\n[duplicate-name lint] FAIL — multiple migrations share the same base name:",
+	);
+	for (const [name, files] of dupes) {
+		console.error(`  - ${name}:`);
+		for (const f of files) console.error(`      ${f.file}`);
+	}
+	console.error(
+		"  Rename one of them (use a more specific suffix) before the PR lands. Once",
+		"\n  applied to either ledger, the choice is locked in — fix this locally.",
+	);
+	return true;
 }
 
 async function readRemoteLedger(project) {
@@ -152,6 +197,62 @@ function diffPrimaryVsSecondary(primaryRemoteVersions, secondaryRemoteVersions) 
 	return bad;
 }
 
+/**
+ * Local-only lint. New post-launch indexes on known hot tables MUST use
+ * `CREATE INDEX CONCURRENTLY` to avoid taking `ACCESS EXCLUSIVE` and blocking
+ * writes during the migration. Empty / brand-new tables and migrations that
+ * were applied before this rule existed are grandfathered by version cutoff.
+ */
+const HOT_TABLES = [
+	"public.tests",
+	"public.profiles",
+	"public.questions",
+	"public.student_answers",
+	"public.assignment_submissions",
+	"public.billing_events",
+	"public.email_log",
+];
+const CONCURRENT_LINT_MIN_VERSION = "20260623000000";
+
+function lintConcurrentIndexes(local) {
+	const violations = [];
+	for (const m of local) {
+		if (m.version < CONCURRENT_LINT_MIN_VERSION) continue;
+		let body;
+		try {
+			body = readFileSync(join(migrationsDir, m.file), "utf8");
+		} catch {
+			continue;
+		}
+		// Strip line + block comments before regex matching so commented-out
+		// CREATE INDEX in documentation doesn't false-positive.
+		const stripped = body
+			.replace(/--[^\n]*\n/g, "\n")
+			.replace(/\/\*[\s\S]*?\*\//g, "");
+		const createIndexRe = /create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?(?:"?[\w]+"?\s+)?on\s+(public\.[a-z_][a-z0-9_]*)/gi;
+		const matches = stripped.matchAll(createIndexRe);
+		for (const match of matches) {
+			const table = match[1];
+			const concurrent = /create\s+(?:unique\s+)?index\s+concurrently\s+/i.test(
+				match[0],
+			);
+			if (HOT_TABLES.includes(table) && !concurrent) {
+				violations.push({ file: m.file, table });
+			}
+		}
+	}
+	if (violations.length === 0) return false;
+	console.error(
+		"\n[concurrent-index lint] FAIL — new post-launch indexes on hot tables must use CONCURRENTLY:",
+	);
+	for (const v of violations) console.error(`  - ${v.file}: CREATE INDEX on ${v.table}`);
+	console.error(
+		"  Postgres CREATE INDEX takes ACCESS EXCLUSIVE; CONCURRENTLY uses SHARE",
+		"\n  UPDATE EXCLUSIVE and lets writes continue. Mandatory on hot OLTP tables.",
+	);
+	return true;
+}
+
 async function main() {
 	let local;
 	try {
@@ -159,6 +260,21 @@ async function main() {
 	} catch (e) {
 		console.error(`check-migration-drift: ERROR — ${e.message}`);
 		process.exit(1);
+	}
+
+	const duplicateNameFail = lintDuplicateMigrationNames(local);
+	const concurrentFail = lintConcurrentIndexes(local);
+
+	// Lints above are local-only; if the operator hasn't set primary Supabase
+	// env they still ran. Bail here with success when env is absent so the
+	// drift portion can SKIP without leaving the lints unfired.
+	if (!PRIMARY.url || !PRIMARY.key) {
+		if (duplicateNameFail || concurrentFail) {
+			console.error("\ncheck-migration-drift: FAIL — local lints failed.");
+			process.exit(1);
+		}
+		console.log("check-migration-drift: SKIP drift check (primary Supabase env not set); local lints OK");
+		process.exit(0);
 	}
 
 	let primaryFail = false;
@@ -198,7 +314,7 @@ async function main() {
 		crossFail = diffPrimaryVsSecondary(primaryRemoteVersions, secondaryRemoteVersions);
 	}
 
-	if (primaryFail || secondaryFail || crossFail) {
+	if (primaryFail || secondaryFail || crossFail || duplicateNameFail || concurrentFail) {
 		console.error("\ncheck-migration-drift: FAIL — see above.");
 		process.exit(1);
 	}

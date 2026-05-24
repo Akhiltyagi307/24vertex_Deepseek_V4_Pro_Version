@@ -62,11 +62,13 @@ export async function selectParentStudentAction(formData: FormData): Promise<voi
 		httpOnly: true,
 		sameSite: "lax",
 		secure: process.env.NODE_ENV === "production",
-		// 30 days. Rewritten on every select-student / open-report call so
+		// 90 days. Rewritten on every select-student / open-report call so
 		// active parents stay logged-in indefinitely; idle accounts fall off
-		// the cookie within a month. Previously 400 days — needlessly long
-		// blast radius if the cookie ever leaks.
-		maxAge: 60 * 60 * 24 * 30,
+		// within a quarter. Previously 400 days (audit P3-29) — needlessly
+		// long blast radius if the cookie ever leaks. 90 days is the sweet
+		// spot for a monthly-login family portal: most parents never re-pick
+		// the active child, but a stolen device session expires within Q.
+		maxAge: 60 * 60 * 24 * 90,
 	});
 
 	await writeParentAudit({

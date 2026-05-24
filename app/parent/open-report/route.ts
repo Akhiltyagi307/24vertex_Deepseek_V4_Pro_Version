@@ -65,7 +65,9 @@ export async function GET(request: Request) {
 				httpOnly: true,
 				sameSite: "lax",
 				secure: process.env.NODE_ENV === "production",
-				maxAge: 60 * 60 * 24 * 30,
+				// 90-day TTL. Mirrors the value in `select-student/actions.ts` —
+				// rewritten on each open-report so active parents stay logged-in.
+				maxAge: 60 * 60 * 24 * 90,
 			});
 
 			const reqHeaders = await headers();

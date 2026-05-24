@@ -90,3 +90,16 @@ export const STUDENT_PRACTICE_BATCH_UPSERT_WINDOW_SECONDS = 60;
 /** Practice abandon-submit — should be infrequent; tight cap. */
 export const STUDENT_PRACTICE_ABANDON_LIMIT_N = 10;
 export const STUDENT_PRACTICE_ABANDON_WINDOW_SECONDS = 60;
+
+/**
+ * Daily activity streak widget — fetched on each dashboard mount, dashboard
+ * client retries, and after a test-submit. Sized to match the notification
+ * cadence (these endpoints fire from the same top-bar surface together) but
+ * decoupled so future tuning of one doesn't accidentally affect the other.
+ */
+export const STUDENT_STREAK_LIMIT_N = 60;
+export const STUDENT_STREAK_WINDOW_SECONDS = 60;
+
+/** Open-assignments indicator — same shape as streak; same justification. */
+export const STUDENT_ASSIGNMENT_INDICATOR_LIMIT_N = 60;
+export const STUDENT_ASSIGNMENT_INDICATOR_WINDOW_SECONDS = 60;

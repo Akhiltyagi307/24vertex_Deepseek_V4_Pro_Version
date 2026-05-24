@@ -26,7 +26,10 @@ const TOPIC_B = "22222222-2222-4222-8222-222222222202";
 function buildQuestion(
 	base: Omit<PracticeGradingPdfQuestion, "analysis" | "step_by_step_solution"> & GradedQuestionItem,
 ): PracticeGradingPdfQuestion {
-	const feedback = formatGradingFeedbackForStorage(base);
+	// `formatGradingFeedbackForStorage(base)` is the canonical text the prod
+	// path computes; called here to surface format errors in this sample
+	// renderer even though the field is read structured below.
+	formatGradingFeedbackForStorage(base);
 	const step = base.step_by_step_solution;
 	return {
 		...base,

@@ -3,6 +3,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { shouldRedirectToMaintenance } from "@/lib/admin/maintenance-routing";
 import { adminProxyGate } from "@/lib/admin/proxy-guard";
 import { billingProxyGate } from "@/lib/billing/proxy-guard";
+import { feedbackProxyGate } from "@/lib/feedback/proxy-guard";
+import { contactProxyGate } from "@/lib/marketing/contact/proxy-guard";
 import { parentProxyGate } from "@/lib/parent/proxy-guard";
 import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
 import { studentProxyGate } from "@/lib/student/proxy-guard";
@@ -68,6 +70,20 @@ export async function proxy(request: NextRequest) {
 		teacherEarly.headers.set(REQUEST_ID_HEADER, requestId);
 		teacherEarly.headers.set("Content-Security-Policy", csp);
 		return teacherEarly;
+	}
+
+	const feedbackEarly = feedbackProxyGate(request);
+	if (feedbackEarly) {
+		feedbackEarly.headers.set(REQUEST_ID_HEADER, requestId);
+		feedbackEarly.headers.set("Content-Security-Policy", csp);
+		return feedbackEarly;
+	}
+
+	const contactEarly = contactProxyGate(request);
+	if (contactEarly) {
+		contactEarly.headers.set(REQUEST_ID_HEADER, requestId);
+		contactEarly.headers.set("Content-Security-Policy", csp);
+		return contactEarly;
 	}
 
 	if (shouldRedirectToMaintenance(pathname, process.env.MAINTENANCE_MODE)) {

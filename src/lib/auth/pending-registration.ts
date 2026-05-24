@@ -4,7 +4,6 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import {
-	EDUAI_PENDING_REGISTRATION_META_KEY,
 	PENDING_REGISTRATION_META_KEYS,
 	VERTEX24_PENDING_REGISTRATION_META_KEY,
 } from "@/lib/auth/pending-registration-meta";

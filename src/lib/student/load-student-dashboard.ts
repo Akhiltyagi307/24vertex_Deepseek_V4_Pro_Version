@@ -31,17 +31,6 @@ export type StudentDashboardProfileRow = StudentProfileSubjectsRow & {
 	organization_id: string | null;
 };
 
-type DashboardCompletedTestRow = {
-	id: string;
-	test_date: string | null;
-	total_score: string | number | null;
-	subject_id: string;
-	duration_seconds: number | null;
-	time_limit_seconds: number | null;
-	/** Populated via FK embed (same pattern as `app/student/reports/page.tsx`). */
-	subjects?: { id?: string; name?: string | null } | null;
-};
-
 function statusPriority(status: "good" | "satisfactory" | "bad" | "not_tested"): number {
 	if (status === "bad") return 0;
 	if (status === "satisfactory") return 1;

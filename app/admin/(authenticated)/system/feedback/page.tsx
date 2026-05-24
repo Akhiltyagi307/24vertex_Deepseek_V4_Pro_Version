@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { desc } from "drizzle-orm";
 
@@ -5,6 +6,11 @@ import { FeedbackReportRowActions } from "@/components/admin/feedback/feedback-r
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
 import { userFeedbackReports } from "@/db/schema/user-feedback-reports";
+
+export const metadata: Metadata = {
+	title: "User feedback · Admin",
+	robots: { index: false, follow: false },
+};
 
 function userAdminHref(portal: string, userId: string): string {
 	if (portal === "teacher") return `/admin/users/teachers?highlight=${userId}`;

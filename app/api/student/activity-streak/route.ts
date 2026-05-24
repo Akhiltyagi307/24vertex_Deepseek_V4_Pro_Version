@@ -5,8 +5,8 @@ import { getStudentActivityStreakSnapshot } from "@/lib/student/activity-streak"
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
-	STUDENT_NOTIFICATIONS_LIMIT_N,
-	STUDENT_NOTIFICATIONS_WINDOW_SECONDS,
+	STUDENT_STREAK_LIMIT_N,
+	STUDENT_STREAK_WINDOW_SECONDS,
 	consumeStudentRateLimit,
 } from "@/lib/student/rate-limit";
 
@@ -42,8 +42,8 @@ export async function GET() {
 	const rl = await consumeStudentRateLimit({
 		userId: user.id,
 		bucket: "activity-streak",
-		limitN: STUDENT_NOTIFICATIONS_LIMIT_N,
-		windowSeconds: STUDENT_NOTIFICATIONS_WINDOW_SECONDS,
+		limitN: STUDENT_STREAK_LIMIT_N,
+		windowSeconds: STUDENT_STREAK_WINDOW_SECONDS,
 	});
 	if (!rl.ok) {
 		return rateLimitedResponse(rl.resetAt);
