@@ -38,7 +38,7 @@ describe("teacher dashboard actions", () => {
 			recentGradedItemsUsed: 1,
 			recentWindowSize: 5,
 			performanceBands: [],
-			upliftOpportunity: null,
+			upliftOpportunities: [],
 		};
 		const atRiskRows = [{ studentId: "student-1", fullName: "A Student", summary: "Needs attention" }];
 

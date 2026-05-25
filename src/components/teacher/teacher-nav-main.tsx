@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+	ClipboardCheckIcon,
 	ClipboardListIcon,
 	LayoutDashboardIcon,
 	LineChartIcon,
@@ -30,6 +31,7 @@ const primaryItems: NavItem[] = [
 	{ title: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboardIcon },
 	{ title: "Link Student", href: "/teacher/students", icon: UsersRoundIcon },
 	{ title: "Assignments", href: "/teacher/assignments", icon: ClipboardListIcon },
+	{ title: "Submissions", href: "/teacher/submissions", icon: ClipboardCheckIcon },
 	{ title: "Student performance", href: "/teacher/student-performance", icon: LineChartIcon },
 	{ title: "Topic performance", href: "/teacher/topic-performance", icon: ListTree },
 	{ title: "Settings", href: "/teacher/settings", icon: SettingsIcon },

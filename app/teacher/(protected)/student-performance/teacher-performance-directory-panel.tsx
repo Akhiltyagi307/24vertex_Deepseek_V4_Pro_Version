@@ -9,7 +9,10 @@ import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-queries";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import {
+	buildSubjectCatalogPillSelectModel,
+	type SubjectCatalogRow,
+} from "@/lib/teachers/subject-catalog-label";
 import { cn } from "@/lib/utils";
 
 export function TeacherPerformanceDirectoryPanel({
@@ -44,6 +47,11 @@ export function TeacherPerformanceDirectoryPanel({
 		if (grade === "all") return subjectsCatalog;
 		return subjectsCatalog.filter((s) => s.grade === grade);
 	}, [grade, subjectsCatalog]);
+
+	const subjectPillModel = useMemo(
+		() => buildSubjectCatalogPillSelectModel(subjectOptions),
+		[subjectOptions],
+	);
 
 	useEffect(() => {
 		if (skipInitialFetch.current) {
@@ -149,21 +157,17 @@ export function TeacherPerformanceDirectoryPanel({
 									onValueChange={(v) => setSection(v === "" ? "all" : v)}
 								/>
 							</div>
-							<div className="flex min-w-[min(14rem,calc(100vw-2.75rem))] max-w-[min(20rem,85vw)] shrink-0 flex-col gap-1.5">
+							<div className="flex min-w-[min(16rem,calc(100vw-2.75rem))] max-w-[min(28rem,92vw)] shrink-0 flex-col gap-1.5">
 								<span className="text-foreground text-xs font-medium">Subject</span>
 								<ReportsPillSelect
 									fullWidth
+									menuWide
 									menuTitle="Subject"
 									ariaLabel="Filter students by subject"
 									icon={Library}
 									value={subjectPillValue}
-									options={[
-										{ value: "", label: "All subjects" },
-										...subjectOptions.map((s) => ({
-											value: s.id,
-											label: `${s.name} (Gr. ${s.grade})`,
-										})),
-									]}
+									options={subjectPillModel.options}
+									optionGroups={subjectPillModel.optionGroups}
 									className="shadow-none"
 									onValueChange={(v) => setSubjectId(v === "" ? "all" : v)}
 								/>

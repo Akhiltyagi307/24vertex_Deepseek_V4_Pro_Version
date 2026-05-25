@@ -43,5 +43,5 @@ export type TeacherClassPerformanceSummary = {
 	recentGradedItemsUsed: number;
 	recentWindowSize: number;
 	performanceBands: TeacherPerformanceBandSummary[];
-	upliftOpportunity: TeacherClassUpliftOpportunity | null;
+	upliftOpportunities: TeacherClassUpliftOpportunity[];
 };

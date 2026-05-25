@@ -19,6 +19,9 @@ import { teacherFilterAccessibleStudentIdsForSession } from "@/lib/teachers/teac
 export type CreateTeacherAssignmentState = {
 	ok: boolean;
 	message: string;
+	assignmentId?: string;
+	title?: string;
+	studentCount?: number;
 };
 
 function formValueArray(formData: FormData, name: string): string[] {
@@ -118,9 +121,13 @@ export async function createTeacherAssignmentAction(
 			studentCount: uniqueStudentIds.length,
 		});
 		revalidatePath("/teacher/assignments");
+		revalidatePath("/teacher/submissions");
 		return {
 			ok: true,
 			message: `Assignment published for ${uniqueStudentIds.length} student${uniqueStudentIds.length === 1 ? "" : "s"}.`,
+			assignmentId: result.assignmentId,
+			title: parsed.data.title,
+			studentCount: uniqueStudentIds.length,
 		};
 	});
 }

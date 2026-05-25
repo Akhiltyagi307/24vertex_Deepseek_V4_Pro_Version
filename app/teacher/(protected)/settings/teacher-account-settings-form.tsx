@@ -28,7 +28,7 @@ import SmoothTab from "@/components/kokonutui/smooth-tab";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { SerializedOrganization } from "@/lib/organizations/schemas";
 import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-queries";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import type { SubjectCatalogRow } from "@/lib/teachers/subject-catalog-label";
 import { cn } from "@/lib/utils";
 
 export type { TeacherAccountProfile } from "./teacher-account-settings-form-types";

@@ -16,19 +16,26 @@ export type TeacherTopicPerformanceScope = {
 	subjectId?: string | null;
 };
 
+export type TeacherTopicBelowSupportLineStudent = {
+	studentId: string;
+	fullName: string;
+	averagePercent: number;
+};
+
 export type TeacherTopicPerformanceRow = {
 	topicId: string;
 	topicName: string;
 	subjectId: string;
 	subjectName: string;
 	topicGrade: number;
+	chapterNumber: number;
 	sortUnit: number;
-	sortChapter: number;
 	sortTopic: number;
 	averagePercent: number;
 	studentsWithData: number;
 	testsTaken: number;
 	studentsBelowSupportLine: number;
+	belowSupportLineStudents: TeacherTopicBelowSupportLineStudent[];
 };
 
 export type TeacherTopicStudentBreakdownRow = {
@@ -65,6 +72,7 @@ export async function listTeacherTopicPerformanceRows(
 
 	if (roster.length === 0) return [];
 
+	const rosterById = new Map(roster.map((s) => [s.id, s]));
 	const studentIds = roster.map((s) => s.id);
 
 	const topicFilters = [
@@ -102,13 +110,14 @@ export async function listTeacherTopicPerformanceRows(
 		subjectId: string;
 		subjectName: string;
 		topicGrade: number;
+		chapterNumber: number;
 		sortUnit: number;
-		sortChapter: number;
 		sortTopic: number;
 		scoreSum: number;
 		studentsWithData: number;
 		testsTaken: number;
 		studentsBelowSupportLine: number;
+		belowSupportLineStudents: TeacherTopicBelowSupportLineStudent[];
 	};
 
 	const byTopic = new Map<string, Agg>();
@@ -126,13 +135,14 @@ export async function listTeacherTopicPerformanceRows(
 				subjectId: row.subjectId,
 				subjectName: row.subjectName,
 				topicGrade: row.topicGrade,
+				chapterNumber: row.chapterNumber,
 				sortUnit: row.unitNumber,
-				sortChapter: row.chapterNumber,
 				sortTopic: row.topicNumber,
 				scoreSum: 0,
 				studentsWithData: 0,
 				testsTaken: 0,
 				studentsBelowSupportLine: 0,
+				belowSupportLineStudents: [],
 			};
 
 		bucket.scoreSum += averageScore;
@@ -140,31 +150,45 @@ export async function listTeacherTopicPerformanceRows(
 		bucket.testsTaken += testsTaken;
 		if (averageScore < CLASS_PERFORMANCE_SUPPORT_LINE_PERCENT) {
 			bucket.studentsBelowSupportLine += 1;
+			const profile = rosterById.get(row.studentId);
+			if (profile) {
+				bucket.belowSupportLineStudents.push({
+					studentId: row.studentId,
+					fullName: profile.fullName,
+					averagePercent: roundPercent(averageScore),
+				});
+			}
 		}
 		byTopic.set(row.topicId, bucket);
 	}
 
-	const list: TeacherTopicPerformanceRow[] = [...byTopic.values()].map((topic) => ({
-		topicId: topic.topicId,
-		topicName: topic.topicName,
-		subjectId: topic.subjectId,
-		subjectName: topic.subjectName,
-		topicGrade: topic.topicGrade,
-		sortUnit: topic.sortUnit,
-		sortChapter: topic.sortChapter,
-		sortTopic: topic.sortTopic,
-		averagePercent: roundPercent(topic.scoreSum / topic.studentsWithData),
-		studentsWithData: topic.studentsWithData,
-		testsTaken: topic.testsTaken,
-		studentsBelowSupportLine: topic.studentsBelowSupportLine,
-	}));
+	const list: TeacherTopicPerformanceRow[] = [...byTopic.values()].map((topic) => {
+		const belowSupportLineStudents = [...topic.belowSupportLineStudents].sort((a, b) =>
+			a.fullName.localeCompare(b.fullName),
+		);
+		return {
+			topicId: topic.topicId,
+			topicName: topic.topicName,
+			subjectId: topic.subjectId,
+			subjectName: topic.subjectName,
+			topicGrade: topic.topicGrade,
+			chapterNumber: topic.chapterNumber,
+			sortUnit: topic.sortUnit,
+			sortTopic: topic.sortTopic,
+			averagePercent: roundPercent(topic.scoreSum / topic.studentsWithData),
+			studentsWithData: topic.studentsWithData,
+			testsTaken: topic.testsTaken,
+			studentsBelowSupportLine: belowSupportLineStudents.length,
+			belowSupportLineStudents,
+		};
+	});
 
 	list.sort((a, b) => {
 		const sub = a.subjectName.localeCompare(b.subjectName);
 		if (sub !== 0) return sub;
 		if (a.topicGrade !== b.topicGrade) return a.topicGrade - b.topicGrade;
 		if (a.sortUnit !== b.sortUnit) return a.sortUnit - b.sortUnit;
-		if (a.sortChapter !== b.sortChapter) return a.sortChapter - b.sortChapter;
+		if (a.chapterNumber !== b.chapterNumber) return a.chapterNumber - b.chapterNumber;
 		if (a.sortTopic !== b.sortTopic) return a.sortTopic - b.sortTopic;
 		return a.topicName.localeCompare(b.topicName);
 	});
@@ -181,6 +205,7 @@ export async function listTeacherTopicStudentBreakdown(params: {
 	subjectId?: string | null;
 }): Promise<{
 	topicLabel: string;
+	chapterNumber: number | null;
 	subjectName: string;
 	topicSubjectId: string | null;
 	rows: TeacherTopicStudentBreakdownRow[];
@@ -196,12 +221,13 @@ export async function listTeacherTopicStudentBreakdown(params: {
 	const rosterById = new Map(roster.map((s) => [s.id, s]));
 
 	if (roster.length === 0) {
-		return { topicLabel: "Topic", subjectName: "", topicSubjectId: null, rows: [] };
+		return { topicLabel: "Topic", chapterNumber: null, subjectName: "", topicSubjectId: null, rows: [] };
 	}
 
 	const metaRows = await db
 		.select({
 			topicName: topics.topicName,
+			chapterNumber: topics.chapterNumber,
 			subjectName: subjects.name,
 			subjectId: topics.subjectId,
 		})
@@ -211,6 +237,7 @@ export async function listTeacherTopicStudentBreakdown(params: {
 		.limit(1);
 
 	const topicLabel = metaRows[0]?.topicName ?? "Topic";
+	const chapterNumber = metaRows[0]?.chapterNumber ?? null;
 	const subjectName = metaRows[0]?.subjectName ?? "";
 	const topicSubjectId = metaRows[0]?.subjectId ?? null;
 
@@ -254,5 +281,5 @@ export async function listTeacherTopicStudentBreakdown(params: {
 
 	breakdown.sort((a, b) => a.fullName.localeCompare(b.fullName));
 
-	return { topicLabel, subjectName, topicSubjectId, rows: breakdown };
+	return { topicLabel, chapterNumber, subjectName, topicSubjectId, rows: breakdown };
 }

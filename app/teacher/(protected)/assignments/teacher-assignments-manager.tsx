@@ -4,14 +4,13 @@ import * as React from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, ClipboardList } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 
-import { panelRaisedInputClass, tabAccentClass } from "@/app/student/settings/_settings-form-styles";
+import { panelRaisedInputClass } from "@/app/student/settings/_settings-form-styles";
+import { AssignmentPublishedSuccessDialog } from "@/components/teacher/assignment-published-success-dialog";
 import { AssignmentDueDatetimeField } from "@/components/teacher/assignment-due-datetime-field";
-import { TeacherAssignmentsSubmissionsHub } from "@/components/teacher/teacher-assignments-submissions-hub";
 import { TeacherAssignmentTopicMatrix } from "@/components/teacher/teacher-assignment-topic-matrix";
 import { practiceTopicMatrixCheckCircleClass } from "@/components/student/practice/practice-test-wizard/types";
-import SmoothTab from "@/components/kokonutui/smooth-tab";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Separator } from "@/components/ui/separator";
 import { createTeacherAssignmentAction, type CreateTeacherAssignmentState } from "./actions";
@@ -26,10 +25,9 @@ import {
 	type AssignmentBandFilterId,
 } from "@/lib/assignments/recipient-selection";
 import type { AssignmentTopicCatalogRow } from "@/lib/assignments/queries";
-import type { TeacherSubmissionAssignmentBundle } from "@/lib/assignments/teacher-submissions-hub-types";
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
 import {
-	formatSubjectCatalogOptionLabel,
+	buildSubjectCatalogPillSelectModel,
 	type SubjectCatalogRow,
 } from "@/lib/teachers/subject-catalog-label";
 import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-queries";
@@ -39,7 +37,6 @@ type Props = {
 	subjectsCatalog: SubjectCatalogRow[];
 	topicsCatalog: AssignmentTopicCatalogRow[];
 	students: TeacherPerformanceStudentRow[];
-	submissionBundles: TeacherSubmissionAssignmentBundle[];
 };
 
 const initialState: CreateTeacherAssignmentState = { ok: false, message: "" };
@@ -49,9 +46,6 @@ const ASSIGNMENT_STUDENT_BAND_FILTER_OPTIONS: { id: AssignmentBandFilterId; labe
 	{ id: "near_target", label: "Near target" },
 	{ id: "needs_support", label: "Needs support" },
 ];
-
-const ASSIGNMENTS_SMOOTH_TAB_PANEL_CLASS =
-	"min-h-[280px] rounded-xl border border-border/90 bg-muted px-6 py-7 shadow-sm medium:px-8 medium:py-8 dark:border-border dark:bg-muted/20";
 
 function SubmitButton({
 	disabled,
@@ -75,16 +69,20 @@ export function TeacherAssignmentsManager({
 	subjectsCatalog,
 	topicsCatalog,
 	students,
-	submissionBundles,
 }: Props) {
 	const router = useRouter();
-	const [activateTabRequest, setActivateTabRequest] = React.useState<{
-		token: number;
-		tabId: string;
+	const [successDialogOpen, setSuccessDialogOpen] = React.useState(false);
+	const [publishedSummary, setPublishedSummary] = React.useState<{
+		title: string;
+		studentCount: number;
 	} | null>(null);
 	const [state, formAction] = useActionState(createTeacherAssignmentAction, initialState);
 	const [formKey, setFormKey] = React.useState(0);
 	const [subjectId, setSubjectId] = React.useState(subjectsCatalog[0]?.id ?? "");
+	const assignmentSubjectGroups = React.useMemo(
+		() => buildSubjectCatalogPillSelectModel(subjectsCatalog, { includeAll: false }).optionGroups,
+		[subjectsCatalog],
+	);
 	const topicsForSubject = React.useMemo(
 		() => topicsCatalog.filter((topic) => topic.subjectId === subjectId),
 		[topicsCatalog, subjectId],
@@ -305,19 +303,22 @@ export function TeacherAssignmentsManager({
 	);
 
 	React.useEffect(() => {
-		if (!state.ok || !state.message) return;
+		if (!state.ok || !state.assignmentId || !state.title || state.studentCount == null) return;
 		router.refresh();
+		setPublishedSummary({ title: state.title, studentCount: state.studentCount });
+		setSuccessDialogOpen(true);
 		setFormKey((k) => k + 1);
 		setSelectedTopicIds(new Set());
 		setManualSelectionEnabled(false);
 		setSelectedStudentIds([]);
 		setEligibleStudentIds([]);
 		setEligibilityError(null);
-		setActivateTabRequest((prev) => ({
-			token: (prev?.token ?? 0) + 1,
-			tabId: "submissions",
-		}));
-	}, [state.ok, state.message, router]);
+	}, [state.ok, state.assignmentId, state.title, state.studentCount, router]);
+
+	const handleCreateAnother = React.useCallback(() => {
+		setSuccessDialogOpen(false);
+		setPublishedSummary(null);
+	}, []);
 
 	const inputFocusRing =
 		"outline-none transition-[border-color,box-shadow] duration-150 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/45";
@@ -332,25 +333,11 @@ export function TeacherAssignmentsManager({
 				</p>
 			</div>
 
-			<SmoothTab
-				defaultTabId="create"
-				activateTabRequest={activateTabRequest}
-				panelClassName={ASSIGNMENTS_SMOOTH_TAB_PANEL_CLASS}
-				persistContentPanels
-				deferUntilActivatedTabIds={["submissions"]}
-				tabListPosition="top"
-				items={[
-					{
-						id: "create",
-						title: "Create assignments",
-						icon: ClipboardList,
-						color: tabAccentClass,
-						content: (
-							<form
-								key={formKey}
-								action={formAction}
-								className="space-y-10 rounded-2xl border border-border/70 bg-card p-5 shadow-sm medium:space-y-11 medium:p-7"
-							>
+			<form
+				key={formKey}
+				action={formAction}
+				className="space-y-10 rounded-2xl border border-border/70 bg-card p-5 shadow-sm medium:space-y-11 medium:p-7"
+			>
 						<div className="flex flex-wrap items-center gap-5 border-border/50 border-b pb-8">
 							<div
 								className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary dark:bg-primary/16"
@@ -358,11 +345,8 @@ export function TeacherAssignmentsManager({
 							>
 								<ClipboardList className="size-5" />
 							</div>
-							<div className="min-w-0 flex-1 space-y-1.5">
+							<div className="min-w-0 flex-1">
 								<h2 className="font-semibold text-foreground text-lg tracking-tight">New assignment</h2>
-								<p className="text-muted-foreground text-sm leading-relaxed">
-									Jobs materialize tests on a short stagger so the queue stays smooth.
-								</p>
 							</div>
 						</div>
 
@@ -419,12 +403,16 @@ export function TeacherAssignmentsManager({
 											value={subjectId}
 											onChange={(e) => setSubjectId(e.target.value)}
 											required
-											className={cn("rounded-lg border border-input", inputFocusRing)}
+											className={cn("max-w-full rounded-lg border border-input", inputFocusRing)}
 										>
-											{subjectsCatalog.map((subject) => (
-												<option key={subject.id} value={subject.id}>
-													{formatSubjectCatalogOptionLabel(subject)}
-												</option>
+											{assignmentSubjectGroups.map((group) => (
+												<optgroup key={group.heading} label={group.heading}>
+													{group.options.map((opt) => (
+														<option key={opt.value} value={opt.value}>
+															{opt.label}
+														</option>
+													))}
+												</optgroup>
 											))}
 										</NativeSelect>
 									</label>
@@ -558,14 +546,9 @@ export function TeacherAssignmentsManager({
 								<Separator className="flex-1" />
 							</div>
 							<div className="space-y-5">
-								<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-									<p className="max-w-[62ch] text-muted-foreground text-xs leading-relaxed">
-										Same chapter layout as the student practice test builder. Expand a chapter and tick topics.
-									</p>
-									<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-										{selectedTopicIds.size} selected
-									</p>
-								</div>
+								<p className="text-right text-muted-foreground text-xs tabular-nums" aria-live="polite">
+									{selectedTopicIds.size} selected
+								</p>
 
 								{Array.from(selectedTopicIds).map((id) => (
 									<input key={id} type="hidden" name="topic_ids" value={id} />
@@ -691,11 +674,8 @@ export function TeacherAssignmentsManager({
 							</div>
 						</section>
 
-						{state.message ? (
-							<p
-								className={state.ok ? "text-emerald-600 text-sm dark:text-emerald-400" : "text-destructive text-sm"}
-								role="status"
-							>
+						{!state.ok && state.message ? (
+							<p className="text-destructive text-sm" role="alert">
 								{state.message}
 							</p>
 						) : null}
@@ -710,22 +690,17 @@ export function TeacherAssignmentsManager({
 								</p>
 							) : null}
 						</div>
-					</form>
-				),
-			},
-			{
-				id: "submissions",
-				title: "Submissions",
-				icon: ClipboardCheck,
-				color: tabAccentClass,
-				content: (
-					<div className="flex flex-col gap-5">
-						<TeacherAssignmentsSubmissionsHub bundles={submissionBundles} />
-					</div>
-				),
-			},
-				]}
-			/>
+			</form>
+
+			{publishedSummary ?
+				<AssignmentPublishedSuccessDialog
+					open={successDialogOpen}
+					onOpenChange={setSuccessDialogOpen}
+					title={publishedSummary.title}
+					studentCount={publishedSummary.studentCount}
+					onCreateAnother={handleCreateAnother}
+				/>
+			:	null}
 		</div>
 	);
 }

@@ -7,6 +7,7 @@
  * Routes covered:
  *   - /teacher/dashboard
  *   - /teacher/assignments
+ *   - /teacher/submissions
  *   - /teacher/settings
  *   - /teacher/student-performance
  *   - /teacher/topic-performance
@@ -54,6 +55,7 @@ async function runAxe(page: import("@playwright/test").Page): Promise<AxeResults
 const ROUTES = [
 	"/teacher/dashboard",
 	"/teacher/assignments",
+	"/teacher/submissions",
 	"/teacher/settings",
 	"/teacher/student-performance",
 	"/teacher/topic-performance",

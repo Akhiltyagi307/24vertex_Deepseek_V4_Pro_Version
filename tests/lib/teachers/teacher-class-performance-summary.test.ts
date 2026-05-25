@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	computeRecentClassAverage,
 	computeRecentPerformanceBandPerStudent,
-	selectUpliftOpportunity,
+	selectUpliftOpportunities,
 } from "@/lib/teachers/teacher-class-performance-summary";
 
 describe("teacher class performance summary helpers", () => {
@@ -89,8 +89,8 @@ describe("teacher class performance summary helpers", () => {
 		]);
 	});
 
-	it("selects a broad low-performing topic over a one-student outlier", () => {
-		const opportunity = selectUpliftOpportunity({
+	it("returns up to five weakest topics, preferring broad low performers over one-student outliers", () => {
+		const opportunities = selectUpliftOpportunities({
 			studentsInScope: 10,
 			supportLinePercent: 60,
 			topics: [
@@ -121,9 +121,57 @@ describe("teacher class performance summary helpers", () => {
 					testsTaken: 18,
 					studentsBelowSupportLine: 1,
 				},
+				{
+					topicId: "topic-second",
+					topicName: "Linear equations",
+					subjectName: "Mathematics",
+					averagePercent: 48,
+					studentsTested: 6,
+					testsTaken: 12,
+					studentsBelowSupportLine: 4,
+				},
+				{
+					topicId: "topic-third",
+					topicName: "Quadratic roots",
+					subjectName: "Mathematics",
+					averagePercent: 55,
+					studentsTested: 5,
+					testsTaken: 10,
+					studentsBelowSupportLine: 3,
+				},
+				{
+					topicId: "topic-fourth",
+					topicName: "Trigonometry ratios",
+					subjectName: "Mathematics",
+					averagePercent: 58,
+					studentsTested: 4,
+					testsTaken: 8,
+					studentsBelowSupportLine: 2,
+				},
+				{
+					topicId: "topic-fifth",
+					topicName: "Coordinate geometry",
+					subjectName: "Mathematics",
+					averagePercent: 61,
+					studentsTested: 3,
+					testsTaken: 6,
+					studentsBelowSupportLine: 1,
+				},
+				{
+					topicId: "topic-sixth",
+					topicName: "Statistics basics",
+					subjectName: "Mathematics",
+					averagePercent: 63,
+					studentsTested: 3,
+					testsTaken: 6,
+					studentsBelowSupportLine: 0,
+				},
 			],
 		});
 
-		expect(opportunity?.topicId).toBe("topic-broad");
+		expect(opportunities).toHaveLength(5);
+		expect(opportunities[0]?.topicId).toBe("topic-second");
+		expect(opportunities.map((topic) => topic.topicId)).toContain("topic-broad");
+		expect(opportunities.map((topic) => topic.topicId)).not.toContain("topic-outlier");
 	});
 });

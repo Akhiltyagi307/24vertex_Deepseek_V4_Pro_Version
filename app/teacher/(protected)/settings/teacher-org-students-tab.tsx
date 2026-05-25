@@ -6,7 +6,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { fetchTeacherOrganizationRoster } from "./org-roster-actions";
 import { SensitiveLinkCode } from "@/components/teacher/sensitive-link-code";
 import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-queries";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import {
+	buildSubjectCatalogPillSelectModel,
+	type SubjectCatalogRow,
+} from "@/lib/teachers/subject-catalog-label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +43,11 @@ export function TeacherOrgStudentsTab({
 		if (grade === "all") return subjectsCatalog;
 		return subjectsCatalog.filter((s) => s.grade === grade);
 	}, [grade, subjectsCatalog]);
+
+	const subjectSelectModel = useMemo(
+		() => buildSubjectCatalogPillSelectModel(subjectOptions),
+		[subjectOptions],
+	);
 
 	useEffect(() => {
 		if (skipInitialFetch.current) {
@@ -139,12 +147,17 @@ export function TeacherOrgStudentsTab({
 						onChange={(e) => handleSubjectChange(e.target.value)}
 						disabled={pending}
 						aria-busy={pending}
+						className="max-w-full"
 					>
 						<option value="all">All subjects</option>
-						{subjectOptions.map((s) => (
-							<option key={s.id} value={s.id}>
-								{s.name} (Gr. {s.grade})
-							</option>
+						{subjectSelectModel.optionGroups.map((group) => (
+							<optgroup key={group.heading} label={group.heading}>
+								{group.options.map((opt) => (
+									<option key={opt.value} value={opt.value}>
+										{opt.label}
+									</option>
+								))}
+							</optgroup>
 						))}
 					</NativeSelect>
 				</div>

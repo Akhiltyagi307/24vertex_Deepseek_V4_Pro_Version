@@ -11,7 +11,10 @@ import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import type { TeacherDashboardBundle } from "./teacher-dashboard-data";
 import type { TeacherClassPerformanceSummary } from "@/lib/teachers/teacher-class-performance-summary-types";
 import type { TeacherAtRiskStudentRow } from "@/lib/teachers/teacher-at-risk-types";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import {
+	buildSubjectCatalogPillSelectModel,
+	type SubjectCatalogRow,
+} from "@/lib/teachers/subject-catalog-label";
 
 type Props = {
 	activeOrganization: { name: string } | null;
@@ -56,6 +59,11 @@ export function TeacherDashboardPanel({
 		return subjectsCatalog.filter((s) => s.grade === grade);
 	}, [grade, subjectsCatalog]);
 
+	const subjectPillModel = useMemo(
+		() => buildSubjectCatalogPillSelectModel(subjectOptions),
+		[subjectOptions],
+	);
+
 	const handleGradeChange = (value: string) => {
 		const nextGrade = value === "" ? "all" : Number(value);
 		setGrade(nextGrade);
@@ -72,7 +80,9 @@ export function TeacherDashboardPanel({
 
 	const scopeSummaryParts = [
 		grade === "all" ? "All grades" : `Grade ${grade}`,
-		subjectId === "all" ? "All subjects" : (subjectOptions.find((s) => s.id === subjectId)?.name ?? "Subject"),
+		subjectId === "all" ?
+			"All subjects"
+		:	(subjectPillModel.options.find((o) => o.value === subjectId)?.label ?? "Subject"),
 		section === "all" ? "All sections" : section,
 	];
 	const scopeLabel = scopeSummaryParts.join(" · ");
@@ -162,14 +172,13 @@ export function TeacherDashboardPanel({
 						<div className="min-w-0 flex-1">
 							<ReportsPillSelect
 								fullWidth
+								menuWide
 								menuTitle="Subject"
 								ariaLabel="Set dashboard scope: subject"
 								icon={Library}
 								value={subjectPillValue}
-								options={[
-									{ value: "", label: "All subjects" },
-									...subjectOptions.map((s) => ({ value: s.id, label: s.name })),
-								]}
+								options={subjectPillModel.options}
+								optionGroups={subjectPillModel.optionGroups}
 								className="shadow-none"
 								onValueChange={(v) => setSubjectId(v === "" ? "all" : v)}
 							/>

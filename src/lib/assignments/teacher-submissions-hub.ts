@@ -222,6 +222,9 @@ export async function loadTeacherSubmissionAssignmentBundles(
 			let satisfactoryCount = 0;
 			let goodCount = 0;
 			let sampleStudents = 0;
+			const badStudents: TopicSubmissionAggRow["badStudents"] = [];
+			const satisfactoryStudents: TopicSubmissionAggRow["satisfactoryStudents"] = [];
+			const goodStudents: TopicSubmissionAggRow["goodStudents"] = [];
 
 			for (const sub of gradedRows) {
 				const pack = reportByTestId.get(sub.testId!);
@@ -230,15 +233,33 @@ export async function loadTeacherSubmissionAssignmentBundles(
 				if (!hit) continue;
 				sampleStudents += 1;
 				const avg = Number(hit.average_score);
+				const averagePercent = Number.isFinite(avg) ? avg : 0;
 				if (Number.isFinite(avg)) {
 					scoreSum += avg;
 					scoreN += 1;
 				}
 				const st = normalizeTrackerStatus(hit.status);
-				if (st === "bad") badCount += 1;
-				else if (st === "satisfactory") satisfactoryCount += 1;
-				else if (st === "good") goodCount += 1;
+				const studentEntry = {
+					studentId: sub.studentId,
+					fullName: sub.studentFullName,
+					averagePercent,
+				};
+				if (st === "bad") {
+					badCount += 1;
+					badStudents.push(studentEntry);
+				} else if (st === "satisfactory") {
+					satisfactoryCount += 1;
+					satisfactoryStudents.push(studentEntry);
+				} else if (st === "good") {
+					goodCount += 1;
+					goodStudents.push(studentEntry);
+				}
 			}
+
+			const sortBandStudents = (list: TopicSubmissionAggRow["badStudents"]) =>
+				[...list].sort(
+					(a, b) => a.averagePercent - b.averagePercent || a.fullName.localeCompare(b.fullName),
+				);
 
 			const topicName = topicNameById.get(topicId) ?? hitTopicNameFallback(gradedRows, topicId, reportByTestId);
 
@@ -250,6 +271,9 @@ export async function loadTeacherSubmissionAssignmentBundles(
 				satisfactoryCount,
 				goodCount,
 				sampleStudents,
+				badStudents: sortBandStudents(badStudents),
+				satisfactoryStudents: sortBandStudents(satisfactoryStudents),
+				goodStudents: sortBandStudents(goodStudents),
 			});
 		}
 
@@ -306,6 +330,7 @@ export async function loadTeacherSubmissionAssignmentBundles(
 			title,
 			dueAt,
 			createdAt,
+			subjectId,
 			subjectName,
 			subjectGrade,
 			sectionsLabel: formatSectionsLabel(rows),

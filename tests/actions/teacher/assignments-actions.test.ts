@@ -107,6 +107,8 @@ describe("createTeacherAssignmentAction", () => {
 			makeFormData(),
 		);
 		expect(result.ok).toBe(true);
+		expect(result.assignmentId).toBe("assignment-1");
+		expect(result.studentCount).toBe(1);
 		expect(createPublishedPracticeAssignment).toHaveBeenCalledWith(
 			expect.objectContaining({ teacherId: "teacher-1", organizationId: "org-1" }),
 		);
@@ -114,5 +116,6 @@ describe("createTeacherAssignmentAction", () => {
 			expect.objectContaining({ assignmentId: "assignment-1" }),
 		);
 		expect(revalidatePath).toHaveBeenCalledWith("/teacher/assignments");
+		expect(revalidatePath).toHaveBeenCalledWith("/teacher/submissions");
 	});
 });

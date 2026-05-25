@@ -71,6 +71,18 @@ test.describe("Teacher portal", () => {
 		expect(errors, `console errors on /teacher/assignments: ${errors.join("\n")}`).toHaveLength(0);
 	});
 
+	test("/teacher/submissions loads with lifecycle tabs", async ({ page }) => {
+		const { errors } = attachConsoleCollector(page);
+		await page.goto("/teacher/submissions", { waitUntil: "domcontentloaded" });
+		const path = new URL(page.url()).pathname;
+		expect(path.startsWith("/teacher/")).toBe(true);
+		await expect(page).toHaveTitle(/submissions/i, { timeout: 5000 });
+		await expect(page.getByRole("tab", { name: /ongoing/i })).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByRole("tab", { name: /completed/i })).toBeVisible();
+		await expect(page.getByRole("tab", { name: /past/i })).toBeVisible();
+		expect(errors, `console errors on /teacher/submissions: ${errors.join("\n")}`).toHaveLength(0);
+	});
+
 	test("/teacher/settings exposes Profile/Login email/Password tabs", async ({ page }) => {
 		await page.goto("/teacher/settings", { waitUntil: "domcontentloaded" });
 		await expect(page.getByRole("tab", { name: /^profile$/i })).toBeVisible({ timeout: 10_000 });

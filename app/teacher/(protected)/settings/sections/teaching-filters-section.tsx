@@ -4,7 +4,10 @@ import { settingsPrimarySubmitClass } from "./_shared";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import {
+	buildSubjectCatalogPillSelectModel,
+	type SubjectCatalogRow,
+} from "@/lib/teachers/subject-catalog-label";
 
 import type { TeacherAccountProfile } from "../teacher-account-settings-form-types";
 
@@ -22,6 +25,7 @@ export function TeacherTeachingFiltersSection({
 	formAction: (formData: FormData) => void;
 }) {
 	const subjectsForGrade = subjectsCatalog.filter((s) => s.grade === gradePick);
+	const subjectGroups = buildSubjectCatalogPillSelectModel(subjectsForGrade, { includeAll: false }).optionGroups;
 	return (
 		<form action={formAction} className="space-y-6">
 			<div>
@@ -64,10 +68,14 @@ export function TeacherTeachingFiltersSection({
 						{subjectsForGrade.length === 0 ? (
 							<option value="">No subjects configured for this grade</option>
 						) : (
-							subjectsForGrade.map((s) => (
-								<option key={s.id} value={s.id}>
-									{s.name}
-								</option>
+							subjectGroups.map((group) => (
+								<optgroup key={group.heading} label={group.heading}>
+									{group.options.map((opt) => (
+										<option key={opt.value} value={opt.value}>
+											{opt.label}
+										</option>
+									))}
+								</optgroup>
 							))
 						)}
 					</NativeSelect>

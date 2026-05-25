@@ -6,7 +6,15 @@ import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 
 export type { SubjectCatalogRow } from "./subject-catalog-label";
-export { formatSubjectCatalogOptionLabel } from "./subject-catalog-label";
+export {
+	buildSubjectCatalogPillSelectModel,
+	formatSubjectCatalogOptionLabel,
+} from "./subject-catalog-label";
+export type {
+	SubjectCatalogPillOption,
+	SubjectCatalogPillOptionGroup,
+	SubjectCatalogPillSelectModel,
+} from "./subject-catalog-label";
 
 import type { SubjectCatalogRow } from "./subject-catalog-label";
 

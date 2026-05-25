@@ -27,6 +27,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
+import { getWeakTopicsPreview, type TeacherSubmissionBucket } from "@/lib/assignments/teacher-submission-buckets";
 import type {
 	StudentSubmissionPerfRow,
 	TeacherSubmissionAssignmentBundle,
@@ -38,10 +39,18 @@ import type { TrackerTopicStatus } from "@/lib/practice/topic-rollup";
 import { formatTrackerStatusLabel, TRACKER_STATUS_LABELS } from "@/lib/student/tracker-status-labels";
 import { cn } from "@/lib/utils";
 
+import {
+	AssignmentTopicBandCountCell,
+	AssignmentTopicBandCountCellWrapper,
+} from "@/components/teacher/assignment-topic-band-count-cell";
+
 const HANDED_IN = new Set(["submitted", "grading", "graded"]);
 
 type Props = {
 	bundles: TeacherSubmissionAssignmentBundle[];
+	bucket?: TeacherSubmissionBucket;
+	emptyTitle?: string;
+	emptyBody?: string;
 };
 
 type SheetVariant = "assigned" | "submitted" | "notSubmitted";
@@ -128,6 +137,99 @@ function followUpBadge(tone: FollowUpTone) {
 				</Badge>
 			);
 	}
+}
+
+function bucketStatusBadge(
+	bundle: TeacherSubmissionAssignmentBundle,
+	bucket: TeacherSubmissionBucket | undefined,
+): React.ReactNode {
+	if (!bucket) {
+		const followUp = assignmentFollowUpTone(bundle);
+		return followUp ? followUpBadge(followUp) : null;
+	}
+	switch (bucket) {
+		case "ongoing": {
+			const waiting = bundle.counts.notSubmitted;
+			if (waiting <= 0) {
+				return (
+					<Badge variant="secondary" className="shrink-0 font-normal">
+						Open
+					</Badge>
+				);
+			}
+			return (
+				<Badge variant="outline" className="shrink-0 font-normal">
+					{waiting} waiting
+				</Badge>
+			);
+		}
+		case "completed":
+			return bundle.counts.notSubmitted === 0 ?
+					(
+						<Badge variant="secondary" className="shrink-0 font-normal">
+							All handed in
+						</Badge>
+					)
+				:	(
+						<Badge variant="outline" className="shrink-0 font-normal">
+							Closed
+						</Badge>
+					);
+		case "past":
+			return (
+				<Badge variant="outline" className="shrink-0 font-normal text-muted-foreground">
+					Archived
+				</Badge>
+			);
+	}
+}
+
+function WeakTopicsStrip({
+	bundle,
+	onViewAllTopics,
+}: {
+	bundle: TeacherSubmissionAssignmentBundle;
+	onViewAllTopics: () => void;
+}) {
+	const preview = getWeakTopicsPreview(bundle);
+	if (preview.length === 0) {
+		const hasGradedSamples = bundle.topicAnalytics.some((row) => row.sampleStudents > 0);
+		if (hasGradedSamples) return null;
+		return (
+			<p className="text-muted-foreground text-xs leading-relaxed">
+				Topic insights appear after grading.
+			</p>
+		);
+	}
+
+	return (
+		<div className="space-y-2">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<p className="text-muted-foreground text-xs font-medium">Topics to strengthen</p>
+				<button
+					type="button"
+					className="text-link text-xs underline-offset-4 hover:underline"
+					onClick={onViewAllTopics}
+				>
+					View all topics
+				</button>
+			</div>
+			<div className="flex flex-wrap gap-2">
+				{preview.map((row) => (
+					<Badge
+						key={row.topicId}
+						variant={row.badCount > 0 ? "destructive" : "secondary"}
+						className="max-w-full font-normal"
+					>
+						<span className="truncate">{row.topicName}</span>
+						{row.badCount > 0 ?
+							<span className="ml-1 tabular-nums opacity-90">· {row.badCount} {TRACKER_STATUS_LABELS.bad.toLowerCase()}</span>
+						:	null}
+					</Badge>
+				))}
+			</div>
+		</div>
+	);
 }
 
 function assignmentMetaLine(bundle: TeacherSubmissionAssignmentBundle): string {
@@ -227,7 +329,12 @@ function sheetTitleParts(variant: SheetVariant): { title: string; description: s
 	}
 }
 
-export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
+export function TeacherAssignmentsSubmissionsHub({
+	bundles,
+	bucket,
+	emptyTitle = "No submissions yet",
+	emptyBody = "When you publish an assignment, each student\u2019s progress and status show up here.",
+}: Props) {
 	const [sheet, setSheet] = React.useState<
 		null | { bundle: TeacherSubmissionAssignmentBundle; variant: SheetVariant }
 	>(null);
@@ -248,10 +355,8 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 				<div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground">
 					<InboxIcon className="size-6" aria-hidden />
 				</div>
-				<p className="font-medium text-foreground">No submissions yet</p>
-				<p className="mt-2 text-muted-foreground text-sm leading-relaxed">
-					When you publish an assignment, each student&apos;s progress and status show up here.
-				</p>
+				<p className="font-medium text-foreground">{emptyTitle}</p>
+				<p className="mt-2 text-muted-foreground text-sm leading-relaxed">{emptyBody}</p>
 			</div>
 		);
 	}
@@ -260,7 +365,6 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 		<>
 			<div className="flex flex-col gap-4">
 				{bundles.map((bundle) => {
-					const followUp = assignmentFollowUpTone(bundle);
 					return (
 						<article
 							key={bundle.assignmentId}
@@ -271,7 +375,7 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 									<div className="min-w-0 flex-1 space-y-3">
 										<div className="flex flex-wrap items-start gap-2 gap-y-1">
 											<h2 className="min-w-0 font-semibold text-foreground text-lg tracking-tight">{bundle.title}</h2>
-											{followUp ? followUpBadge(followUp) : null}
+											{bucketStatusBadge(bundle, bucket)}
 										</div>
 										{bundle.dueAt ?
 											<p className="text-muted-foreground text-sm">
@@ -282,6 +386,10 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 										<SubmissionProgress
 											submitted={bundle.counts.submitted}
 											assigned={bundle.counts.assigned}
+										/>
+										<WeakTopicsStrip
+											bundle={bundle}
+											onViewAllTopics={() => setAnalytics({ bundle, step: "topic" })}
 										/>
 									</div>
 
@@ -391,18 +499,20 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 								<Button
 									type="button"
 									variant="outline"
+									aria-label="Performance by topic"
 									className="h-auto min-h-[5.5rem] flex-col items-start gap-1 whitespace-normal rounded-xl px-4 py-4 text-left"
 									onClick={() => setAnalytics({ ...analytics, step: "topic" })}
 								>
 									<span className="font-semibold text-foreground">Performance by topic</span>
 									<span className="text-muted-foreground text-xs font-normal leading-snug">
-										Cumulative scores and strengthen, on track, and strong counts per syllabus topic
-										(graded tests only).
+										Cumulative scores and strengthen, on track, and strong counts per syllabus topic (graded
+										tests only).
 									</span>
 								</Button>
 								<Button
 									type="button"
 									variant="outline"
+									aria-label="Performance by student"
 									className="h-auto min-h-[5.5rem] flex-col items-start gap-1 whitespace-normal rounded-xl px-4 py-4 text-left"
 									onClick={() => setAnalytics({ ...analytics, step: "student" })}
 								>
@@ -418,6 +528,7 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 					{analytics?.step === "topic" ?
 						<TopicPerformancePanel
 							bundle={analytics.bundle}
+							panelKey={analytics.bundle.assignmentId}
 							onBack={() => setAnalytics({ ...analytics, step: "pick" })}
 							onClose={() => setAnalytics(null)}
 						/>
@@ -516,10 +627,12 @@ export function TeacherAssignmentsSubmissionsHub({ bundles }: Props) {
 
 function TopicPerformancePanel({
 	bundle,
+	panelKey,
 	onBack,
 	onClose,
 }: {
 	bundle: TeacherSubmissionAssignmentBundle;
+	panelKey: string;
 	onBack: () => void;
 	onClose: () => void;
 }) {
@@ -538,35 +651,37 @@ function TopicPerformancePanel({
 						No graded topic breakdowns yet. As soon as tests finish grading, roll-ups appear here using each
 						report&apos;s topic scores.
 					</p>
-				:	<table className="w-full min-w-[40rem] border-collapse text-sm">
-						<thead>
-							<tr className="border-border border-b bg-muted/40 text-left dark:bg-muted/20">
-								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									Topic
-								</th>
-								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									Cumulative %
-								</th>
-								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									{TRACKER_STATUS_LABELS.bad}
-								</th>
-								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									{TRACKER_STATUS_LABELS.satisfactory}
-								</th>
-								<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
-									{TRACKER_STATUS_LABELS.good}
-								</th>
-								<th scope="col" className="px-3 py-3 font-medium text-muted-foreground text-xs">
-									Graded n
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							{rows.map((row) => (
-								<TopicPerfRow key={row.topicId} row={row} />
-							))}
-						</tbody>
-					</table>
+				:	<AssignmentTopicBandCountCellWrapper resetKey={panelKey}>
+						<table className="w-full min-w-[40rem] border-collapse text-sm">
+							<thead>
+								<tr className="border-border border-b bg-muted/40 text-left dark:bg-muted/20">
+									<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
+										Topic
+									</th>
+									<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
+										Cumulative %
+									</th>
+									<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
+										{TRACKER_STATUS_LABELS.bad}
+									</th>
+									<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
+										{TRACKER_STATUS_LABELS.satisfactory}
+									</th>
+									<th scope="col" className="px-3 py-3 font-medium text-foreground text-xs">
+										{TRACKER_STATUS_LABELS.good}
+									</th>
+									<th scope="col" className="px-3 py-3 font-medium text-muted-foreground text-xs">
+										Graded n
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{rows.map((row) => (
+									<TopicPerfRow key={row.topicId} row={row} subjectId={bundle.subjectId} />
+								))}
+							</tbody>
+						</table>
+					</AssignmentTopicBandCountCellWrapper>
 				}
 			</div>
 			<div className="flex flex-wrap gap-2 border-border border-t bg-muted/15 px-5 py-4 dark:bg-muted/10">
@@ -581,7 +696,7 @@ function TopicPerformancePanel({
 	);
 }
 
-function TopicPerfRow({ row }: { row: TopicSubmissionAggRow }) {
+function TopicPerfRow({ row, subjectId }: { row: TopicSubmissionAggRow; subjectId: string | null }) {
 	return (
 		<tr className="border-border border-b last:border-b-0 hover:bg-muted/20">
 			<th scope="row" className="max-w-[14rem] px-3 py-3 text-left align-middle font-normal text-foreground leading-snug">
@@ -590,9 +705,33 @@ function TopicPerfRow({ row }: { row: TopicSubmissionAggRow }) {
 			<td className="px-3 py-3 align-middle font-mono text-xs tabular-nums">
 				{row.cumulativePercent != null ? `${row.cumulativePercent.toFixed(1)}%` : "—"}
 			</td>
-			<td className="px-3 py-3 align-middle font-mono text-xs tabular-nums">{row.badCount}</td>
-			<td className="px-3 py-3 align-middle font-mono text-xs tabular-nums">{row.satisfactoryCount}</td>
-			<td className="px-3 py-3 align-middle font-mono text-xs tabular-nums">{row.goodCount}</td>
+			<td className="px-3 py-3 align-middle text-xs">
+				<AssignmentTopicBandCountCell
+					cellKey={`${row.topicId}:bad`}
+					label={TRACKER_STATUS_LABELS.bad}
+					tone="bad"
+					students={row.badStudents}
+					subjectId={subjectId}
+				/>
+			</td>
+			<td className="px-3 py-3 align-middle text-xs">
+				<AssignmentTopicBandCountCell
+					cellKey={`${row.topicId}:satisfactory`}
+					label={TRACKER_STATUS_LABELS.satisfactory}
+					tone="satisfactory"
+					students={row.satisfactoryStudents}
+					subjectId={subjectId}
+				/>
+			</td>
+			<td className="px-3 py-3 align-middle text-xs">
+				<AssignmentTopicBandCountCell
+					cellKey={`${row.topicId}:good`}
+					label={TRACKER_STATUS_LABELS.good}
+					tone="good"
+					students={row.goodStudents}
+					subjectId={subjectId}
+				/>
+			</td>
 			<td className="px-3 py-3 align-middle text-muted-foreground text-xs tabular-nums">{row.sampleStudents}</td>
 		</tr>
 	);

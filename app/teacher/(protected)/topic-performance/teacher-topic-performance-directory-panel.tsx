@@ -5,11 +5,16 @@ import { GraduationCap, Layers2, Library, ListTree } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { fetchTeacherTopicPerformanceDirectory } from "./teacher-topic-performance-actions";
+import { TeacherTopicBelowSupportLineCell } from "./teacher-topic-below-support-line-cell";
+import { TeacherTopicBelowSupportLineHoverProvider } from "./teacher-topic-below-support-line-hover-context";
 import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { TeacherTopicPerformanceRow } from "@/lib/teachers/teacher-topic-performance-queries";
-import type { SubjectCatalogRow } from "@/lib/teachers/subjects-catalog";
+import {
+	buildSubjectCatalogPillSelectModel,
+	type SubjectCatalogRow,
+} from "@/lib/teachers/subject-catalog-label";
 import { cn } from "@/lib/utils";
 
 function topicDetailHref(topicId: string, filters: { grade: number | "all"; section: string | "all"; subjectId: string | "all" }) {
@@ -20,6 +25,10 @@ function topicDetailHref(topicId: string, filters: { grade: number | "all"; sect
 	const qs = q.toString();
 	return `/teacher/topic-performance/${topicId}${qs ? `?${qs}` : ""}`;
 }
+
+const topicDirectoryMetricHeaderClass =
+	"px-3 py-2.5 text-right font-medium text-muted-foreground text-xs whitespace-nowrap";
+const topicDirectoryMetricCellClass = "px-3 py-3 text-right tabular-nums whitespace-nowrap";
 
 export function TeacherTopicPerformanceDirectoryPanel({
 	workspaceDescription,
@@ -41,6 +50,7 @@ export function TeacherTopicPerformanceDirectoryPanel({
 	const [error, setError] = useState<string | null>(null);
 	const [pending, startTransition] = useTransition();
 	const skipInitialFetch = useRef(true);
+	const tableScrollRef = useRef<HTMLDivElement>(null);
 
 	const gradeOptions = useMemo(() => {
 		const fromData = filterOptions.grades.length ? filterOptions.grades : [];
@@ -53,6 +63,11 @@ export function TeacherTopicPerformanceDirectoryPanel({
 		if (grade === "all") return subjectsCatalog;
 		return subjectsCatalog.filter((s) => s.grade === grade);
 	}, [grade, subjectsCatalog]);
+
+	const subjectPillModel = useMemo(
+		() => buildSubjectCatalogPillSelectModel(subjectOptions),
+		[subjectOptions],
+	);
 
 	useEffect(() => {
 		if (skipInitialFetch.current) {
@@ -89,6 +104,7 @@ export function TeacherTopicPerformanceDirectoryPanel({
 	const showingLabel = rows.length === 1 ? "Showing 1 topic" : `Showing ${rows.length} topics`;
 
 	const filterSnapshot = useMemo(() => ({ grade, section, subjectId }), [grade, section, subjectId]);
+	const belowSupportHoverResetKey = useMemo(() => rows.map((r) => r.topicId).join(","), [rows]);
 
 	return (
 		<div className="flex min-h-[calc(100svh-5rem)] w-full min-w-0 flex-col gap-8 py-6">
@@ -159,21 +175,17 @@ export function TeacherTopicPerformanceDirectoryPanel({
 									onValueChange={(v) => setSection(v === "" ? "all" : v)}
 								/>
 							</div>
-							<div className="flex min-w-[min(14rem,calc(100vw-2.75rem))] max-w-[min(20rem,85vw)] shrink-0 flex-col gap-1.5">
+							<div className="flex min-w-[min(16rem,calc(100vw-2.75rem))] max-w-[min(28rem,92vw)] shrink-0 flex-col gap-1.5">
 								<span className="text-foreground text-xs font-medium">Subject</span>
 								<ReportsPillSelect
 									fullWidth
+									menuWide
 									menuTitle="Subject"
 									ariaLabel="Filter topics by subject"
 									icon={Library}
 									value={subjectPillValue}
-									options={[
-										{ value: "", label: "All subjects" },
-										...subjectOptions.map((s) => ({
-											value: s.id,
-											label: `${s.name} (Gr. ${s.grade})`,
-										})),
-									]}
+									options={subjectPillModel.options}
+									optionGroups={subjectPillModel.optionGroups}
 									className="shadow-none"
 									onValueChange={(v) => setSubjectId(v === "" ? "all" : v)}
 								/>
@@ -192,53 +204,125 @@ export function TeacherTopicPerformanceDirectoryPanel({
 								</p>
 							</div>
 						) : (
-							<div className="flex min-h-0 flex-1 flex-col overflow-auto">
-								<div className="min-w-0 flex-1">
-									<div className="min-w-[860px]">
-										<div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)_3rem_4rem_4.5rem_4rem_4rem_auto] gap-2 border-b border-border bg-muted/40 px-4 py-2 text-muted-foreground text-xs font-medium uppercase tracking-wide">
-											<span>Topic</span>
-											<span>Subject</span>
-											<span>Gr.</span>
-											<span>Avg</span>
-											<span>Students</span>
-											<span>Tests</span>
-											<span title="Students averaging below 60%">&lt;60%</span>
-											<span className="text-right"> </span>
-										</div>
-										<ul className="divide-y divide-border/80 bg-background">
-											{rows.map((row) => (
-												<li
-													key={row.topicId}
-													className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)_3rem_4rem_4.5rem_4rem_4rem_auto] items-center gap-2 px-4 py-3 text-sm"
-												>
-													<span className="min-w-0 truncate font-medium" title={row.topicName}>
+							<div ref={tableScrollRef} className="flex min-h-0 flex-1 flex-col overflow-auto">
+								<TeacherTopicBelowSupportLineHoverProvider
+									scrollRootRef={tableScrollRef}
+									resetKey={belowSupportHoverResetKey}
+								>
+								<table className="w-full min-w-[58rem] border-collapse text-sm">
+									<caption className="sr-only">
+										Topic performance by chapter: class average, student counts, and tests from graded practice
+									</caption>
+									<thead>
+										<tr className="border-b border-border bg-muted/40 text-muted-foreground">
+											<th
+												scope="col"
+												className="px-4 py-2.5 text-left font-medium text-xs"
+											>
+												Topic
+											</th>
+											<th
+												scope="col"
+												className={cn(topicDirectoryMetricHeaderClass, "min-w-[4.5rem]")}
+												title="Curriculum chapter number"
+											>
+												Chapter
+											</th>
+											<th
+												scope="col"
+												className="min-w-[9rem] px-3 py-2.5 text-left font-medium text-xs"
+											>
+												Subject
+											</th>
+											<th
+												scope="col"
+												className={topicDirectoryMetricHeaderClass}
+												title="Curriculum grade for this topic"
+											>
+												Grade
+											</th>
+											<th
+												scope="col"
+												className={cn(topicDirectoryMetricHeaderClass, "min-w-[5.5rem]")}
+												title="Average score across students with graded practice on this topic"
+											>
+												Class average
+											</th>
+											<th
+												scope="col"
+												className={cn(topicDirectoryMetricHeaderClass, "min-w-[5.25rem]")}
+												title="Students with at least one graded practice test on this topic"
+											>
+												Students
+											</th>
+											<th
+												scope="col"
+												className={cn(topicDirectoryMetricHeaderClass, "min-w-[5.25rem]")}
+												title="Total graded practice tests across those students"
+											>
+												Tests taken
+											</th>
+											<th
+												scope="col"
+												className={cn(topicDirectoryMetricHeaderClass, "min-w-[5.5rem]")}
+												title="Students whose topic average is below 60%"
+											>
+												Below 60%
+											</th>
+											<th scope="col" className="px-4 py-2.5 text-right font-medium text-xs">
+												<span className="sr-only">Actions</span>
+											</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-border/80 bg-background">
+										{rows.map((row) => (
+											<tr key={row.topicId} className="align-middle">
+												<td className="max-w-[18rem] px-4 py-3 font-medium">
+													<span className="block truncate" title={row.topicName}>
 														{row.topicName}
 													</span>
-													<span className="min-w-0 truncate text-muted-foreground" title={row.subjectName}>
+												</td>
+												<td
+													className={cn(topicDirectoryMetricCellClass, "text-muted-foreground")}
+													title={`Chapter ${row.chapterNumber}`}
+												>
+													{row.chapterNumber}
+												</td>
+												<td className="max-w-[14rem] px-3 py-3 text-muted-foreground">
+													<span className="block truncate" title={row.subjectName}>
 														{row.subjectName}
 													</span>
-													<span className="text-muted-foreground tabular-nums">{row.topicGrade}</span>
-													<span className="tabular-nums">{row.averagePercent}%</span>
-													<span className="tabular-nums">{row.studentsWithData}</span>
-													<span className="tabular-nums">{row.testsTaken}</span>
-													<span className="tabular-nums">{row.studentsBelowSupportLine}</span>
-													<div className="flex justify-end">
-														<Button
-															render={
-																<Link href={topicDetailHref(row.topicId, filterSnapshot)} prefetch={false} />
-															}
-															size="sm"
-															variant="outline"
-															className="whitespace-nowrap"
-														>
-															Class breakdown
-														</Button>
-													</div>
-												</li>
-											))}
-										</ul>
-									</div>
-								</div>
+												</td>
+												<td className={cn(topicDirectoryMetricCellClass, "text-muted-foreground")}>
+													{row.topicGrade}
+												</td>
+												<td className={topicDirectoryMetricCellClass}>{row.averagePercent}%</td>
+												<td className={topicDirectoryMetricCellClass}>{row.studentsWithData}</td>
+												<td className={topicDirectoryMetricCellClass}>{row.testsTaken}</td>
+												<td className={topicDirectoryMetricCellClass}>
+													<TeacherTopicBelowSupportLineCell
+														topicId={row.topicId}
+														students={row.belowSupportLineStudents}
+														subjectId={row.subjectId}
+													/>
+												</td>
+												<td className="px-4 py-3 text-right">
+													<Button
+														render={
+															<Link href={topicDetailHref(row.topicId, filterSnapshot)} prefetch={false} />
+														}
+														size="sm"
+														variant="outline"
+														className="whitespace-nowrap"
+													>
+														Class breakdown
+													</Button>
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+								</TeacherTopicBelowSupportLineHoverProvider>
 							</div>
 						)}
 					</div>

@@ -20,6 +20,7 @@ import type {
 } from "@/lib/teachers/teacher-class-performance-summary-types";
 
 export const CLASS_PERFORMANCE_RECENT_WINDOW_SIZE = 5;
+export const CLASS_PERFORMANCE_UPLIFT_TOPICS_LIMIT = 5;
 export const CLASS_PERFORMANCE_SUPPORT_LINE_PERCENT = 60;
 export const CLASS_PERFORMANCE_BANDS: Omit<TeacherPerformanceBandSummary, "count" | "students">[] = [
 	{
@@ -190,16 +191,14 @@ export function computeRecentClassAverage({
 	};
 }
 
-export function selectUpliftOpportunity({
-	studentsInScope,
-	supportLinePercent = CLASS_PERFORMANCE_SUPPORT_LINE_PERCENT,
-	topics: topicRows,
-}: UpliftOpportunityInput): TeacherClassUpliftOpportunity | null {
-	if (studentsInScope <= 0 || topicRows.length === 0) return null;
-
+function sortTopicsByUpliftScore(
+	topics: TeacherClassUpliftOpportunity[],
+	studentsInScope: number,
+	supportLinePercent: number,
+): TeacherClassUpliftOpportunity[] {
 	const minimumCoverage = studentsInScope <= 2 ? 1 : Math.max(2, Math.ceil(studentsInScope * 0.25));
-	const eligibleRows = topicRows.filter((topic) => topic.studentsTested >= minimumCoverage);
-	const candidates = eligibleRows.length > 0 ? eligibleRows : topicRows;
+	const eligibleRows = topics.filter((topic) => topic.studentsTested >= minimumCoverage);
+	const candidates = eligibleRows.length > 0 ? eligibleRows : topics;
 
 	return [...candidates].sort((a, b) => {
 		const coverageA = a.studentsTested / studentsInScope;
@@ -218,7 +217,17 @@ export function selectUpliftOpportunity({
 			b.testsTaken - a.testsTaken ||
 			a.topicName.localeCompare(b.topicName)
 		);
-	})[0] ?? null;
+	});
+}
+
+export function selectUpliftOpportunities({
+	studentsInScope,
+	supportLinePercent = CLASS_PERFORMANCE_SUPPORT_LINE_PERCENT,
+	topics: topicRows,
+	limit = CLASS_PERFORMANCE_UPLIFT_TOPICS_LIMIT,
+}: UpliftOpportunityInput & { limit?: number }): TeacherClassUpliftOpportunity[] {
+	if (studentsInScope <= 0 || topicRows.length === 0) return [];
+	return sortTopicsByUpliftScore(topicRows, studentsInScope, supportLinePercent).slice(0, limit);
 }
 
 function buildTopicOpportunities(
@@ -319,7 +328,7 @@ export async function getTeacherClassPerformanceSummaryForRoster(params: {
 			recentGradedItemsUsed: 0,
 			recentWindowSize: CLASS_PERFORMANCE_RECENT_WINDOW_SIZE,
 			performanceBands: emptyPerformanceBands(),
-			upliftOpportunity: null,
+			upliftOpportunities: [],
 		};
 	}
 
@@ -366,7 +375,7 @@ export async function getTeacherClassPerformanceSummaryForRoster(params: {
 	return {
 		studentsInScope: studentIds.length,
 		...recentAverage,
-		upliftOpportunity: selectUpliftOpportunity({
+		upliftOpportunities: selectUpliftOpportunities({
 			studentsInScope: studentIds.length,
 			topics: topicOpportunities,
 		}),

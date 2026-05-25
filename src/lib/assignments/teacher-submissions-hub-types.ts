@@ -2,6 +2,12 @@ import type { TrackerTopicStatus } from "@/lib/practice/topic-rollup";
 
 import type { TeacherAssignmentSubmissionRow } from "./queries";
 
+export type TopicTrackerBandStudent = {
+	studentId: string;
+	fullName: string;
+	averagePercent: number;
+};
+
 export type TopicSubmissionAggRow = {
 	topicId: string;
 	topicName: string;
@@ -10,6 +16,9 @@ export type TopicSubmissionAggRow = {
 	satisfactoryCount: number;
 	goodCount: number;
 	sampleStudents: number;
+	badStudents: TopicTrackerBandStudent[];
+	satisfactoryStudents: TopicTrackerBandStudent[];
+	goodStudents: TopicTrackerBandStudent[];
 };
 
 export type StudentSubmissionPerfRow = {
@@ -29,6 +38,7 @@ export type TeacherSubmissionAssignmentBundle = {
 	title: string;
 	dueAt: string | null;
 	createdAt: string | null;
+	subjectId: string | null;
 	subjectName: string | null;
 	subjectGrade: number | null;
 	sectionsLabel: string;

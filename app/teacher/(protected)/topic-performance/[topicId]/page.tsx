@@ -95,7 +95,8 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 	const sp = await searchParams;
 	const filters = parseFilters(sp);
 
-	const { topicLabel, subjectName, topicSubjectId, rows } = await listTeacherTopicStudentBreakdown({
+	const { topicLabel, chapterNumber, subjectName, topicSubjectId, rows } =
+		await listTeacherTopicStudentBreakdown({
 		teacherId: user.id,
 		activeOrganizationId: activeOrg?.id ?? null,
 		topicId,
@@ -115,7 +116,15 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 				<span aria-hidden className="px-1.5 text-muted-foreground/70">
 					/
 				</span>
-				<span className="text-foreground">{topicLabel}</span>
+				<span className="text-foreground">
+					{chapterNumber != null ? (
+						<>
+							<span className="tabular-nums text-muted-foreground">Ch {chapterNumber}</span>
+							<span className="text-muted-foreground/70"> · </span>
+						</>
+					) : null}
+					{topicLabel}
+				</span>
 				{subjectName ? (
 					<span className="text-muted-foreground"> · {subjectName}</span>
 				) : null}
@@ -135,27 +144,63 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 				</p>
 			) : (
 				<div className="overflow-auto rounded-lg border border-border shadow-none">
-					<div className="min-w-[640px]">
-						<div className="grid grid-cols-[minmax(0,1fr)_3rem_4rem_4rem_4rem_auto] gap-2 border-b border-border bg-muted/40 px-4 py-2 text-muted-foreground text-xs font-medium uppercase tracking-wide">
-							<span>Student</span>
-							<span>Gr.</span>
-							<span>Sec.</span>
-							<span>Avg</span>
-							<span>Tests</span>
-							<span className="text-right"> </span>
-						</div>
-						<ul className="divide-y divide-border/80 bg-background">
-							{rows.map((row) => (
-								<li
-									key={row.studentId}
-									className="grid grid-cols-[minmax(0,1fr)_3rem_4rem_4rem_4rem_auto] items-center gap-2 px-4 py-3 text-sm"
+					<table className="w-full min-w-[40rem] border-collapse text-sm">
+						<caption className="sr-only">Per-student averages and test counts for this topic</caption>
+						<thead>
+							<tr className="border-b border-border bg-muted/40 text-muted-foreground">
+								<th scope="col" className="px-4 py-2.5 text-left font-medium text-xs">
+									Student
+								</th>
+								<th
+									scope="col"
+									className="px-3 py-2.5 text-right font-medium text-xs whitespace-nowrap"
+									title="Student grade"
 								>
-									<span className="min-w-0 truncate font-medium">{row.fullName}</span>
-									<span className="text-muted-foreground tabular-nums">{row.grade ?? "—"}</span>
-									<span className="text-muted-foreground">{row.section?.trim() || "—"}</span>
-									<span className="tabular-nums">{row.averagePercent}%</span>
-									<span className="tabular-nums">{row.testsTaken}</span>
-									<div className="flex justify-end">
+									Grade
+								</th>
+								<th
+									scope="col"
+									className="min-w-[4.5rem] px-3 py-2.5 text-right font-medium text-xs whitespace-nowrap"
+									title="Class section"
+								>
+									Section
+								</th>
+								<th
+									scope="col"
+									className="min-w-[5.5rem] px-3 py-2.5 text-right font-medium text-xs whitespace-nowrap"
+									title="Average score on this topic from graded practice"
+								>
+									Topic average
+								</th>
+								<th
+									scope="col"
+									className="min-w-[5.25rem] px-3 py-2.5 text-right font-medium text-xs whitespace-nowrap"
+									title="Graded practice tests completed on this topic"
+								>
+									Tests taken
+								</th>
+								<th scope="col" className="px-4 py-2.5 text-right font-medium text-xs">
+									<span className="sr-only">Actions</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-border/80 bg-background">
+							{rows.map((row) => (
+								<tr key={row.studentId} className="align-middle">
+									<td className="max-w-[16rem] px-4 py-3 font-medium">
+										<span className="block truncate" title={row.fullName}>
+											{row.fullName}
+										</span>
+									</td>
+									<td className="px-3 py-3 text-right text-muted-foreground tabular-nums whitespace-nowrap">
+										{row.grade ?? "—"}
+									</td>
+									<td className="px-3 py-3 text-right text-muted-foreground whitespace-nowrap">
+										{row.section?.trim() || "—"}
+									</td>
+									<td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">{row.averagePercent}%</td>
+									<td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">{row.testsTaken}</td>
+									<td className="px-4 py-3 text-right">
 										<Button
 											render={
 												<Link
@@ -169,11 +214,11 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 										>
 											View student
 										</Button>
-									</div>
-								</li>
+									</td>
+								</tr>
 							))}
-						</ul>
-					</div>
+						</tbody>
+					</table>
 				</div>
 			)}
 		</div>

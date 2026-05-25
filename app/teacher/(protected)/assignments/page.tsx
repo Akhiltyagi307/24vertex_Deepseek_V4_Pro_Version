@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { TeacherAssignmentsManager } from "./teacher-assignments-manager";
-import { loadTeacherSubmissionAssignmentBundles } from "@/lib/assignments/teacher-submissions-hub";
 import {
 	listTeacherAssignmentSubjectCatalog,
 	listTeacherAssignableStudents,
@@ -25,11 +24,10 @@ export default async function TeacherAssignmentsPage() {
 	}
 	const { user } = session;
 
-	const [subjectsCatalogRaw, topicsCatalog, students, submissionBundles] = await Promise.all([
+	const [subjectsCatalogRaw, topicsCatalog, students] = await Promise.all([
 		listActiveSubjectsCatalog(),
 		listTeacherAssignmentSubjectCatalog(user.id),
 		listTeacherAssignableStudents(user.id),
-		loadTeacherSubmissionAssignmentBundles(user.id),
 	]);
 	const visibleSubjectIds = new Set(topicsCatalog.map((topic) => topic.subjectId));
 	const subjectsCatalog = subjectsCatalogRaw.filter((subject) => visibleSubjectIds.has(subject.id));
@@ -39,7 +37,6 @@ export default async function TeacherAssignmentsPage() {
 			subjectsCatalog={subjectsCatalog}
 			topicsCatalog={topicsCatalog}
 			students={students}
-			submissionBundles={submissionBundles}
 		/>
 	);
 }
