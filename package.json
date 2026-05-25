@@ -169,7 +169,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
-    "jsdom": "^26.1.0",
+    "jsdom": "^29.1.1",
     "knip": "^5.78.0",
     "pm2": "^6.0.14",
     "sharp": "^0.34.5",
