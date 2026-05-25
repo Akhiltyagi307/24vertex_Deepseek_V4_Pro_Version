@@ -19,13 +19,9 @@ export function useMarketingThemeSync(): void {
 		if (!mounted) return;
 		if (resolvedTheme !== "light" && resolvedTheme !== "dark") return;
 		const root = document.documentElement;
-		if (resolvedTheme === "light" && root.classList.contains("dark")) {
-			root.classList.remove("dark");
-			root.classList.add("light");
-		} else if (resolvedTheme === "dark" && root.classList.contains("light")) {
-			root.classList.remove("light");
-			root.classList.add("dark");
-		}
+		// Tailwind dark mode uses `.dark` on `<html>` only; drop legacy `light` class.
+		root.classList.remove("light");
+		root.classList.toggle("dark", resolvedTheme === "dark");
 		root.style.colorScheme = resolvedTheme === "dark" ? "dark" : "light";
 	}, [mounted, resolvedTheme]);
 }

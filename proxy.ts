@@ -6,13 +6,7 @@ import { billingProxyGate } from "@/lib/billing/proxy-guard";
 import { feedbackProxyGate } from "@/lib/feedback/proxy-guard";
 import { contactProxyGate } from "@/lib/marketing/contact/proxy-guard";
 import { parentProxyGate } from "@/lib/parent/proxy-guard";
-import {
-	CSP_NONCE_REQUEST_HEADER,
-	buildCsp,
-	buildPublicMarketingCsp,
-	generateCspNonce,
-} from "@/lib/security/csp";
-import { isPublicMarketingCspPath } from "@/lib/security/public-csp-paths";
+import { CSP_NONCE_REQUEST_HEADER, resolveCspPolicyForPath } from "@/lib/security/csp";
 import { studentProxyGate } from "@/lib/student/proxy-guard";
 import { updateSession } from "@/lib/supabase/session";
 import { teacherProxyGate } from "@/lib/teachers/proxy-guard";
@@ -40,9 +34,7 @@ export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
 	const requestId = resolveRequestId(request);
-	const publicMarketing = isPublicMarketingCspPath(pathname);
-	const nonce = publicMarketing ? "" : generateCspNonce();
-	const csp = publicMarketing ? buildPublicMarketingCsp() : buildCsp(nonce);
+	const { csp, nonce, forwardNonce } = resolveCspPolicyForPath(pathname);
 
 	const adminEarly = await adminProxyGate(request);
 	if (adminEarly) {
@@ -109,7 +101,7 @@ export async function proxy(request: NextRequest) {
 	const extraRequestHeaders: Record<string, string> = {
 		[REQUEST_ID_HEADER]: requestId,
 	};
-	if (!publicMarketing) {
+	if (forwardNonce) {
 		extraRequestHeaders[CSP_NONCE_REQUEST_HEADER] = nonce;
 	}
 

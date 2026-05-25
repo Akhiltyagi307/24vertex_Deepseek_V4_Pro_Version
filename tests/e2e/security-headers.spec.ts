@@ -40,8 +40,16 @@ test.describe("security headers", () => {
 		}
 	});
 
-	test("marketing landing uses public CSP without a per-request nonce", async ({ request }) => {
+	test("dynamic home uses nonce CSP for next-themes", async ({ request }) => {
 		const res = await request.get("/", { failOnStatusCode: false });
+		const csp = res.headers()["content-security-policy"];
+		expect(csp, "Content-Security-Policy header missing").toBeTruthy();
+		expect(csp).toMatch(/strict-dynamic/);
+		expect(csp).toMatch(/'nonce-[A-Za-z0-9+/=_-]+'/);
+	});
+
+	test("static marketing subpage uses hash CSP without a per-request nonce", async ({ request }) => {
+		const res = await request.get("/pricing", { failOnStatusCode: false });
 		const csp = res.headers()["content-security-policy"];
 		expect(csp, "Content-Security-Policy header missing").toBeTruthy();
 		expect(csp).toMatch(/strict-dynamic/);

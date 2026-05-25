@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { PUBLIC_CSP_SCRIPT_HASHES } from "@/lib/security/public-csp-hashes";
+import { isPublicMarketingCspPath } from "@/lib/security/public-csp-paths";
 
 export const CSP_NONCE_REQUEST_HEADER = "x-nonce";
 
@@ -117,11 +118,57 @@ export function buildCsp(nonce: string): string {
  * framework scripts are allowed via `'unsafe-inline'` until
  * {@link PUBLIC_CSP_SCRIPT_HASHES} is populated and
  * `PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK=1` is enabled.
+ *
+ * In development we omit build-time hashes so Turbopack/HMR and `next-themes`
+ * inline bootstraps are not blocked (`'unsafe-inline'` is ignored whenever
+ * hashes are present in the policy).
  */
 export function buildPublicMarketingCsp(): string {
+	const isDev = process.env.NODE_ENV !== "production";
 	const scriptSrcParts = buildScriptSrcParts({
-		hashes: PUBLIC_CSP_SCRIPT_HASHES,
-		includeUnsafeInline: !shouldDropUnsafeInlinePublic(),
+		hashes: isDev ? [] : PUBLIC_CSP_SCRIPT_HASHES,
+		includeUnsafeInline: isDev || !shouldDropUnsafeInlinePublic(),
 	});
 	return buildSharedDirectives(scriptSrcParts);
+}
+
+export type CspPolicyMode = "portal" | "public-static" | "public-home";
+
+export type ResolvedCspPolicy = {
+	csp: string;
+	nonce: string;
+	forwardNonce: boolean;
+	mode: CspPolicyMode;
+};
+
+function isPublicMarketingHomePath(pathname: string): boolean {
+	const trimmed = pathname.replace(/\/+$/, "");
+	return trimmed === "" || trimmed === "/";
+}
+
+/**
+ * Picks CSP for `proxy.ts`: static marketing/legal use hash CSP; `/` (dynamic
+ * home) and portals use per-request nonce CSP for `next-themes`.
+ */
+export function resolveCspPolicyForPath(pathname: string): ResolvedCspPolicy {
+	const publicMarketing = isPublicMarketingCspPath(pathname);
+	const publicHome = publicMarketing && isPublicMarketingHomePath(pathname);
+	const staticPublicMarketing = publicMarketing && !publicHome;
+
+	if (staticPublicMarketing) {
+		return {
+			csp: buildPublicMarketingCsp(),
+			nonce: "",
+			forwardNonce: false,
+			mode: "public-static",
+		};
+	}
+
+	const nonce = generateCspNonce();
+	return {
+		csp: buildCsp(nonce),
+		nonce,
+		forwardNonce: true,
+		mode: publicHome ? "public-home" : "portal",
+	};
 }

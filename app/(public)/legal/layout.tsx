@@ -3,6 +3,7 @@ import { Fragment } from "react";
 
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { LegalContactBlock } from "@/components/legal/legal-contact-block";
+import { Providers } from "@/components/providers";
 
 const SIBLING_LINKS = [
 	{ href: "/legal/privacy", label: "Privacy policy" },
@@ -15,6 +16,7 @@ export default function LegalLayout({
 	children,
 }: Readonly<{ children: React.ReactNode }>) {
 	return (
+		<Providers>
 		<main className="w-full min-w-0 max-w-none px-4 py-12 text-foreground medium:px-8">
 			<MotionPageEnter className="flex flex-col">
 				<nav aria-label="Legal section header" className="mb-6 flex items-center justify-between text-sm">
@@ -52,5 +54,6 @@ export default function LegalLayout({
 				</nav>
 			</MotionPageEnter>
 		</main>
+		</Providers>
 	);
 }

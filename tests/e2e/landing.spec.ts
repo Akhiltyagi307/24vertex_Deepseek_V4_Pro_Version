@@ -67,6 +67,28 @@ test.describe("public landing", () => {
 		expect(page.url()).toMatch(/\/signup\/role-picker$/);
 	});
 
+	test("theme toggle switches document dark class", async ({ page }) => {
+		await page.goto("/", { waitUntil: "domcontentloaded" });
+		await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+
+		const toggle = page.getByRole("switch", { name: /theme/i }).first();
+		await expect(toggle).toBeVisible();
+
+		const initialTheme = await page.evaluate(() =>
+			document.documentElement.classList.contains("dark") ? "dark" : "light",
+		);
+		await toggle.click();
+		await expect
+			.poll(
+				async () =>
+					page.evaluate(() =>
+						document.documentElement.classList.contains("dark") ? "dark" : "light",
+					),
+				{ timeout: 3000 },
+			)
+			.not.toBe(initialTheme);
+	});
+
 	test("skip-to-main-content link is keyboard-reachable on first tab", async ({ page }) => {
 		await page.goto("/", { waitUntil: "domcontentloaded" });
 		// Anchor focus on <body> first — without this, headless Chromium's initial

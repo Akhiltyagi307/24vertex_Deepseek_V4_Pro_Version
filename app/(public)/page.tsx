@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
+import { NonceProviders } from "@/components/nonce-providers";
 import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { HomeMarketingShell } from "@/components/marketing/home-marketing-shell";
 import { LandingMarketingBody } from "@/components/marketing/landing-marketing-body";
@@ -115,6 +116,7 @@ export default async function HomePage() {
 	}
 
 	return (
+		<NonceProviders>
 		<HomeMarketingShell className="flex min-h-screen w-full flex-col bg-background">
 			{/* JSON-LD is not executable JS — CSP `script-src` does not apply, and
 			    attaching a per-request `nonce` causes a React hydration mismatch
@@ -144,5 +146,6 @@ export default async function HomePage() {
 			</div>
 			<MarketingSiteFooter />
 		</HomeMarketingShell>
+		</NonceProviders>
 	);
 }
