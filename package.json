@@ -70,7 +70,7 @@
     "@supabase/postgrest-js": "^2.102.0",
     "@supabase/realtime-js": "^2.102.0",
     "@supabase/ssr": "^0.10.0",
-    "@supabase/storage-js": "^2.102.0",
+    "@supabase/storage-js": "^2.106.2",
     "@supabase/supabase-js": "^2.102.0",
     "@svg-maps/india": "2.0.0",
     "@tanstack/react-table": "^8.21.3",
