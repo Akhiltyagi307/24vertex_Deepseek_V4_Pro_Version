@@ -7,6 +7,7 @@ const getActiveTeacherOrganizationSnapshot = vi.fn();
 const listOrganizationStudentsWithFilters = vi.fn();
 const getOrganizationRosterFilterOptions = vi.fn();
 const listTeacherPerformanceDirectoryStudents = vi.fn();
+const listTeacherPerformanceDirectoryRows = vi.fn();
 const listTeacherTopicPerformanceRows = vi.fn();
 const consumeTeacherPortalDataActionRateLimit = vi.fn();
 
@@ -18,6 +19,7 @@ vi.mock("@/lib/teachers/roster-queries", () => ({
 }));
 vi.mock("@/lib/teachers/teacher-performance-directory-queries", () => ({
 	listTeacherPerformanceDirectoryStudents,
+	listTeacherPerformanceDirectoryRows,
 }));
 vi.mock("@/lib/teachers/teacher-topic-performance-queries", () => ({
 	listTeacherTopicPerformanceRows,
@@ -56,7 +58,7 @@ describe("teacher roster and directory actions", () => {
 		const result = await fetchTeacherPerformanceDirectory({ grade: "all", section: "all", subjectId: "all" });
 
 		expect(result).toEqual({ error: "Your teacher account must be verified before using this feature." });
-		expect(listTeacherPerformanceDirectoryStudents).not.toHaveBeenCalled();
+		expect(listTeacherPerformanceDirectoryRows).not.toHaveBeenCalled();
 	});
 
 	it("rejects topic performance directory requests before loading rows when rate limited", async () => {

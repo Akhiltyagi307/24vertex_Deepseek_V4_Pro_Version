@@ -1,18 +1,56 @@
 import "server-only";
 
-import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { teacherStudentLinks } from "@/db/schema/organizations";
 import { profiles } from "@/db/schema/profiles";
+import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
 import {
 	getOrganizationRosterFilterOptions,
 	listOrganizationStudentsWithFilters,
 	type OrganizationRosterFilterOptions,
 	type OrganizationRosterStudentRow,
 } from "@/lib/teachers/roster-queries";
+import {
+	CLASS_PERFORMANCE_RECENT_WINDOW_SIZE,
+	loadRecentScoreEventsForTeacherStudents,
+} from "@/lib/teachers/teacher-class-performance-summary";
+import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
 
 export type TeacherPerformanceStudentRow = OrganizationRosterStudentRow;
+
+/** Days without any graded event before a student is considered inactive on the directory. */
+export const TEACHER_DIRECTORY_INACTIVE_THRESHOLD_DAYS = 7;
+
+/** Submission lifecycle statuses that mean the student has not yet handed in. */
+const NOT_SUBMITTED_STATUSES = new Set([
+	"pending_materialize",
+	"ready",
+	"in_progress",
+	"failed_generation",
+	"grading_failed",
+]);
+
+export type TeacherPerformanceDirectoryRow = TeacherPerformanceStudentRow & {
+	recentAveragePercent: number | null;
+	recentItemsUsed: number;
+	band: TeacherPerformanceBandId | null;
+	overdueAssignments: number;
+	lateAssignments: number;
+	lastActivityMs: number | null;
+};
+
+function performanceBandForAverage(avg: number): TeacherPerformanceBandId {
+	if (avg >= 90) return "strong";
+	if (avg >= 75) return "near_target";
+	if (avg >= 60) return "needs_support";
+	return "at_risk";
+}
+
+function roundPercent(value: number): number {
+	return Math.round(value * 10) / 10;
+}
 
 function mapRows(
 	rows: {
@@ -132,4 +170,116 @@ export async function getTeacherPerformanceDirectoryFilterOptions(params: {
 		return getOrganizationRosterFilterOptions(params.activeOrganizationId);
 	}
 	return getIndependentTeacherPerformanceFilterOptions(params.teacherId);
+}
+
+/**
+ * Returns the directory roster enriched with the same recent-window signals the dashboard uses
+ * (last {CLASS_PERFORMANCE_RECENT_WINDOW_SIZE} graded items = teacher assignments + self-practice tests),
+ * plus a count of outstanding-past-due and late submissions on this teacher's published assignments.
+ *
+ * When `subjectId` is set, every metric is scoped to that subject. When omitted/null, metrics span all
+ * subjects the student is enrolled in — same convention as the teacher dashboard.
+ */
+export async function listTeacherPerformanceDirectoryRows(params: {
+	teacherId: string;
+	activeOrganizationId: string | null;
+	grade?: number | null;
+	section?: string | null;
+	subjectId?: string | null;
+}): Promise<TeacherPerformanceDirectoryRow[]> {
+	const roster = await listTeacherPerformanceDirectoryStudents(params);
+	return enrichTeacherPerformanceDirectoryRows({
+		teacherId: params.teacherId,
+		roster,
+		subjectId: params.subjectId,
+	});
+}
+
+async function enrichTeacherPerformanceDirectoryRows(params: {
+	teacherId: string;
+	roster: TeacherPerformanceStudentRow[];
+	subjectId?: string | null;
+}): Promise<TeacherPerformanceDirectoryRow[]> {
+	const { teacherId, roster } = params;
+	if (roster.length === 0) return [];
+
+	const studentIds = roster.map((r) => r.id);
+	const scopeSubject = params.subjectId?.trim() ? params.subjectId.trim() : undefined;
+
+	const events = await loadRecentScoreEventsForTeacherStudents({
+		teacherId,
+		studentIds,
+		scopeSubject,
+	});
+
+	const eventsByStudent = new Map<string, { occurredAtMs: number; percent: number }[]>();
+	for (const id of studentIds) eventsByStudent.set(id, []);
+	for (const e of events) {
+		if (!Number.isFinite(e.percent)) continue;
+		eventsByStudent.get(e.studentId)?.push({ occurredAtMs: e.occurredAtMs, percent: e.percent });
+	}
+
+	const assignmentFilters = [
+		eq(assignments.teacherId, teacherId),
+		eq(assignments.status, "published"),
+		inArray(assignmentSubmissions.studentId, studentIds),
+	];
+	if (scopeSubject) {
+		assignmentFilters.push(sql`(assignments.config->>'subject_id')::uuid = ${scopeSubject}::uuid`);
+	}
+	const submissionRows = await db
+		.select({
+			studentId: assignmentSubmissions.studentId,
+			lifecycleStatus: assignmentSubmissions.lifecycleStatus,
+			submittedAt: assignmentSubmissions.submittedAt,
+			isLate: assignmentSubmissions.isLate,
+			dueAt: assignments.dueAt,
+		})
+		.from(assignmentSubmissions)
+		.innerJoin(assignments, eq(assignments.id, assignmentSubmissions.assignmentId))
+		.where(and(...assignmentFilters));
+
+	const nowMs = Date.now();
+	const submissionAggByStudent = new Map<string, { overdue: number; late: number }>();
+	for (const id of studentIds) submissionAggByStudent.set(id, { overdue: 0, late: 0 });
+	for (const row of submissionRows) {
+		const bucket = submissionAggByStudent.get(row.studentId);
+		if (!bucket) continue;
+		const dueMs = row.dueAt ? row.dueAt.getTime() : null;
+		if (dueMs != null && nowMs > dueMs && NOT_SUBMITTED_STATUSES.has(row.lifecycleStatus)) {
+			bucket.overdue += 1;
+		}
+		const submittedAfterDue =
+			row.submittedAt != null &&
+			dueMs != null &&
+			row.submittedAt.getTime() > dueMs &&
+			!NOT_SUBMITTED_STATUSES.has(row.lifecycleStatus);
+		if (row.isLate === true || submittedAfterDue || row.lifecycleStatus === "late") {
+			bucket.late += 1;
+		}
+	}
+
+	return roster.map((student) => {
+		const studentEvents = (eventsByStudent.get(student.id) ?? [])
+			.slice()
+			.sort((a, b) => b.occurredAtMs - a.occurredAtMs);
+		const recentWindow = studentEvents.slice(0, CLASS_PERFORMANCE_RECENT_WINDOW_SIZE);
+		const recentItemsUsed = recentWindow.length;
+		const recentAveragePercent =
+			recentItemsUsed === 0
+				? null
+				: roundPercent(recentWindow.reduce((s, e) => s + e.percent, 0) / recentItemsUsed);
+		const band = recentAveragePercent == null ? null : performanceBandForAverage(recentAveragePercent);
+		const lastActivityMs = studentEvents[0]?.occurredAtMs ?? null;
+		const agg = submissionAggByStudent.get(student.id) ?? { overdue: 0, late: 0 };
+		return {
+			...student,
+			recentAveragePercent,
+			recentItemsUsed,
+			band,
+			overdueAssignments: agg.overdue,
+			lateAssignments: agg.late,
+			lastActivityMs,
+		};
+	});
 }

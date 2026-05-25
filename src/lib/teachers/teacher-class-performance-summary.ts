@@ -382,7 +382,7 @@ export async function getTeacherClassPerformanceSummaryForRoster(params: {
 	};
 }
 
-async function loadRecentScoreEventsForTeacherStudents(params: {
+export async function loadRecentScoreEventsForTeacherStudents(params: {
 	teacherId: string;
 	studentIds: string[];
 	scopeSubject?: string;
