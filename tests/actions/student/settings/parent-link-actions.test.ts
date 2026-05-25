@@ -10,7 +10,9 @@ const { mockSupabase, mockUser, revalidatePathMock, logSupabaseErrorMock } = vi.
 	mockSupabase: { current: null as unknown },
 	mockUser: { current: null as null | { id: string } },
 	revalidatePathMock: { current: vi.fn(() => undefined) },
-	logSupabaseErrorMock: { current: vi.fn(() => undefined) },
+	logSupabaseErrorMock: {
+		current: vi.fn<(context: string, error: unknown, metadata?: unknown) => void>(),
+	},
 }));
 
 vi.mock("@/lib/auth/get-server-user", () => ({

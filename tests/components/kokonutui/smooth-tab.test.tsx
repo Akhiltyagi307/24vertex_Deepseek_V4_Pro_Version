@@ -7,8 +7,18 @@ import { createRoot, type Root } from "react-dom/client";
 
 vi.mock("motion/react", async () => {
 	const ReactModule = await import("react");
+	type MotionStubProps = React.HTMLAttributes<Element> & {
+		children?: React.ReactNode;
+		animate?: unknown;
+		custom?: unknown;
+		exit?: unknown;
+		initial?: unknown;
+		transition?: unknown;
+		variants?: unknown;
+	};
+
 	const makeMotionComponent = (tag: keyof React.JSX.IntrinsicElements) =>
-		ReactModule.forwardRef<Element, React.HTMLAttributes<Element> & { children?: React.ReactNode }>(
+		ReactModule.forwardRef<Element, MotionStubProps>(
 			({ animate, custom, exit, initial, transition, variants, ...props }, ref) =>
 				ReactModule.createElement(tag, { ...props, ref }, props.children),
 		);
