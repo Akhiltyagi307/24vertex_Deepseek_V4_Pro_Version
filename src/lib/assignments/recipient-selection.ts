@@ -1,5 +1,5 @@
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
-import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-queries";
+import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-types";
 
 export const ASSIGNMENT_SECTION_FILTER_NONE = "__section_none__";
 

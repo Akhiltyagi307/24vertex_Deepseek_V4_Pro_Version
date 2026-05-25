@@ -20,8 +20,10 @@ import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { TeacherPerformanceDirectoryRow } from "@/lib/teachers/teacher-performance-directory-queries";
-import { TEACHER_DIRECTORY_INACTIVE_THRESHOLD_DAYS } from "@/lib/teachers/teacher-performance-directory-queries";
+import {
+	TEACHER_DIRECTORY_INACTIVE_THRESHOLD_DAYS,
+	type TeacherPerformanceDirectoryRow,
+} from "@/lib/teachers/teacher-performance-directory-types";
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
 import {
 	buildSubjectCatalogPillSelectModel,
