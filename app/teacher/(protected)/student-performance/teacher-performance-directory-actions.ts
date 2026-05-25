@@ -7,12 +7,12 @@ import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/querie
 import { consumeTeacherPortalDataActionRateLimit } from "@/lib/teachers/teacher-portal-action-rate-limit";
 import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
 import {
-	listTeacherPerformanceDirectoryStudents,
-	type TeacherPerformanceStudentRow,
+	listTeacherPerformanceDirectoryRows,
+	type TeacherPerformanceDirectoryRow,
 } from "@/lib/teachers/teacher-performance-directory-queries";
 
 export type TeacherPerformanceDirectoryActionResult =
-	| { rows: TeacherPerformanceStudentRow[] }
+	| { rows: TeacherPerformanceDirectoryRow[] }
 	| { error: string };
 
 const filtersSchema = z
@@ -48,7 +48,7 @@ export async function fetchTeacherPerformanceDirectory(
 
 		const { grade, section, subjectId } = parsed.data;
 
-		const rows = await listTeacherPerformanceDirectoryStudents({
+		const rows = await listTeacherPerformanceDirectoryRows({
 			teacherId: session.user.id,
 			activeOrganizationId: activeOrg?.id ?? null,
 			grade: grade === "all" ? undefined : grade,

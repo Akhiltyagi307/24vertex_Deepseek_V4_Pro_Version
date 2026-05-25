@@ -6,7 +6,7 @@ import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
 import {
 	getTeacherPerformanceDirectoryFilterOptions,
-	listTeacherPerformanceDirectoryStudents,
+	listTeacherPerformanceDirectoryRows,
 } from "@/lib/teachers/teacher-performance-directory-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
 
@@ -42,7 +42,7 @@ export default async function TeacherStudentPerformanceDirectoryPage({ searchPar
 	const initialSubjectId =
 		sp.subject && subjectsCatalog.some((subject) => subject.id === sp.subject) ? sp.subject : "all";
 
-	const initialRows = await listTeacherPerformanceDirectoryStudents({
+	const initialRows = await listTeacherPerformanceDirectoryRows({
 		teacherId: user.id,
 		activeOrganizationId: activeOrg?.id ?? null,
 		subjectId: initialSubjectId === "all" ? undefined : initialSubjectId,
