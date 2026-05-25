@@ -9,19 +9,23 @@ import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
 import {
 	getOrganizationRosterFilterOptions,
 	listOrganizationStudentsWithFilters,
-	type OrganizationRosterFilterOptions,
-	type OrganizationRosterStudentRow,
 } from "@/lib/teachers/roster-queries";
+import type { OrganizationRosterFilterOptions } from "@/lib/teachers/roster-types";
 import {
 	CLASS_PERFORMANCE_RECENT_WINDOW_SIZE,
 	loadRecentScoreEventsForTeacherStudents,
 } from "@/lib/teachers/teacher-class-performance-summary";
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
+import type {
+	TeacherPerformanceDirectoryRow,
+	TeacherPerformanceStudentRow,
+} from "@/lib/teachers/teacher-performance-directory-types";
 
-export type TeacherPerformanceStudentRow = OrganizationRosterStudentRow;
-
-/** Days without any graded event before a student is considered inactive on the directory. */
-export const TEACHER_DIRECTORY_INACTIVE_THRESHOLD_DAYS = 7;
+export type {
+	TeacherPerformanceDirectoryRow,
+	TeacherPerformanceStudentRow,
+} from "@/lib/teachers/teacher-performance-directory-types";
+export { TEACHER_DIRECTORY_INACTIVE_THRESHOLD_DAYS } from "@/lib/teachers/teacher-performance-directory-types";
 
 /** Submission lifecycle statuses that mean the student has not yet handed in. */
 const NOT_SUBMITTED_STATUSES = new Set([
@@ -31,15 +35,6 @@ const NOT_SUBMITTED_STATUSES = new Set([
 	"failed_generation",
 	"grading_failed",
 ]);
-
-export type TeacherPerformanceDirectoryRow = TeacherPerformanceStudentRow & {
-	recentAveragePercent: number | null;
-	recentItemsUsed: number;
-	band: TeacherPerformanceBandId | null;
-	overdueAssignments: number;
-	lateAssignments: number;
-	lastActivityMs: number | null;
-};
 
 function performanceBandForAverage(avg: number): TeacherPerformanceBandId {
 	if (avg >= 90) return "strong";

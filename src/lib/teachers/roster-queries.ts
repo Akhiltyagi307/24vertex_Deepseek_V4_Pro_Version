@@ -4,14 +4,12 @@ import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { profiles } from "@/db/schema/profiles";
+import type {
+	OrganizationRosterFilterOptions,
+	OrganizationRosterStudentRow,
+} from "@/lib/teachers/roster-types";
 
-export type OrganizationRosterStudentRow = {
-	id: string;
-	fullName: string;
-	grade: number | null;
-	section: string | null;
-	studentLinkCode: string | null;
-};
+export type { OrganizationRosterFilterOptions, OrganizationRosterStudentRow };
 
 const organizationStudentBaseConditions = (organizationId: string) =>
 	and(
@@ -55,11 +53,6 @@ export async function listOrganizationStudentsForTeachingRoster(params: {
 		studentLinkCode: r.studentLinkCode,
 	}));
 }
-
-export type OrganizationRosterFilterOptions = {
-	grades: number[];
-	sections: string[];
-};
 
 /** Distinct grades / sections present among students in an organization (for roster filters). */
 export async function getOrganizationRosterFilterOptions(

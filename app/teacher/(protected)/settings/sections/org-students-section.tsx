@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { loadTeacherOrganizationRosterTabData } from "../org-roster-actions";
 import { TeacherOrgStudentsTab } from "../teacher-org-students-tab";
 import { Button } from "@/components/ui/button";
-import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-queries";
+import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-types";
 import type { SubjectCatalogRow } from "@/lib/teachers/subject-catalog-label";
 
 export type TeacherOrgStudentRosterData = {

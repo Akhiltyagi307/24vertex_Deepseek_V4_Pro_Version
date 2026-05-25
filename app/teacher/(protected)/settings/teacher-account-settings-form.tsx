@@ -27,7 +27,7 @@ import { tabAccentClass } from "@/app/student/settings/_settings-form-styles";
 import SmoothTab from "@/components/kokonutui/smooth-tab";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { SerializedOrganization } from "@/lib/organizations/schemas";
-import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-queries";
+import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-types";
 import type { SubjectCatalogRow } from "@/lib/teachers/subject-catalog-label";
 import { cn } from "@/lib/utils";
 

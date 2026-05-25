@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { fetchTeacherOrganizationRoster } from "./org-roster-actions";
 import { SensitiveLinkCode } from "@/components/teacher/sensitive-link-code";
-import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-queries";
+import type { OrganizationRosterStudentRow } from "@/lib/teachers/roster-types";
 import {
 	buildSubjectCatalogPillSelectModel,
 	type SubjectCatalogRow,

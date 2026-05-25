@@ -30,7 +30,7 @@ import {
 	buildSubjectCatalogPillSelectModel,
 	type SubjectCatalogRow,
 } from "@/lib/teachers/subject-catalog-label";
-import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-queries";
+import type { TeacherPerformanceStudentRow } from "@/lib/teachers/teacher-performance-directory-types";
 import { cn } from "@/lib/utils";
 
 type Props = {
