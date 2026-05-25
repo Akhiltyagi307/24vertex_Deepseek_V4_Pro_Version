@@ -16,22 +16,34 @@ import {
 	ListFilter,
 	ListOrdered,
 	Search,
-	type LucideIcon,
 } from "lucide-react";
 import * as React from "react";
-import { formatDateMediumInAppTimeZone, formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { loadOlderStudentReports } from "@/app/student/reports/reports-actions";
+import {
+	REPORTS_LIST_PAGE_SIZE,
+	reportsListWindowStartIso,
+} from "@/lib/student/reports-list-window";
+import {
+	formatReportSummaryDate,
+	formatReportTableDateTime,
+	reportPdfPath,
+	ReportStatResponsive,
+	rowTimestamp,
+	scoreForAverage,
+	useReportsStaggerVariants,
+} from "@/components/student/reports/reports-view-stat-tiles";
 import {
 	formatDuration,
 	parseScoreNumber,
@@ -42,183 +54,28 @@ import {
 export type StudentReportsViewProps = {
 	initialTests: StudentReportTestRowSerialized[];
 	loadError: string | null;
+	/** True when graded tests exist before the default 18-month server window. */
+	hasOlderOutsideWindow?: boolean;
 	/** Parent portal: guardian-facing copy (monitoring tone). */
 	parentViewer?: boolean;
 };
 
-function reportPdfPath(testId: string) {
-	return `/api/student/reports/${encodeURIComponent(testId)}/pdf`;
-}
-
-function rowTimestamp(r: StudentReportTestRowSerialized): number {
-	const raw = r.testDate ?? r.createdAt;
-	if (!raw) return 0;
-	const t = new Date(raw).getTime();
-	return Number.isFinite(t) ? t : 0;
-}
-
-/** Avoid mixing host/Browser local tz; all clocks use Asia/Kolkata. */
-function formatReportTableDateTime(raw: string): string {
-	const d = new Date(raw);
-	if (!Number.isFinite(d.getTime())) return "—";
-	return formatDateTimeMediumShortInAppTimeZone(raw);
-}
-
-function formatReportSummaryDate(raw: number): string {
-	const d = new Date(raw);
-	if (!Number.isFinite(d.getTime())) return "—";
-	return formatDateMediumInAppTimeZone(d);
-}
-
-/** Below `medium` (768px): dense row + 2-column grid so the table surfaces sooner. */
-function ReportStatTileCompact({
-	Icon,
-	iconClassName,
-	label,
-	value,
-	hint,
-}: {
-	Icon: LucideIcon;
-	iconClassName: string;
-	label: string;
-	value: React.ReactNode;
-	hint: string;
-}) {
-	return (
-		<Card size="sm" className="shadow-none gap-0 py-0">
-			<CardContent className="space-y-1 p-3">
-				<div className="flex items-start justify-between gap-2">
-					<div className="flex min-w-0 flex-1 items-center gap-1.5">
-						<Icon className={cn("size-4 shrink-0", iconClassName)} strokeWidth={2} aria-hidden />
-						<span className="min-w-0 truncate text-xs font-medium leading-tight text-foreground">{label}</span>
-					</div>
-					<div className="min-w-0 max-w-[52%] shrink-0 text-right font-semibold leading-tight text-foreground">
-						{value}
-					</div>
-				</div>
-				<p className="text-pretty text-muted-foreground text-[0.625rem] leading-snug">{hint}</p>
-			</CardContent>
-		</Card>
-	);
-}
-
-/** medium+: original spacious stat cards. */
-function ReportStatTileFull({
-	Icon,
-	iconClassName,
-	label,
-	hint,
-	value,
-	valueClassName,
-}: {
-	Icon: LucideIcon;
-	iconClassName: string;
-	label: string;
-	hint: string;
-	value: React.ReactNode;
-	/** e.g. last-test date: no tabular-nums */
-	valueClassName?: string;
-}) {
-	return (
-		<Card className="shadow-none">
-			<CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
-				<CardTitle className="min-w-0 flex-1 text-sm font-semibold leading-snug">{label}</CardTitle>
-				<Icon className={cn("size-8 shrink-0", iconClassName)} strokeWidth={2} aria-hidden />
-			</CardHeader>
-			<CardContent>
-				<p className={cn("font-semibold text-2xl tabular-nums", valueClassName)}>{value}</p>
-				<p className="text-muted-foreground text-xs">{hint}</p>
-			</CardContent>
-		</Card>
-	);
-}
-
-function ReportStatResponsive({
-	Icon,
-	iconClassName,
-	label,
-	hint,
-	compactValue,
-	fullValue,
-	fullValueClassName,
-}: {
-	Icon: LucideIcon;
-	iconClassName: string;
-	label: string;
-	hint: string;
-	compactValue: React.ReactNode;
-	fullValue: React.ReactNode;
-	fullValueClassName?: string;
-}) {
-	return (
-		<>
-			<div className="medium:hidden">
-				<ReportStatTileCompact
-					Icon={Icon}
-					iconClassName={iconClassName}
-					label={label}
-					value={compactValue}
-					hint={hint}
-				/>
-			</div>
-			<div className="hidden medium:block">
-				<ReportStatTileFull
-					Icon={Icon}
-					iconClassName={iconClassName}
-					label={label}
-					hint={hint}
-					value={fullValue}
-					valueClassName={fullValueClassName}
-				/>
-			</div>
-		</>
-	);
-}
-
-function scoreForAverage(r: StudentReportTestRowSerialized): number | null {
-	const s = parseScoreNumber(r.totalScore);
-	if (s == null) return null;
-	if (r.status === "graded") return s;
-	if (r.status === "submitted") return s;
-	return null;
-}
-
-function useReportsStaggerVariants() {
-	const reduceMotion = useReducedMotion();
-	const y = reduceMotion ? 0 : 10;
-	const stagger = reduceMotion ? 0 : 0.05;
-	const duration = reduceMotion ? 0 : 0.24;
-
-	const container = React.useMemo(
-		() => ({
-			hidden: {},
-			show: {
-				transition: { staggerChildren: stagger, delayChildren: reduceMotion ? 0 : 0.02 },
-			},
-		}),
-		[reduceMotion, stagger],
-	);
-
-	const item = React.useMemo(
-		() => ({
-			hidden: { opacity: reduceMotion ? 1 : 0, y },
-			show: {
-				opacity: 1,
-				y: 0,
-				transition: { duration, ease: "easeOut" as const },
-			},
-		}),
-		[duration, reduceMotion, y],
-	);
-
-	return { container, item };
-}
-
 export function StudentReportsView({
 	initialTests,
 	loadError,
+	hasOlderOutsideWindow = false,
 	parentViewer = false,
 }: StudentReportsViewProps) {
+	const [allTests, setAllTests] = React.useState(initialTests);
+	const [loadingOlder, setLoadingOlder] = React.useState(false);
+	const [olderError, setOlderError] = React.useState<string | null>(null);
+	const [canLoadMore, setCanLoadMore] = React.useState(hasOlderOutsideWindow);
+
+	React.useEffect(() => {
+		setAllTests(initialTests);
+		setCanLoadMore(hasOlderOutsideWindow);
+	}, [initialTests, hasOlderOutsideWindow]);
+
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -232,6 +89,37 @@ export function StudentReportsView({
 		},
 		[router, pathname, searchParams],
 	);
+
+	const loadOlderReports = React.useCallback(async () => {
+		setLoadingOlder(true);
+		setOlderError(null);
+		try {
+			const byDate = [...allTests].sort((a, b) => rowTimestamp(b) - rowTimestamp(a));
+			const oldest = byDate[byDate.length - 1];
+			const beforeIso = oldest?.testDate ?? reportsListWindowStartIso();
+			const result = await loadOlderStudentReports(beforeIso);
+			if (!result.ok) {
+				setOlderError(result.message);
+				return;
+			}
+			setAllTests((prev) => {
+				const seen = new Set(prev.map((r) => r.id));
+				const merged = [...prev];
+				for (const row of result.tests) {
+					if (!seen.has(row.id)) {
+						seen.add(row.id);
+						merged.push(row);
+					}
+				}
+				return merged;
+			});
+			if (result.tests.length < REPORTS_LIST_PAGE_SIZE) {
+				setCanLoadMore(false);
+			}
+		} finally {
+			setLoadingOlder(false);
+		}
+	}, [allTests]);
 
 	const [highlightRowId, setHighlightRowId] = React.useState<string | null>(null);
 	const didFocusFromGradingRef = React.useRef(false);
@@ -266,14 +154,14 @@ export function StudentReportsView({
 	const searchInputValue = searchParams.get("q") ?? searchParams.get("sq") ?? "";
 
 	const overviewStats = React.useMemo(() => {
-		const total = initialTests.length;
-		const submitted = initialTests.filter((r) => r.status === "submitted").length;
-		const graded = initialTests.filter((r) => r.status === "graded").length;
-		const scores = initialTests.map(scoreForAverage).filter((n): n is number => n != null);
+		const total = allTests.length;
+		const submitted = allTests.filter((r) => r.status === "submitted").length;
+		const graded = allTests.filter((r) => r.status === "graded").length;
+		const scores = allTests.map(scoreForAverage).filter((n): n is number => n != null);
 		const avg =
 			scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
 		let last = 0;
-		for (const r of initialTests) {
+		for (const r of allTests) {
 			const t = rowTimestamp(r);
 			if (t > last) last = t;
 		}
@@ -284,11 +172,11 @@ export function StudentReportsView({
 			avgScore: avg,
 			lastTestMs: last,
 		};
-	}, [initialTests]);
+	}, [allTests]);
 
 	const subjectPillOptions = React.useMemo(() => {
 		const map = new Map<string, { id: string; name: string; sort: number }>();
-		for (const t of initialTests) {
+		for (const t of allTests) {
 			if (!map.has(t.subjectId)) {
 				map.set(t.subjectId, {
 					id: t.subjectId,
@@ -302,11 +190,11 @@ export function StudentReportsView({
 			return a.name.localeCompare(b.name);
 		});
 		return [{ value: "", label: "All subjects" }, ...list.map((s) => ({ value: s.id, label: s.name }))];
-	}, [initialTests]);
+	}, [allTests]);
 
 	const q = searchInputValue.trim().toLowerCase();
 
-	let filteredSorted = initialTests.filter((r) => {
+	let filteredSorted = allTests.filter((r) => {
 		if (subjectFilter && r.subjectId !== subjectFilter) return false;
 		if (difficultyFilter) {
 			const d = (r.difficulty ?? "").toLowerCase();
@@ -490,7 +378,7 @@ export function StudentReportsView({
 					<p className="m-0 shrink-0 text-muted-foreground text-xs">
 						Showing{" "}
 						<span className="font-medium tabular-nums text-foreground">{filteredSorted.length}</span> of{" "}
-						<span className="font-medium tabular-nums text-foreground">{initialTests.length}</span>
+						<span className="font-medium tabular-nums text-foreground">{allTests.length}</span>
 					</p>
 				</div>
 				<Card className="overflow-hidden p-0 shadow-none">
@@ -772,7 +660,7 @@ export function StudentReportsView({
 							</tr>
 						</thead>
 						<tbody className="[&_tr]:bg-background dark:[&_tr]:bg-transparent">
-							{initialTests.length === 0 ? (
+							{allTests.length === 0 ? (
 								<tr>
 									<td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
 										<div className="flex w-full min-w-0 flex-col items-center gap-2">
@@ -908,6 +796,22 @@ export function StudentReportsView({
 						</tbody>
 					</table>
 						</div>
+						{canLoadMore && allTests.length > 0 ?
+							<div className="flex flex-col items-center gap-2 border-t border-border px-4 py-4">
+								{olderError ?
+									<p className="text-sm text-destructive">{olderError}</p>
+								:	null}
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={loadingOlder}
+									onClick={() => void loadOlderReports()}
+								>
+									{loadingOlder ? "Loading…" : "Load older reports"}
+								</Button>
+							</div>
+						:	null}
 					</Card>
 			</motion.section>
 		</div>

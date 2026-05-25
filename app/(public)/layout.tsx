@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { Providers } from "@/components/providers";
+
 const PARENT_FIRST_TITLE =
 	"24Vertex: Catch your child's weak chapters before report-card day";
 const PARENT_FIRST_DESCRIPTION =
@@ -44,5 +46,5 @@ export const metadata: Metadata = {
 export default function PublicLayout({
 	children,
 }: Readonly<{ children: React.ReactNode }>) {
-	return <>{children}</>;
+	return <Providers>{children}</Providers>;
 }

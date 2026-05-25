@@ -36,6 +36,7 @@ export const finalizePracticeConfigSchema = z
 		/** Optional — defaults to "all" server-side when omitted by older clients. */
 		focusArea: practiceFocusAreaSchema.optional(),
 	})
+	.strict()
 	.superRefine((data, ctx) => {
 		const unique = new Set(data.trackerIds);
 		if (unique.size !== data.trackerIds.length) {

@@ -1,12 +1,16 @@
 import "server-only";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { tests } from "@/db/schema/assessment";
 import { profiles } from "@/db/schema/profiles";
 import { getProfileOrganizationSnapshot } from "@/lib/organizations/queries";
-import { localDateKey } from "@/lib/student/dashboard-performance-stats";
+import {
+	dashboardStatsWindowKeys,
+	dateKeyToIsoStartInAppTz,
+	localDateKey,
+} from "@/lib/student/dashboard-performance-stats";
 import {
 	buildLeaderboardScopeResult,
 	filterTestsInLast30Days,
@@ -54,6 +58,9 @@ export async function buildStudentDashboardLeaderboardPayload(params: {
 	const testEvents: LeaderboardTestEvent[] = [];
 
 	if (cohortIds.length > 0) {
+		const { startKey30 } = dashboardStatsWindowKeys();
+		const windowStart = new Date(dateKeyToIsoStartInAppTz(startKey30));
+
 		const testRows = await db
 			.select({
 				studentId: tests.studentId,
@@ -67,6 +74,8 @@ export async function buildStudentDashboardLeaderboardPayload(params: {
 					inArray(tests.studentId, cohortIds),
 					eq(tests.isDraft, false),
 					inArray(tests.status, ["submitted", "graded"]),
+					isNotNull(tests.testDate),
+					gte(tests.testDate, windowStart),
 				),
 			);
 

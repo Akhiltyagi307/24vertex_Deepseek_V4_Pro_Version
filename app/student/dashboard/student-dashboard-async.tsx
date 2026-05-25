@@ -1,10 +1,13 @@
+import { Suspense } from "react";
+
 import { StudentDashboardView } from "@/components/student/student-dashboard-view";
 import type {
 	LoadStudentDashboardOptions,
 	StudentDashboardProfileRow,
 } from "@/lib/student/load-student-dashboard";
-import { loadStudentDashboardViewPayload } from "@/lib/student/load-student-dashboard";
-import { createClient } from "@/lib/supabase/server";
+import { loadStudentDashboardCorePayloadCached } from "@/lib/student/student-dashboard-cache";
+import { StudentDashboardLeaderboardAsync } from "./student-dashboard-leaderboard-async";
+import { StudentDashboardLeaderboardSkeleton } from "./student-dashboard-leaderboard-skeleton";
 
 export async function StudentDashboardAsync({
 	userId,
@@ -17,10 +20,25 @@ export async function StudentDashboardAsync({
 	loadOpts?: LoadStudentDashboardOptions;
 	viewVariant?: "student" | "parent";
 }) {
-	const supabase = await createClient();
-	const payload = await loadStudentDashboardViewPayload(supabase, userId, profileRow, {
+	const core = await loadStudentDashboardCorePayloadCached(userId, profileRow, {
 		...loadOpts,
 		viewerRole: viewVariant,
 	});
-	return <StudentDashboardView {...payload} variant={viewVariant} />;
+
+	return (
+		<StudentDashboardView
+			{...core}
+			variant={viewVariant}
+			leaderboardContent={
+				<Suspense fallback={<StudentDashboardLeaderboardSkeleton />}>
+					<StudentDashboardLeaderboardAsync
+						studentId={userId}
+						organizationId={profileRow.organization_id}
+						enrolledSubjects={core.enrolledSubjects}
+						variant={viewVariant}
+					/>
+				</Suspense>
+			}
+		/>
+	);
 }

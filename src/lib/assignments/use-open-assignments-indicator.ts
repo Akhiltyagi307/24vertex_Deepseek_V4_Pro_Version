@@ -3,9 +3,14 @@
 import * as React from "react";
 import * as Sentry from "@sentry/nextjs";
 
+/** Background poll interval for sidebar open-assignment dot (ms). */
+export const OPEN_ASSIGNMENTS_POLL_MS = 180_000;
+
 export type UseOpenAssignmentsIndicatorArgs = {
 	apiBasePath: string;
 	initialHasOpen?: boolean;
+	/** When true, layout already computed indicator; skip duplicate mount request. */
+	skipMountRefresh?: boolean;
 	/** Refetch when the active route changes (pass `usePathname()` from the shell). */
 	routeKey?: string;
 };
@@ -16,6 +21,7 @@ export type UseOpenAssignmentsIndicatorArgs = {
 export function useOpenAssignmentsIndicator({
 	apiBasePath,
 	initialHasOpen = false,
+	skipMountRefresh = false,
 	routeKey = "",
 }: UseOpenAssignmentsIndicatorArgs) {
 	const [hasOpen, setHasOpen] = React.useState(initialHasOpen);
@@ -36,15 +42,16 @@ export function useOpenAssignmentsIndicator({
 	}, [apiBasePath]);
 
 	React.useEffect(() => {
+		if (skipMountRefresh) return;
 		void refresh();
-	}, [refresh, routeKey]);
+	}, [refresh, routeKey, skipMountRefresh]);
 
 	React.useEffect(() => {
 		if (typeof document === "undefined") return;
 		const tick = () => {
 			if (document.visibilityState !== "hidden") void refresh();
 		};
-		const interval = setInterval(tick, 60_000);
+		const interval = setInterval(tick, OPEN_ASSIGNMENTS_POLL_MS);
 		const onVisible = () => {
 			if (document.visibilityState === "visible") void refresh();
 		};

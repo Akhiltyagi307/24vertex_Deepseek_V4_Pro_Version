@@ -44,5 +44,7 @@ export async function syncPerformanceTrackerFromSession(): Promise<
 		ok: true,
 		durationMs: Date.now() - started,
 	});
+	const { revalidateStudentDashboard } = await import("@/lib/student/revalidate-student-dashboard");
+	revalidateStudentDashboard(user.id);
 	return { ok: true };
 }

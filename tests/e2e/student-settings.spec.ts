@@ -40,6 +40,18 @@ test.describe("Student settings", () => {
 		});
 	});
 
+	test("parent link requests panel when pending links exist", async ({ page }) => {
+		const ok = await gotoIfStudent(page, "/student/settings");
+		test.skip(!ok, "No authenticated student session available.");
+
+		const panel = page.getByRole("alert").filter({ hasText: /parent link requests/i });
+		if ((await panel.count()) === 0) {
+			test.skip(true, "No pending parent link requests on this test account.");
+		}
+		await expect(panel.getByRole("button", { name: /^approve$/i }).first()).toBeVisible();
+		await expect(panel.getByRole("button", { name: /^decline$/i }).first()).toBeVisible();
+	});
+
 	test("Notifications tab exposes the in-app and email toggles", async ({ page }) => {
 		const ok = await gotoIfStudent(page, "/student/settings");
 		test.skip(!ok, "No authenticated student session available.");

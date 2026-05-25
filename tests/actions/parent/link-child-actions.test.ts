@@ -20,8 +20,7 @@ const {
 	resolveStudentMock,
 	classifyMock,
 	auditMock,
-	notifyLinkedMock,
-	notifyConfirmedMock,
+	processNotificationsMock,
 	redirectMock,
 	headersMock,
 	rateLimitPerParentMock,
@@ -35,8 +34,7 @@ const {
 	},
 	classifyMock: { current: vi.fn(() => "generic" as string) },
 	auditMock: { current: vi.fn(async () => undefined) },
-	notifyLinkedMock: { current: vi.fn(async () => undefined) },
-	notifyConfirmedMock: { current: vi.fn(async () => undefined) },
+	processNotificationsMock: { current: vi.fn(async () => undefined) },
 	redirectMock: {
 		current: vi.fn((url: string) => {
 			const err = new Error(`NEXT_REDIRECT:${url}`);
@@ -84,11 +82,9 @@ vi.mock("@/lib/parent/audit", () => ({
 	writeParentAudit: (...args: unknown[]) =>
 		(auditMock.current as (...a: unknown[]) => unknown)(...args),
 }));
-vi.mock("@/lib/notifications/account-security", () => ({
-	notifyParentLinkedToStudent: (...args: unknown[]) =>
-		(notifyLinkedMock.current as (...a: unknown[]) => unknown)(...args),
-	notifyParentChildLinkConfirmed: (...args: unknown[]) =>
-		(notifyConfirmedMock.current as (...a: unknown[]) => unknown)(...args),
+vi.mock("@/lib/parent/process-parent-link-notifications", () => ({
+	processParentLinkNotifications: (...args: unknown[]) =>
+		(processNotificationsMock.current as (...a: unknown[]) => unknown)(...args),
 }));
 vi.mock("@/lib/admin/api-request-meta", () => ({
 	clientIpFromHeaders: () => "127.0.0.1",
@@ -123,13 +119,12 @@ beforeEach(() => {
 	mockUser.current = { id: PARENT_ID };
 	mockSupabase.current = makeMockSupabase({
 		user: { id: PARENT_ID },
-		rpcs: { link_parent_to_student: { error: null } },
+		rpcs: { link_parent_to_student: { data: "active", error: null } },
 	});
 	resolveStudentMock.current = vi.fn(async () => STUDENT_PROFILE_ID);
 	classifyMock.current = vi.fn(() => "generic" as const);
 	auditMock.current = vi.fn(async () => undefined);
-	notifyLinkedMock.current = vi.fn(async () => undefined);
-	notifyConfirmedMock.current = vi.fn(async () => undefined);
+	processNotificationsMock.current = vi.fn(async () => undefined);
 	redirectMock.current = vi.fn((url: string) => {
 		const err = new Error(`NEXT_REDIRECT:${url}`);
 		(err as { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};308;`;
@@ -186,31 +181,26 @@ describe("linkParentToStudent", () => {
 		);
 	});
 
-	it("still redirects when notifyLinked throws (notifications are best-effort)", async () => {
-		notifyLinkedMock.current = vi.fn(async () => {
-			throw new Error("Resend down");
+	it("redirects to pending UX when RPC returns pending", async () => {
+		mockSupabase.current = makeMockSupabase({
+			user: { id: PARENT_ID },
+			rpcs: { link_parent_to_student: { data: "pending", error: null } },
 		});
 		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
-			/NEXT_REDIRECT:\/parent\/dashboard/,
+			/NEXT_REDIRECT:\/parent\/link-child\?status=pending/,
+		);
+		expect(processNotificationsMock.current).toHaveBeenCalledWith(
+			expect.objectContaining({ linkStatus: "pending" }),
 		);
 	});
 
-	it("still redirects when notifyConfirmed throws", async () => {
-		notifyConfirmedMock.current = vi.fn(async () => {
-			throw new Error("Sentry'd");
-		});
+	it("still redirects when processParentLinkNotifications runs on success", async () => {
 		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
 			/NEXT_REDIRECT:\/parent\/dashboard/,
 		);
-	});
-
-	it("still redirects when resolveStudentProfileIdForLinkRef returns null (no student id => no notifications)", async () => {
-		resolveStudentMock.current = vi.fn(async (): Promise<string | null> => null);
-		await expect(linkParentToStudent({}, fd({ studentId: STUDENT_REF_CODE }))).rejects.toThrow(
-			/NEXT_REDIRECT:\/parent\/dashboard/,
+		expect(processNotificationsMock.current).toHaveBeenCalledWith(
+			expect.objectContaining({ linkStatus: "active", parentId: PARENT_ID }),
 		);
-		expect(notifyLinkedMock.current).not.toHaveBeenCalled();
-		expect(notifyConfirmedMock.current).not.toHaveBeenCalled();
 	});
 
 	it("returns throttled error and writes throttled audit when per-parent rate limit denies", async () => {

@@ -1,8 +1,7 @@
 import { StudentPerformanceView } from "@/components/student/student-performance-view";
 import type { AppProfileRow } from "@/lib/auth/cached-profile";
 import { buildEnrolledSubjectCards } from "@/lib/student/performance-matrix";
-import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
-import { createClient } from "@/lib/supabase/server";
+import { loadStudentPerformanceBundleCached } from "@/lib/student/student-performance-cache";
 
 type Props = {
 	userId: string;
@@ -23,10 +22,8 @@ export async function StudentPerformanceAsync({
 	parentViewer,
 	viewerOverviewHref,
 }: Props) {
-	const supabase = await createClient();
-
 	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } =
-		await loadStudentPerformanceBundle(supabase, userId, profileRow);
+		await loadStudentPerformanceBundleCached(userId, profileRow);
 
 	const enrolledSubjectCards = buildEnrolledSubjectCards(enrolledSubjects, topicCountBySubjectId, rows);
 

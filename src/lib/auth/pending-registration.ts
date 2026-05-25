@@ -10,11 +10,7 @@ import {
 import { registerStudentViaRpc } from "@/lib/auth/register-student-rpc";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { classifyLinkParentRpc } from "@/lib/auth/link-parent-rpc-errors";
-import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
-import {
-	notifyParentChildLinkConfirmed,
-	notifyParentLinkedToStudent,
-} from "@/lib/notifications/account-security";
+import { processParentLinkNotifications } from "@/lib/parent/process-parent-link-notifications";
 import {
 	parentRegistrationPayloadSchema,
 	studentProfileBodySchema,
@@ -77,15 +73,17 @@ async function linkPendingParentToStudent(
 	| "parent_portal_link_student_not_found"
 	| "parent_portal_link_unknown"
 > {
-	const { error: linkErr } = await supabase.rpc("link_parent_to_student", {
+	const { data: linkStatusRaw, error: linkErr } = await supabase.rpc("link_parent_to_student", {
 		p_student_ref: studentLinkCode,
 	});
 	if (!linkErr) {
-		const studentId = await resolveStudentProfileIdForLinkRef(supabase, studentLinkCode);
-		if (studentId) {
-			await notifyParentLinkedToStudent({ studentId, parentId: parentUserId });
-			await notifyParentChildLinkConfirmed({ studentId, parentId: parentUserId });
-		}
+		const linkStatus = linkStatusRaw === "pending" ? "pending" : "active";
+		await processParentLinkNotifications({
+			supabase,
+			parentId: parentUserId,
+			studentRef: studentLinkCode,
+			linkStatus,
+		});
 		return "completed_profile";
 	}
 	logSupabaseError("consumePendingRegistration.link_parent_to_student", linkErr);

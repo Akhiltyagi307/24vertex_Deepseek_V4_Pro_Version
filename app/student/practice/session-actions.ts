@@ -14,6 +14,7 @@ import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-erro
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
+	assertTestOwnedByStudent,
 	assertTestOwnedInProgress,
 	executePracticeTestSubmit,
 	redirectPathForExistingTestSubmission,
@@ -163,6 +164,13 @@ export async function submitPracticeTest(
 		return { ok: false, message: "Sign in to submit." };
 	}
 
+	const owned = await assertTestOwnedByStudent(supabase, parsed.data.testId, user.id, {
+		status: ["in_progress", "grading", "grading_failed", "graded"],
+	});
+	if (!owned.ok) {
+		return { ok: false, message: owned.message };
+	}
+
 	if (syncGradingEnabled()) {
 		return executePracticeTestSubmit(supabase, user.id, parsed.data.testId, parsed.data.elapsedSeconds);
 	}
@@ -187,6 +195,7 @@ export async function submitPracticeTest(
 			.from("tests")
 			.select("subject_id, status")
 			.eq("id", parsed.data.testId)
+			.eq("student_id", user.id)
 			.maybeSingle();
 		return {
 			ok: true,

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { createClient } from "@/lib/supabase/server";
-import { executePracticeTestSubmit } from "@/lib/practice/submit-practice-shared";
+import { assertTestOwnedByStudent, executePracticeTestSubmit } from "@/lib/practice/submit-practice-shared";
 import {
 	STUDENT_PRACTICE_ABANDON_LIMIT_N,
 	STUDENT_PRACTICE_ABANDON_WINDOW_SECONDS,
@@ -52,6 +52,13 @@ export async function POST(request: Request) {
 	}
 
 	const supabase = await createClient();
+
+	const owned = await assertTestOwnedByStudent(supabase, parsed.data.testId, user.id, {
+		status: ["in_progress", "grading", "grading_failed"],
+	});
+	if (!owned.ok) {
+		return Response.json({ ok: false, message: owned.message }, { status: 403 });
+	}
 
 	const result = await executePracticeTestSubmit(
 		supabase,

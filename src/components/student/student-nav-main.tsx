@@ -75,6 +75,7 @@ function SidebarAssignmentsRow({
 	const { hasOpen } = useOpenAssignmentsIndicator({
 		apiBasePath: "/api/student/assignments",
 		initialHasOpen,
+		skipMountRefresh: true,
 		routeKey: pathname,
 	});
 	const isActive =

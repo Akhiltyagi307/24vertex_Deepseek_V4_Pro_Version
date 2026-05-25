@@ -51,6 +51,7 @@ export function StudentNotificationsBell({
 		userId,
 		apiBasePath,
 		initialCount: initialUnreadCount,
+		skipMountRefresh: true,
 		realtimeScope: "bell",
 	});
 	const [items, setItems] = React.useState<NotificationListItem[]>([]);

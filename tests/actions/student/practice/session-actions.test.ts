@@ -36,6 +36,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 	createServiceRoleClient: () => mockAdmin.current,
 }));
 vi.mock("@/lib/practice/submit-practice-shared", () => ({
+	assertTestOwnedByStudent: () => (assertTestMock.current ?? (async () => ({ ok: true })))(),
 	assertTestOwnedInProgress: () => (assertTestMock.current ?? (async () => ({ ok: false })))(),
 	writeStudentAnswerRow: () => (writeRowMock.current ?? (async () => ({ error: null })))(),
 	executePracticeTestSubmit: () => (executeSubmitMock.current ?? (async () => ({ ok: false })))(),

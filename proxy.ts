@@ -6,7 +6,13 @@ import { billingProxyGate } from "@/lib/billing/proxy-guard";
 import { feedbackProxyGate } from "@/lib/feedback/proxy-guard";
 import { contactProxyGate } from "@/lib/marketing/contact/proxy-guard";
 import { parentProxyGate } from "@/lib/parent/proxy-guard";
-import { CSP_NONCE_REQUEST_HEADER, buildCsp, generateCspNonce } from "@/lib/security/csp";
+import {
+	CSP_NONCE_REQUEST_HEADER,
+	buildCsp,
+	buildPublicMarketingCsp,
+	generateCspNonce,
+} from "@/lib/security/csp";
+import { isPublicMarketingCspPath } from "@/lib/security/public-csp-paths";
 import { studentProxyGate } from "@/lib/student/proxy-guard";
 import { updateSession } from "@/lib/supabase/session";
 import { teacherProxyGate } from "@/lib/teachers/proxy-guard";
@@ -34,8 +40,9 @@ export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
 	const requestId = resolveRequestId(request);
-	const nonce = generateCspNonce();
-	const csp = buildCsp(nonce);
+	const publicMarketing = isPublicMarketingCspPath(pathname);
+	const nonce = publicMarketing ? "" : generateCspNonce();
+	const csp = publicMarketing ? buildPublicMarketingCsp() : buildCsp(nonce);
 
 	const adminEarly = await adminProxyGate(request);
 	if (adminEarly) {
@@ -99,11 +106,15 @@ export async function proxy(request: NextRequest) {
 	// handlers via mutated request headers. Server components read the nonce
 	// via headers().get('x-nonce'); route handlers read request.headers.get(
 	// 'x-request-id') for Sentry / structured-log correlation.
+	const extraRequestHeaders: Record<string, string> = {
+		[REQUEST_ID_HEADER]: requestId,
+	};
+	if (!publicMarketing) {
+		extraRequestHeaders[CSP_NONCE_REQUEST_HEADER] = nonce;
+	}
+
 	const response = await updateSession(request, {
-		extraRequestHeaders: {
-			[CSP_NONCE_REQUEST_HEADER]: nonce,
-			[REQUEST_ID_HEADER]: requestId,
-		},
+		extraRequestHeaders,
 	});
 	response.headers.set(REQUEST_ID_HEADER, requestId);
 	response.headers.set("Content-Security-Policy", csp);

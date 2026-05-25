@@ -1,11 +1,6 @@
-import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
-import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
+import { requireVerifiedTeacher } from "@/lib/auth/require-verified-teacher-layout";
 
 export default async function ProtectedTeacherLayout({ children }: { children: React.ReactNode }) {
-	const session = await getVerifiedTeacherSession();
-	if (!session.ok) {
-		handleVerifiedTeacherSessionFailure(session);
-	}
-
+	await requireVerifiedTeacher();
 	return children;
 }

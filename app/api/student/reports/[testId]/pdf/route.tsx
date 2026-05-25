@@ -1,7 +1,10 @@
 import { renderToBuffer } from "@react-pdf/renderer";
-import { z } from "zod";
-
 import { getServerUser } from "@/lib/auth/get-server-user";
+import {
+	reportPdfParamsSchema,
+	reportPdfQuerySchema,
+	searchParamsToRecord,
+} from "@/lib/student/api-query-schemas";
 import {
 	buildPracticeGradingReportPdfBuffer,
 	uploadPracticeGradingReportPdf,
@@ -17,17 +20,21 @@ export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ testId: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
-	const { testId } = await context.params;
-	if (!testId || !z.string().uuid().safeParse(testId).success) {
+	const rawParams = await context.params;
+	const parsedParams = reportPdfParamsSchema.safeParse(rawParams);
+	if (!parsedParams.success) {
 		return new Response("Missing or invalid test id", { status: 400 });
 	}
+	const testId = parsedParams.data.testId;
 
 	const url = new URL(request.url);
-	const dispositionParam = url.searchParams.get("disposition");
+	const parsedQuery = reportPdfQuerySchema.safeParse(searchParamsToRecord(url.searchParams));
+	if (!parsedQuery.success) {
+		return new Response("Invalid query parameters.", { status: 400 });
+	}
+	const { disposition: dispositionParam, view, inline: inlineParam } = parsedQuery.data;
 	const inline =
-		dispositionParam === "inline" ||
-		url.searchParams.get("view") === "1" ||
-		url.searchParams.get("inline") === "1";
+		dispositionParam === "inline" || view === "1" || inlineParam === "1";
 
 	const user = await getServerUser();
 	if (!user) {

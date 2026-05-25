@@ -29,6 +29,7 @@ import { AccountDetailsPanel } from "./sections/account-details-panel";
 import { settingsNestedWellClass } from "./sections/_account-fields";
 import { OrganizationPanel } from "./sections/organization-panel";
 import { ParentPanel } from "./sections/parent-panel";
+import type { PendingParentLinkRow } from "@/lib/parent/pending-parent-links";
 import { ProfileEditorPanel } from "./sections/profile-editor-panel";
 import { SubjectsPanel } from "./sections/subjects-panel";
 import {
@@ -77,6 +78,7 @@ export function StudentProfileSettingsForm({
 	organizations = [],
 	initialNotificationPrefs,
 	saveNotificationPreferences,
+	pendingParentLinks = [],
 }: {
 	userId: string;
 	loginEmail: string;
@@ -89,6 +91,7 @@ export function StudentProfileSettingsForm({
 	saveNotificationPreferences: (
 		input: NotificationPreferencesInput,
 	) => Promise<NotificationPreferencesState>;
+	pendingParentLinks?: PendingParentLinkRow[];
 }) {
 	const [state, formAction] = useActionState<UpdateStudentProfileState | undefined, FormData>(
 		updateStudentProfile,
@@ -264,7 +267,9 @@ export function StudentProfileSettingsForm({
 							title: "Guardian",
 							icon: Users,
 							color: tabAccentClass,
-							content: <ParentPanel profile={profile} />,
+							content: (
+								<ParentPanel profile={profile} pendingParentLinks={pendingParentLinks} />
+							),
 						},
 						{
 							id: "notifications",

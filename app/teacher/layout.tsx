@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { AuthSignedOutListener } from "@/components/auth/auth-signed-out-listener";
+import { NonceProviders } from "@/components/nonce-providers";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { TeacherShell } from "@/components/teacher/teacher-shell";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
@@ -31,7 +32,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 	const contextLabel = teacherOrg?.type_label ?? "Teacher";
 
 	return (
-		<>
+		<NonceProviders>
 			<SkipToContent />
 			<AuthSignedOutListener />
 			<AdminImpersonationBanner />
@@ -44,6 +45,6 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 			>
 				{children}
 			</TeacherShell>
-		</>
+		</NonceProviders>
 	);
 }

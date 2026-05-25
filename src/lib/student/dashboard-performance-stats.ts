@@ -16,11 +16,40 @@ export type DashboardPerformanceStats = {
 	timeSpentMinutesLast30Days: number;
 };
 
-type CompletedTestRow = {
+export type CompletedTestRow = {
 	test_date: string | null;
-	total_score: string | number | null;
+	total_score?: string | number | null;
 	duration_seconds?: number | null;
 };
+
+/** Calendar-day lookback for study-streak KPI (test_date only). Streaks longer than this may under-count. */
+export const DASHBOARD_STREAK_LOOKBACK_DAYS = 400;
+
+export type DashboardCompletedTestInput = {
+	testsCompleted: number;
+	recentTests: CompletedTestRow[];
+	streakTestDates: CompletedTestRow[];
+};
+
+export function dashboardStatsWindowKeys(now: Date = new Date()): {
+	endKey: string;
+	startKey30: string;
+	streakStartKey: string;
+} {
+	const endKey = appTimeZoneDateKey(now);
+	return {
+		endKey,
+		startKey30: addCalendarDaysToAppTimeZoneDateKey(endKey, -29),
+		streakStartKey: addCalendarDaysToAppTimeZoneDateKey(endKey, -DASHBOARD_STREAK_LOOKBACK_DAYS),
+	};
+}
+
+/** Start of calendar day in IST as ISO (for Supabase `gte` on timestamptz). */
+export function dateKeyToIsoStartInAppTz(dateKey: string): string {
+	const [y, m, d] = dateKey.split("-").map(Number);
+	if (!y || !m || !d) return dateKey;
+	return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T00:00:00+05:30`;
+}
 
 /** yyyy-MM-dd in India (Asia/Kolkata); safe on UTC servers and in the browser. */
 export function localDateKey(d: Date): string {
@@ -57,19 +86,19 @@ function parseScore(v: string | number | null | undefined): number | null {
 
 export function buildDashboardPerformanceStats(
 	trackerRows: PerformanceRowSerialized[],
-	completedTests: CompletedTestRow[] | null | undefined,
+	input: DashboardCompletedTestInput,
+	referenceDate: Date = new Date(),
 ): DashboardPerformanceStats {
-	const testsCompleted = completedTests?.length ?? 0;
+	const { testsCompleted, recentTests, streakTestDates } = input;
 
-	const endKey = appTimeZoneDateKey(new Date());
-	const startKey = addCalendarDaysToAppTimeZoneDateKey(endKey, -29);
+	const { endKey, startKey30 } = dashboardStatsWindowKeys(referenceDate);
 	const recentScores: number[] = [];
-	for (const t of completedTests ?? []) {
+	for (const t of recentTests) {
 		if (!t.test_date) continue;
 		const td = new Date(t.test_date);
 		if (Number.isNaN(td.getTime())) continue;
 		const tk = localDateKey(td);
-		if (tk < startKey || tk > endKey) continue;
+		if (tk < startKey30 || tk > endKey) continue;
 		const sc = parseScore(t.total_score);
 		if (sc != null) recentScores.push(sc);
 	}
@@ -81,18 +110,16 @@ export function buildDashboardPerformanceStats(
 	const topicsMasteredCount = trackerRows.filter((r) => r.status === "good").length;
 	const topicsNeedingImprovementCount = trackerRows.filter((r) => r.status !== "good").length;
 
-	const streakDates = (completedTests ?? [])
-		.map((t) => t.test_date)
-		.filter((d): d is string => Boolean(d));
+	const streakDates = streakTestDates.map((t) => t.test_date).filter((d): d is string => Boolean(d));
 	const studyStreakDays = computeStudyStreakDays(streakDates);
 
 	let timeSpentMinutesLast30Days = 0;
-	for (const t of completedTests ?? []) {
+	for (const t of recentTests) {
 		if (!t.test_date || t.duration_seconds == null || t.duration_seconds <= 0) continue;
 		const td = new Date(t.test_date);
 		if (Number.isNaN(td.getTime())) continue;
 		const tk = localDateKey(td);
-		if (tk < startKey || tk > endKey) continue;
+		if (tk < startKey30 || tk > endKey) continue;
 		timeSpentMinutesLast30Days += t.duration_seconds / 60;
 	}
 	timeSpentMinutesLast30Days = Math.round(timeSpentMinutesLast30Days);

@@ -25,6 +25,7 @@ export type StudentShellProps = {
 	/** Auth user id — used to subscribe the top-bar bell to Realtime inserts. */
 	userId?: string | null;
 	initialHasOpenAssignments?: boolean;
+	initialUnreadCount?: number;
 	activityStreak?: StudentActivityStreakSnapshot | null;
 	children: React.ReactNode;
 };
@@ -39,6 +40,7 @@ export function StudentShell({
 	entitlement,
 	userId,
 	initialHasOpenAssignments = false,
+	initialUnreadCount = 0,
 	activityStreak = null,
 	children,
 }: StudentShellProps) {
@@ -55,6 +57,7 @@ export function StudentShell({
 						userDisplayName={userDisplayName}
 						shareableId={shareableId}
 						userId={userId ?? null}
+						initialUnreadCount={initialUnreadCount}
 						activityStreak={activityStreak}
 					/>
 				}

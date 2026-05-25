@@ -27,6 +27,7 @@ export type StudentTopBarProps = {
 	userId?: string | null;
 	/** Server-hydrated weekly streak for the top-bar widget. */
 	activityStreak?: StudentActivityStreakSnapshot | null;
+	initialUnreadCount?: number;
 	/** Parent auth user id — when set with `headerPortal="parent"`, shows parent notifications bell. */
 	parentNotificationsUserId?: string | null;
 };
@@ -39,6 +40,7 @@ export function StudentTopBar({
 	userId,
 	parentNotificationsUserId,
 	activityStreak = null,
+	initialUnreadCount = 0,
 }: StudentTopBarProps) {
 	return (
 		<header className="sticky top-[env(safe-area-inset-top)] z-50 flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-sidebar px-4">
@@ -63,13 +65,14 @@ export function StudentTopBar({
 					<ActivityStreakWidget initialSnapshot={activityStreak} />
 				) : null}
 				{userId && headerPortal === "student" ? (
-					<StudentNotificationsBell userId={userId} />
+					<StudentNotificationsBell userId={userId} initialUnreadCount={initialUnreadCount} />
 				) : parentNotificationsUserId && headerPortal === "parent" ? (
 					<StudentNotificationsBell
 						userId={parentNotificationsUserId}
 						apiBasePath="/api/parent/notifications"
 						notificationsPageHref="/parent/notifications"
 						portal="parent"
+						initialUnreadCount={initialUnreadCount}
 					/>
 				) : null}
 				<FeedbackReportTopBarButton

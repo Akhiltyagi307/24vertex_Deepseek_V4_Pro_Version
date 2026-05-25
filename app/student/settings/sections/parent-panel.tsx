@@ -1,6 +1,7 @@
 "use client";
 
 import type { StudentProfileSettingsRow } from "../student-profile-settings-form";
+import type { PendingParentLinkRow } from "@/lib/parent/pending-parent-links";
 import {
 	Card,
 	CardContent,
@@ -8,14 +9,18 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { PendingParentLinksPanel } from "./pending-parent-links-panel";
 
 export function ParentPanel({
 	profile,
+	pendingParentLinks = [],
 }: {
 	profile: StudentProfileSettingsRow;
+	pendingParentLinks?: PendingParentLinkRow[];
 }) {
 	return (
 		<div>
+			<PendingParentLinksPanel links={pendingParentLinks} />
 			<Card className="border-0 bg-transparent p-0 shadow-none ring-0">
 				<CardHeader className="px-0 pt-0">
 					<CardTitle className="text-lg">Guardian &amp; parent connection</CardTitle>
@@ -42,8 +47,8 @@ export function ParentPanel({
 						</p>
 					</div>
 					<p className="mt-6 text-muted-foreground text-sm leading-relaxed">
-						These values are set when your parent links their account with your link
-						code.
+						When a parent uses your link code, you may need to approve the connection first.
+						After approval, we show their contact here and you cannot edit these fields.
 					</p>
 				</CardContent>
 			</Card>

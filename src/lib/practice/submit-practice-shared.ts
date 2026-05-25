@@ -1,15 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
-import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/notifications/report-ready";
-import { gradePracticeTestWithAi, recordGradingFailure, renderAndUploadPracticeReportPdf } from "@/lib/practice/ai-grade-practice-test";
-import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
+import { gradePracticeTestWithAi, recordGradingFailure } from "@/lib/practice/ai-grade-practice-test";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { refreshActivityStreakAfterSubmit } from "@/lib/student/refresh-activity-streak-safe";
+import {
+	assertTestOwnedByStudent,
+	assertTestOwnedInProgress,
+} from "@/lib/practice/test-ownership";
 import {
 	writeStudentAnswerRow,
 	writeStudentAnswerRows,
 	type StudentAnswerWriteRow,
 } from "@/lib/practice/student-answer-write";
+
+export { assertTestOwnedByStudent, assertTestOwnedInProgress };
 
 export type { StudentAnswerWriteRow };
 export { writeStudentAnswerRow, writeStudentAnswerRows };
@@ -50,33 +55,6 @@ type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 type AnswerKeyJson = {
 	correct_answer: string;
 };
-
-/**
- * Compatibility shim retained for callers outside `executePracticeTestSubmit`.
- * New code should use the atomic `practice_start_grading` RPC instead.
- */
-export async function assertTestOwnedInProgress(
-	supabase: ServerSupabase,
-	testId: string,
-	studentId: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-	const { data: test, error } = await supabase
-		.from("tests")
-		.select("id, student_id, status")
-		.eq("id", testId)
-		.maybeSingle();
-
-	if (error || !test) {
-		return { ok: false, message: "Test not found." };
-	}
-	if (test.student_id !== studentId) {
-		return { ok: false, message: "You do not have access to this test." };
-	}
-	if (test.status !== "in_progress") {
-		return { ok: false, message: "This test is no longer in progress." };
-	}
-	return { ok: true };
-}
 
 /**
  * Phase 1: `validateAndStripGeneration` now enforces that stored answer keys
@@ -166,6 +144,11 @@ export async function executePracticeTestSubmit(
 	testId: string,
 	elapsedSeconds: number,
 ): Promise<SubmitPracticeTestResult> {
+	const owned = await assertTestOwnedByStudent(supabase, testId, userId);
+	if (!owned.ok) {
+		return { ok: false, message: owned.message };
+	}
+
 	const gate = await startPracticeGrading(supabase, testId, elapsedSeconds);
 	if (!gate.ok) {
 		if (gate.alreadySubmitted) {
@@ -173,6 +156,7 @@ export async function executePracticeTestSubmit(
 				.from("tests")
 				.select("subject_id, status")
 				.eq("id", testId)
+				.eq("student_id", userId)
 				.maybeSingle();
 			return {
 				ok: true,
@@ -319,33 +303,17 @@ export async function executePracticeTestSubmit(
 			testId,
 			jobType: "pdf",
 		});
-		const pdfResult = await renderAndUploadPracticeReportPdf(testId);
-		if (!pdfResult.ok) {
-			logServerError(
-				"executePracticeTestSubmit.renderAndUploadPracticeReportPdf",
-				new Error(pdfResult.message),
-				{ testId },
-			);
-		} else {
-			try {
-				await notifyTestReportReady({
-					studentId: pdfResult.studentId,
-					testId,
-					subjectName: pdfResult.subjectName,
-					overallPercent: pdfResult.overallPercent,
-					submittedAtIso: pdfResult.submittedAtIso,
-				});
-			} catch (err) {
-				logServerError("executePracticeTestSubmit.fallback_in_app_notify", err, {
-					testId,
-				});
-			}
-			void notifyTestReportPdfReadyEmails({
+		const retryAfter = new Date(Date.now() + 60_000).toISOString();
+		const { error: pdfRetryErr } = await supabase.rpc("practice_enqueue_job", {
+			p_job_type: "pdf",
+			p_test_id: testId,
+			p_payload: { retry: true },
+			p_run_after: retryAfter,
+		});
+		if (pdfRetryErr) {
+			logSupabaseError("executePracticeTestSubmit.practice_enqueue_job.retry", pdfRetryErr, {
 				testId,
-				studentId: pdfResult.studentId,
-				subjectName: pdfResult.subjectName,
-				overallPercent: pdfResult.overallPercent,
-				storagePath: pdfResult.storagePath,
+				jobType: "pdf",
 			});
 		}
 	}
@@ -354,6 +322,9 @@ export async function executePracticeTestSubmit(
 	const redirectTo = subjectId
 		? `/student/reports?subject=${encodeURIComponent(subjectId)}`
 		: "/student/reports";
+
+	const { revalidateStudentDashboard } = await import("@/lib/student/revalidate-student-dashboard");
+	revalidateStudentDashboard(userId);
 
 	return { ok: true, redirectTo };
 }

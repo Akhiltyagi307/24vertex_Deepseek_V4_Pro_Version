@@ -5,17 +5,18 @@ import "katex/dist/katex.min.css";
 
 import { AdminImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { AuthSignedOutListener } from "@/components/auth/auth-signed-out-listener";
+import { NonceProviders } from "@/components/nonce-providers";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { requireParent } from "@/lib/auth/require-parent";
 
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {
 	await requireParent();
 	return (
-		<>
+		<NonceProviders>
 			<SkipToContent />
 			<AuthSignedOutListener />
 			<AdminImpersonationBanner />
 			{children}
-		</>
+		</NonceProviders>
 	);
 }

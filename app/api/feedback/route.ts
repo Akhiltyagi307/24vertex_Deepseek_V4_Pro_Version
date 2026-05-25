@@ -11,6 +11,7 @@ import {
 	portalMatchesProfileRole,
 	type FeedbackPortal,
 } from "@/lib/feedback/types";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 import { eq } from "drizzle-orm";
 
@@ -113,9 +114,7 @@ export async function POST(request: Request) {
 		.single();
 
 	if (error || !row) {
-		if (process.env.NODE_ENV === "development") {
-			console.error("[feedback]", error?.message, error?.code, error?.details);
-		}
+		logSupabaseError("feedback.insert", error ?? { message: "no row returned" }, { userId: user.id });
 		return Response.json({ ok: false, message: "Could not submit your report." }, { status: 500 });
 	}
 

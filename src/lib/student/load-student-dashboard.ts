@@ -7,6 +7,7 @@ import { buildStudentDashboardLeaderboardPayload } from "@/lib/student/dashboard
 import type { StudentDashboardLeaderboardPayload } from "@/lib/student/dashboard-leaderboard";
 import { listOpenStudentAssignments } from "@/lib/student/dashboard-open-assignments.server";
 import { buildDashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
+import { loadDashboardCompletedTestInput } from "@/lib/student/load-dashboard-test-stats";
 import {
 	pickParentDashboardGreeting,
 	pickStudentDashboardGreeting,
@@ -20,7 +21,6 @@ import {
 } from "@/lib/student/performance-matrix";
 import type { StudentProfileSubjectsRow } from "@/lib/student/student-performance-load";
 import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
-import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
@@ -75,7 +75,7 @@ function buildPerformanceSubjectHref(subjectId: string, opts?: LoadStudentDashbo
 	return `${base}?${params.toString()}#perf-topic-matrix`;
 }
 
-export type StudentDashboardViewPayload = {
+export type StudentDashboardCorePayload = {
 	headerGreeting: string;
 	performanceStats: ReturnType<typeof buildDashboardPerformanceStats>;
 	subjectCards: StudentDashboardSubjectCard[];
@@ -83,20 +83,24 @@ export type StudentDashboardViewPayload = {
 	topicProgressRadar: SubjectTopicRadarDatum[];
 	subjectsLoadError: string | null;
 	openAssignments: StudentAssignmentCard[];
-	leaderboard: StudentDashboardLeaderboardPayload;
 	trackerNeedsHydration: boolean;
+	/** For deferred leaderboard load (Suspense). */
+	enrolledSubjects: { id: string; name: string }[];
+};
+
+export type StudentDashboardViewPayload = StudentDashboardCorePayload & {
+	leaderboard: StudentDashboardLeaderboardPayload;
 };
 
 /**
- * Loads all data required by `StudentDashboardView` (server-only).
- * Keeps `app/student/dashboard/page.tsx` as auth + wiring only.
+ * Core dashboard data (excludes leaderboard for streaming).
  */
-export async function loadStudentDashboardViewPayload(
+export async function loadStudentDashboardCorePayload(
 	supabase: SupabaseServer,
 	userId: string,
 	profileRow: StudentDashboardProfileRow,
 	opts?: LoadStudentDashboardOptions,
-): Promise<StudentDashboardViewPayload> {
+): Promise<StudentDashboardCorePayload> {
 	const bundleInput: StudentProfileSubjectsRow = {
 		grade: profileRow.grade,
 		stream: profileRow.stream,
@@ -104,39 +108,15 @@ export async function loadStudentDashboardViewPayload(
 		role: profileRow.role,
 	};
 
-	const completedTestSelect = `
-		id,
-		test_date,
-		total_score,
-		subject_id,
-		duration_seconds,
-		time_limit_seconds,
-		subjects (
-			id,
-			name
-		)
-	`;
-
-	const [bundle, completedTestRes, openAssignments] = await Promise.all([
+	const [bundle, completedTestInput, openAssignments] = await Promise.all([
 		loadStudentPerformanceBundle(supabase, userId, bundleInput),
-		supabase
-			.from("tests")
-			.select(completedTestSelect)
-			.eq("student_id", userId)
-			.eq("is_draft", false)
-			.in("status", ["submitted", "graded"])
-			.order("test_date", { ascending: false, nullsFirst: false })
-			.order("updated_at", { ascending: false }),
+		loadDashboardCompletedTestInput(supabase, userId),
 		listOpenStudentAssignments(userId),
 	]);
 
 	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } = bundle;
-	if (completedTestRes.error) {
-		logSupabaseError("loadStudentDashboardViewPayload.tests.select", completedTestRes.error, { userId });
-	}
-	const completedTestRows = completedTestRes.data;
 
-	const performanceStats = buildDashboardPerformanceStats(rows, completedTestRows ?? []);
+	const performanceStats = buildDashboardPerformanceStats(rows, completedTestInput);
 
 	const enrolledSubjectCards = buildEnrolledSubjectCards(enrolledSubjects, topicCountBySubjectId, rows);
 	const trackerMap = buildSubjectCardTrackerStats(rows);
@@ -210,12 +190,6 @@ export async function loadStudentDashboardViewPayload(
 		return { subject: c.subjectName, coverage, perfected };
 	});
 
-	const leaderboardPayload = await buildStudentDashboardLeaderboardPayload({
-		studentId: userId,
-		organizationId: profileRow.organization_id,
-		enrolledSubjects: enrolledSubjects.map((s) => ({ id: s.id, name: s.name })),
-	});
-
 	const headerGreeting =
 		opts?.viewerRole === "parent"
 			? pickParentDashboardGreeting(profileRow.full_name)
@@ -228,7 +202,33 @@ export async function loadStudentDashboardViewPayload(
 		topicProgressRadar,
 		subjectsLoadError: loadError,
 		openAssignments,
-		leaderboard: leaderboardPayload,
 		trackerNeedsHydration,
+		enrolledSubjects: enrolledSubjects.map((s) => ({ id: s.id, name: s.name })),
 	};
+}
+
+export async function loadStudentDashboardLeaderboardOnly(params: {
+	studentId: string;
+	organizationId: string | null;
+	enrolledSubjects: { id: string; name: string }[];
+}): Promise<StudentDashboardLeaderboardPayload> {
+	return buildStudentDashboardLeaderboardPayload(params);
+}
+
+/**
+ * Loads all data required by `StudentDashboardView` (server-only), including leaderboard.
+ */
+export async function loadStudentDashboardViewPayload(
+	supabase: SupabaseServer,
+	userId: string,
+	profileRow: StudentDashboardProfileRow,
+	opts?: LoadStudentDashboardOptions,
+): Promise<StudentDashboardViewPayload> {
+	const core = await loadStudentDashboardCorePayload(supabase, userId, profileRow, opts);
+	const leaderboard = await loadStudentDashboardLeaderboardOnly({
+		studentId: userId,
+		organizationId: profileRow.organization_id,
+		enrolledSubjects: core.enrolledSubjects,
+	});
+	return { ...core, leaderboard };
 }

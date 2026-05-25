@@ -164,7 +164,9 @@ export type StudentDashboardViewProps = {
 	topicProgressRadar: SubjectTopicRadarDatum[];
 	subjectsLoadError: string | null;
 	openAssignments: StudentAssignmentCard[];
-	leaderboard: StudentDashboardLeaderboardPayload;
+	/** Eager leaderboard (marketing mocks). Prefer `leaderboardContent` when streaming. */
+	leaderboard?: StudentDashboardLeaderboardPayload;
+	leaderboardContent?: React.ReactNode;
 	trackerNeedsHydration?: boolean;
 	/** Parent portal reuses this view with read-only messaging and links under `/parent`. */
 	variant?: "student" | "parent";
@@ -178,6 +180,7 @@ export function StudentDashboardView({
 	subjectsLoadError,
 	openAssignments,
 	leaderboard,
+	leaderboardContent,
 	trackerNeedsHydration = false,
 	variant = "student",
 }: StudentDashboardViewProps) {
@@ -597,10 +600,13 @@ export function StudentDashboardView({
 						/>
 					</motion.div>
 					<motion.div variants={item} className="flex min-w-0">
-						<StudentDashboardLeaderboardCard
-							leaderboard={leaderboard}
-							variant={isParent ? "parent" : "student"}
-						/>
+						{leaderboardContent ??
+							(leaderboard ?
+								<StudentDashboardLeaderboardCard
+									leaderboard={leaderboard}
+									variant={isParent ? "parent" : "student"}
+								/>
+							:	null)}
 					</motion.div>
 				</motion.div>
 			</section>

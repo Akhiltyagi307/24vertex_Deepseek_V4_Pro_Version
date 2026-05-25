@@ -10,17 +10,14 @@ import {
 	userMessageForLinkParentRpcFailure,
 } from "@/lib/auth/link-parent-rpc-errors";
 import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
-import {
-	notifyParentChildLinkConfirmed,
-	notifyParentLinkedToStudent,
-} from "@/lib/notifications/account-security";
+import { processParentLinkNotifications } from "@/lib/parent/process-parent-link-notifications";
 import { writeParentAudit } from "@/lib/parent/audit";
 import { PARENT_ACTIONS } from "@/lib/parent/audit-actions";
 import {
 	consumeParentLinkPerParent,
 	consumeParentLinkPerStudent,
 } from "@/lib/parent/rate-limit";
-import { logSupabaseError, logServerError } from "@/lib/server/log-supabase-error";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 import { linkParentSchema } from "@/lib/validations/auth";
 
@@ -88,7 +85,7 @@ export async function linkParentToStudent(
 		return { error: THROTTLED_USER_MESSAGE };
 	}
 
-	const { error } = await supabase.rpc("link_parent_to_student", {
+	const { data: linkStatusRaw, error } = await supabase.rpc("link_parent_to_student", {
 		p_student_ref: parsed.data.studentId,
 	});
 
@@ -134,32 +131,17 @@ export async function linkParentToStudent(
 			userAgent: ua,
 		});
 		Sentry.metrics.count("parent.link.success", 1);
-		if (studentId) {
-			try {
-				await notifyParentLinkedToStudent({ studentId, parentId: parentUser.id });
-			} catch (e) {
-				logServerError("linkParentToStudent.notifyParentLinkedToStudent", e, {
-					studentId,
-					parentId: parentUser.id,
-				});
-				Sentry.captureException(e, {
-					level: "warning",
-					tags: { feature: "parent.link", phase: "notify_linked" },
-				});
-			}
-			try {
-				await notifyParentChildLinkConfirmed({ studentId, parentId: parentUser.id });
-			} catch (e) {
-				logServerError("linkParentToStudent.notifyParentChildLinkConfirmed", e, {
-					studentId,
-					parentId: parentUser.id,
-				});
-				Sentry.captureException(e, {
-					level: "warning",
-					tags: { feature: "parent.link", phase: "notify_confirmed" },
-				});
-			}
-		}
+		const linkStatus = linkStatusRaw === "pending" ? "pending" : "active";
+		await processParentLinkNotifications({
+			supabase,
+			parentId: parentUser.id,
+			studentRef: parsed.data.studentId,
+			linkStatus,
+		});
+	}
+
+	if (linkStatusRaw === "pending") {
+		redirect("/parent/link-child?status=pending");
 	}
 
 	redirect("/parent/dashboard");

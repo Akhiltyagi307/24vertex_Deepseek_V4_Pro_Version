@@ -91,6 +91,8 @@ export async function updateStudentProfile(
 	}
 
 	revalidatePath("/student", "layout");
+	const { revalidateStudentDashboard } = await import("@/lib/student/revalidate-student-dashboard");
+	revalidateStudentDashboard(user.id);
 	return { success: true };
 }
 
@@ -177,6 +179,8 @@ export async function updateStudentSchoolPlacement(
 	}
 
 	revalidatePath("/student", "layout");
+	const { revalidateStudentDashboard } = await import("@/lib/student/revalidate-student-dashboard");
+	revalidateStudentDashboard(user.id);
 	return { success: true };
 }
 
@@ -240,5 +244,7 @@ export async function updateStudentOrganization(
 
 	revalidatePath("/student", "layout");
 	revalidatePath("/student/settings");
+	const { revalidateStudentDashboard } = await import("@/lib/student/revalidate-student-dashboard");
+	revalidateStudentDashboard(user.id);
 	return { success: true };
 }

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { hasOpenAssignmentsForStudent } from "@/lib/assignments/has-open-assignments";
+import { parseStrictEmptyQuery } from "@/lib/student/api-query-schemas";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
 	STUDENT_ASSIGNMENT_INDICATOR_LIMIT_N,
@@ -37,7 +38,15 @@ function rateLimitedResponse(resetAt: Date): NextResponse {
  *
  * Whether the signed-in student has open (not yet submitted) assignments.
  */
-export async function GET() {
+export async function GET(request: Request) {
+	const query = parseStrictEmptyQuery(new URL(request.url).searchParams);
+	if (!query.ok) {
+		return NextResponse.json(
+			{ error: query.error },
+			{ status: 400, headers: privateHeaders() },
+		);
+	}
+
 	const user = await getServerUser();
 	if (!user) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders() });

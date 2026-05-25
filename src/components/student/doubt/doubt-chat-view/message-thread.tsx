@@ -14,6 +14,7 @@ import {
 	regenerateLastAssistantAction,
 } from "@/lib/doubt/doubt-actions";
 import type { AttachmentRow } from "@/lib/doubt/attachments/types";
+import { captureDoubtChatError } from "@/lib/doubt/capture-doubt-chat-error";
 import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -120,7 +121,7 @@ export function MessageThread({
 			} catch {
 				// fall through
 			}
-			console.error("doubt chat", err);
+			captureDoubtChatError("send", err, { conversationId });
 		},
 		onFinish: () => {
 			// fire-and-forget: useChat's onFinish expects `() => void`; reject inside this branch must not become an unhandled rejection
@@ -138,7 +139,7 @@ export function MessageThread({
 					}
 					router.refresh();
 				} catch (err) {
-					console.error("doubt chat onFinish", err);
+					captureDoubtChatError("onFinish", err, { conversationId });
 				}
 			})();
 		},
@@ -216,7 +217,7 @@ export function MessageThread({
 			// without appending a new one.
 			await regenerate();
 		} catch (err) {
-			console.error("doubt chat regenerate", err);
+			captureDoubtChatError("regenerate", err, { conversationId });
 			toast.error("Could not regenerate. Try again.");
 		} finally {
 			setRegenPending(false);

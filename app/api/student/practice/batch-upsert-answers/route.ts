@@ -7,6 +7,7 @@ import {
 	writeStudentAnswerRows,
 } from "@/lib/practice/submit-practice-shared";
 import type { StudentAnswerWriteRow } from "@/lib/practice/student-answer-write";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
 	STUDENT_PRACTICE_BATCH_UPSERT_LIMIT_N,
 	STUDENT_PRACTICE_BATCH_UPSERT_WINDOW_SECONDS,
@@ -125,9 +126,7 @@ export async function POST(request: Request) {
 
 	const { error: upErr } = await writeStudentAnswerRows(supabase, writeRows);
 	if (upErr) {
-		if (process.env.NODE_ENV === "development") {
-			console.error("[batch-upsert-answers]", upErr.message, upErr.code, upErr.details);
-		}
+		logSupabaseError("batch-upsert-answers.write", upErr, { testId, userId: user.id });
 		return Response.json({ ok: false, message: friendlyError() }, { status: 500 });
 	}
 

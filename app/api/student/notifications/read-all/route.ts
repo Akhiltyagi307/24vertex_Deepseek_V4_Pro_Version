@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { parseStrictEmptyQuery } from "@/lib/student/api-query-schemas";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
@@ -36,7 +37,15 @@ function rateLimitedResponse(resetAt: Date): NextResponse {
  *
  * Marks all of the signed-in student's unread notifications as read.
  */
-export async function POST() {
+export async function POST(request: Request) {
+	const query = parseStrictEmptyQuery(new URL(request.url).searchParams);
+	if (!query.ok) {
+		return NextResponse.json(
+			{ error: query.error },
+			{ status: 400, headers: privateHeaders() },
+		);
+	}
+
 	const user = await getServerUser();
 	if (!user) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders() });

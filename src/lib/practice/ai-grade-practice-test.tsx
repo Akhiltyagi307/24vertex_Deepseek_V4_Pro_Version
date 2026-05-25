@@ -810,6 +810,8 @@ async function gradePracticeTestWithAiInner(
 	}
 
 	trace.ok = true;
+	const { revalidateStudentDashboard } = await import("@/lib/student/revalidate-student-dashboard");
+	revalidateStudentDashboard(userId);
 	return { ok: true };
 	} finally {
 		logPracticeObs({

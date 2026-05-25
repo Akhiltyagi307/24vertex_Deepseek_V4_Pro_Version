@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getServerUser } from "@/lib/auth/get-server-user";
+import {
+	searchParamsToRecord,
+	studentNotificationsListQuerySchema,
+} from "@/lib/student/api-query-schemas";
 import { createClient } from "@/lib/supabase/server";
 import { listStudentNotifications, getStudentUnreadCount } from "@/lib/notifications/student-queries";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -56,9 +60,16 @@ export async function GET(request: Request) {
 	}
 
 	const url = new URL(request.url);
-	const cursor = url.searchParams.get("cursor");
-	const filterRaw = url.searchParams.get("filter");
-	const limitRaw = url.searchParams.get("limit");
+	const parsedQuery = studentNotificationsListQuerySchema.safeParse(
+		searchParamsToRecord(url.searchParams),
+	);
+	if (!parsedQuery.success) {
+		return NextResponse.json(
+			{ error: "Invalid query parameters." },
+			{ status: 400, headers: privateHeaders() },
+		);
+	}
+	const { cursor, filter: filterRaw, limit: limitRaw } = parsedQuery.data;
 	const filter = filterRaw === "unread" ? "unread" : "all";
 	const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
 

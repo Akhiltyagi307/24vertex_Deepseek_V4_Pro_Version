@@ -11,7 +11,28 @@
  * doubt-chat side effects (counts in the manifest, presence of the right
  * filenames in the export, the right where-clause shape on counts).
  */
+import { getTableName } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
+
+import { aiCalls } from "@/db/schema/ai-calls";
+import { adminActionLog } from "@/db/schema/admin-action-log";
+import {
+	adminTestMessages,
+	performanceTracker,
+	questionFlags,
+	questions,
+	studentAnswers,
+	testReports,
+	tests,
+} from "@/db/schema/assessment";
+import { assignmentSubmissions } from "@/db/schema/teaching";
+import { couponRedemptions, freeTrialClaims, payments, subscriptions, usagePeriods } from "@/db/schema/billing";
+import { complianceRequests } from "@/db/schema/compliance-requests";
+import { auditLogs, emailLog, notifications, userPreferences } from "@/db/schema/comms-audit";
+import { doubtConversations, doubtMessageAttachments, doubtMessages } from "@/db/schema/doubt";
+import { parentalConsents } from "@/db/schema/parental-consents";
+import { parentStudentLinks, profiles } from "@/db/schema/profiles";
+import { userFeedbackReports } from "@/db/schema/user-feedback-reports";
 
 const {
 	selectMock,
@@ -81,6 +102,49 @@ type ChainMock = {
 	then: (res: (v: unknown[]) => unknown, rej?: (e: unknown) => unknown) => Promise<unknown>;
 };
 
+/** Map Drizzle table refs to planned select results (order-independent). */
+function installTableSelectResponses(byTable: Record<string, unknown[]>): void {
+	selectMock.mockImplementation(() => ({
+		from: (table: unknown) => {
+			const name = getTableName(table as Parameters<typeof getTableName>[0]);
+			return makeChain(byTable[name] ?? [{ c: 0 }]);
+		},
+	}));
+}
+
+/** Empty export fixture for every slice `buildComplianceExportZip` may select. */
+function emptyExportSelectFixture(): Record<string, unknown[]> {
+	return {
+		[getTableName(profiles)]: [],
+		[getTableName(performanceTracker)]: [],
+		[getTableName(tests)]: [],
+		[getTableName(questions)]: [],
+		[getTableName(studentAnswers)]: [],
+		[getTableName(testReports)]: [],
+		[getTableName(adminTestMessages)]: [],
+		[getTableName(questionFlags)]: [],
+		[getTableName(userFeedbackReports)]: [],
+		[getTableName(assignmentSubmissions)]: [],
+		[getTableName(notifications)]: [],
+		[getTableName(userPreferences)]: [],
+		[getTableName(parentStudentLinks)]: [],
+		[getTableName(subscriptions)]: [],
+		[getTableName(usagePeriods)]: [],
+		[getTableName(payments)]: [],
+		[getTableName(couponRedemptions)]: [],
+		[getTableName(freeTrialClaims)]: [],
+		[getTableName(auditLogs)]: [],
+		[getTableName(adminActionLog)]: [],
+		[getTableName(parentalConsents)]: [],
+		[getTableName(complianceRequests)]: [],
+		[getTableName(emailLog)]: [],
+		[getTableName(aiCalls)]: [],
+		[getTableName(doubtConversations)]: [],
+		[getTableName(doubtMessages)]: [],
+		[getTableName(doubtMessageAttachments)]: [],
+	};
+}
+
 function makeChain(rows: unknown[]): ChainMock {
 	// Build the chain so each call returns the same object; .limit and the
 	// thenable both resolve to the rows. Drizzle queries either `await
@@ -95,53 +159,25 @@ function makeChain(rows: unknown[]): ChainMock {
 	return chain;
 }
 
-// TODO(audit-followup): the response-order fixture in this file has drifted
-// from `countErasureImpact`'s actual select call order, so the destructuring
-// `[{ c: number }] = []` crashes at lib/compliance/erasure.ts:97 / :122. The
-// implementation looks correct — the fix is to rebuild the fixture as a
-// shape-aware mock (match by table name passed to `.from`) instead of strict
-// positional ordering. Skipped here to unblock the full-suite CI gate
-// (PR #79); tracked as a follow-up.
 describe("countErasureImpact — doubt rows", () => {
-	it.skip("reports doubt_conversations_deleted and doubt_messages_deleted", async () => {
-		// `countErasureImpact` issues many `select(...)` calls. We respond with
-		// generic empty/zero shapes for all OTHER tables and inject realistic
-		// values when the call shape matches doubt-chat. The simplest robust
-		// approach: every select returns a chain. Each `.limit()` (or thenable)
-		// resolves to whatever the next planned response is. We track the order
-		// strictly here by re-assigning `selectMock.mockImplementation`.
-		const responses: unknown[][] = [];
-		// Rows for `loadTestIdsForStudent` (first select)
-		responses.push([]); // no tests
-		// `count(*) profiles` → `[{ c: 1 }]`
-		responses.push([{ c: 1 }]);
-		// student_answers count (skipped if no testIds — replaced by 0 path)
-		// counts.question_flags_deleted
-		responses.push([{ c: 0 }]);
-		// performance_tracker
-		responses.push([{ c: 0 }]);
-		// assignment_submissions
-		responses.push([{ c: 0 }]);
-		// notifications
-		responses.push([{ c: 0 }]);
-		// user_preferences
-		responses.push([{ c: 0 }]);
-		// parent_student_links
-		responses.push([{ c: 0 }]);
-		// doubt convos list — drive the count through here
-		responses.push([{ id: "11111111-1111-1111-1111-111111111111" }, { id: "22222222-2222-2222-2222-222222222222" }]);
-		// doubt_messages count for those two convos
-		responses.push([{ c: 7 }]);
-		// doubt_message_attachments count
-		responses.push([{ c: 3 }]);
-		// ai_calls count
-		responses.push([{ c: 0 }]);
-
-		let i = 0;
-		selectMock.mockImplementation(() => {
-			const rows = responses[i] ?? [];
-			i++;
-			return makeChain(rows);
+	it("reports doubt_conversations_deleted and doubt_messages_deleted", async () => {
+		installTableSelectResponses({
+			[getTableName(tests)]: [],
+			[getTableName(profiles)]: [{ c: 1 }],
+			[getTableName(questionFlags)]: [{ c: 0 }],
+			[getTableName(userFeedbackReports)]: [{ c: 0 }],
+			[getTableName(performanceTracker)]: [{ c: 0 }],
+			[getTableName(assignmentSubmissions)]: [{ c: 0 }],
+			[getTableName(notifications)]: [{ c: 0 }],
+			[getTableName(userPreferences)]: [{ c: 0 }],
+			[getTableName(parentStudentLinks)]: [{ c: 0 }],
+			[getTableName(doubtConversations)]: [
+				{ id: "11111111-1111-1111-1111-111111111111" },
+				{ id: "22222222-2222-2222-2222-222222222222" },
+			],
+			[getTableName(doubtMessages)]: [{ c: 7 }],
+			[getTableName(doubtMessageAttachments)]: [{ c: 3 }],
+			[getTableName(aiCalls)]: [{ c: 0 }],
 		});
 
 		const counts = await countErasureImpact("00000000-0000-0000-0000-0000000000aa");
@@ -151,25 +187,19 @@ describe("countErasureImpact — doubt rows", () => {
 		expect(counts.doubt_message_attachments_deleted).toBe(3);
 	});
 
-	it.skip("reports zero when the student has no doubt conversations", async () => {
-		const responses: unknown[][] = [
-			[], // tests
-			[{ c: 1 }], // profiles
-			[{ c: 0 }], // q_flags
-			[{ c: 0 }], // perf
-			[{ c: 0 }], // submissions
-			[{ c: 0 }], // notifications
-			[{ c: 0 }], // user_preferences
-			[{ c: 0 }], // parent_student_links
-			[], // doubt convos
-			[{ c: 0 }], // ai_calls
-		];
-
-		let i = 0;
-		selectMock.mockImplementation(() => {
-			const rows = responses[i] ?? [];
-			i++;
-			return makeChain(rows);
+	it("reports zero when the student has no doubt conversations", async () => {
+		installTableSelectResponses({
+			[getTableName(tests)]: [],
+			[getTableName(profiles)]: [{ c: 1 }],
+			[getTableName(questionFlags)]: [{ c: 0 }],
+			[getTableName(userFeedbackReports)]: [{ c: 0 }],
+			[getTableName(performanceTracker)]: [{ c: 0 }],
+			[getTableName(assignmentSubmissions)]: [{ c: 0 }],
+			[getTableName(notifications)]: [{ c: 0 }],
+			[getTableName(userPreferences)]: [{ c: 0 }],
+			[getTableName(parentStudentLinks)]: [{ c: 0 }],
+			[getTableName(doubtConversations)]: [],
+			[getTableName(aiCalls)]: [{ c: 0 }],
 		});
 
 		const counts = await countErasureImpact("00000000-0000-0000-0000-0000000000bb");
@@ -180,55 +210,29 @@ describe("countErasureImpact — doubt rows", () => {
 });
 
 describe("buildComplianceExportZip — doubt slices in the manifest", () => {
-	// TODO(audit-followup): same fixture-drift problem as the two skipped
-	// countErasureImpact tests above — the export builder reports 3 conversation
-	// rows where the fixture expects 2. Skipped to unblock full-suite CI gate.
-	it.skip("includes doubt_conversations.json and doubt_messages.json in the manifest with row counts", async () => {
+	it("includes doubt_conversations.json and doubt_messages.json in the manifest with row counts", async () => {
 		const doubtConvos = [
 			{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
 			{ id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" },
 		];
-		const doubtMsgs = [
-			{ id: "m1" },
-			{ id: "m2" },
-			{ id: "m3" },
-		];
-		const doubtAtts = [{ id: "a1" }];
-
-		// Each top-level select call in `buildComplianceExportZip` runs sequentially.
-		// We provide responses in the exact ORDER they're queried. The doubt slices
-		// are near the end. Most other slices return empty arrays.
-		const orderedResponses: unknown[][] = [
-			[], // profiles
-			[], // perf
-			[], // tests
-			// no testIds → skip questionRows/answerRows/reportRows/adminMsgRows branch
-			[], // qFlags
-			[], // submissions
-			[], // notifs
-			[], // prefs
-			[], // links
-			[], // subs
-			// no subIds → skip usagePeriods branch
-			[], // payments
-			[], // redemption
-			[], // trial
-			[], // audit
-			[], // adminLog
-			[], // consent
-			[], // dsr
-			[], // emailLog
-			[], // aiCalls
-			doubtConvos, // doubtConvos
-			doubtMsgs, // doubtMessages (because convoIds is non-empty)
-			doubtAtts, // doubtMessageAttachments (because convoIds is non-empty)
+		const doubtMsgs = [{ id: "m1" }, { id: "m2" }, { id: "m3" }];
+		const doubtAtts = [
+			{
+				id: "a1",
+				conversationId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+				messageId: "m1",
+				kind: "image",
+				mime: "image/png",
+				sizeBytes: 100,
+				storagePath: "student/x.png",
+			},
 		];
 
-		let i = 0;
-		selectMock.mockImplementation(() => {
-			const rows = orderedResponses[i] ?? [];
-			i++;
-			return makeChain(rows);
+		installTableSelectResponses({
+			...emptyExportSelectFixture(),
+			[getTableName(doubtConversations)]: doubtConvos,
+			[getTableName(doubtMessages)]: doubtMsgs,
+			[getTableName(doubtMessageAttachments)]: doubtAtts,
 		});
 
 		const { manifest } = await buildComplianceExportZip({
@@ -239,25 +243,12 @@ describe("buildComplianceExportZip — doubt slices in the manifest", () => {
 		expect(manifest["doubt_conversations.json"]).toBe(2);
 		expect(manifest["doubt_messages.json"]).toBe(3);
 		expect(manifest["doubt_message_attachments.json"]).toBe(1);
-		// One downloads sidecar entry per attachment row (URL + metadata).
 		expect(manifest["doubt_attachments_downloads.json"]).toBe(1);
-		// Sanity: index file always present.
 		expect(manifest["index.html"]).toBe(1);
 	});
 
 	it("emits doubt_messages.json with 0 rows when the student has no doubt conversations", async () => {
-		const orderedResponses: unknown[][] = [
-			[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [],
-			[], // aiCalls
-			[], // doubtConvos — empty, so doubtMessages branch is skipped entirely
-		];
-
-		let i = 0;
-		selectMock.mockImplementation(() => {
-			const rows = orderedResponses[i] ?? [];
-			i++;
-			return makeChain(rows);
-		});
+		installTableSelectResponses(emptyExportSelectFixture());
 
 		const { manifest } = await buildComplianceExportZip({
 			subjectUserId: "00000000-0000-0000-0000-0000000000dd",

@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { qnaNavDirectionSchema } from "@/lib/student/api-query-schemas";
 import { getQnaLogAdjacent } from "@/lib/student/qna-logs/get-qna-log-adjacent";
 import { getQnaLogDetail } from "@/lib/student/qna-logs/get-qna-log-detail";
 import { parseQnaLogQueryParams } from "@/lib/student/qna-logs/qna-log-query-params";
@@ -16,8 +15,6 @@ export const dynamic = "force-dynamic";
 const NAV_LIMIT_N = 120;
 const NAV_WINDOW_SECONDS = 60;
 
-const dirSchema = z.enum(["next", "prev"]);
-
 export async function GET(request: Request) {
 	const viewer = await resolveStudentQnaViewer();
 	if (!viewer.ok) return viewer.response;
@@ -28,7 +25,7 @@ export async function GET(request: Request) {
 		url.searchParams.get("nav_dir") ??
 		url.searchParams.get("direction") ??
 		url.searchParams.get("dir");
-	const dir = dirSchema.safeParse(navDirectionRaw);
+	const dir = qnaNavDirectionSchema.safeParse(navDirectionRaw);
 	if (!dir.success) return qnaError(400, "Invalid navigation direction.");
 
 	const paramsWithoutNav = new URLSearchParams(url.searchParams);

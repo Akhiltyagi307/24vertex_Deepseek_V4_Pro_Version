@@ -21,6 +21,7 @@ export type ParentShellProps = {
 	childGradeLabel: string;
 	entitlement: EntitlementSnapshot | null;
 	initialHasOpenAssignments?: boolean;
+	initialUnreadCount?: number;
 	children: React.ReactNode;
 };
 
@@ -35,6 +36,7 @@ export function ParentShell({
 	childGradeLabel,
 	entitlement,
 	initialHasOpenAssignments = false,
+	initialUnreadCount = 0,
 	children,
 }: ParentShellProps) {
 	return (
@@ -48,6 +50,7 @@ export function ParentShell({
 					shareableId={childLinkCode}
 					headerPortal="parent"
 					parentNotificationsUserId={parentUserId}
+					initialUnreadCount={initialUnreadCount}
 				/>
 			}
 			sidebar={

@@ -10,6 +10,7 @@ import { requireVerifiedStudent } from "@/lib/auth/require-verified-student";
 import { getNotificationPrefs } from "@/lib/notifications/prefs";
 import { listCatalogOrganizations } from "@/lib/organizations/queries";
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
+import { loadPendingParentLinksForStudent } from "@/lib/parent/pending-parent-links";
 import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -58,8 +59,11 @@ export default async function StudentSettingsPage() {
 		.map((row: { id: string; name: string }) => ({ id: row.id, name: row.name }))
 		.filter((s: ResolvedSubjectForSettings) => Boolean(s.id && s.name));
 
-	const prefs = await getNotificationPrefs(user.id);
-	const organizations = await listCatalogOrganizations();
+	const [prefs, organizations, pendingParentLinks] = await Promise.all([
+		getNotificationPrefs(user.id),
+		listCatalogOrganizations(),
+		loadPendingParentLinksForStudent(user.id),
+	]);
 	const initialNotificationPrefs = {
 		enableInApp: prefs.enableInApp,
 		enableEmail: prefs.enableEmail,
@@ -95,6 +99,7 @@ export default async function StudentSettingsPage() {
 								organizations={organizations}
 								initialNotificationPrefs={initialNotificationPrefs}
 								saveNotificationPreferences={updateNotificationPreferences}
+								pendingParentLinks={pendingParentLinks}
 							/>
 						),
 					},

@@ -6,10 +6,15 @@ import * as Sentry from "@sentry/nextjs";
 import { subscribeToMyNotifications } from "@/lib/notifications/realtime-client";
 import type { NotificationsRealtimeScope } from "@/lib/notifications/realtime-client";
 
+/** Background poll interval when Realtime is healthy (ms). */
+export const NOTIFICATION_UNREAD_POLL_MS = 180_000;
+
 export type UseNotificationUnreadCountArgs = {
 	userId: string;
 	apiBasePath: string;
 	initialCount?: number;
+	/** When true, layout already fetched count; skip duplicate mount request. */
+	skipMountRefresh?: boolean;
 	/** Distinct Realtime channel suffix — each subscriber needs its own scope. */
 	realtimeScope: NotificationsRealtimeScope;
 };
@@ -22,6 +27,7 @@ export function useNotificationUnreadCount({
 	userId,
 	apiBasePath,
 	initialCount = 0,
+	skipMountRefresh = false,
 	realtimeScope,
 }: UseNotificationUnreadCountArgs) {
 	const [count, setCount] = React.useState(initialCount);
@@ -44,8 +50,9 @@ export function useNotificationUnreadCount({
 	}, [apiBasePath]);
 
 	React.useEffect(() => {
+		if (skipMountRefresh) return;
 		void refresh();
-	}, [refresh]);
+	}, [refresh, skipMountRefresh]);
 
 	React.useEffect(() => {
 		const unsubscribe = subscribeToMyNotifications(
@@ -63,7 +70,7 @@ export function useNotificationUnreadCount({
 		const tick = () => {
 			if (document.visibilityState !== "hidden") void refresh();
 		};
-		const interval = setInterval(tick, 60_000);
+		const interval = setInterval(tick, NOTIFICATION_UNREAD_POLL_MS);
 		const onVisible = () => {
 			if (document.visibilityState === "visible") void refresh();
 		};

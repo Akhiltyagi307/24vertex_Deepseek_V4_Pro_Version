@@ -225,3 +225,58 @@ export async function notifyParentChildLinkConfirmed(input: NotifyParentLinkedIn
 		});
 	}
 }
+
+/**
+ * Student must approve before a parent can access the portal when no guardian email was on file.
+ */
+export async function notifyStudentParentLinkApprovalRequest(
+	input: NotifyParentLinkedInput,
+): Promise<void> {
+	try {
+		const parentName = await loadDisplayName(input.parentId);
+		const who = parentName ? ` (${parentName})` : "";
+		await insertInAppNotification({
+			recipientId: input.studentId,
+			senderId: input.parentId,
+			title: "Parent link request",
+			body: `A parent account${who} asked to connect to your profile. Open Settings → Parent to approve or decline. Until you approve, they cannot use the parent portal for your account.`,
+			type: "system",
+			category: "parent_link_pending_student",
+			referenceType: "profile",
+			referenceId: input.parentId,
+			forceInApp: true,
+		});
+	} catch (err) {
+		logServerError("notifications.parent_link_pending_student", err, {
+			studentId: input.studentId,
+			parentId: input.parentId,
+		});
+	}
+}
+
+/**
+ * Parent submitted a link request that awaits student approval.
+ */
+export async function notifyParentLinkPendingApproval(input: NotifyParentLinkedInput): Promise<void> {
+	try {
+		const contact = await loadProfileContact(input.studentId);
+		const label = formatPersonDisplayName(contact?.fullName ?? "") || "your student";
+		await insertInAppNotification({
+			recipientId: input.parentId,
+			senderId: input.studentId,
+			title: "Waiting for student approval",
+			body: `${label} must approve your link request in their 24Vertex settings before you can view their progress. We will notify you when they respond.`,
+			type: "system",
+			category: "parent_link_pending_parent",
+			referenceType: "student",
+			referenceId: input.studentId,
+			contextStudentId: input.studentId,
+			forceInApp: true,
+		});
+	} catch (err) {
+		logServerError("notifications.parent_link_pending_parent", err, {
+			studentId: input.studentId,
+			parentId: input.parentId,
+		});
+	}
+}

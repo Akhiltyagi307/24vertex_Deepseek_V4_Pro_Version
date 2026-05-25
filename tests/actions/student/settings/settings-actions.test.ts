@@ -30,9 +30,11 @@ vi.mock("@/lib/server/log-supabase-error", () => ({
 	logServerError: () => undefined,
 	isPostgresUndefinedColumnError: () => false,
 }));
+const revalidateTagMock = vi.fn();
 vi.mock("next/cache", () => ({
 	revalidatePath: (...args: unknown[]) =>
 		(revalidatePathMock.current as (...a: unknown[]) => unknown)(...args),
+	revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
 }));
 
 import {

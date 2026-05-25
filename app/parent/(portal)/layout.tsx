@@ -8,7 +8,9 @@ import { getCachedEntitlementsForProfile } from "@/lib/billing/entitlements";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
+import { getStudentUnreadCount } from "@/lib/notifications/student-queries";
 import { createClient } from "@/lib/supabase/server";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 
 function gradeLabel(grade: number | null, section: string | null): string {
 	if (grade == null) return "Child account";
@@ -48,9 +50,15 @@ export default async function ParentPortalLayout({ children }: { children: React
 		redirect("/parent/select-student");
 	}
 
-	const [entitlement, initialHasOpenAssignments] = await Promise.all([
+	const [entitlement, initialHasOpenAssignments, initialUnreadCount] = await Promise.all([
 		getCachedEntitlementsForProfile(activeId),
 		hasOpenAssignmentsForStudent(activeId).catch(() => false),
+		getStudentUnreadCount(supabase, user.id).catch((err) => {
+			logSupabaseError("parent.layout.unread_count", err as { message?: string }, {
+				userId: user.id,
+			});
+			return 0;
+		}),
 	]);
 
 	const org = childRow.school_name?.trim() || "Your school";
@@ -69,6 +77,7 @@ export default async function ParentPortalLayout({ children }: { children: React
 			childGradeLabel={gradeLabel(childRow.grade, childRow.section)}
 			entitlement={entitlement}
 			initialHasOpenAssignments={initialHasOpenAssignments}
+			initialUnreadCount={initialUnreadCount}
 		>
 			{children}
 		</ParentShell>

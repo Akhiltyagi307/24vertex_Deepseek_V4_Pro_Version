@@ -30,6 +30,11 @@ function linkChildReasonMessage(reason: string | null): { title: string; body: s
 				title: "Could not attach your student automatically",
 				body: "Your parent account is ready. Enter your child's link code below to finish connecting them.",
 			};
+		case "pending":
+			return {
+				title: "Waiting for your student",
+				body: "We sent a request to your child. They must approve the connection in Settings before you can open their dashboard.",
+			};
 		default:
 			return null;
 	}
@@ -38,7 +43,9 @@ function linkChildReasonMessage(reason: string | null): { title: string; body: s
 export function LinkChildForm() {
 	const [state, formAction] = useActionState(linkParentToStudent, {});
 	const searchParams = useSearchParams();
-	const reasonCopy = linkChildReasonMessage(searchParams.get("reason"));
+	const reasonCopy =
+		linkChildReasonMessage(searchParams.get("reason")) ??
+		linkChildReasonMessage(searchParams.get("status"));
 
 	const staggerSections = [
 		{

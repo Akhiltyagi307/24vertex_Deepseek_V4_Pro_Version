@@ -7,6 +7,7 @@ import {
 	STUDENT_FLAG_QUESTION_WINDOW_SECONDS,
 	consumeStudentRateLimit,
 } from "@/lib/student/rate-limit";
+import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
 
 const bodySchema = z
@@ -75,9 +76,10 @@ export async function POST(request: Request) {
 	});
 
 	if (error) {
-		if (process.env.NODE_ENV === "development") {
-			console.error("[flag-question]", error.message, error.code, error.details);
-		}
+		logSupabaseError("flag-question.insert", error, {
+			questionId: parsed.data.questionId,
+			userId: user.id,
+		});
 		return Response.json({ ok: false, message: "Could not submit your report." }, { status: 500 });
 	}
 
@@ -92,9 +94,10 @@ export async function POST(request: Request) {
 			status: "open",
 		});
 	} catch (e) {
-		if (process.env.NODE_ENV === "development") {
-			console.error("[flag-question] moderation_flags", e);
-		}
+		logServerError("flag-question.moderation_flags", e, {
+			questionId: parsed.data.questionId,
+			userId: user.id,
+		});
 	}
 
 	return Response.json({ ok: true });

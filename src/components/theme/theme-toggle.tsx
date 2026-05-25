@@ -10,7 +10,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { createClient } from "@/lib/supabase/client";
+import { signOutEverywhere } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
 
 /** Distinct from `bg-sidebar` header so controls do not disappear into the bar */
@@ -24,10 +24,8 @@ export function ThemeToggle() {
 	const { resolvedTheme, setTheme } = useTheme();
 	const isDark = (resolvedTheme ?? "dark") === "dark";
 
-	async function signOut() {
-		const supabase = createClient();
-		await supabase.auth.signOut();
-		window.location.href = "/";
+	function signOut() {
+		void signOutEverywhere();
 	}
 
 	const themeSwitchLabel = mounted

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { parseStrictEmptyQuery } from "@/lib/student/api-query-schemas";
 import { createClient } from "@/lib/supabase/server";
 import { getStudentUnreadCount } from "@/lib/notifications/student-queries";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -38,7 +39,15 @@ function rateLimitedResponse(resetAt: Date): NextResponse {
  * Lightweight count endpoint used by the top-bar bell when Realtime is
  * unavailable (60s poll fallback) and for initial hydration.
  */
-export async function GET() {
+export async function GET(request: Request) {
+	const query = parseStrictEmptyQuery(new URL(request.url).searchParams);
+	if (!query.ok) {
+		return NextResponse.json(
+			{ error: query.error },
+			{ status: 400, headers: privateHeaders() },
+		);
+	}
+
 	const user = await getServerUser();
 	if (!user) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: privateHeaders() });

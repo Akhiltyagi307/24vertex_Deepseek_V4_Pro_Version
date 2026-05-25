@@ -16,6 +16,7 @@ export type LinkParentRpcErrorClass =
 	| "link_trigger_blocked"
 	/** Postgres 42P10: parent_student_links missing UNIQUE for ON CONFLICT (parent_id, student_id) */
 	| "link_upsert_constraint_missing"
+	| "link_not_pending"
 	| "generic";
 
 export function classifyLinkParentRpc(err: {
@@ -57,6 +58,9 @@ export function classifyLinkParentRpc(err: {
 		m.includes("no unique or exclusion constraint matching the on conflict")
 	) {
 		return "link_upsert_constraint_missing";
+	}
+	if (m.includes("link is not pending")) {
+		return "link_not_pending";
 	}
 	return "generic";
 }
