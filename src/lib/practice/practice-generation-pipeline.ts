@@ -15,9 +15,20 @@ import {
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { generateStructured, streamStructured } from "@/lib/ai/structured-output";
 
-import { getOpenAIPracticeChatModelFallback, getPracticePipelineVariant } from "@/lib/env";
+import {
+	getOpenAIPracticeChatModelFallback,
+	getPracticeBlueprintLlmEnabled,
+	getPracticeParallelBatchesEnabled,
+	getPracticePipelineVariant,
+} from "@/lib/env";
 import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
 import { buildDeterministicPracticeBlueprint } from "@/lib/practice/practice-generation-blueprint-deterministic";
+import {
+	buildBatchUserPromptTail,
+	mergePracticeBatchOutputs,
+	splitPracticeQuestionPlanIntoBatches,
+	type PracticeGenerationBatch,
+} from "@/lib/practice/practice-generation-batches";
 import { runPracticeValidationPass } from "@/lib/practice/practice-validation";
 import {
 	mapResolveToGenerateFailure,
@@ -970,29 +981,37 @@ async function runPracticeGenerationAfterResolveCore(
 		// is that per-slot `visual_intent` is null (visual decisions are made
 		// from stem text in the later enrichment call). See
 		// practice-generation-blueprint-deterministic.ts for the trade-offs.
+		// Blueprint sourcing:
+		// - 5call variant: always LLM (full pipeline).
+		// - 3call variant default: deterministic (saves a Flash round-trip).
+		// - 3call + PRACTICE_BLUEPRINT_LLM=true: LLM blueprint (V4 Flash by
+		//   default via DEEPSEEK_BLUEPRINT_MODEL) so we keep 3call's visual
+		//   optimizations while regaining per-slot `visual_intent` +
+		//   `skill_target` from a real planning call.
 		const pipelineVariant = getPracticePipelineVariant();
-		const blueprintResult =
-			pipelineVariant === "3call"
-				? {
-						ok: true as const,
-						blueprint: buildDeterministicPracticeBlueprint({
-							expectedTypeCounts,
-							topicIds: [...topicIdSet],
-							difficulty: difficulty as "easy" | "medium" | "hard",
-							subjectName: resolved.subjectName,
-							visualsEnabled: jobContext.visuals.enabled,
-							preferredKinds: jobContext.visuals.preferredKinds,
-						}),
-						model: "deterministic",
-						modelMs: 0,
-						inputTokens: 0,
-						outputTokens: 0,
-					}
-				: await generatePracticeBlueprint({
-						jobContext,
-						promptRevision: PRACTICE_PROMPT_REVISION,
-						abortSignal: opts.abortSignal,
-					});
+		const useLlmBlueprint =
+			pipelineVariant !== "3call" || getPracticeBlueprintLlmEnabled();
+		const blueprintResult = useLlmBlueprint
+			? await generatePracticeBlueprint({
+					jobContext,
+					promptRevision: PRACTICE_PROMPT_REVISION,
+					abortSignal: opts.abortSignal,
+				})
+			: {
+					ok: true as const,
+					blueprint: buildDeterministicPracticeBlueprint({
+						expectedTypeCounts,
+						topicIds: [...topicIdSet],
+						difficulty: difficulty as "easy" | "medium" | "hard",
+						subjectName: resolved.subjectName,
+						visualsEnabled: jobContext.visuals.enabled,
+						preferredKinds: jobContext.visuals.preferredKinds,
+					}),
+					model: "deterministic",
+					modelMs: 0,
+					inputTokens: 0,
+					outputTokens: 0,
+				};
 		cumulativeModelMs += blueprintResult.modelMs;
 		await writeGenerationStep({
 			stepKey: "blueprint_generate",
@@ -1003,7 +1022,10 @@ async function runPracticeGenerationAfterResolveCore(
 			inputTokens: blueprintResult.inputTokens,
 			outputTokens: blueprintResult.outputTokens,
 			error: blueprintResult.ok ? null : blueprintResult.message,
-			metadata: { variant: pipelineVariant },
+			metadata: {
+				variant: pipelineVariant,
+				blueprint_source: useLlmBlueprint ? "llm" : "deterministic",
+			},
 		});
 		if (!blueprintResult.ok) {
 			return {
@@ -1024,43 +1046,122 @@ async function runPracticeGenerationAfterResolveCore(
 - If slot.visual_intent.needs_visual is true, write the stem so a later visual can naturally support it (e.g. "shown below", "use the graph/table", or a visual-first setup) without leaking answers. The stem + options must be consistent with slot.visual_intent.visual_idea and align with slot.visual_intent.preferred_kind (same modality — do not describe a graph in prose if the plan is a table unless the idea calls for both).
 - If slot.visual_intent.needs_visual is false, keep the stem fully understandable without relying on an unseen figure.
 - For this pass, emit \`visual: null\` on every question. You may include lightweight visual cues for slots marked \`needs_visual=true\`, but avoid making stems unsolvable without the later enrichment visual.`;
+		// Canonical full-context user prompt. In single-call mode this is what
+		// the model receives; in parallel-batched mode it stays defined for the
+		// repair pass when `PRACTICE_REPAIR_INCLUDE_FULL_CONTEXT=true` (repair
+		// benefits from seeing every blueprint slot, not just the batch's slice).
 		const generationUserPrompt = `${userPrompt}
 
 BLUEPRINT_SLOTS_JSON:
 ${JSON.stringify(blueprintSlots)}`;
 
+		const parallelBatched = getPracticeParallelBatchesEnabled();
 		const m0 = Date.now();
-		generationCallCount++;
-		const r = await runModelOnceWithFallback(
-			generationSystemPrompt,
-			generationUserPrompt,
-			expectedCount,
-			generationOutputSchema,
-			opts,
-			resolved.userId,
-			{
-				generationRunId,
-				correlationId,
-				stepKey: "question_generation",
-			},
-		);
-		cumulativeModelMs += Date.now() - m0;
-		await writeGenerationStep({
-			stepKey: "question_generation",
-			status: r.ok ? "ok" : "error",
-			model: r.usage.model,
-			feature: "practice.generation",
-			latencyMs: r.usage.latencyMs,
-			inputTokens: r.usage.inputTokens,
-			outputTokens: r.usage.outputTokens,
-			error: r.ok ? null : r.message,
-		});
-		if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
+		let grouped: PracticeGenerationGroupedOutput;
 
-		let grouped: PracticeGenerationGroupedOutput = normalizeGroupedEstimatedTimesToPlan(
-			r.object,
-			durationSeconds,
-		);
+		if (parallelBatched) {
+			const batches = splitPracticeQuestionPlanIntoBatches({
+				plan: expectedTypeCounts,
+				slots: blueprintSlots,
+			});
+			const totalQuestionsInTest = blueprintSlots.length;
+
+			const settled = await Promise.all(
+				batches.map(async (batch: PracticeGenerationBatch) => {
+					const batchSchema = createPracticeGenerationOutputSchema(batch.typeCounts, {
+						visualsEnabled: false,
+					});
+					const batchUserPrompt = `${userPrompt}\n\n${buildBatchUserPromptTail({
+						batch,
+						totalBatches: batches.length,
+						totalQuestionsInTest,
+					})}`;
+					const stepKey = `question_generation_batch_${batch.index + 1}_${batch.label}`;
+					const result = await runModelOnceWithFallback(
+						generationSystemPrompt,
+						batchUserPrompt,
+						batch.slots.length,
+						batchSchema,
+						opts,
+						resolved.userId,
+						{
+							generationRunId,
+							correlationId,
+							stepKey,
+						},
+					);
+					return { batch, result, stepKey };
+				}),
+			);
+
+			generationCallCount += batches.length;
+			cumulativeModelMs += Date.now() - m0;
+
+			for (const { batch, result, stepKey } of settled) {
+				await writeGenerationStep({
+					stepKey,
+					status: result.ok ? "ok" : "error",
+					model: result.usage.model,
+					feature: "practice.generation",
+					latencyMs: result.usage.latencyMs,
+					inputTokens: result.usage.inputTokens,
+					outputTokens: result.usage.outputTokens,
+					error: result.ok ? null : result.message,
+					metadata: {
+						batch_index: batch.index,
+						batch_label: batch.label,
+						batch_size: batch.slots.length,
+						parallel_batched: true,
+					},
+				});
+			}
+
+			const firstFailure = settled.find(({ result }) => !result.ok);
+			if (firstFailure) {
+				return {
+					ok: false,
+					message: (firstFailure.result as { ok: false; message: string }).message,
+					code: "generation_failed",
+				};
+			}
+
+			const merged = mergePracticeBatchOutputs(
+				settled.map(
+					({ result }) =>
+						(result as { ok: true; object: PracticeGenerationGroupedOutput }).object,
+				),
+			);
+			grouped = normalizeGroupedEstimatedTimesToPlan(merged, durationSeconds);
+		} else {
+			generationCallCount++;
+			const r = await runModelOnceWithFallback(
+				generationSystemPrompt,
+				generationUserPrompt,
+				expectedCount,
+				generationOutputSchema,
+				opts,
+				resolved.userId,
+				{
+					generationRunId,
+					correlationId,
+					stepKey: "question_generation",
+				},
+			);
+			cumulativeModelMs += Date.now() - m0;
+			await writeGenerationStep({
+				stepKey: "question_generation",
+				status: r.ok ? "ok" : "error",
+				model: r.usage.model,
+				feature: "practice.generation",
+				latencyMs: r.usage.latencyMs,
+				inputTokens: r.usage.inputTokens,
+				outputTokens: r.usage.outputTokens,
+				error: r.ok ? null : r.message,
+			});
+			if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
+
+			grouped = normalizeGroupedEstimatedTimesToPlan(r.object, durationSeconds);
+		}
 
 		const chunkAlignmentCtx = chunkAlignmentForQuality();
 		const targetedIndexesForReason = (reason: PracticeGenerationRepairReason): number[] => {

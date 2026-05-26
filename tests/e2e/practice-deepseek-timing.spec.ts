@@ -27,7 +27,7 @@ const STUDENT_EMAIL = (
 // trackers were replaced. Targeting two visual-rich Commerce subjects:
 // Accountancy (T-accounts, journals, balance sheets) and Economics
 // (supply/demand curves, indifference curves).
-const TARGET_SUBJECTS = ["Financial Accounting Part 1", "Economics"] as const;
+const TARGET_SUBJECTS = ["Financial Accounting Part 1", "Economics", "Statistics"] as const;
 
 /**
  * Tier-1 topic pinning. When a subject is in this map, the test uses ONLY
@@ -195,14 +195,19 @@ async function pickEasyDifficulty(page: import("@playwright/test").Page) {
 
 async function answerCurrentQuestionBestEffort(
 	page: import("@playwright/test").Page,
+	correctMcqLetter?: string | null,
 ): Promise<boolean> {
-	const mcq = page
-		.locator("fieldset")
-		.filter({ hasText: "Select an answer" })
-		.locator('input[type="radio"]')
-		.first();
-	if (await mcq.isVisible().catch(() => false)) {
-		await mcq.check();
+	const mcqGroup = page.locator("fieldset").filter({ hasText: "Select an answer" });
+	const mcqFirst = mcqGroup.locator('input[type="radio"]').first();
+	if (await mcqFirst.isVisible().catch(() => false)) {
+		// If we know the correct letter, click that index (A=0, B=1, C=2, D=3).
+		// Radios render in alphabetical order in question-card.tsx.
+		if (correctMcqLetter && /^[A-D]$/.test(correctMcqLetter)) {
+			const idx = correctMcqLetter.charCodeAt(0) - "A".charCodeAt(0);
+			await mcqGroup.locator('input[type="radio"]').nth(idx).check();
+		} else {
+			await mcqFirst.check();
+		}
 		return true;
 	}
 	const simple = page.locator("[data-practice-answer-field]").first();
@@ -217,6 +222,38 @@ async function answerCurrentQuestionBestEffort(
 		return true;
 	}
 	return false;
+}
+
+type AnswerKeyRow = {
+	question_number: number;
+	question_type: string;
+	answer_key: { correct_answer?: string } | null;
+};
+
+/**
+ * Pre-fetches answer keys for all questions in a generated test so the
+ * Playwright run can pick the correct MCQ option per question. Returns an
+ * array indexed by question_number-1 (i.e. result[0] is question 1). Each
+ * entry's `correct_answer` is the MCQ letter (A/B/C/D) for MCQ questions,
+ * null for non-MCQ (the test falls back to dummy text answers for those).
+ */
+async function fetchAnswerKeys(
+	request: import("@playwright/test").APIRequestContext,
+	testId: string,
+): Promise<Array<{ correct_answer: string | null; question_type: string }>> {
+	const r = await request.get(
+		`${SUPABASE_URL}/rest/v1/questions?test_id=eq.${encodeURIComponent(testId)}&select=question_number,question_type,answer_key&order=question_number.asc`,
+		{ headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` } },
+	);
+	expect(r.ok(), `fetchAnswerKeys ${r.status()}`).toBeTruthy();
+	const rows = (await r.json()) as AnswerKeyRow[];
+	return rows.map((row) => ({
+		question_type: row.question_type,
+		correct_answer:
+			row.question_type === "multiple_choice" ?
+				(row.answer_key?.correct_answer?.trim() ?? null)
+			:	null,
+	}));
 }
 
 async function runOneSubject(
@@ -334,18 +371,26 @@ async function runOneSubject(
 		expect(testId, `test id from URL for ${subj.name}`).toBeTruthy();
 		result.test_id = testId;
 
-		// Answer up to 5 questions then submit (gives the grader more chunks
-		// per test, so per-chunk Pro latency variance is more visible).
+		// Walk all 15 questions so MCQ-only correctness logic gets to see every
+		// MCQ slot — the question_number order is round-robin (MCQ → FIB → SA →
+		// LA → MCQ → ...), so the 5 MCQs are spread across the test, not the
+		// first 5 slots. Don't break on a non-MCQ failure (e.g. tiptap not
+		// hydrated yet) — just advance to the next slot so subsequent MCQs
+		// still get their correct option clicked.
 		await expect(page.getByRole("button", { name: /Submit test/i }).first()).toBeVisible({
 			timeout: 120_000,
 		});
-		for (let i = 0; i < 5; i++) {
-			const ok = await answerCurrentQuestionBestEffort(page);
-			if (!ok) break;
+		const answerKeys = await fetchAnswerKeys(request, testId!);
+		for (let i = 0; i < answerKeys.length; i++) {
+			const correctLetter = answerKeys[i]?.correct_answer ?? null;
+			await answerCurrentQuestionBestEffort(page, correctLetter).catch(() => false);
 			const next = page.getByRole("button", { name: /^Next$/i });
-			if ((await next.isVisible()) && (await next.isEnabled())) {
+			// Last question won't have a Next button — submit handles that.
+			if ((await next.isVisible().catch(() => false)) && (await next.isEnabled().catch(() => false))) {
 				await next.click();
-				await page.waitForTimeout(200);
+				// Wait for the question card to advance. The card uses
+				// `key={active.id}` so React re-mounts it; a brief settle works.
+				await page.waitForTimeout(300);
 			}
 		}
 
