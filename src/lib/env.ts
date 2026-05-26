@@ -258,9 +258,10 @@ export function getDeepSeekGradingChatModel(): string {
 }
 
 /**
- * Reasoning effort for V4 reasoning models. `high` is the migration default —
- * higher quality with manageable latency. Lower to `medium` / `low` if a
- * specific feature starts feeling sluggish in practice.
+ * Reasoning effort for V4 reasoning models. `medium` is the default after the
+ * parallel-batched generation rollout — `high` burned ~3-5 minutes of CoT on
+ * single-call 15-question gens; `medium` is enough to keep quality steady at a
+ * fraction of the latency. Override per-environment with DEEPSEEK_REASONING_EFFORT.
  */
 export type DeepSeekReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -269,7 +270,7 @@ export function getDeepSeekReasoningEffort(): DeepSeekReasoningEffort {
 	if (raw === "low" || raw === "medium" || raw === "high" || raw === "xhigh" || raw === "max") {
 		return raw;
 	}
-	return "high";
+	return "medium";
 }
 
 /**
@@ -340,6 +341,34 @@ export type PracticePipelineVariant = "5call" | "3call";
 export function getPracticePipelineVariant(): PracticePipelineVariant {
 	const raw = readTrimmedEnv("PRACTICE_PIPELINE_VARIANT").toLowerCase();
 	return raw === "3call" ? "3call" : "5call";
+}
+
+/**
+ * Splits the single 15- or 30-question structured generation call into four
+ * concurrent calls (MCQ / FIB / SA / LA) that share an identical cacheable
+ * prompt prefix and diverge only in a per-batch BATCH CONTRACT tail. Cuts
+ * wall-clock by roughly the long-answer-batch latency floor at the cost of
+ * ~1.4× input tokens (offset by DeepSeek prompt caching).
+ *
+ * Off by default while we A/B against the single-call baseline; flip
+ * PRACTICE_PARALLEL_BATCHES=true in env to opt a deployment in.
+ */
+export function getPracticeParallelBatchesEnabled(): boolean {
+	return readTrimmedEnv("PRACTICE_PARALLEL_BATCHES").toLowerCase() === "true";
+}
+
+/**
+ * Forces the LLM blueprint path (V4 Flash by default via
+ * DEEPSEEK_BLUEPRINT_MODEL) regardless of pipeline variant. Without this
+ * flag, the `3call` variant uses a deterministic blueprint to skip a Flash
+ * round-trip. With this flag, you keep `3call`'s visual optimizations
+ * (no retry rounds, no deterministic fallback visuals) while regaining
+ * the LLM-derived per-slot `visual_intent` and `skill_target`.
+ *
+ * Off by default; flip PRACTICE_BLUEPRINT_LLM=true to opt in.
+ */
+export function getPracticeBlueprintLlmEnabled(): boolean {
+	return readTrimmedEnv("PRACTICE_BLUEPRINT_LLM").toLowerCase() === "true";
 }
 
 /**

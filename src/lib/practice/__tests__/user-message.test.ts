@@ -250,8 +250,14 @@ describe("buildPracticeUserMessage", () => {
 
 	it("populates visuals_policy from PRACTICE_VISUALS env and subject", () => {
 		const original = process.env.PRACTICE_VISUALS;
+		const originalTemplate = process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE;
 		try {
 			process.env.PRACTICE_VISUALS = "true";
+			// Ensure the template engine is off for this test — when on, the
+			// builder adds an extra `template_policy` key that breaks the exact
+			// `toEqual` assertions below. Template-policy behavior is covered
+			// by the dedicated test further down.
+			delete process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE;
 			const physics = buildPracticeUserMessage({
 				studentGrade: 11,
 				subject: { id: "x", name: "Physics" },
@@ -364,6 +370,8 @@ describe("buildPracticeUserMessage", () => {
 		} finally {
 			if (original === undefined) delete process.env.PRACTICE_VISUALS;
 			else process.env.PRACTICE_VISUALS = original;
+			if (originalTemplate === undefined) delete process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE;
+			else process.env.PRACTICE_VISUAL_TEMPLATE_ENGINE = originalTemplate;
 		}
 	});
 
