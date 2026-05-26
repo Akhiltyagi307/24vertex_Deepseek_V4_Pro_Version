@@ -20,6 +20,10 @@ export const aiCalls = pgTable(
 		stepKey: varchar("step_key", { length: 64 }),
 		inputTokens: integer("input_tokens").notNull(),
 		outputTokens: integer("output_tokens").notNull(),
+		reasoningTokens: integer("reasoning_tokens"),
+		cacheHitTokens: integer("cache_hit_tokens"),
+		cacheMissTokens: integer("cache_miss_tokens"),
+		provider: varchar("provider", { length: 32 }),
 		latencyMs: integer("latency_ms"),
 		status: varchar("status", { length: 20 }).notNull(),
 		error: text("error"),
@@ -33,5 +37,6 @@ export const aiCalls = pgTable(
 		index("idx_ai_calls_test_created").on(t.testId, t.createdAt),
 		index("idx_ai_calls_correlation_created").on(t.correlationId, t.createdAt),
 		index("idx_ai_calls_step_key_created").on(t.stepKey, t.createdAt),
+		index("idx_ai_calls_provider_created").on(t.provider, t.createdAt),
 	],
 );

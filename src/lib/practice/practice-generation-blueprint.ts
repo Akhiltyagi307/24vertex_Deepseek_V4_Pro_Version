@@ -1,8 +1,6 @@
-import { generateObject } from "ai";
-
+import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { getOpenAIProvider } from "@/lib/ai/openai-provider";
-import { getOpenAIPracticeChatModel } from "@/lib/env";
+import { generateStructured } from "@/lib/ai/structured-output";
 
 import type { PracticeGenerationJobContext } from "./generation-job-context";
 import {
@@ -105,13 +103,14 @@ export async function generatePracticeBlueprint(args: {
 	promptRevision: string;
 	abortSignal?: AbortSignal;
 }): Promise<GeneratePracticeBlueprintResult> {
-	const modelId = getOpenAIPracticeChatModel();
+	const resolved = resolveChatModel("practice.generation.blueprint");
+	const modelId = resolved.modelId;
 	const t0 = Date.now();
 	const schema = createPracticeGenerationBlueprintSchema(args.jobContext.plan.expectedTypeCounts);
 
 	try {
-		const { object, usage } = await generateObject({
-			model: getOpenAIProvider()(modelId),
+		const { object, usage, telemetry } = await generateStructured({
+			resolved,
 			schema,
 			system: buildBlueprintSystemPrompt(),
 			prompt: buildBlueprintUserPrompt(args.jobContext),
@@ -149,6 +148,10 @@ export async function generatePracticeBlueprint(args: {
 				stepKey: "blueprint_generate",
 				inputTokens: usage?.inputTokens ?? 0,
 				outputTokens: usage?.outputTokens ?? 0,
+				reasoningTokens: telemetry.reasoningTokens,
+				cacheHitTokens: telemetry.cacheHitTokens,
+				cacheMissTokens: telemetry.cacheMissTokens,
+				provider: telemetry.provider,
 				latencyMs: Date.now() - t0,
 				status: "error",
 				error: check.message,
@@ -173,6 +176,10 @@ export async function generatePracticeBlueprint(args: {
 			stepKey: "blueprint_generate",
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
+			reasoningTokens: telemetry.reasoningTokens,
+			cacheHitTokens: telemetry.cacheHitTokens,
+			cacheMissTokens: telemetry.cacheMissTokens,
+			provider: telemetry.provider,
 			latencyMs: Date.now() - t0,
 			status: "ok",
 		});
@@ -197,6 +204,7 @@ export async function generatePracticeBlueprint(args: {
 			stepKey: "blueprint_generate",
 			inputTokens: 0,
 			outputTokens: 0,
+			provider: resolved.provider,
 			latencyMs: Date.now() - t0,
 			status: "error",
 			error: message,

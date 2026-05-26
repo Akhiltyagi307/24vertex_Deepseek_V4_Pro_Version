@@ -203,6 +203,161 @@ export function getOpenAIPracticeChatModelFallback(): string | null {
 }
 
 // ============================================================
+// DeepSeek (V4 Pro) — used when the model router selects "deepseek"
+// for a feature. OpenAI helpers above remain the fallback path
+// (vision turns, env_default=openai), so both providers can coexist.
+// ============================================================
+
+/** DeepSeek API key — server-only. Validation deferred until a feature actually routes to DeepSeek. */
+export function getDeepSeekApiKey(): string {
+	const key = process.env.DEEPSEEK_API_KEY?.trim();
+	if (!key) throw new Error("Missing DEEPSEEK_API_KEY");
+	return key;
+}
+
+/**
+ * Optional baseURL override for self-hosted gateways. Defaults to https://api.deepseek.com.
+ *
+ * Important: `readTrimmedEnv` returns `""` (not `undefined`) when the env var
+ * is unset. The DeepSeek SDK uses `options.baseURL ?? DEFAULT` — `??` only
+ * fires on null/undefined, so passing `""` here makes the SDK build URLs like
+ * `"" + "/chat/completions"` → relative URL → fetch failure. Coerce empty to
+ * undefined so the SDK default kicks in.
+ */
+export function getDeepSeekBaseUrl(): string | undefined {
+	const v = readTrimmedEnv("DEEPSEEK_BASE_URL");
+	return v.length > 0 ? v : undefined;
+}
+
+/** Default chat model. V4 Pro is the migration target; older `deepseek-chat` is auto-mapped by DeepSeek until 2026-07-24. */
+export function getDeepSeekChatModel(): string {
+	const model = readTrimmedEnv("DEEPSEEK_CHAT_MODEL");
+	if (model) return model;
+	return "deepseek-v4-pro";
+}
+
+/**
+ * Per-feature overrides — when unset, fall back to {@link getDeepSeekChatModel}.
+ *
+ * `readTrimmedEnv` returns `""` (not `undefined`) for unset vars, so `??` does
+ * not short-circuit — guard explicitly with a truthiness check.
+ */
+export function getDeepSeekDoubtChatModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_DOUBT_CHAT_MODEL");
+	return v.length > 0 ? v : getDeepSeekChatModel();
+}
+
+export function getDeepSeekPracticeChatModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_PRACTICE_CHAT_MODEL");
+	return v.length > 0 ? v : getDeepSeekChatModel();
+}
+
+export function getDeepSeekGradingChatModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_GRADING_CHAT_MODEL");
+	return v.length > 0 ? v : getDeepSeekChatModel();
+}
+
+/**
+ * Reasoning effort for V4 reasoning models. `high` is the migration default —
+ * higher quality with manageable latency. Lower to `medium` / `low` if a
+ * specific feature starts feeling sluggish in practice.
+ */
+export type DeepSeekReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+export function getDeepSeekReasoningEffort(): DeepSeekReasoningEffort {
+	const raw = readTrimmedEnv("DEEPSEEK_REASONING_EFFORT")?.toLowerCase();
+	if (raw === "low" || raw === "medium" || raw === "high" || raw === "xhigh" || raw === "max") {
+		return raw;
+	}
+	return "high";
+}
+
+/**
+ * Per-feature thinking modes. Practice generation has high variance in how
+ * much CoT actually helps: blueprint is structural (slot allocation, topic
+ * mapping) and rarely benefits from thinking; visual enrichment + grade
+ * summary are formatting-heavy. The big quality lever is the main practice
+ * generation + grade-chunk passes.
+ *
+ * `disabled` skips CoT entirely (best latency, lowest cost). `enabled` is
+ * the V4 Pro default. `adaptive` lets the model decide per-turn.
+ */
+export type DeepSeekThinkingMode = "enabled" | "disabled" | "adaptive";
+
+function readThinkingMode(envName: string, fallback: DeepSeekThinkingMode): DeepSeekThinkingMode {
+	const raw = readTrimmedEnv(envName)?.toLowerCase();
+	if (raw === "enabled" || raw === "disabled" || raw === "adaptive") return raw;
+	return fallback;
+}
+
+export function getDeepSeekBlueprintThinking(): DeepSeekThinkingMode {
+	return readThinkingMode("DEEPSEEK_BLUEPRINT_THINKING", "enabled");
+}
+
+export function getDeepSeekVisualEnrichmentThinking(): DeepSeekThinkingMode {
+	return readThinkingMode("DEEPSEEK_VISUAL_ENRICHMENT_THINKING", "enabled");
+}
+
+export function getDeepSeekGradeSummaryThinking(): DeepSeekThinkingMode {
+	return readThinkingMode("DEEPSEEK_GRADE_SUMMARY_THINKING", "enabled");
+}
+
+/**
+ * Per-feature model overrides — Flash for structural/format calls, Pro for
+ * quality-critical generation + per-chunk grading. When unset, falls back to
+ * {@link getDeepSeekChatModel}.
+ *
+ * `readTrimmedEnv` returns `""` for unset vars (not undefined), so the
+ * truthy guard is required — `?? fallback` would never fire.
+ */
+export function getDeepSeekBlueprintModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_BLUEPRINT_MODEL");
+	return v.length > 0 ? v : getDeepSeekChatModel();
+}
+
+export function getDeepSeekVisualEnrichmentModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_VISUAL_ENRICHMENT_MODEL");
+	return v.length > 0 ? v : getDeepSeekChatModel();
+}
+
+export function getDeepSeekGradeSummaryModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_GRADE_SUMMARY_MODEL");
+	return v.length > 0 ? v : getDeepSeekChatModel();
+}
+
+/**
+ * Variant selector for the practice generation pipeline.
+ *
+ * - `5call` (default): blueprint LLM → main gen → visual enrich ×3 (parallel)
+ * - `3call`: deterministic blueprint → main gen → single visual-enrich call → Flash structure+sanity validator
+ *
+ * The 3-call variant trades a small quality safety net (LLM-derived
+ * visual_idea per slot) for ~25s + ₹0.20 saved per generation. It's feature-
+ * flagged so the team can A/B both pipelines against the same student traffic.
+ */
+export type PracticePipelineVariant = "5call" | "3call";
+
+export function getPracticePipelineVariant(): PracticePipelineVariant {
+	const raw = readTrimmedEnv("PRACTICE_PIPELINE_VARIANT").toLowerCase();
+	return raw === "3call" ? "3call" : "5call";
+}
+
+/**
+ * Flash model used for the final structure+sanity validator in the 3-call
+ * variant. Falls back to the default Flash override so changing one env var
+ * propagates; falls back to the global chat model if neither is set.
+ */
+export function getDeepSeekValidationModel(): string {
+	const v = readTrimmedEnv("DEEPSEEK_VALIDATION_MODEL");
+	if (v.length > 0) return v;
+	return getDeepSeekVisualEnrichmentModel(); // same Flash route as enrichment by default
+}
+
+export function getDeepSeekValidationThinking(): DeepSeekThinkingMode {
+	return readThinkingMode("DEEPSEEK_VALIDATION_THINKING", "disabled");
+}
+
+// ============================================================
 // Billing / SaaS
 // ============================================================
 

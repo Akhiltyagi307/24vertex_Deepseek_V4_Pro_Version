@@ -100,6 +100,12 @@ export function isPracticeVisualEnrichmentEnabled(): boolean {
 /**
  * Max number of candidate indexes sent in each enrichment request.
  * Keeps prompt/token growth bounded while allowing broader visual coverage.
+ *
+ * Cap was 6 when enrichment ran on GPT-5.4-mini (Pro-equivalent latency).
+ * Raised to 30 so the 3-call DeepSeek variant can fit a full 15-question
+ * test into a single Flash+thinking call rather than fall back to the
+ * deterministic placeholder template. 30 is a safety ceiling, not a target —
+ * callers pass the actual candidate count they want.
  */
 export function getPracticeVisualEnrichmentBatchSize(): number {
 	const raw = process.env.PRACTICE_VISUAL_ENRICHMENT_BATCH_SIZE;
@@ -107,7 +113,7 @@ export function getPracticeVisualEnrichmentBatchSize(): number {
 	const n = Number.parseInt(raw, 10);
 	if (!Number.isFinite(n)) return 2;
 	if (n < 1) return 1;
-	if (n > 6) return 6;
+	if (n > 30) return 30;
 	return n;
 }
 

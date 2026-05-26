@@ -1,17 +1,24 @@
 import { randomUUID } from "node:crypto";
 
-import { APICallError, generateObject, NoObjectGeneratedError, streamObject } from "ai";
+import { APICallError, NoObjectGeneratedError } from "ai";
 
 import {
 	insertHeuristicModerationFlag,
 	moderatePracticeGenerationText,
 	moderatePracticeQuestionsPerItem,
 } from "@/lib/ai/moderation";
+import {
+	buildOpenAiResolved,
+	resolveChatModel,
+	type ResolvedAiModel,
+} from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
+import { generateStructured, streamStructured } from "@/lib/ai/structured-output";
 
-import { getOpenAIProvider } from "@/lib/ai/openai-provider";
-import { getOpenAIPracticeChatModel, getOpenAIPracticeChatModelFallback } from "@/lib/env";
+import { getOpenAIPracticeChatModelFallback, getPracticePipelineVariant } from "@/lib/env";
 import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
+import { buildDeterministicPracticeBlueprint } from "@/lib/practice/practice-generation-blueprint-deterministic";
+import { runPracticeValidationPass } from "@/lib/practice/practice-validation";
 import {
 	mapResolveToGenerateFailure,
 	type GeneratePracticeFailure,
@@ -78,11 +85,6 @@ import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentry-tags";
 import { getPracticeGenerationRepairBudget } from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
-import {
-	embedQuestionTexts,
-	findDuplicatesAgainstStudent,
-	persistQuestionEmbeddings,
-} from "@/lib/practice/dedup-embeddings";
 import {
 	appendGenerationStep,
 	attachTestIdToRunAiCalls,
@@ -323,7 +325,7 @@ async function runModelOnce(
 		stepKey: string;
 		testId?: string | null;
 	},
-	chatModelId: string = getOpenAIPracticeChatModel(),
+	resolved: ResolvedAiModel,
 ): Promise<
 	| {
 			ok: true;
@@ -342,9 +344,9 @@ async function runModelOnce(
 	// per-request limits on some models and produces unpredictable cost. 12k
 	// fits a 40-question schema comfortably.
 	const maxOutputTokens = practiceGenerationMaxOutputTokens(estimatedQuestionCount);
-	const model = getOpenAIProvider()(chatModelId);
-	const baseParams = {
-		model,
+	const chatModelId = resolved.modelId;
+	const baseArgs = {
+		resolved,
 		schema: outputSchema,
 		system: systemPrompt,
 		prompt: userPrompt,
@@ -364,7 +366,7 @@ async function runModelOnce(
 	if (opts.useStreamObject) {
 		const t0 = Date.now();
 		try {
-			const result = streamObject(baseParams);
+			const result = streamStructured(baseArgs);
 			const streamPartial = (async () => {
 				if (!opts.onPartialObject) {
 					return;
@@ -375,6 +377,7 @@ async function runModelOnce(
 			})();
 			const [object] = await Promise.all([result.object, streamPartial]);
 			const usage = await result.usage;
+			const callTelemetry = await result.telemetry;
 			void recordAiCall({
 				feature: "practice.generation",
 				model: chatModelId,
@@ -382,6 +385,10 @@ async function runModelOnce(
 				promptId: PRACTICE_PROMPT_REVISION,
 				inputTokens: usage?.inputTokens ?? 0,
 				outputTokens: usage?.outputTokens ?? 0,
+				reasoningTokens: callTelemetry.reasoningTokens,
+				cacheHitTokens: callTelemetry.cacheHitTokens,
+				cacheMissTokens: callTelemetry.cacheMissTokens,
+				provider: callTelemetry.provider,
 				latencyMs: Date.now() - t0,
 				status: "ok",
 				generationRunId: telemetry.generationRunId,
@@ -413,6 +420,7 @@ async function runModelOnce(
 				stepKey: telemetry.stepKey,
 				inputTokens: 0,
 				outputTokens: 0,
+				provider: resolved.provider,
 				latencyMs,
 				status: "error",
 				error: formatGenerationError(e),
@@ -428,7 +436,7 @@ async function runModelOnce(
 
 	const t0 = Date.now();
 	try {
-		const { object, usage } = await generateObject(baseParams);
+		const { object, usage, telemetry: callTelemetry } = await generateStructured(baseArgs);
 		void recordAiCall({
 			feature: "practice.generation",
 			model: chatModelId,
@@ -436,6 +444,10 @@ async function runModelOnce(
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
+			reasoningTokens: callTelemetry.reasoningTokens,
+			cacheHitTokens: callTelemetry.cacheHitTokens,
+			cacheMissTokens: callTelemetry.cacheMissTokens,
+			provider: callTelemetry.provider,
 			latencyMs: Date.now() - t0,
 			status: "ok",
 			generationRunId: telemetry.generationRunId,
@@ -467,6 +479,7 @@ async function runModelOnce(
 			stepKey: telemetry.stepKey,
 			inputTokens: 0,
 			outputTokens: 0,
+			provider: resolved.provider,
 			latencyMs,
 			status: "error",
 			error: formatGenerationError(e),
@@ -505,7 +518,7 @@ async function runModelOnceWithFallback(
 			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
 	  }
 > {
-	const primary = getOpenAIPracticeChatModel();
+	const primaryResolved = resolveChatModel("practice.generation");
 	const first = await runModelOnce(
 		systemPrompt,
 		userPrompt,
@@ -514,17 +527,23 @@ async function runModelOnceWithFallback(
 		opts,
 		studentUserId,
 		telemetry,
-		primary,
+		primaryResolved,
 	);
 	if (first.ok) return first;
 
-	const fallback = getOpenAIPracticeChatModelFallback();
-	if (!fallback || !isRetryableForFallback(first.error)) {
+	// Cross-provider fallback to OpenAI is intentional: DeepSeek V4 Pro has no
+	// configured structured-output fallback today, but a transient DeepSeek
+	// outage still benefits from one retry on the OpenAI fallback model
+	// (if configured). When the router already chose OpenAI, this is the same
+	// model swap as before the migration.
+	const fallbackModelId = getOpenAIPracticeChatModelFallback();
+	if (!fallbackModelId || !isRetryableForFallback(first.error)) {
 		return { ok: false, message: first.message, usage: first.usage };
 	}
+	const fallbackResolved = buildOpenAiResolved(fallbackModelId);
 	logServerError(
 		"generatePracticeTest.modelFallback",
-		`Primary model ${primary} failed retryably; retrying with fallback ${fallback}.`,
+		`Primary model ${primaryResolved.modelId} failed retryably; retrying with fallback ${fallbackModelId}.`,
 		{ primaryError: first.message },
 	);
 	const second = await runModelOnce(
@@ -535,7 +554,7 @@ async function runModelOnceWithFallback(
 		opts,
 		studentUserId,
 		telemetry,
-		fallback,
+		fallbackResolved,
 	);
 	if (second.ok) return second;
 	return { ok: false, message: second.message, usage: second.usage };
@@ -594,9 +613,11 @@ async function runPracticeGenerationRepairGrouped(params: {
 	});
 	const t0 = Date.now();
 	const maxRepairTokens = practiceRepairMaxOutputTokens(params.estimatedQuestionCount);
+	const resolved = resolveChatModel("practice.generation.repair");
+	const modelId = resolved.modelId;
 	try {
-		const { object, usage } = await generateObject({
-			model: getOpenAIProvider()(getOpenAIPracticeChatModel()),
+		const { object, usage, telemetry: callTelemetry } = await generateStructured({
+			resolved,
 			schema: params.generationOutputSchema,
 			system: buildPracticeGenerationRepairSystemPrompt(),
 			prompt: repairUser,
@@ -609,11 +630,15 @@ async function runPracticeGenerationRepairGrouped(params: {
 		});
 		void recordAiCall({
 			feature: "practice.generation.repair",
-			model: getOpenAIPracticeChatModel(),
+			model: modelId,
 			userId: params.studentUserId,
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
+			reasoningTokens: callTelemetry.reasoningTokens,
+			cacheHitTokens: callTelemetry.cacheHitTokens,
+			cacheMissTokens: callTelemetry.cacheMissTokens,
+			provider: callTelemetry.provider,
 			latencyMs: Date.now() - t0,
 			status: "ok",
 			generationRunId: params.telemetry.generationRunId,
@@ -632,11 +657,12 @@ async function runPracticeGenerationRepairGrouped(params: {
 		logServerError("runPracticeGenerationRepairGrouped", e);
 		void recordAiCall({
 			feature: "practice.generation.repair",
-			model: getOpenAIPracticeChatModel(),
+			model: modelId,
 			userId: params.studentUserId,
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: 0,
 			outputTokens: 0,
+			provider: resolved.provider,
 			latencyMs: Date.now() - t0,
 			status: "error",
 			error: formatGenerationError(e),
@@ -925,34 +951,6 @@ async function runPracticeGenerationAfterResolveCore(
 			contextQuality: userPayload.grounding_meta.context_quality ?? "ok",
 		}) as const;
 
-	function tryFinalizeGroupedOutput(
-		g: PracticeGenerationGroupedOutput,
-	):
-		| {
-				flat: PracticeGenerationOutput;
-				strippedOk: Extract<
-					ReturnType<typeof validateAndStripGeneration>,
-					{ ok: true }
-				>;
-		  }
-		| null {
-		const norm = normalizeGroupedEstimatedTimesToPlan(g, durationSeconds);
-		const flat = applyDeterministicPracticeAutofix(flattenPracticeGenerationOutput(norm));
-		const val = validateAndStripGeneration(flat, expectedCount, topicIdSet, {
-			expectedDurationSeconds: durationSeconds,
-			expectedTypeCounts,
-		});
-		if (!val.ok) return null;
-		const qg = evaluatePracticeGenerationQuality({
-			questions: flat.questions,
-			allowedTopicCount: topicIdSet.size,
-			skipMissingVisualGate: jobContext.visuals.enabled,
-			chunkAlignment: chunkAlignmentForQuality(),
-		});
-		if (!qg.ok) return null;
-		return { flat, strippedOk: val };
-	}
-
 	// Single initial generation + repair-only follow-ups (no full regeneration retries).
 	const repairBudgetTotal = getPracticeGenerationRepairBudget();
 
@@ -966,21 +964,46 @@ async function runPracticeGenerationAfterResolveCore(
 		  }
 		| { ok: false; message: string; code: GeneratePracticeFailure["code"] }
 	> {
-		const blueprintResult = await generatePracticeBlueprint({
-			jobContext,
-			promptRevision: PRACTICE_PROMPT_REVISION,
-			abortSignal: opts.abortSignal,
-		});
+		// 3-call variant skips the LLM blueprint pass entirely — we build the
+		// same shape deterministically in <1ms. The downstream "BLUEPRINT
+		// CONTRACT" prompt section still applies; the only behavioural change
+		// is that per-slot `visual_intent` is null (visual decisions are made
+		// from stem text in the later enrichment call). See
+		// practice-generation-blueprint-deterministic.ts for the trade-offs.
+		const pipelineVariant = getPracticePipelineVariant();
+		const blueprintResult =
+			pipelineVariant === "3call"
+				? {
+						ok: true as const,
+						blueprint: buildDeterministicPracticeBlueprint({
+							expectedTypeCounts,
+							topicIds: [...topicIdSet],
+							difficulty: difficulty as "easy" | "medium" | "hard",
+							subjectName: resolved.subjectName,
+							visualsEnabled: jobContext.visuals.enabled,
+							preferredKinds: jobContext.visuals.preferredKinds,
+						}),
+						model: "deterministic",
+						modelMs: 0,
+						inputTokens: 0,
+						outputTokens: 0,
+					}
+				: await generatePracticeBlueprint({
+						jobContext,
+						promptRevision: PRACTICE_PROMPT_REVISION,
+						abortSignal: opts.abortSignal,
+					});
 		cumulativeModelMs += blueprintResult.modelMs;
 		await writeGenerationStep({
 			stepKey: "blueprint_generate",
 			status: blueprintResult.ok ? "ok" : "error",
-			model: blueprintResult.model,
+			model: blueprintResult.ok && "model" in blueprintResult ? blueprintResult.model : null,
 			feature: "practice.generation.blueprint",
 			latencyMs: blueprintResult.modelMs,
 			inputTokens: blueprintResult.inputTokens,
 			outputTokens: blueprintResult.outputTokens,
 			error: blueprintResult.ok ? null : blueprintResult.message,
+			metadata: { variant: pipelineVariant },
 		});
 		if (!blueprintResult.ok) {
 			return {
@@ -1107,7 +1130,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			await writeGenerationStep({
 				stepKey,
 				status: repaired.ok ? "ok" : "error",
-				model: getOpenAIPracticeChatModel(),
+				model: resolveChatModel("practice.generation.repair").modelId,
 				feature: "practice.generation.repair",
 				latencyMs: repaired.modelMs,
 				inputTokens: repaired.inputTokens,
@@ -1262,8 +1285,6 @@ ${JSON.stringify(blueprintSlots)}`;
 		}
 	}
 
-	let stripped!: ReturnType<typeof validateAndStripGeneration>;
-
 	const attempt = await generateAndStrip();
 	if (!attempt.ok) {
 		const failCode = attempt.code === "generation_failed" ? "generation_failed" : "generation_invalid";
@@ -1328,8 +1349,7 @@ ${JSON.stringify(blueprintSlots)}`;
 		return { ok: false, code: attempt.code, message: attempt.message };
 	}
 
-	stripped = attempt.public;
-	let lastGrouped = attempt.grouped;
+	const stripped = attempt.public;
 	const blueprintSlots = attempt.blueprintSlots;
 	succeededOnCall = generationCallCount + repairCallCount;
 
@@ -1352,113 +1372,11 @@ ${JSON.stringify(blueprintSlots)}`;
 	const fullOutput = attempt.object;
 	const totalQ = fullOutput.questions.length;
 
-	// Generation-time dedup is OFF by default (PRACTICE_DEDUP_MAX_REGENS=0). When
-	// enabled, near-duplicate questions vs this student's history get one dedup-focused
-	// repair — never a fresh full-generation pass.
-	const dedupThreshold = Number.parseInt(process.env.PRACTICE_DEDUP_MAX_REGENS ?? "0", 10);
-	if (Number.isFinite(dedupThreshold) && dedupThreshold > 0) {
-		const dedupT0 = Date.now();
-		try {
-			const texts = fullOutput.questions.map((q) => q.question_text);
-			const embeddings = await embedQuestionTexts(texts, {
-				userId: resolved.userId,
-				generationRunId,
-				correlationId,
-				stepKey: "dedup_embeddings",
-			});
-			await writeGenerationStep({
-				stepKey: "dedup_embeddings",
-				status: "ok",
-				feature: "embeddings.dedup",
-				metadata: { text_count: texts.length },
-			});
-			const dupes = await findDuplicatesAgainstStudent(
-				supabase,
-				resolved.userId,
-				fullOutput.questions.map((q) => ({ topic_id: q.topic_id, question_text: q.question_text })),
-				embeddings,
-			);
-			if (dupes.length > 0) {
-				logPracticeObs({
-					phase: "generation_dedup_regen",
-					correlation_id: correlationId,
-					duplicates: dupes.length,
-				});
-				if (isPracticeGenerationRepairEnabled() && repairCallCount < repairBudgetTotal) {
-					repairCallCount++;
-					const dedupGroupedLens = summarizeGroupedQuestionTypeCounts(lastGrouped);
-					const dedupFlatMap = buildPracticeRoundRobinFlatIndexMap(dedupGroupedLens);
-					const dedupRepaired = await runPracticeGenerationRepairGrouped({
-						failedGrouped: lastGrouped,
-						reason: {
-							kind: "dedup",
-							message: `${dupes.length} question(s) are too similar to this student's recent questions on the same topic; rewrite only those items.`,
-							failedIndexes: dupes,
-						},
-						targetedContextJson: JSON.stringify({
-							failed_indexes: dupes,
-							failed_questions: dupes.map((idx) => fullOutput.questions[idx] ?? null),
-							topic_evidence: selectEvidenceForFailedIndexes(
-								jobContext.evidenceByTopicId,
-								fullOutput.questions,
-								dupes,
-							),
-						}),
-						flatIndexMap: dedupFlatMap,
-						durationSeconds,
-						expectedTypeCounts,
-						allowedTopicIds: [...topicIdSet],
-						generationOutputSchema,
-						estimatedQuestionCount: expectedCount,
-						studentUserId: resolved.userId,
-						telemetry: {
-							generationRunId,
-							correlationId,
-							stepKey: `repair_dedup_${repairCallCount}`,
-						},
-						abortSignal: opts.abortSignal,
-					});
-					cumulativeModelMs += dedupRepaired.modelMs;
-					await writeGenerationStep({
-						stepKey: `repair_dedup_${repairCallCount}`,
-						status: dedupRepaired.ok ? "ok" : "error",
-						model: getOpenAIPracticeChatModel(),
-						feature: "practice.generation.repair",
-						latencyMs: dedupRepaired.modelMs,
-						inputTokens: dedupRepaired.inputTokens,
-						outputTokens: dedupRepaired.outputTokens,
-						error: dedupRepaired.ok ? null : dedupRepaired.message,
-						metadata: { reason_kind: "dedup", duplicate_count: dupes.length },
-					});
-					if (dedupRepaired.ok) {
-						const ng = normalizeGroupedEstimatedTimesToPlan(dedupRepaired.object, durationSeconds);
-						const mat = tryFinalizeGroupedOutput(ng);
-						if (mat) {
-							lastGrouped = ng;
-							(fullOutput as PracticeGenerationOutput).questions = mat.flat.questions;
-							(fullOutput as PracticeGenerationOutput).generation_metadata =
-								mat.flat.generation_metadata;
-							stripped = mat.strippedOk;
-						}
-					}
-				}
-			}
-			(fullOutput as PracticeGenerationOutput & { __embeddings?: number[][] }).__embeddings = embeddings;
-		} catch (e) {
-			logServerError("generatePracticeTest.dedupEmbeddings", e, {
-				subjectId,
-				correlationId,
-			});
-			await writeGenerationStep({
-				stepKey: "dedup_embeddings",
-				status: "error",
-				feature: "embeddings.dedup",
-				error: e instanceof Error ? e.message : String(e),
-			});
-		} finally {
-			timingsMs.dedup = Date.now() - dedupT0;
-		}
-	}
+	// Embedding-based dedup against the student's question history was removed
+	// when migrating to DeepSeek V4 Pro (DeepSeek has no embeddings API). See
+	// docs/deepseek-migration-plan.md §4.4. The `PRACTICE_DEDUP_MAX_REGENS` env
+	// knob is no longer consulted; the `questions.embedding` column remains
+	// (defer destructive drop to a separate cleanup migration).
 
 	const visualIntentDecisions = resolveQuestionVisualIntent({
 		questions: fullOutput.questions,
@@ -1532,7 +1450,7 @@ ${JSON.stringify(blueprintSlots)}`;
 		await writeGenerationStep({
 			stepKey: "visual_enrichment",
 			status: visualEnrichmentResult.ok ? "ok" : "error",
-			model: getOpenAIPracticeChatModel(),
+			model: resolveChatModel("practice.generation.visual_enrichment").modelId,
 			feature: "practice.generation.visual_enrichment",
 			latencyMs: visualEnrichmentResult.modelMs,
 			inputTokens: visualEnrichmentResult.inputTokens,
@@ -1557,34 +1475,55 @@ ${JSON.stringify(blueprintSlots)}`;
 		});
 	}
 
-	// Two retry rounds max. Prioritize questions where visuals are necessary/high first.
+	// Visual enrichment retry strategy varies by provider:
+	// - OpenAI (sequential): each round picks up where the last left off,
+	//   skipping already-filled slots. Saves cost when the first pass succeeds.
+	// - DeepSeek + thinking-disabled (parallel): each call is fast and cheap
+	//   on Flash; running the 2 retry rounds in parallel cuts wall clock by
+	//   roughly 2x at the cost of doing a tiny bit of redundant work in the
+	//   common case where round 1 already hit the target.
 	const visualTarget = Math.min(
 		jobContext.visuals.maxNonNullVisuals,
 		fullOutput.questions.length,
 		visualIntentSummary.needs_visual_true,
 	);
+	const enrichmentResolved = resolveChatModel("practice.generation.visual_enrichment");
+	const parallelEnrichmentRetries =
+		enrichmentResolved.provider === "deepseek" && enrichmentResolved.thinkingActive === false;
+
 	if (jobContext.visuals.enabled && jobContext.visuals.preferredKinds.length > 0 && visualTarget > 0) {
-		const maxRetryRounds = 2;
-		for (let retryRound = 1; retryRound <= maxRetryRounds; retryRound++) {
-			const beforeRetryVisualCount = countNonNullVisuals();
-			if (beforeRetryVisualCount >= visualTarget) {
-				break;
-			}
-			const retryCandidateIndexes = selectVisualCandidateIndexes({
-				round: retryRound === 1 ? "retry_1" : "retry_2",
+		// 3-call variant: skip retry rounds entirely. The single Flash-parallel
+		// enrichment call above handles all candidate slots up front, so a
+		// second pass would mostly burn budget on cases that aren't actually
+		// recoverable. 5-call variant keeps the two-round safety net.
+		const outerPipelineVariant = getPracticePipelineVariant();
+		const maxRetryRounds = outerPipelineVariant === "3call" ? 0 : 2;
+
+		type RetryPlan = {
+			round: 1 | 2;
+			batch: number[];
+			requireAtLeastOneVisual: boolean;
+			intent: ReturnType<typeof buildCandidateIntent>;
+		};
+
+		function planRetryRound(round: 1 | 2): RetryPlan | null {
+			const indexes = selectVisualCandidateIndexes({
+				round: round === 1 ? "retry_1" : "retry_2",
 				questions: fullOutput.questions,
 				decisions: visualIntentDecisions,
 			});
-			const retryCandidateBatch = retryCandidateIndexes.slice(0, enrichmentBatchSize);
-			if (retryCandidateBatch.length === 0) {
-				break;
-			}
-			const requireAtLeastOneVisual = shouldRequireAtLeastOneVisual(
-				retryCandidateBatch,
-				visualIntentDecisions,
-			);
-			const retryCandidateIntent = buildCandidateIntent(retryCandidateBatch);
-			const retryVisualEnrichment = await generateVisualEnrichmentPass({
+			const batch = indexes.slice(0, enrichmentBatchSize);
+			if (batch.length === 0) return null;
+			return {
+				round,
+				batch,
+				requireAtLeastOneVisual: shouldRequireAtLeastOneVisual(batch, visualIntentDecisions),
+				intent: buildCandidateIntent(batch),
+			};
+		}
+
+		const runRetry = (plan: RetryPlan, beforeCount: number) =>
+			generateVisualEnrichmentPass({
 				output: fullOutput,
 				userId: resolved.userId,
 				subjectName: resolved.subjectName,
@@ -1592,63 +1531,99 @@ ${JSON.stringify(blueprintSlots)}`;
 				evidenceByTopicId: jobContext.evidenceByTopicId,
 				topicExemplarHint: jobContext.topicExemplarHint,
 				templatePolicy: jobContext.visuals.templatePolicy,
-				candidateIndexes: retryCandidateBatch,
-				candidateIntent: retryCandidateIntent,
-				maxCandidateCount: retryCandidateBatch.length,
+				candidateIndexes: plan.batch,
+				candidateIntent: plan.intent,
+				maxCandidateCount: plan.batch.length,
 				strictGrounding: strictGroundingForVisuals,
-				requireAtLeastOneVisual,
+				requireAtLeastOneVisual: plan.requireAtLeastOneVisual,
 				generationRunId,
 				correlationId,
 				abortSignal: opts.abortSignal,
-			});
+			}).then((retryVisualEnrichment) => ({ plan, retryVisualEnrichment, beforeCount }));
+
+		async function recordRetryOutcome(args: {
+			plan: RetryPlan;
+			retryVisualEnrichment: Awaited<ReturnType<typeof generateVisualEnrichmentPass>>;
+			beforeCount: number;
+		}) {
+			const { plan, retryVisualEnrichment, beforeCount } = args;
 			if (
 				retryVisualEnrichment.modelMs > 0 ||
 				retryVisualEnrichment.patches.length > 0 ||
-				retryCandidateBatch.length > 0
+				plan.batch.length > 0
 			) {
 				await writeGenerationStep({
 					stepKey: "visual_enrichment_retry",
 					status: retryVisualEnrichment.ok ? "ok" : "error",
-					model: getOpenAIPracticeChatModel(),
+					model: resolveChatModel("practice.generation.visual_enrichment").modelId,
 					feature: "practice.generation.visual_enrichment",
 					latencyMs: retryVisualEnrichment.modelMs,
 					inputTokens: retryVisualEnrichment.inputTokens,
 					outputTokens: retryVisualEnrichment.outputTokens,
 					error: retryVisualEnrichment.ok ? null : "Visual enrichment retry failed.",
 					metadata: {
-						candidate_indexes: retryCandidateBatch.length,
+						candidate_indexes: plan.batch.length,
 						patch_candidates: retryVisualEnrichment.patches.length,
-						required_candidate_round: requireAtLeastOneVisual,
-						round: retryRound,
+						required_candidate_round: plan.requireAtLeastOneVisual,
+						round: plan.round,
 						target_non_null_visuals: visualTarget,
-						before_non_null_visuals: beforeRetryVisualCount,
+						before_non_null_visuals: beforeCount,
+						parallel: parallelEnrichmentRetries,
 					},
 				});
 			}
 			if (retryVisualEnrichment.ok && retryVisualEnrichment.patches.length > 0) {
 				const enrichedRetry = applyVisualPatches(fullOutput, retryVisualEnrichment.patches);
 				fullOutput.questions = enrichedRetry.output.questions;
-				const afterRetryVisualCount = countNonNullVisuals();
 				logPracticeObs({
 					phase: "practice_generation_visual_enrichment_retry_applied",
 					correlation_id: correlationId,
 					applied: enrichedRetry.applied,
 					candidates: retryVisualEnrichment.patches.length,
-					non_null_visuals: afterRetryVisualCount,
-					retry_round: retryRound,
+					non_null_visuals: countNonNullVisuals(),
+					retry_round: plan.round,
 					visual_target: visualTarget,
 				});
 			} else {
-				const afterRetryVisualCount = countNonNullVisuals();
 				logPracticeObs({
 					phase: "practice_generation_visual_enrichment_retry_applied",
 					correlation_id: correlationId,
 					applied: 0,
 					candidates: retryVisualEnrichment.patches.length,
-					non_null_visuals: afterRetryVisualCount,
-					retry_round: retryRound,
+					non_null_visuals: countNonNullVisuals(),
+					retry_round: plan.round,
 					visual_target: visualTarget,
 				});
+			}
+		}
+
+		if (parallelEnrichmentRetries) {
+			// Pre-plan both rounds based on the post-initial state, fire them
+			// concurrently, then merge results in priority order. The
+			// deterministic fallback below covers any slots both calls miss.
+			const beforeRetryVisualCount = countNonNullVisuals();
+			if (beforeRetryVisualCount < visualTarget) {
+				const plans = [planRetryRound(1), planRetryRound(2)].filter(
+					(p): p is RetryPlan => p !== null,
+				);
+				if (plans.length > 0) {
+					const settled = await Promise.all(
+						plans.map((p) => runRetry(p, beforeRetryVisualCount)),
+					);
+					// Apply round-1 patches first so round-2 doesn't overwrite higher-priority slots.
+					settled.sort((a, b) => a.plan.round - b.plan.round);
+					for (const r of settled) await recordRetryOutcome(r);
+				}
+			}
+		} else {
+			// OpenAI path — sequential, with early exit when target is hit.
+			for (let retryRound = 1; retryRound <= maxRetryRounds; retryRound++) {
+				const beforeRetryVisualCount = countNonNullVisuals();
+				if (beforeRetryVisualCount >= visualTarget) break;
+				const plan = planRetryRound(retryRound as 1 | 2);
+				if (!plan) break;
+				const r = await runRetry(plan, beforeRetryVisualCount);
+				await recordRetryOutcome(r);
 			}
 		}
 		const unresolvedNeededIndexes = selectVisualCandidateIndexes({
@@ -1656,22 +1631,32 @@ ${JSON.stringify(blueprintSlots)}`;
 			questions: fullOutput.questions,
 			decisions: visualIntentDecisions,
 		});
+		// 3-call variant: the deterministic fallback produces authoritative-
+		// looking-but-content-wrong placeholders (it picks an off-the-shelf
+		// template — "block on inclined plane", "vector addition" — that
+		// rarely matches the actual stem). Better to ship visual=null on
+		// those slots than wrong content masquerading as a real visual.
+		// Verified by inspection: 4/9 Physics visuals in batch=15 test had
+		// alt text describing an inclined plane for stems about flat tables.
+		const skipDeterministicFallback = outerPipelineVariant === "3call";
 		let fallbackApplied = 0;
-		for (const index of unresolvedNeededIndexes) {
-			if (countNonNullVisuals() >= visualTarget) break;
-			const question = fullOutput.questions[index];
-			const decision = visualIntentDecisions[index];
-			if (!question || !decision || question.visual) continue;
-			const fallbackVisual = buildDeterministicFallbackVisual({
-				questionText: question.question_text,
-				preferredKind: decision.preferredKind,
-				allowedKinds: jobContext.visuals.preferredKinds,
-				strictGrounding: strictGroundingForVisuals,
-				visualIdea: blueprintSlots[index]?.visual_intent?.visual_idea ?? null,
-			});
-			if (!fallbackVisual) continue;
-			question.visual = fallbackVisual;
-			fallbackApplied += 1;
+		if (!skipDeterministicFallback) {
+			for (const index of unresolvedNeededIndexes) {
+				if (countNonNullVisuals() >= visualTarget) break;
+				const question = fullOutput.questions[index];
+				const decision = visualIntentDecisions[index];
+				if (!question || !decision || question.visual) continue;
+				const fallbackVisual = buildDeterministicFallbackVisual({
+					questionText: question.question_text,
+					preferredKind: decision.preferredKind,
+					allowedKinds: jobContext.visuals.preferredKinds,
+					strictGrounding: strictGroundingForVisuals,
+					visualIdea: blueprintSlots[index]?.visual_intent?.visual_idea ?? null,
+				});
+				if (!fallbackVisual) continue;
+				question.visual = fallbackVisual;
+				fallbackApplied += 1;
+			}
 		}
 		if (fallbackApplied > 0) {
 			await writeGenerationStep({
@@ -1776,7 +1761,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			await writeGenerationStep({
 				stepKey: "visual_enrichment_recovery",
 				status: recoveryResult.ok ? "ok" : "error",
-				model: getOpenAIPracticeChatModel(),
+				model: resolveChatModel("practice.generation.visual_enrichment").modelId,
 				feature: "practice.generation.visual_enrichment",
 				latencyMs: recoveryResult.modelMs,
 				inputTokens: recoveryResult.inputTokens,
@@ -1826,6 +1811,54 @@ ${JSON.stringify(blueprintSlots)}`;
 		}
 	}
 
+	// 3-call variant: Flash structure+sanity validator before persist. Runs
+	// only when PRACTICE_PIPELINE_VARIANT=3call. Fail-open by design — a
+	// flaky validator must not block a passing test (the existing
+	// deterministic Zod + quality gates already ran upstream). We capture
+	// failed indexes as telemetry today; in a follow-up we can drive them
+	// into the existing repair loop.
+	if (getPracticePipelineVariant() === "3call") {
+		const vT0 = Date.now();
+		const v = await runPracticeValidationPass({
+			output: fullOutput,
+			expectedTypeCounts,
+			allowedTopicIds: [...topicIdSet],
+			studentUserId: resolved.userId,
+			telemetry: {
+				generationRunId,
+				correlationId,
+				stepKey: "post_assembly_validation",
+			},
+			abortSignal: opts.abortSignal,
+		});
+		await writeGenerationStep({
+			stepKey: "post_assembly_validation",
+			status: v.ok ? "ok" : "error",
+			feature: "practice.generation.validation",
+			latencyMs: Date.now() - vT0,
+			inputTokens: v.inputTokens,
+			outputTokens: v.outputTokens,
+			error: v.ok ? null : v.message,
+			metadata:
+				v.ok ?
+					{ variant: "3call" }
+				:	{
+						variant: "3call",
+						failed_indexes: v.failedIndexes,
+						issue_count: v.issues.length,
+						issue_codes: [...new Set(v.issues.map((i) => i.code))],
+					},
+		});
+		if (!v.ok) {
+			logPracticeObs({
+				phase: "practice_generation_validator_3call_flagged",
+				correlation_id: correlationId,
+				failed_indexes: v.failedIndexes,
+				issue_count: v.issues.length,
+			});
+		}
+	}
+
 	const questionsPayload = sanitizeForPostgresJsonb(
 		fullOutput.questions.map((q) => ({
 			topic_id: q.topic_id,
@@ -1837,7 +1870,17 @@ ${JSON.stringify(blueprintSlots)}`;
 			// Persist the structured visual envelope (or null) under
 			// `questions.metadata.visual` per v2 visuals plan §4.3 — no DB
 			// migration needed in v1; promote to a typed column in Phase 4.
-			metadata: { visual: q.visual ?? null },
+			//
+			// Also persist `cognitive_demand` (Bloom-level) and `marks` (CBSE
+			// convention 1-5) inside metadata so analytics can slice tests by
+			// cognitive distribution and marking weight without an extra LLM
+			// inference pass. Both are optional in the Zod schema — store
+			// `null` rather than omit so dashboards don't see undefined.
+			metadata: {
+				visual: q.visual ?? null,
+				cognitive_demand: q.cognitive_demand ?? null,
+				marks: q.marks ?? null,
+			},
 		})),
 	);
 
@@ -1950,37 +1993,9 @@ ${JSON.stringify(blueprintSlots)}`;
 		await attachTestIdToRunAiCalls(generationRunId, testId);
 	}
 
-	const embeddings = (fullOutput as PracticeGenerationOutput & { __embeddings?: number[][] }).__embeddings;
-	if (embeddings && embeddings.length === totalQ) {
-		void (async () => {
-			try {
-				const adminC = createServiceRoleClient();
-				const { data: qRows } = await adminC
-					.from("questions")
-					.select("id, question_number")
-					.eq("test_id", testId)
-					.order("question_number", { ascending: true });
-				if (qRows?.length === totalQ) {
-					await persistQuestionEmbeddings(
-						adminC,
-						qRows
-							.map((r, i) => ({
-								question_id: r.id as string,
-								embedding: embeddings[i] ?? [],
-							}))
-							.filter((x) => x.embedding.length > 0),
-					);
-				}
-			} catch (e) {
-				logServerError("generatePracticeTest.persistQuestionEmbeddings", e, {
-					testId,
-					correlationId,
-				});
-			}
-		})().catch((e) => {
-			logServerError("generatePracticeTest.persistQuestionEmbeddings.unhandled", e, { testId, correlationId });
-		});
-	}
+	// `questions.embedding` is no longer populated post-DeepSeek migration. The
+	// column is preserved for now to avoid a destructive backfill; see plan §11
+	// step 25 for the column drop.
 
 	logPracticeObs({
 		phase: "practice_generation_complete",
