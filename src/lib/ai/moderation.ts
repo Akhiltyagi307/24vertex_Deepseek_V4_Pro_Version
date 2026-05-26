@@ -9,23 +9,14 @@ import { isModerationPreCheckEnabled } from "@/lib/admin/feature-flags";
 
 const DEFAULT_PROFANITY = /\b(fuck|shit|bitch|slut|n[i1]g+[e3]r)\b/i;
 
-function parseEmbeddingVector(raw: unknown): number[] | null {
-	if (Array.isArray(raw) && raw.length === 1536 && raw.every((x) => typeof x === "number")) {
-		return raw as number[];
-	}
-	if (typeof raw === "string") {
-		try {
-			const parsed = JSON.parse(raw) as unknown;
-			if (Array.isArray(parsed) && parsed.length === 1536) {
-				return parsed.map((x) => Number(x)) as number[];
-			}
-		} catch {
-			return null;
-		}
-	}
-	return null;
-}
-
+/**
+ * Cosine similarity helper. Retained for the admin blacklist authoring UI
+ * (`/admin/moderation/blacklist`) which still supports creating embedding-
+ * pattern rules. The generation-time pipeline no longer evaluates those rules
+ * (post-DeepSeek-migration; see {@link moderatePracticeGenerationText}), so
+ * existing embedding rules are inert — but the admin tool keeps building them
+ * for the day we wire a non-OpenAI embedding provider back in.
+ */
 export function cosineSimilarity(a: number[], b: number[]): number {
 	if (a.length !== b.length || a.length === 0) return 0;
 	let dot = 0;
@@ -40,6 +31,13 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 	return denom === 0 ? 0 : dot / denom;
 }
 
+/**
+ * Generates a 1536-dim embedding for the admin blacklist authoring flow only.
+ * Calls OpenAI directly with the embeddings API — DeepSeek has none. Returns
+ * null on any failure so the admin form can fall back to a regex pattern.
+ *
+ * Not used at generation time anymore; see {@link moderatePracticeGenerationText}.
+ */
 export async function embedText1536(text: string): Promise<number[] | null> {
 	const apiKey = process.env.OPENAI_API_KEY?.trim();
 	if (!apiKey) return null;
@@ -69,7 +67,7 @@ export async function embedText1536(text: string): Promise<number[] | null> {
 
 export type ModerationOutcome =
 	| { ok: true }
-	| { ok: false; reason: string; source: "profanity" | "regex_blacklist" | "embedding_blacklist" };
+	| { ok: false; reason: string; source: "profanity" | "regex_blacklist" };
 
 export type PerQuestionFlag = {
 	index: number;
@@ -126,11 +124,17 @@ export async function moderatePracticeQuestionsPerItem(
 
 /**
  * Server-side moderation for AI practice output (PDR §4.27).
- * Regex blacklist + optional embedding similarity (≥0.95) against `content_blacklist`.
+ * Regex blacklist + profanity check against `content_blacklist`.
  *
  * Use {@link moderatePracticeQuestionsPerItem} first for per-question regex /
- * profanity checks; this blob pass exists primarily for the embedding rule
- * which is most meaningful at the test-as-a-whole level.
+ * profanity checks; this blob pass catches patterns that only appear when the
+ * full test JSON is inspected together (e.g. blacklist phrases split across
+ * question + options).
+ *
+ * Embedding-based similarity moderation was removed when the LLM backend
+ * migrated to DeepSeek V4 Pro — DeepSeek has no embeddings API and the
+ * embedding rules carried marginal value (we kept all the regex coverage).
+ * See docs/deepseek-migration-plan.md §4.5.
  */
 export async function moderatePracticeGenerationText(blob: string): Promise<ModerationOutcome> {
 	if (!(await isModerationPreCheckEnabled())) {
@@ -155,25 +159,6 @@ export async function moderatePracticeGenerationText(blob: string): Promise<Mode
 			} catch {
 				/* invalid regex — skip */
 			}
-		}
-	}
-
-	const embeddingRows = rules.filter((r) => r.patternType === "embedding" && r.embedding);
-	if (embeddingRows.length === 0) {
-		return { ok: true };
-	}
-
-	const generated = await embedText1536(blob);
-	if (!generated) {
-		return { ok: true };
-	}
-
-	for (const row of embeddingRows) {
-		const ref = parseEmbeddingVector(row.embedding);
-		if (!ref) continue;
-		const sim = cosineSimilarity(generated, ref);
-		if (sim >= 0.95) {
-			return { ok: false, reason: `embedding_similarity_${sim.toFixed(3)}`, source: "embedding_blacklist" };
 		}
 	}
 

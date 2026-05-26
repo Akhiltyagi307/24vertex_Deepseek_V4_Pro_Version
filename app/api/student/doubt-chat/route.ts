@@ -1,8 +1,12 @@
 import { convertToModelMessages, type UIMessage, streamText } from "ai";
 import * as Sentry from "@sentry/nextjs";
 
+import {
+	extractDeepSeekCacheTokens,
+	extractReasoningTokens,
+} from "@/lib/ai/deepseek-provider";
 import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/doubt-prompt-templates";
-import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
 import {
@@ -14,7 +18,6 @@ import { fetchDoubtTopicContextBlockByTopicIds } from "@/lib/doubt/topic-context
 import { doubtChatBodySchema } from "@/lib/doubt/request-schema";
 import { getTextFromUIMessage } from "@/lib/doubt/uimessage-text";
 import { resolveDoubtScopeForConversation, type DoubtScopeSuccess } from "@/lib/doubt/validate-doubt-scope";
-import { getOpenAIDoubtChatModel } from "@/lib/env";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { consumeDoubtChatRateLimit } from "@/lib/practice/practice-rate-limit";
 import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
@@ -44,6 +47,33 @@ export const maxDuration = 120;
 
 function toUIMessageList(raw: unknown[]): UIMessage[] {
 	return raw as UIMessage[];
+}
+
+/**
+ * Strip `reasoning` parts from prior assistant messages before forwarding to
+ * DeepSeek. The DeepSeek thinking endpoint returns HTTP 400 when any input
+ * message contains `reasoning_content`. The Vercel SDK normally treats
+ * reasoning as a first-class message part and faithfully re-encodes it on
+ * subsequent turns; for DeepSeek-mode doubt chat we drop it so the next turn
+ * forwards just the visible text. Reasoning is still emitted to the client
+ * by the assistant on each new turn (DeepSeek decides freshly whether to
+ * think), so this only changes wire encoding, not behaviour.
+ */
+function stripReasoningPartsFromMessages<T extends { role: string; content?: unknown }>(
+	messages: T[],
+): T[] {
+	return messages.map((msg) => {
+		if (msg.role !== "assistant") return msg;
+		const content = msg.content;
+		if (!Array.isArray(content)) return msg;
+		const filtered = content.filter((part) => {
+			if (!part || typeof part !== "object") return true;
+			const type = (part as { type?: unknown }).type;
+			return type !== "reasoning";
+		});
+		if (filtered.length === content.length) return msg;
+		return { ...msg, content: filtered };
+	});
 }
 
 function attachTopicContextChunksToScope(scope: DoubtScopeSuccess, chunkBlock: string): DoubtScopeSuccess {
@@ -219,7 +249,11 @@ export async function POST(req: Request) {
 		});
 	}
 
-	const modelId = getOpenAIDoubtChatModel();
+	// Per the migration plan: turns with image attachments stay on OpenAI
+	// because `@ai-sdk/deepseek` doesn't list image input in its capability
+	// table. Text-only turns route via env (`AI_PROVIDER_DOUBT_CHAT`).
+	const resolved = resolveChatModel("doubt.chat", { hasAttachments });
+	const modelId = resolved.modelId;
 	const doubtFeature = tutorMode === "explain" ? "doubt.explain" : "doubt.solve_with_me";
 	const dbPrompt = await getActiveAiPrompt(doubtFeature);
 	const templateSrc = dbPrompt?.template?.trim()
@@ -307,11 +341,21 @@ export async function POST(req: Request) {
 		});
 	}
 
+	// DeepSeek's thinking-mode endpoint returns HTTP 400 if `reasoning_content`
+	// appears inside any input message. The Vercel SDK normally maps assistant
+	// `reasoning` parts back into the request payload, so we strip those parts
+	// from prior assistant turns before forwarding. OpenAI tolerates them either
+	// way — safe to do unconditionally.
+	if (resolved.provider === "deepseek") {
+		modelMessages = stripReasoningPartsFromMessages(modelMessages);
+	}
+
 	const streamStartedAt = Date.now();
 	const result = streamText({
-		model: getOpenAIProvider().chat(modelId),
+		model: resolved.model,
 		system,
 		messages: modelMessages,
+		providerOptions: resolved.providerOptions,
 		// D29: surface AI SDK internals (token counts, model id, finish reason)
 		// to Sentry traces. `recordTelemetry` doesn't currently wire to OTel, so
 		// we manually forward in `onFinish` below; setting `isEnabled` lets the
@@ -324,24 +368,35 @@ export async function POST(req: Request) {
 				model: modelId,
 			},
 		},
-		// Cancel the OpenAI HTTP call when the client disconnects so we stop
+		// Cancel the model HTTP call when the client disconnects so we stop
 		// paying for tokens after the user closes the tab.
 		abortSignal: req.signal,
-		onFinish: async ({ text, totalUsage, finishReason }) => {
+		onFinish: async ({ text, totalUsage, finishReason, providerMetadata }) => {
 			const promptT = totalUsage?.inputTokens ?? null;
 			const compT = totalUsage?.outputTokens ?? null;
+			const reasoningTokens = extractReasoningTokens(
+				totalUsage as { reasoningTokens?: number | null } | undefined,
+			);
+			const cacheTokens = extractDeepSeekCacheTokens(
+				providerMetadata as Record<string, unknown> | undefined,
+			);
 			const latencyMs = Date.now() - streamStartedAt;
 			// D29: forward usage/latency/model to Sentry with the route tag so
 			// dashboards can slice on this without joining against the DB.
 			Sentry.getCurrentScope().setTag("ai.route", "/api/student/doubt-chat");
+			Sentry.getCurrentScope().setTag("ai.provider", resolved.provider);
 			Sentry.addBreadcrumb({
 				category: "ai",
 				level: "info",
 				message: "doubt-chat stream finished",
 				data: {
+					provider: resolved.provider,
 					model: modelId,
 					promptTokens: promptT,
 					outputTokens: compT,
+					reasoningTokens,
+					cacheHitTokens: cacheTokens.cacheHitTokens,
+					cacheMissTokens: cacheTokens.cacheMissTokens,
 					latencyMs,
 					finishReason,
 				},
@@ -354,6 +409,10 @@ export async function POST(req: Request) {
 				promptId: dbPrompt?.id ?? null,
 				inputTokens: promptT ?? 0,
 				outputTokens: compT ?? 0,
+				reasoningTokens,
+				cacheHitTokens: cacheTokens.cacheHitTokens,
+				cacheMissTokens: cacheTokens.cacheMissTokens,
+				provider: resolved.provider,
 				latencyMs,
 				status: "ok",
 			});
@@ -412,5 +471,8 @@ export async function POST(req: Request) {
 		},
 	});
 
-	return result.toUIMessageStreamResponse({ headers });
+	// `sendReasoning: false` keeps DeepSeek's CoT server-side; the student sees
+	// only the final answer. Reasoning tokens are still billed and logged via
+	// onFinish above, but we never include them in the user-facing stream.
+	return result.toUIMessageStreamResponse({ headers, sendReasoning: false });
 }

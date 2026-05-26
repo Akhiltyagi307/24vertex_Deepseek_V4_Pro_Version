@@ -2,13 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { renderToBuffer } from "@react-pdf/renderer";
-import { generateObject } from "ai";
 
-import { getOpenAIProvider } from "@/lib/ai/openai-provider";
+import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
+import { generateStructured } from "@/lib/ai/structured-output";
 import { consumeTest } from "@/lib/billing/entitlements";
 import { notifyTestReportReady } from "@/lib/notifications/report-ready";
-import { getOpenAIChatModel } from "@/lib/env";
 import {
 	formatGradingFeedbackForStorage,
 	gradedItemFromStoredFeedback,
@@ -188,11 +187,12 @@ async function runGradingChunk(
 	// Hard-cap output tokens at 12k. CHUNK_SIZE=5 means at most ~6k expected
 	// tokens per chunk (~1.2k per question grading payload), well within budget.
 	const maxOutputTokens = Math.min(14_000, Math.max(4_500, nQuestions * 1_500));
-	const modelId = getOpenAIChatModel();
+	const resolved = resolveChatModel("practice.grade.chunk");
+	const modelId = resolved.modelId;
 	return withPracticeAiAttempts("gradePracticeTest.chunk", async () => {
 		const t0 = Date.now();
-		const { object, usage } = await generateObject({
-			model: getOpenAIProvider()(modelId),
+		const { object, usage, telemetry } = await generateStructured({
+			resolved,
 			schema: gradingChunkSchema,
 			system: systemPrompt,
 			prompt: userPrompt,
@@ -208,6 +208,10 @@ async function runGradingChunk(
 			userId,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
+			reasoningTokens: telemetry.reasoningTokens,
+			cacheHitTokens: telemetry.cacheHitTokens,
+			cacheMissTokens: telemetry.cacheMissTokens,
+			provider: telemetry.provider,
 			latencyMs: Date.now() - t0,
 			status: "ok",
 		});
@@ -246,9 +250,10 @@ async function runSummaryObject(
 
 	return withPracticeAiAttempts("gradePracticeTest.summary", async () => {
 		const t0 = Date.now();
-		const modelId = getOpenAIChatModel();
-		const { object, usage } = await generateObject({
-			model: getOpenAIProvider()(modelId),
+		const resolved = resolveChatModel("practice.grade.summary");
+		const modelId = resolved.modelId;
+		const { object, usage, telemetry } = await generateStructured({
+			resolved,
 			schema: practiceGradingSummarySchema,
 			system: [
 				"Return structured summary fields only.",
@@ -269,6 +274,10 @@ async function runSummaryObject(
 			userId,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
+			reasoningTokens: telemetry.reasoningTokens,
+			cacheHitTokens: telemetry.cacheHitTokens,
+			cacheMissTokens: telemetry.cacheMissTokens,
+			provider: telemetry.provider,
 			latencyMs: Date.now() - t0,
 			status: "ok",
 		});

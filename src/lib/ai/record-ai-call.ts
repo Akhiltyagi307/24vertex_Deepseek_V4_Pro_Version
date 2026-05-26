@@ -21,6 +21,13 @@ export type RecordAiCallInput = {
 	latencyMs: number;
 	status: "ok" | "error";
 	error?: string | null;
+	/** Which LLM vendor handled this call. Omit for legacy callers; defaults to null. */
+	provider?: "openai" | "deepseek" | null;
+	/** Tokens DeepSeek's reasoning model used for chain-of-thought, billed at the output rate. */
+	reasoningTokens?: number | null;
+	/** Prompt-cache hit/miss split — only DeepSeek populates these today. */
+	cacheHitTokens?: number | null;
+	cacheMissTokens?: number | null;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -49,7 +56,10 @@ function asStepKeyOrNull(v: string | null | undefined): string | null {
 export async function recordAiCall(input: RecordAiCallInput): Promise<void> {
 	const cost =
 		input.status === "ok"
-			? computeCostInr(input.model, input.inputTokens, input.outputTokens)
+			? computeCostInr(input.model, input.inputTokens, input.outputTokens, {
+					cacheHitTokens: input.cacheHitTokens ?? null,
+					cacheMissTokens: input.cacheMissTokens ?? null,
+				})
 			: null;
 	try {
 		await db.insert(aiCalls).values({
@@ -63,6 +73,10 @@ export async function recordAiCall(input: RecordAiCallInput): Promise<void> {
 			stepKey: asStepKeyOrNull(input.stepKey),
 			inputTokens: input.inputTokens,
 			outputTokens: input.outputTokens,
+			reasoningTokens: input.reasoningTokens ?? null,
+			cacheHitTokens: input.cacheHitTokens ?? null,
+			cacheMissTokens: input.cacheMissTokens ?? null,
+			provider: input.provider ?? null,
 			latencyMs: input.latencyMs,
 			status: input.status,
 			error: input.error ?? null,

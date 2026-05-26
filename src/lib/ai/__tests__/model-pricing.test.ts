@@ -64,4 +64,63 @@ describe("computeCostInr", () => {
 		const dec = str.split(".")[1];
 		if (dec) expect(dec.length).toBeLessThanOrEqual(4);
 	});
+
+	describe("DeepSeek V4 Pro cache split", () => {
+		it("prices a pure cache-miss request at the regular tier", () => {
+			// 1M cache-miss input + 0 output: 1M * $0.435 = $0.435 = 36.105 INR
+			const cost = computeCostInr("deepseek-v4-pro", 1_000_000, 0, {
+				cacheMissTokens: 1_000_000,
+				cacheHitTokens: 0,
+			});
+			expect(cost).toBeCloseTo(36.105, 3);
+		});
+
+		it("prices a pure cache-hit request at the cheap tier", () => {
+			// 1M cache-hit input + 0 output: 1M * $0.003625 = $0.003625 = 0.3009 INR
+			const cost = computeCostInr("deepseek-v4-pro", 1_000_000, 0, {
+				cacheHitTokens: 1_000_000,
+				cacheMissTokens: 0,
+			});
+			expect(cost).toBeCloseTo(0.3009, 3);
+		});
+
+		it("splits cost across cache buckets correctly", () => {
+			// 500k cache-hit + 500k cache-miss + 0 output:
+			// 500_000 * 0.003625 + 500_000 * 0.435 = $1.8125 + $217500/1M = ...
+			// (500_000 * 0.003625 + 500_000 * 0.435) / 1_000_000 = $0.219313
+			// * 83 = 18.20 INR
+			const cost = computeCostInr("deepseek-v4-pro", 1_000_000, 0, {
+				cacheHitTokens: 500_000,
+				cacheMissTokens: 500_000,
+			});
+			expect(cost).toBeCloseTo(18.2029, 3);
+		});
+
+		it("treats remainder as cache-miss when buckets are partial", () => {
+			// 1M input total, only 200k bucketed as cache-hit, no cache-miss reported.
+			// Remainder 800k → cache-miss tier.
+			// 200_000 * 0.003625 + 800_000 * 0.435 = $725 + $348000 per 1M = ...
+			// = (725 + 348000)/1_000_000 = $0.348725 * 83 = 28.94 INR
+			const cost = computeCostInr("deepseek-v4-pro", 1_000_000, 0, {
+				cacheHitTokens: 200_000,
+				cacheMissTokens: null,
+			});
+			expect(cost).toBeCloseTo(28.9442, 3);
+		});
+
+		it("falls back to all-cache-miss when no breakdown given", () => {
+			const withBreakdown = computeCostInr("deepseek-v4-pro", 1_000_000, 0, {
+				cacheMissTokens: 1_000_000,
+				cacheHitTokens: 0,
+			});
+			const withoutBreakdown = computeCostInr("deepseek-v4-pro", 1_000_000, 0);
+			expect(withoutBreakdown).toEqual(withBreakdown);
+		});
+
+		it("prices output tokens at the model's output rate regardless of cache", () => {
+			// 0 input + 1M output: 1M * $0.87 = $0.87 = 72.21 INR
+			const cost = computeCostInr("deepseek-v4-pro", 0, 1_000_000);
+			expect(cost).toBeCloseTo(72.21, 3);
+		});
+	});
 });

@@ -99,7 +99,7 @@ export default defineConfig({
 			// Match the legacy student-suite filenames plus every `student-*.spec.ts`
 			// (a11y, doubt-chat, settings, notifications-mutations, etc.).
 			testMatch:
-				/((post-login|notifications|practice-generate|practice-full-subjects)\.spec\.ts$|student-[\w-]+\.spec\.ts$)/,
+				/((post-login|notifications|practice-generate|practice-full-subjects|practice-deepseek-timing)\.spec\.ts$|student-[\w-]+\.spec\.ts$)/,
 			dependencies: ["auth-setup"],
 			use: { storageState: STUDENT_STORAGE_STATE },
 		},

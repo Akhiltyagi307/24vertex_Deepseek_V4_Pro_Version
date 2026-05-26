@@ -6,6 +6,47 @@ import { questionVisualEnvelopeSchema } from "./visuals/schemas";
 const questionTypeSchema = z.enum(["multiple_choice", "fill_in_blank", "short_answer", "long_answer"]);
 const difficultyLevelSchema = z.enum(["easy", "medium", "hard"]);
 
+/**
+ * Bloom's-taxonomy-aligned cognitive demand. Per question. Used to enforce
+ * the distribution caps/floors in the system prompt (Remember-cap, Apply-floor)
+ * and to drive analytics on what kind of cognitive work the test exercises.
+ */
+const cognitiveDemandSchema = z.enum([
+	"Remember",
+	"Understand",
+	"Apply",
+	"Analyze",
+	"Evaluate",
+	"Create",
+]);
+
+/**
+ * Per-option distractor rationale for MCQs. Four entries keyed by A/B/C/D,
+ * each labelling the archetype the option fills (CORRECT, COMMON-ERROR,
+ * PARTIAL-KNOWLEDGE, SURFACE-PLAUSIBILITY) plus the misconception trapped.
+ * Forces the model to *justify* each distractor's existence rather than
+ * pad with noise.
+ */
+const distractorRationaleSchema = z.object({
+	A: z.string(),
+	B: z.string(),
+	C: z.string(),
+	D: z.string(),
+});
+
+/**
+ * Non-MCQ analogue of distractor_rationale: the FIB / short_answer parallel.
+ * For fill_in_blank and short_answer items, the model lists 2-4 common WRONG
+ * answers students give, each with the misconception it reveals. Downstream,
+ * the grader uses this to provide targeted "you fell into this trap" feedback
+ * when a student's answer matches one of these entries — instead of generic
+ * "wrong" labels.
+ */
+const expectedMisanswerSchema = z.object({
+	answer: z.string().min(1).max(120),
+	rationale: z.string().min(1).max(280),
+});
+
 export const practiceAnswerKeySchema = z.object({
 	/** MCQ letter, numeric/text answer, etc. — always a string for JSON-schema compatibility */
 	correct_answer: z.string(),
@@ -18,6 +59,18 @@ export const practiceAnswerKeySchema = z.object({
 	acceptable_variants: z.array(z.string()).optional(),
 	/** Optional: checklist for full-credit band. */
 	full_credit_requires: z.array(z.string()).optional(),
+	/**
+	 * Optional, MCQ-only: per-option archetype + misconception trapped.
+	 * See `MCQ distractor discipline` in system-prompt.ts.
+	 */
+	distractor_rationale: distractorRationaleSchema.optional(),
+	/**
+	 * Optional, FIB / short_answer / long_answer: 2-4 common wrong answers
+	 * with the misconception each reveals. Grader uses these to provide
+	 * targeted "you fell into this trap" feedback. See `Expected misanswers`
+	 * in system-prompt.ts.
+	 */
+	expected_misanswers: z.array(expectedMisanswerSchema).max(6).optional(),
 });
 
 export const practiceQuestionGeneratedSchema = z.object({
@@ -27,6 +80,18 @@ export const practiceQuestionGeneratedSchema = z.object({
 	question_text: z.string(),
 	question_type: questionTypeSchema,
 	difficulty_level: difficultyLevelSchema,
+	/**
+	 * Optional Bloom's-aligned cognitive demand. Required by the system prompt
+	 * (the discipline block enforces a distribution against this field), but
+	 * kept Zod-optional so the parser doesn't fail when an older model run
+	 * omits it — the prompt is the source of truth for whether it's expected.
+	 */
+	cognitive_demand: cognitiveDemandSchema.optional(),
+	/**
+	 * Optional CBSE-marks allocation (1 / 2 / 3 / 4 / 5). MCQ=1, FIB=1, SA=2-3,
+	 * LA=4-5 by convention. Optional in v1 so historical rows still parse.
+	 */
+	marks: z.number().int().min(1).max(5).optional(),
 	options: z.record(z.string()).nullable(),
 	answer_key: practiceAnswerKeySchema,
 	estimated_time_seconds: z.number().int().positive(),

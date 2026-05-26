@@ -148,8 +148,16 @@ ${visualLine}${visualExtras}${args.finalChecklistExtras ? `\n${args.finalCheckli
 function buildSubjectDisciplineBlock(difficulty: PracticeDifficulty): string {
 	const rememberCap =
 		difficulty === "easy" ?
-			"For an `easy` test, at most **30%** of items may be `Remember`-level recall."
-		:	"For `medium` and `hard` tests, at most **15%** of items may be `Remember`-level recall.";
+			"For an `easy` test, at most **35%** of items may be `Remember`-level recall."
+		: difficulty === "medium" ?
+			"For a `medium` test, at most **15%** of items may be `Remember`-level recall."
+		:	"For a `hard` test, at most **5%** of items may be `Remember`-level recall.";
+	const applyFloor =
+		difficulty === "easy" ?
+			"For an `easy` test, at least **30%** of items must be `Apply`-or-higher (`Apply | Analyze | Evaluate | Create`)."
+		: difficulty === "medium" ?
+			"For a `medium` test, at least **50%** of items must be `Apply`-or-higher."
+		:	"For a `hard` test, at least **65%** of items must be `Apply`-or-higher.";
 	return `## Subject discipline (every question must teach the SUBJECT)
 
 Each item exists to test the named subject's concepts, methods, or reasoning. If a non-subject expert could answer the item from general knowledge or trivia alone, the item is **OFF-BAND** — rewrite or replace it.
@@ -162,19 +170,103 @@ Each item exists to test the named subject's concepts, methods, or reasoning. If
 - **DEFINITIONAL FLASHCARDS.** A fill-in-blank whose answer is one glossary word copied verbatim from the book is a flashcard, not an assessment — upgrade to one-step application / inference, or use another bucket. (Bad: "The SI unit of power is ______" → watt. Good: a short numerical power problem with clean numbers.)
 - **SUBJECTIVE SUPERLATIVES WITHOUT GROUNDING.** Avoid "best", "latest", "most modern", "most important" unless the chunk explicitly supplies that ranking.
 - **NEAR-DUPLICATE STEMS.** Within one test, do not paraphrase the same fact twice (e.g. "Wöhler … in ___" plus "In 1828, Wöhler …"). Each item must teach a **distinct** skill — avoid copy-paste procedural twins (e.g. two Lassaigne setups differing only in trivial wording).
+- **SYLLABUS DRIFT.** Each question must be answerable from this test's \`topic_grounding\`. If you're invoking facts outside that chapter's scope to make the item work, it is off-syllabus — replace it with a stem grounded in the chunks you were given.
 
-### Cognitive-demand floor
+### MCQ distractor discipline (every multiple_choice item)
+
+A 4-option MCQ has ONE correct answer and THREE distractors. Each distractor must correspond to a specific student misconception or error — never random plausible-sounding noise. Use these four archetypes deliberately; for every MCQ, fill every position with intent:
+
+- **CORRECT** — the defensible best answer.
+- **COMMON-ERROR distractor** — the value/answer a student gets when they make the single most common procedural slip on this topic: forgetting a unit conversion, sign error, missing a factor of 2 in kinematics, forgetting to balance an equation, dropping a negative when transposing, computing perimeter instead of area, etc.
+- **PARTIAL-KNOWLEDGE distractor** — the answer a student picks when they know half the concept: applied the right formula but skipped step 2, identified the right substance but confused its state, computed the right intermediate but stopped early.
+- **SURFACE-PLAUSIBILITY distractor** — looks the same shape/magnitude/form as the right answer but is conceptually wrong. For numericals: in the same ballpark, obtained by reversing a ratio or swapping two givens. For conceptual: the answer to a sibling question in the same chapter.
+
+For each MCQ, populate \`answer_key.distractor_rationale\` with FOUR one-line entries keyed by option letter, naming which archetype each option occupies and what specific misconception it traps. Example:
+  { "A": "CORRECT — applied F = μN with μ=0.4, N=50 → 20 N",
+    "B": "COMMON-ERROR — forgot to multiply by N, just used μ × 10 = 4 N",
+    "C": "SURFACE-PLAUSIBILITY — 50 N (used N as the answer; right magnitude, wrong concept)",
+    "D": "PARTIAL-KNOWLEDGE — used μ=0.6 (confused static and kinetic friction)" }
+
+### Expected misanswers (fill_in_blank, short_answer, long_answer)
+
+Non-MCQ items have no distractors to design — but they DO have common wrong answers students give, and a good teacher anticipates them. For every \`fill_in_blank\`, \`short_answer\`, and \`long_answer\` item, populate \`answer_key.expected_misanswers\` with 2–4 entries naming the most common WRONG answers students write, each with the misconception it reveals.
+
+Format: \`expected_misanswers: [{ answer: "<the wrong answer>", rationale: "<the misconception>" }, ...]\`. Example for a FIB on Ohm's Law:
+\`\`\`json
+expected_misanswers: [
+  { "answer": "12 A", "rationale": "Student forgot to divide — used V × R instead of V / R." },
+  { "answer": "0.083 A", "rationale": "Student divided R by V (reversed the ratio)." },
+  { "answer": "3", "rationale": "Wrote the value without units — partial credit candidate." }
+]
+\`\`\`
+
+The grader downstream will match the student's answer against this list. When a match occurs, the grader cites the rationale in feedback ("You wrote 12 A — looks like you multiplied V × R; remember Ohm's Law is I = V / R."). This makes feedback diagnostic, not just judgmental.
+
+### Anti-AI-generation tells (every multiple_choice)
+
+- **Length tell**: the correct option must NOT be conspicuously longer or more articulate than distractors. Lengths within 1.5× of each other.
+- **Round-number tell**: numerical distractors should NOT all be multiples of 10 with the correct answer odd. Mix the form across all four options.
+- **Grammar tell**: stem ending in "an ___" must have all four options start with vowels (or rewrite stem as "a / an ___"). Stem with plural subject must have plural options. No grammar shortcuts to the answer.
+- **Parallelism**: all four options must share the same syntactic shape — all noun phrases, OR all sentences, OR all numerical values, OR all formulas. NEVER mix shapes.
+- **Order tell**: do NOT systematically place the correct answer at A. Distribute correct answers roughly uniformly across A/B/C/D within the test.
+- **No "All of the above" / "None of the above" / "Both A and B"** — these are cognitive traps, not assessment.
+
+### Cognitive-demand distribution (test-level)
+
+Each question carries a \`cognitive_demand\` field from this enum: \`Remember | Understand | Apply | Analyze | Evaluate | Create\`. Calibrate to the difficulty band of the test:
 
 - ${rememberCap}
-- The rest must be \`Understand\`, \`Apply\`, \`Analyze\`, \`Evaluate\`, or \`Create\`. Convert pure recall into application, sign/trend prediction, or a one-line worked step.
+- ${applyFloor}
+- Per question type:
+  - \`multiple_choice\`: any cognitive_demand allowed.
+  - \`fill_in_blank\`: Remember and Understand allowed. Apply only when the blank is a *computed* value (not vocabulary recall).
+  - \`short_answer\`: Understand or higher. Never Remember.
+  - \`long_answer\`: Apply or higher. Never Remember or Understand.
+- Before emitting, count your Remember-tagged items vs the test total. If you exceed the cap, convert pure recall into application (sign/trend prediction, one-line worked step).
+
+### Operational difficulty definitions
+
+Treat \`difficulty_level\` per question (and the test-level difficulty) as operational, not labels:
+
+- **easy** = direct one-step application of a single rule, formula, or definition stated in the chapter. Values mirror NCERT worked examples. Stem ≤ 25 words. One concept tested. Cognitive level: Remember + Understand.
+- **medium** = combine TWO concepts from the chapter, OR interpret given data before applying a rule, OR apply a known rule in a slightly novel context. Stem 25–50 words. Cognitive level: Understand + Apply.
+- **hard** = HOTS — multi-step reasoning, OR data analysis without all values given (student infers), OR application of the concept in a context the chapter does NOT explicitly cover (transfer), OR derivation. Stem may reach 80 words. Cognitive level: Apply + Analyze + Evaluate.
+
+An item whose stem is 50 words with a 3-step solution but labelled "easy" is mislabelled — either shrink the stem or relabel.
 
 ### Numeric and answer-key sanity (every numerical item)
 
 - Recompute the keyed answer end-to-end before emitting. If the result is impossible (supersonic speeds from everyday forces, percentage > 100%, probability outside [0, 1], balance sheet that does not balance), **change the input numbers** — do not ship the item.
 - For MCQs, recompute **every option's** numeric value, not only the keyed letter, so two options never accidentally match the correct value.
+- Final numeric answer should be "clean" for the difficulty band: easy → integer or one decimal; medium → simple fraction, surds (√2, √3), or 2 decimals; hard → any.
 - If the stem is fixed and only options shuffle between items, reshuffle so \`correct_answer\` stays consistent — never reuse the same stem with a different keyed letter unless the scenario changed.
 - For **fill_in_blank**, **short_answer**, and **long_answer**, numeric \`correct_answer\` must match the arithmetic in \`answer_key.explanation\` (catch half/double-mole and back-titration errors).
 - Drop or rewrite any item whose \`correct_answer\` is **only** a bare four-digit calendar year.
+
+### Subject-specific quality criteria (positive markers)
+
+Apply the criteria for the current subject; ignore other subjects' lines.
+
+- **Mathematics**: clean numerical answers per difficulty band; all MCQ options dimensionally consistent (no mixing lengths and areas); each algebra MCQ where x is unknown has all four options as candidate values in the same form; geometry items must be drawable from the description alone.
+- **Physics**: every numerical quantity has SI units in stem AND options; real-world physical sensibility (cars not at 500 m/s); use g = 10 m/s² unless stem says otherwise (NCERT convention); sign conventions explicit when non-standard.
+- **Chemistry**: chemical equations BALANCED before being used; state symbols (s, l, g, aq) where the chapter introduces them; molar masses from CBSE periodic table (H=1, C=12, O=16, Na=23, Cl=35.5); IUPAC names preferred over common names unless chapter is about common nomenclature.
+- **Biology**: Indian-context examples (mango tree not oak); diagram refs match NCERT conventions; genetics problems produce Punnett ratios consistent with the cross set up.
+- **Accountancy**: Indian-comma notation (₹15,000 not ₹15000); transaction dates as dd Mmm yyyy (15 Apr 2024); both sides balance in every transaction; Indian business names (Rohan Traders, M/s Saral & Sons).
+- **Economics**: ₹ for prices, % for rates, units for quantity — always specified; current Indian terminology where chapter is contemporary (NITI Aayog, GST, MGNREGA).
+- **English**: comprehension items reference passage line numbers; grammar items name the structure being tested (subject-verb agreement, modals, reported speech); vocabulary uses contextual sentences, never bare definitions.
+- **Social Science**: Indian-context first; prefer maps/data tables over text-only stems where chapter has them; history items reframed to process/cause/significance (NEVER year as answer).
+
+### Pre-emit self-check (every question, before adding to bucket)
+
+Run this checklist in your reasoning. If any line fails, repair or replace the question:
+
+1. [ ] Tests a SPECIFIC learnable skill named in this chapter's \`topic_grounding\` — not GK, trivia, biography, calendar year, or textbook-section pointer.
+2. [ ] If MCQ: I computed all four options' values. Exactly one matches \`correct_answer\`. The other three are wrong under any reasonable interpretation. Each has a \`distractor_rationale\`.
+3. [ ] The keyed answer text does NOT appear in the stem. (Search: does any word in \`correct_answer\` appear in \`question_text\`? If yes, paraphrase.)
+4. [ ] If numerical: final answer is "clean" for the difficulty. Recomputed end-to-end. Result is physically possible.
+5. [ ] \`cognitive_demand\` is consistent with the difficulty matrix and this question_type's allowed range.
+6. [ ] Stem ≤ band length (easy ≤25w, medium ≤50w, hard ≤80w). No double negative, no "EXCEPT" without bolding, no two questions stacked.
+7. [ ] No AI tells: option lengths within 1.5×, options share syntactic shape, no "All/None of the above".
 
 Current difficulty band from payload: **${difficulty}**.`;
 }
@@ -417,7 +509,135 @@ Rules:
 
 ## Output shape
 
-Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`estimated_time_seconds\` (positive integer), \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept; optional marking_points[], acceptable_variants[], full_credit_requires[] for grading hints }), and \`visual\` (envelope or null). Multiple-choice items also include \`options\` ({A,B,C,D}). For long_answer and multi-step short_answer, add \`marking_points\` (3–6 short bullets) when it helps downstream grading. \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
+Top-level: \`{ questions_by_type: { multiple_choice, fill_in_blank, short_answer, long_answer }, generation_metadata: { adaptation_rationale } }\`. Each question contains \`topic_id\`, \`topic_name\`, \`question_text\`, \`difficulty_level\` (easy|medium|hard), \`cognitive_demand\` (Remember|Understand|Apply|Analyze|Evaluate|Create), \`estimated_time_seconds\` (positive integer), \`answer_key\` ({ correct_answer, explanation, common_mistakes[], related_concept; optional marking_points[], acceptable_variants[], full_credit_requires[] for grading hints; **for MCQs**: \`distractor_rationale\` { A, B, C, D } — one-line archetype + misconception per option; **for FIB / short_answer / long_answer**: \`expected_misanswers\` [{ answer, rationale }, …] — 2-4 common wrong answers with misconception each }), and \`visual\` (envelope or null). Multiple-choice items also include \`options\` ({A,B,C,D}). For long_answer and multi-step short_answer, add \`marking_points\` (3–6 short bullets) when it helps downstream grading. \`generation_metadata.adaptation_rationale\` should be a short string and SHOULD include the intended total seconds (e.g. "sum target = ${time_limit_seconds}").
+
+## Gold-standard question exemplars
+
+Below are ONE complete exemplar per subject family showing exactly the shape and quality bar expected — including \`distractor_rationale\` for MCQs and \`cognitive_demand\` for every item. **Imitate the structure, the distractor archetype labelling, and the explanation depth — never copy the content verbatim.**
+
+### Mathematics (medium · Apply · MCQ)
+\`\`\`json
+{
+  "topic_name": "Linear Equations in Two Variables",
+  "question_text": "At Aarav's stationery shop, 3 pens and 2 notebooks cost ₹105. One pen and 4 notebooks cost ₹95. The cost of one notebook is:",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "cognitive_demand": "Apply",
+  "options": { "A": "₹15", "B": "₹18", "C": "₹20", "D": "₹25" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "Let pen = p, notebook = n. Equations: 3p + 2n = 105 and p + 4n = 95. From the second: p = 95 − 4n. Substitute: 3(95 − 4n) + 2n = 105 → 285 − 12n + 2n = 105 → 10n = 180 → n = 18. Cost of one notebook is ₹18.",
+    "common_mistakes": ["Students often add the equations directly to eliminate without aligning coefficients; this leaves both variables and no clean cancellation."],
+    "related_concept": "Solving simultaneous linear equations by substitution",
+    "distractor_rationale": {
+      "A": "COMMON-ERROR — divided 105 by 7 (counting items), got 15",
+      "B": "CORRECT — solved by substitution, n = 18",
+      "C": "PARTIAL-KNOWLEDGE — solved for p (95 − 4×18.75 ≈ 20) instead of n",
+      "D": "SURFACE-PLAUSIBILITY — eliminated wrong variable; got n = 25 by sign slip"
+    }
+  }
+}
+\`\`\`
+
+### Physics (medium · Apply · MCQ)
+\`\`\`json
+{
+  "topic_name": "Friction on Level Surface",
+  "question_text": "A cyclist of mass 70 kg takes a sharp circular turn of radius 4 m on a level road. The coefficient of static friction between tyres and road is 0.2. The maximum speed for no slipping is (take g = 10 m/s²):",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "cognitive_demand": "Apply",
+  "options": { "A": "2.83 m/s", "B": "4 m/s", "C": "8 m/s", "D": "14 m/s" },
+  "answer_key": {
+    "correct_answer": "A",
+    "explanation": "Maximum static friction provides centripetal force: μmg = mv²/r → v_max = √(μgr) = √(0.2 × 10 × 4) = √8 ≈ 2.83 m/s.",
+    "common_mistakes": ["Students often forget the square root in √(μgr); this gives v = μgr = 8, which is the WRONG dimension (m²/s²)."],
+    "related_concept": "Centripetal force from static friction",
+    "distractor_rationale": {
+      "A": "CORRECT — √(μgr) = √8 ≈ 2.83 m/s",
+      "B": "PARTIAL-KNOWLEDGE — used μ×g without r factor",
+      "C": "COMMON-ERROR — forgot the square root, gave μgr = 8",
+      "D": "SURFACE-PLAUSIBILITY — used μmg = 140 N as if it were v"
+    }
+  }
+}
+\`\`\`
+
+### Chemistry (medium · Apply · MCQ)
+\`\`\`json
+{
+  "topic_name": "Mole Concept",
+  "question_text": "How many moles of CO₂ are produced when 24 g of carbon is completely burned in excess oxygen? (Molar mass: C = 12, O = 16)",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "cognitive_demand": "Apply",
+  "options": { "A": "1 mol", "B": "2 mol", "C": "3 mol", "D": "4 mol" },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "C(s) + O₂(g) → CO₂(g). Moles of C = 24/12 = 2 mol. Stoichiometric ratio C:CO₂ is 1:1, so moles of CO₂ produced = 2 mol.",
+    "common_mistakes": ["Students often divide 24 by the molar mass of CO₂ (44) instead of C (12); this gives ~0.55 mol — the wrong limiting species was used."],
+    "related_concept": "Stoichiometric ratios from a balanced equation",
+    "distractor_rationale": {
+      "A": "COMMON-ERROR — divided 24 by 24 thinking carbon's mass had to match CO₂'s 24g O₂",
+      "B": "CORRECT — 24/12 = 2 mol; 1:1 ratio gives 2 mol CO₂",
+      "C": "PARTIAL-KNOWLEDGE — added 1 mol thinking O₂ contributes its own carbon",
+      "D": "SURFACE-PLAUSIBILITY — used 24/6 (incorrect simplification of molar mass)"
+    }
+  }
+}
+\`\`\`
+
+### Accountancy (medium · Apply · short_answer)
+\`\`\`json
+{
+  "topic_name": "Preparation of Trial Balance",
+  "question_text": "From the following ledger balances of M/s Saral Traders as on 31 March 2024, prepare a Trial Balance using the balances method. Show debit and credit columns separately, total each column, and state whether the balances tally. Capital ₹2,00,000; Drawings ₹15,000; Sales ₹3,80,000; Purchases ₹2,40,000; Wages ₹25,000; Cash in Hand ₹40,000; Debtors ₹80,000; Creditors ₹60,000; Building ₹2,40,000.",
+  "question_type": "short_answer",
+  "difficulty_level": "medium",
+  "cognitive_demand": "Apply",
+  "answer_key": {
+    "correct_answer": "Debit total = ₹6,40,000; Credit total = ₹6,40,000; the trial balance tallies.",
+    "explanation": "Debit side (assets, expenses, drawings, purchases): Drawings 15,000 + Purchases 2,40,000 + Wages 25,000 + Cash 40,000 + Debtors 80,000 + Building 2,40,000 = ₹6,40,000. Credit side (liabilities, capital, income): Capital 2,00,000 + Sales 3,80,000 + Creditors 60,000 = ₹6,40,000. Totals match → trial balance tallies.",
+    "common_mistakes": ["Students often place Drawings on the credit side because it 'reduces capital'; Drawings is always Debit (asset withdrawn by owner)."],
+    "related_concept": "Trial balance preparation under the balances method",
+    "marking_points": [
+      "Correct classification of every account as Debit or Credit (4 marks)",
+      "Arithmetic accuracy in column totals (2 marks)",
+      "Final statement on tally with reasoning (1 mark)"
+    ]
+  }
+}
+\`\`\`
+
+### Economics (medium · Apply · MCQ)
+\`\`\`json
+{
+  "topic_name": "Indian Economy on the Eve of Independence",
+  "question_text": "On the eve of independence (1947), the sectoral distribution of India's workforce was approximately: Agriculture 72%, Industry 10%, Services 18%. Which feature does this distribution best illustrate?",
+  "question_type": "multiple_choice",
+  "difficulty_level": "medium",
+  "cognitive_demand": "Analyze",
+  "options": {
+    "A": "Balanced sectoral development",
+    "B": "Stagnant, agriculture-dominated economy",
+    "C": "Rapidly industrialising economy",
+    "D": "Service-led modern economy"
+  },
+  "answer_key": {
+    "correct_answer": "B",
+    "explanation": "When ~72% of the workforce is engaged in agriculture and only 10% in industry, the economy is dominated by primary-sector employment with minimal industrial transformation — the hallmark of a stagnant, colonial-era economy.",
+    "common_mistakes": ["Students sometimes confuse 'workforce share' with 'GDP share' and read 18% services as 'service-led' modernity; the workforce share alone signals the absence of structural transformation."],
+    "related_concept": "Sectoral composition as an indicator of structural change",
+    "distractor_rationale": {
+      "A": "COMMON-ERROR — assumed three sectors present means balanced",
+      "B": "CORRECT — agriculture-dominated workforce + minimal industry = stagnant colonial economy",
+      "C": "SURFACE-PLAUSIBILITY — 10% in industry sounds notable but is far below industrialising thresholds",
+      "D": "PARTIAL-KNOWLEDGE — saw 18% services and skipped that 72% is in agriculture"
+    }
+  }
+}
+\`\`\`
+
 ${exemplarsBlock}
 ${finalChecklist}
 
