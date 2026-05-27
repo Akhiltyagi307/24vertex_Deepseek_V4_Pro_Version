@@ -2,15 +2,23 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildPublicMarketingCsp, resolveCspPolicyForPath } from "@/lib/security/csp";
 
+// Newer @types/node declares `NODE_ENV` as a read-only string union (development | production | test),
+// so direct property assignment trips TS2540. Use a runtime-only `Reflect.set` wrapper to bypass the
+// type-level immutability — the underlying `process.env` object is still a plain mutable record at
+// runtime, and resetting via the same wrapper in `afterEach` keeps test isolation intact.
+const setNodeEnv = (value: string | undefined): void => {
+	Reflect.set(process.env, "NODE_ENV", value);
+};
+
 describe("buildPublicMarketingCsp", () => {
 	const originalNodeEnv = process.env.NODE_ENV;
 
 	afterEach(() => {
-		process.env.NODE_ENV = originalNodeEnv;
+		setNodeEnv(originalNodeEnv);
 	});
 
 	it("omits build-time hashes in development so unsafe-inline can allow next-themes", () => {
-		process.env.NODE_ENV = "development";
+		setNodeEnv("development");
 		const csp = buildPublicMarketingCsp();
 		expect(csp).toMatch(/'unsafe-inline'/);
 		expect(csp).not.toMatch(/'sha256-/);
