@@ -372,6 +372,32 @@ export function getPracticeBlueprintLlmEnabled(): boolean {
 }
 
 /**
+ * V2 batch contract: per-batch system prompts (stripped of irrelevant sections),
+ * per-batch HARD GATES that override the test-wide ones, SISTER_BATCHES_BRIEF
+ * cross-batch context, per-batch cognitive-demand budgets, post-merge invariant
+ * audit, and a Flash test-wide editor pass. Requires PRACTICE_PARALLEL_BATCHES.
+ *
+ * Off by default; flip PRACTICE_BATCH_CONTRACT_V2=true to opt in.
+ */
+export function getPracticeBatchContractV2Enabled(): boolean {
+	return readTrimmedEnv("PRACTICE_BATCH_CONTRACT_V2").toLowerCase() === "true";
+}
+
+/**
+ * When the V2 batch contract is on, also runs a single Flash editor pass after
+ * merge that rebalances MCQ A/B/C/D distribution, rewrites near-duplicate
+ * stems, and tightens the difficulty ramp. Adds one ~3-5s Flash call.
+ *
+ * Defaults to true when V2 is enabled; set PRACTICE_BATCH_EDITOR_PASS=false
+ * to disable independently of the V2 flag.
+ */
+export function getPracticeBatchEditorPassEnabled(): boolean {
+	const raw = readTrimmedEnv("PRACTICE_BATCH_EDITOR_PASS").toLowerCase();
+	if (raw === "false") return false;
+	return getPracticeBatchContractV2Enabled();
+}
+
+/**
  * Flash model used for the final structure+sanity validator in the 3-call
  * variant. Falls back to the default Flash override so changing one env var
  * propagates; falls back to the global chat model if neither is set.
