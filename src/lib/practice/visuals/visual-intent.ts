@@ -288,7 +288,13 @@ export function resolveQuestionVisualIntent(args: {
 	});
 }
 
-function selectByPriority(
+/**
+ * Picks the indices of `needs_visual_true` questions whose priority is in
+ * `allowed`. Exported because the per-question enrichment driver wants to
+ * fire calls for the union of {necessary, high, medium} candidates without
+ * going through the hierarchical `selectVisualCandidateIndexes` cascade.
+ */
+export function selectByPriority(
 	nullVisualNeeded: ResolvedVisualIntentDecision[],
 	allowed: ReadonlySet<VisualNeedPriority>,
 ): number[] {

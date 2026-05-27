@@ -13,6 +13,7 @@ import {
 import { loadStudentSubjects } from "@/lib/student/load-student-subjects";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import type { createClient } from "@/lib/supabase/server";
+import { withSupabaseQueryRetry } from "@/lib/supabase/retry-helper";
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
 
@@ -49,11 +50,21 @@ async function loadPracticeProgressBySubject(
 	progressBySubjectId: Record<string, PracticeSubjectProgress>;
 	loadError: string | null;
 }> {
+	// Wrap RPC calls in `withSupabaseQueryRetry` so transient cold-start
+	// fetch failures (observed in production after dev server restart and on
+	// Vercel cold-start) get up to 3 retries with backoff instead of failing
+	// the whole page load. Non-transient errors (PGRST*, permission denials)
+	// pass through unchanged.
 	const callWithParam = () =>
-		supabase.rpc("practice_subject_progress", {
-			p_student_id: studentId,
-		});
-	const callWithAuthUid = () => supabase.rpc("practice_subject_progress");
+		withSupabaseQueryRetry(
+			() => supabase.rpc("practice_subject_progress", { p_student_id: studentId }),
+			{ context: "loadPracticeProgressBySubject.withParam" },
+		);
+	const callWithAuthUid = () =>
+		withSupabaseQueryRetry(
+			() => supabase.rpc("practice_subject_progress"),
+			{ context: "loadPracticeProgressBySubject.withAuthUid" },
+		);
 
 	let { data, error } = await callWithParam();
 	if (error?.code === "PGRST202") {
@@ -227,10 +238,17 @@ export async function loadStudentPracticePagePayload(
 
 	const [rows, practiceProgress] = await Promise.all([
 		(async () => {
-			const { data, error } = await supabase
-				.from("performance_tracker")
-				.select(performanceTrackerSelect)
-				.eq("student_id", userId);
+			// Wrap both reads in retry helper — performance_tracker hits the same
+			// cold-start window as the RPC above. Failing here would render the
+			// practice-test wizard empty.
+			const { data, error } = await withSupabaseQueryRetry(
+				() =>
+					supabase
+						.from("performance_tracker")
+						.select(performanceTrackerSelect)
+						.eq("student_id", userId),
+				{ context: "loadPracticeProgressBySubject.performance_tracker" },
+			);
 
 			if (error) {
 				loadError = error.message;
@@ -244,12 +262,16 @@ export async function loadStudentPracticePagePayload(
 				}
 			}
 
-			const { data: trackerOnly, error: err2 } = await supabase
-				.from("performance_tracker")
-				.select(
-					"id, topic_id, subject_id, status, last_test_date, average_score, tests_taken, trend, updated_at",
-				)
-				.eq("student_id", userId);
+			const { data: trackerOnly, error: err2 } = await withSupabaseQueryRetry(
+				() =>
+					supabase
+						.from("performance_tracker")
+						.select(
+							"id, topic_id, subject_id, status, last_test_date, average_score, tests_taken, trend, updated_at",
+						)
+						.eq("student_id", userId),
+				{ context: "loadPracticeProgressBySubject.performance_tracker.legacy" },
+			);
 
 			if (err2) {
 				loadError = err2.message;

@@ -137,6 +137,8 @@ export default function FixtureGalleryPage(): React.ReactElement {
 							{group.map((f) => (
 								<li
 									key={`${f.subject}/${f.fileName}`}
+									data-fixture-key={`${f.subject}/${f.fileName}`}
+									data-visual-kind={f.envelope.spec.kind}
 									className="rounded-md border border-border/50 p-4"
 								>
 									<div className="mb-2 flex flex-wrap items-baseline gap-3">

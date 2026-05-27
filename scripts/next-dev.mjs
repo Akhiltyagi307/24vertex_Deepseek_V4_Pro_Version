@@ -3,6 +3,7 @@ import { spawn, execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
 import fs from "node:fs";
+import httpModule from "node:http";
 
 const execFileAsync = promisify(execFile);
 
@@ -371,6 +372,86 @@ if (routesManifestWatchdog) {
 	}, tickMs);
 
 	process.on("exit", () => clearInterval(watchdog));
+}
+
+// ----------------------------------------------------------------------
+// HTTP-health watchdog (NEXT_DEV_HTTP_HEALTH_WATCHDOG=1 / unset = enabled)
+// ----------------------------------------------------------------------
+// The existing routes-manifest + middleware-file watchdogs catch DISK-level
+// hangs (Turbopack failing to write outputs). They do NOT catch the
+// APPLICATION-layer hang we observed in production today: Turbopack
+// accepted TCP but never sent HTTP responses for any route. PM2 thought
+// the process was online; manual `kill -9` + restart was required.
+//
+// This watchdog probes `127.0.0.1:${PORT}/login` every 60s. If no 2xx
+// (or 3xx redirect) response arrives within 30s of the probe, AND no
+// successful probe has been seen for 120s total, kill the process so
+// PM2 respawns. Opt out with `NEXT_DEV_HTTP_HEALTH_WATCHDOG=0`.
+{
+	const httpWatchdogOpt = (process.env.NEXT_DEV_HTTP_HEALTH_WATCHDOG ?? "1").trim();
+	const httpWatchdogOn = httpWatchdogOpt !== "0" && httpWatchdogOpt !== "false";
+	if (!httpWatchdogOn) {
+		// User opted out; do nothing.
+	} else {
+		const probeIntervalMs = Number(process.env.NEXT_DEV_HTTP_PROBE_INTERVAL_MS) || 60_000;
+		const probeTimeoutMs = Number(process.env.NEXT_DEV_HTTP_PROBE_TIMEOUT_MS) || 30_000;
+		const failGraceMs = Number(process.env.NEXT_DEV_HTTP_FAIL_GRACE_MS) || 120_000;
+		// First probe waits one full interval so Turbopack has time to compile
+		// /login. Once any successful probe arrives, the grace window resets.
+		let lastGoodHttpTime = Date.now();
+		let httpWatchdogExiting = false;
+
+		const probeOnce = () => {
+			const startedAt = Date.now();
+			const req = httpModule.request(
+				{
+					host: "127.0.0.1",
+					port: Number(process.env.PORT) || 3001,
+					path: "/login",
+					method: "GET",
+					timeout: probeTimeoutMs,
+					headers: { "user-agent": "next-dev-watchdog/1.0" },
+				},
+				(res) => {
+					// 2xx or 3xx = the server is alive enough to route. Drain the
+					// body so the socket can be reused.
+					res.resume();
+					if (res.statusCode != null && res.statusCode < 500) {
+						lastGoodHttpTime = Date.now();
+					}
+				},
+			);
+			req.on("error", () => {
+				// Don't update lastGoodHttpTime — failure to connect counts toward grace.
+			});
+			req.on("timeout", () => {
+				req.destroy();
+			});
+			req.end();
+			// (no return — fire-and-forget; the interval handles cadence)
+			void startedAt;
+		};
+
+		const httpWatchdog = setInterval(() => {
+			if (httpWatchdogExiting) return;
+			probeOnce();
+			const idleMs = Date.now() - lastGoodHttpTime;
+			if (idleMs > failGraceMs) {
+				httpWatchdogExiting = true;
+				clearInterval(httpWatchdog);
+				const log = `[next-dev] HTTP watchdog: no successful probe to /login for ${(idleMs / 1000).toFixed(0)}s — killing child so PM2 respawns.`;
+				process.stderr.write(log + "\n");
+				try {
+					child.kill("SIGKILL");
+				} catch {
+					/* child may already be dead */
+				}
+				setTimeout(() => process.exit(1), 1500);
+			}
+		}, probeIntervalMs);
+
+		process.on("exit", () => clearInterval(httpWatchdog));
+	}
 }
 
 child.on("exit", (code, signal) => {

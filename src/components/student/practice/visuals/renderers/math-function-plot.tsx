@@ -41,7 +41,7 @@ export function MathFunctionPlot({
 	React.useEffect(() => {
 		const target = containerRef.current;
 		if (!target) return undefined;
-		target.innerHTML = "";
+		target.replaceChildren();
 		try {
 			const yDomain: [number, number] | undefined =
 				spec.yMin != null && spec.yMax != null && spec.yMax > spec.yMin
@@ -86,7 +86,7 @@ export function MathFunctionPlot({
 			setError(message);
 		}
 		return () => {
-			if (target) target.innerHTML = "";
+			if (target) target.replaceChildren();
 		};
 		// KaTeX flags derive from labels that live on `spec`.
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- imperative plot keyed on full spec snapshot

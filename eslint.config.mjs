@@ -126,4 +126,30 @@ export default defineConfig([
 			],
 		},
 	},
+	{
+		// Forbid direct `element.innerHTML = <expr>` writes. Use
+		// `Element.replaceChildren()` to clear, or wrap untrusted strings in
+		// `DOMPurify.sanitize()` before any HTML injection. This is an
+		// AST-level guard against accidentally creating an XSS sink if
+		// someone copies the imperative-renderer "clear the mount node"
+		// pattern with an LLM-derived string. The original imperative
+		// renderers (chemistry-molecule, math-function-plot, economics-curve)
+		// have already been migrated to `replaceChildren()` so no allowlist
+		// override is needed. `dangerouslySetInnerHTML` (a JSX attribute,
+		// not a MemberExpression assignment) is NOT covered by this rule
+		// and remains allowed for trusted-source HTML (e.g. KaTeX output).
+		name: "vertex24-no-innerhtml-assignment",
+		files: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+		rules: {
+			"no-restricted-syntax": [
+				"error",
+				{
+					selector:
+						"AssignmentExpression[operator='='][left.type='MemberExpression'][left.property.name='innerHTML']",
+					message:
+						"Direct innerHTML assignment is forbidden. Use Element.replaceChildren() to clear, or wrap untrusted strings in DOMPurify.sanitize() before any HTML injection.",
+				},
+			],
+		},
+	},
 ]);

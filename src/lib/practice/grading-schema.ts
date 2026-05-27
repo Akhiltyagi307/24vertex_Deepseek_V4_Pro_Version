@@ -28,16 +28,53 @@ export const gradedQuestionItemSchema = z.object({
 	analysis: z.string(),
 	step_by_step_solution: z.string().optional(),
 	score: z.number().min(0).max(100),
-	/** Student-facing label, e.g. "Partial credit (50% band)". */
-	band_label: z.string(),
-	/** What the student did well (at least one item; use "Full credit on this item." when score is 100). */
-	what_was_correct: z.array(z.string()).default([]),
-	/** Why the score is below 100; empty array only when score is 100. */
-	where_marks_were_lost: z.array(z.string()).default([]),
-	/** One sentence on how to reach the next score band; empty only when score is 100. */
+	/**
+	 * Student-facing label, e.g. "Partial credit (50% band)". Must be non-empty —
+	 * tightening this from `z.string()` to `.min(1)` lets `generateStructured`'s
+	 * repair loop catch and re-prompt when the LLM emits `""`, instead of the
+	 * downstream `validateGradingBreakdown` quietly logging a warning.
+	 */
+	band_label: z.string().min(1),
+	/**
+	 * What the student did well. Always at least one non-empty item — for full
+	 * credit, the prompt instructs the model to use "Full credit on this item."
+	 * `.min(1)` (both on the array and inner strings) forces the repair loop to
+	 * fire when the LLM emits `[]` or `[""]` (the most common warning we saw
+	 * in production logs before this tightening).
+	 */
+	what_was_correct: z.array(z.string().min(1)).min(1),
+	/**
+	 * Why the score is below 100. Empty array is allowed when score === 100;
+	 * otherwise must have at least one non-empty item. Conditional enforced
+	 * via the parent schema's `.superRefine()` below.
+	 */
+	where_marks_were_lost: z.array(z.string().min(1)).default([]),
+	/**
+	 * One sentence on how to reach the next score band. Empty allowed only
+	 * when score === 100. Conditional enforced via `.superRefine()` below.
+	 */
 	to_reach_next_band: z.string().default(""),
 	/** Required for long_answer when score < 100; must have exactly 5 rows summing to score. */
 	criterion_scores: z.array(gradedCriterionScoreSchema).optional(),
+}).superRefine((item, ctx) => {
+	// Conditional invariants on the score < 100 branch. Putting these here (vs
+	// the field level) lets us reference `score` from the same object.
+	if (item.score < 100) {
+		if (item.where_marks_were_lost.length === 0) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ["where_marks_were_lost"],
+				message: "where_marks_were_lost must have at least one item when score < 100",
+			});
+		}
+		if (item.to_reach_next_band.trim().length === 0) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ["to_reach_next_band"],
+				message: "to_reach_next_band must be non-empty when score < 100",
+			});
+		}
+	}
 });
 
 export type GradedQuestionItem = z.infer<typeof gradedQuestionItemSchema>;
