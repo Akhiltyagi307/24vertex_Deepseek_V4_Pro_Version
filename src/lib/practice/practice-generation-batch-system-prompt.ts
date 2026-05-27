@@ -83,6 +83,28 @@ Treat \`difficulty_level\` per question as operational, not a label:
 
 An item whose stem is 50 words with a 3-step solution but labelled "easy" is mislabelled.`;
 
+const MATH_TEXT_FORMATTING = `### Math typesetting (KaTeX delimiters)
+
+Every math expression that appears in \`question_text\`, any value in \`options\`, or anywhere inside \`answer_key.explanation\` / \`common_mistakes\` / \`distractor_rationale\` MUST be wrapped in single-dollar KaTeX delimiters.
+
+Required:
+- Variables, equations, exponents, subscripts: \`$x^2 + y^2 = 25$\`, \`$r_s\`, \`$a_{11}$\`.
+- Fractions: \`$\\tfrac{3}{5}$\` or \`$\\frac{3}{5}$\`. Never write \`3/5\` outside delimiters when 3/5 is a number value.
+- Roots: \`$\\sqrt{2}$\`, \`$\\sqrt{a^2+b^2}$\`.
+- Greek letters & operators: \`$\\theta$\`, \`$\\pi$\`, \`$\\pm 4$\`, \`$\\sum D^2$\`, \`$\\sin x$\`, \`$\\cos x$\`, \`$\\tan x$\`, \`$\\le$\`, \`$\\ge$\`, \`$\\ne$\`, \`$\\cdot$\`, \`$\\div$\`, \`$\\times$\`, \`$\\infty$\`.
+- Degrees inside math: \`$45^\\circ$\` (not the Unicode \`°\` symbol when adjacent to a math expression). Standalone temperature like "25°C" outside math is fine.
+- Coordinate pairs that participate in math: \`$(3, -2)$\` and \`$(-1, 4)$\`.
+- Same goes for an MCQ option that IS a numeric expression: \`"$y^2 = 24x$"\`, \`"$(\\pm \\sqrt{34}, 0)$"\` — wrap the whole expression.
+
+Forbidden:
+- Unicode superscripts \`²³⁴⁵⁶⁷⁸⁹⁰\` and subscripts \`₀₁₂₃₄₅₆₇₈₉\` in math. They render as body-font characters, not KaTeX glyphs, producing visually inconsistent output. Use \`^{n}\` / \`_{n}\` inside \`$...$\`.
+- Unicode \`±\`, \`√\`, \`÷\`, \`×\`, \`·\`, \`≤\`, \`≥\`, \`≠\`, \`Σ\`, \`π\`, \`θ\` inside math expressions. Use the KaTeX commands above.
+- Display-math delimiters \`$$...$$\`, \`\\[...\\]\`, \`\\(...\\)\` — only \`$...$\` is supported by the renderer.
+
+Plain prose ("circle", "slope", "calculate") stays outside delimiters. Pure word problems with no symbolic math (Stats Q on definitions, History dates, Civics theory) need no delimiters at all.
+
+Apply this rule uniformly across \`question_text\`, \`options[*]\`, AND every field of \`answer_key\` (\`explanation\`, \`common_mistakes\`, \`distractor_rationale\`, \`marking_points\`). Do not write KaTeX in the stem then drop back to Unicode in the explanation — students see both.`;
+
 const NUMERIC_SANITY = `### Numeric and answer-key sanity
 
 - Recompute the keyed answer end-to-end before emitting. Impossible results (supersonic everyday speeds, percentages > 100%, probabilities outside [0,1], unbalanced balance sheets) → change input numbers, do not ship.
@@ -303,7 +325,7 @@ function batchSpecificDisciplineBlock(label: BatchLabel): string {
 	} else {
 		blocks.push(NON_MCQ_EXPECTED_MISANSWERS, ``, FORMAT_A_B_EXPLANATIONS_NON_MCQ, ``);
 	}
-	blocks.push(OPERATIONAL_DIFFICULTY, ``, NUMERIC_SANITY);
+	blocks.push(OPERATIONAL_DIFFICULTY, ``, NUMERIC_SANITY, ``, MATH_TEXT_FORMATTING);
 	return blocks.join("\n");
 }
 

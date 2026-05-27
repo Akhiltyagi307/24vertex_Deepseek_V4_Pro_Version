@@ -25,6 +25,7 @@
  */
 
 import type { VisualExemplar } from "./exemplars-type";
+import type { QuestionVisualKind } from "./types";
 export type { VisualExemplar };
 
 import { ALL_EXEMPLARS } from "./exemplars/index";
@@ -420,6 +421,15 @@ function orderPoolForTopicHints(items: VisualExemplar[], hintNorm?: string): Vis
 export type PickExemplarsOptions = {
 	/** Lowercase blob from selected topic names + unit/chapter titles (server-built). */
 	topicHintNorm?: string;
+	/**
+	 * Optional kind filter. When set, the picker first narrows the subject pool
+	 * to exemplars whose `visual.spec.kind` matches (plus any `visual: null`
+	 * anchors for schema contrast). If the kind-filtered pool would yield
+	 * fewer than 2 entries (anchor + 1), the filter falls back to the full
+	 * subject pool to preserve diversity. Designed for per-question enrichment
+	 * calls where the candidate's `preferred_kind` is known in advance.
+	 */
+	preferredKind?: QuestionVisualKind | null;
 };
 
 /**
@@ -427,6 +437,10 @@ export type PickExemplarsOptions = {
  * add exemplars that maximize visual-kind diversity first (`spec.kind`), followed by
  * finer variant diversity (`exemplarKindKey`). Matching-topic hints break ties so
  * chapter-aligned exemplars surface sooner without leaking cross-subject examples.
+ *
+ * `options.preferredKind` (when set) narrows the pool to the same kind plus
+ * `visual:null` anchors. Falls back to the full subject pool if the kind has
+ * no matches.
  */
 export function pickExemplarsForSubject(
 	subjectKey: VisualExemplar["subjects"][number],
@@ -434,7 +448,20 @@ export function pickExemplarsForSubject(
 	options?: PickExemplarsOptions,
 ): ReadonlyArray<VisualExemplar> {
 	const hintNorm = options?.topicHintNorm;
-	const matching = VISUAL_EXEMPLARS.filter((ex) => ex.subjects.includes(subjectKey));
+	const subjectPool = VISUAL_EXEMPLARS.filter((ex) => ex.subjects.includes(subjectKey));
+	// Optionally narrow to a single preferred visual kind. Keep `visual: null`
+	// anchors regardless so the model still sees the empty-visual shape.
+	let matching = subjectPool;
+	if (options?.preferredKind != null) {
+		const kindFiltered = subjectPool.filter(
+			(ex) => ex.visual === null || ex.visual.spec.kind === options.preferredKind,
+		);
+		// `> 1` because we always keep the anchor (often visual: null) + at least
+		// one real exemplar of the preferred kind. Falling back to the full pool
+		// when only the anchor would match preserves the diversity baseline.
+		const realMatches = kindFiltered.filter((ex) => ex.visual !== null).length;
+		matching = realMatches > 0 ? kindFiltered : subjectPool;
+	}
 	const maxPickCount = Math.max(1, limit);
 	const anchor = matching.find((ex) => ex.visual === null) ?? matching[0];
 	if (!anchor) return [];

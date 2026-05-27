@@ -130,3 +130,40 @@ export function getPracticeVisualExemplarCount(): number {
 	const n = Number.parseInt(raw, 10);
 	return Number.isFinite(n) && n >= 3 && n <= 12 ? n : 8;
 }
+
+/**
+ * Visual-enrichment dispatch mode.
+ *
+ * - `batch` (default): single LLM call processes all candidate questions in one
+ *   structured-output request (today's behavior). One bad Zod parse = no
+ *   visuals for any candidate.
+ * - `per_question`: K parallel calls, one per `needs_visual_true` question.
+ *   Each call produces a single envelope. Failure isolates per question.
+ *   Activated only when the pipeline variant is also `3call` (5call's retry
+ *   rounds already mitigate single-batch failure, so the dispatch keeps 5call
+ *   on the batch path).
+ */
+export function getPracticeVisualEnrichmentMode(): "batch" | "per_question" {
+	const raw = process.env.PRACTICE_VISUAL_ENRICHMENT_MODE?.trim().toLowerCase();
+	return raw === "per_question" ? "per_question" : "batch";
+}
+
+/**
+ * Parallel cap for the per-question enrichment driver. Clamped to [1, 20];
+ * default 8. Drives `pLimit(n, tasks)` so the LLM provider's rate-limit
+ * concurrency cannot be overrun even when the blueprint flags many
+ * candidates.
+ *
+ * Cap raised from 16 → 20 on 2026-05-28 — observed clean at 8 concurrent
+ * DeepSeek calls in production; 12 needed to fit Math Conic-Sections tests
+ * (12 candidates) into one wave instead of two (saves ~10 s wall time).
+ * The driver caller-side narrows further to `min(cap, candidateCount)` so
+ * small tests don't pay the cap.
+ */
+export function getPracticeVisualEnrichmentConcurrency(): number {
+	const raw = process.env.PRACTICE_VISUAL_ENRICHMENT_CONCURRENCY;
+	if (raw == null || raw.trim() === "") return 8;
+	const n = Number.parseInt(raw, 10);
+	if (!Number.isFinite(n)) return 8;
+	return Math.max(1, Math.min(20, n));
+}

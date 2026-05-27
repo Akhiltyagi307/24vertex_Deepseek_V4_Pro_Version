@@ -59,7 +59,7 @@ export function EconomicsCurve({
 	React.useEffect(() => {
 		const target = containerRef.current;
 		if (!target) return undefined;
-		target.innerHTML = "";
+		target.replaceChildren();
 		try {
 			const yDomainForPlot: [number, number] | undefined = yDomain ?? undefined;
 			functionPlot({
@@ -92,7 +92,7 @@ export function EconomicsCurve({
 			setError(e instanceof Error ? e.message : "Unable to plot curves.");
 		}
 		return () => {
-			if (target) target.innerHTML = "";
+			if (target) target.replaceChildren();
 		};
 		// Derived marks/domains come from `spec`; listing filtered arrays would churn deps every render.
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- imperative plot keyed on full spec snapshot

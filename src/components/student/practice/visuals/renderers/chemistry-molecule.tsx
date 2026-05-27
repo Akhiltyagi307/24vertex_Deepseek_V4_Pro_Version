@@ -32,7 +32,7 @@ export function ChemistryMolecule({
 	React.useEffect(() => {
 		const svg = svgRef.current;
 		if (!svg) return undefined;
-		svg.innerHTML = "";
+		svg.replaceChildren();
 		try {
 			(SmilesDrawer as unknown as {
 				parse(
@@ -70,7 +70,7 @@ export function ChemistryMolecule({
 			setError(e instanceof Error ? e.message : "Could not parse SMILES.");
 		}
 		return () => {
-			if (svg) svg.innerHTML = "";
+			if (svg) svg.replaceChildren();
 		};
 	}, [spec.smiles]);
 

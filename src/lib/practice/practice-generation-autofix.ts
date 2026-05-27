@@ -1,4 +1,5 @@
 import type { PracticeGenerationOutput } from "./generation-schema";
+import { normalizeKatexMath } from "./katex-math-normalize";
 
 const LETTER_ONLY = /^[A-D]$/i;
 const LETTER_WITH_DECORATION = /^(?:option\s*)?([A-D])[\).:\-]?$/i;
@@ -34,23 +35,65 @@ function normalizeMcqCorrectAnswer(
 	return matchedLetter && LETTER_ONLY.test(matchedLetter) ? matchedLetter : correctAnswer;
 }
 
+function normalizeOptionsKatex(
+	options: Record<string, string> | null,
+): Record<string, string> | null {
+	if (!options) return options;
+	const out: Record<string, string> = {};
+	for (const [letter, value] of Object.entries(options)) {
+		out[letter] = normalizeKatexMath(value);
+	}
+	return out;
+}
+
 function fixQuestion(question: PracticeQuestion, index: number): PracticeQuestion {
 	const isMcq = question.question_type === "multiple_choice";
-	const normalizedOptions = isMcq ? question.options : null;
+	const normalizedOptions = isMcq ? normalizeOptionsKatex(question.options) : null;
 	const normalizedCorrectAnswer =
 		isMcq ?
 			normalizeMcqCorrectAnswer(question.answer_key.correct_answer, normalizedOptions)
 		:	question.answer_key.correct_answer.trim();
 
+	// Normalize Unicode-math (²³ ± √ ÷ × · etc.) to `$...$`-wrapped KaTeX
+	// across every visible text field. The LLM is instructed to use `$...$`
+	// directly (see practice-generation-batch-system-prompt:MATH_TEXT_FORMATTING),
+	// but observed behaviour shows it backslides into Unicode for ~60% of
+	// questions — especially in explanations. This pass cleans up.
+	const normalizedExplanation = normalizeKatexMath(question.answer_key.explanation);
+	const normalizedCommonMistakes = (question.answer_key.common_mistakes ?? []).map((m) =>
+		normalizeKatexMath(m),
+	);
+	const normalizedRelatedConcept =
+		question.answer_key.related_concept != null
+			? normalizeKatexMath(question.answer_key.related_concept)
+			: question.answer_key.related_concept;
+	const normalizedDistractorRationale = isMcq
+		? (() => {
+				const dr = question.answer_key.distractor_rationale;
+				if (!dr) return dr;
+				const out: Record<string, string> = {};
+				for (const [letter, value] of Object.entries(dr)) {
+					out[letter] = normalizeKatexMath(value);
+				}
+				return out as typeof question.answer_key.distractor_rationale;
+			})()
+		: question.answer_key.distractor_rationale;
+	const normalizedQuestionText = normalizeKatexMath(question.question_text);
+
 	return {
 		...question,
 		question_number: index + 1,
 		topic_id: question.topic_id.trim(),
+		question_text: normalizedQuestionText,
 		options: normalizedOptions,
 		estimated_time_seconds: normalizeEstimatedTime(question.estimated_time_seconds),
 		answer_key: {
 			...question.answer_key,
 			correct_answer: normalizedCorrectAnswer,
+			explanation: normalizedExplanation,
+			common_mistakes: normalizedCommonMistakes,
+			related_concept: normalizedRelatedConcept,
+			distractor_rationale: normalizedDistractorRationale,
 		},
 	};
 }

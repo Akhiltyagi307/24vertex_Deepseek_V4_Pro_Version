@@ -95,13 +95,16 @@ import { buildTopicCorpusMap, evaluatePracticeGenerationQuality } from "@/lib/pr
 import { applyVisualPatches } from "@/lib/practice/visuals/apply-visual-patches";
 import {
 	getPracticeVisualEnrichmentBatchSize,
+	getPracticeVisualEnrichmentMode,
 	getPracticeVisualStemGroundingMode,
 } from "@/lib/practice/visuals/env";
 import { buildDeterministicFallbackVisual } from "@/lib/practice/visuals/fallback-visual";
 import { generateVisualEnrichmentPass } from "@/lib/practice/visuals/generate-visual-enrichment";
+import { generateVisualEnrichmentPerQuestion } from "@/lib/practice/visuals/generate-visual-enrichment-per-question";
 import { runValidatorPass } from "@/lib/practice/visuals/run-validator-pass";
 import {
 	resolveQuestionVisualIntent,
+	selectByPriority,
 	selectVisualCandidateIndexes,
 	shouldRequireAtLeastOneVisual,
 	summarizeVisualIntentDecisions,
@@ -516,6 +519,90 @@ async function runModelOnce(
 			usage: { inputTokens: 0, outputTokens: 0, latencyMs, model: chatModelId },
 		};
 	}
+}
+
+/**
+ * Tail-latency guard around `runModelOnceWithFallback`. Wraps the batch
+ * dispatch in a soft 75s timeout — if the slow batch exceeds that, abort
+ * via AbortController and retry ONCE. The original observation: one batch
+ * took 102.8s while siblings on identical input ran 22–43s (DeepSeek API
+ * tail-latency outlier). Without this, the slow call alone could double a
+ * test's wall time.
+ *
+ * The retry uses a fresh telemetry stepKey (suffixed `_retry`) so the
+ * `practice_generation_steps` dashboard can count tail events vs first-pass
+ * successes.
+ *
+ * One retry only. If the retry also tails-out, return the timeout failure
+ * — better than waiting forever.
+ */
+const BATCH_TAIL_TIMEOUT_MS = 75_000;
+
+async function runBatchWithTailGuard(args: {
+	systemPrompt: string;
+	userPrompt: string;
+	slotCount: number;
+	schema: ReturnType<typeof createPracticeGenerationOutputSchema>;
+	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">;
+	userId: string;
+	baseStepKey: string;
+	generationRunId: string | null;
+	correlationId: string;
+}): ReturnType<typeof runModelOnceWithFallback> {
+	for (let attempt = 0; attempt < 2; attempt++) {
+		// Child abort controller so a tail-timeout cancels just this attempt
+		// without aborting the whole pipeline. Linked to the parent signal so
+		// a real cancellation (e.g. user navigates away) still propagates.
+		const ac = new AbortController();
+		const onParentAbort = () => ac.abort(args.opts.abortSignal?.reason);
+		args.opts.abortSignal?.addEventListener?.("abort", onParentAbort);
+		const timeoutId = setTimeout(
+			() => ac.abort(new Error("tail_timeout")),
+			BATCH_TAIL_TIMEOUT_MS,
+		);
+		try {
+			const result = await runModelOnceWithFallback(
+				args.systemPrompt,
+				args.userPrompt,
+				args.slotCount,
+				args.schema,
+				{ ...args.opts, abortSignal: ac.signal },
+				args.userId,
+				{
+					generationRunId: args.generationRunId,
+					correlationId: args.correlationId,
+					stepKey: attempt === 0 ? args.baseStepKey : `${args.baseStepKey}_retry`,
+				},
+			);
+			return result;
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			// Only retry on our own tail-timeout abort. Real cancellations or
+			// other errors propagate immediately on first attempt; on retry
+			// attempt, swallow the second tail-timeout and surface a clean error.
+			const isTailTimeout = msg.includes("tail_timeout") || /aborted/i.test(msg);
+			if (attempt === 0 && isTailTimeout && !args.opts.abortSignal?.aborted) {
+				continue; // retry once with a fresh stepKey
+			}
+			if (isTailTimeout) {
+				return {
+					ok: false,
+					message: `Batch ${args.baseStepKey} timed out after ${(BATCH_TAIL_TIMEOUT_MS / 1000).toFixed(0)}s on both attempts.`,
+					usage: { inputTokens: 0, outputTokens: 0, latencyMs: BATCH_TAIL_TIMEOUT_MS, model: "unknown" },
+				};
+			}
+			throw e;
+		} finally {
+			clearTimeout(timeoutId);
+			args.opts.abortSignal?.removeEventListener?.("abort", onParentAbort);
+		}
+	}
+	// Unreachable — the loop either returns or throws — but TS needs a satisfying value.
+	return {
+		ok: false,
+		message: `Batch ${args.baseStepKey} exhausted retry budget without resolution.`,
+		usage: { inputTokens: 0, outputTokens: 0, latencyMs: 0, model: "unknown" },
+	};
 }
 
 /**
@@ -1139,19 +1226,21 @@ ${JSON.stringify(blueprintSlots)}`;
 					const stepKey = `question_generation_batch_${batch.index + 1}_${batch.label}${
 						v2BatchContract ? "_v2" : ""
 					}`;
-					const result = await runModelOnceWithFallback(
-						batchSystemPrompt,
-						batchUserPrompt,
-						batch.slots.length,
-						batchSchema,
+					// Tail-latency guard: in production we observed one batch take
+					// 102.8s while siblings finished in 22–43s on identical input.
+					// Wrap each batch in a 75s soft timeout + ONE retry. The retry
+					// uses fresh telemetry tags so the dashboard can count tail events.
+					const result = await runBatchWithTailGuard({
+						systemPrompt: batchSystemPrompt,
+						userPrompt: batchUserPrompt,
+						slotCount: batch.slots.length,
+						schema: batchSchema,
 						opts,
-						resolved.userId,
-						{
-							generationRunId,
-							correlationId,
-							stepKey,
-						},
-					);
+						userId: resolved.userId,
+						baseStepKey: stepKey,
+						generationRunId,
+						correlationId,
+					});
 					return { batch, result, stepKey };
 				}),
 			);
@@ -1642,15 +1731,42 @@ ${JSON.stringify(blueprintSlots)}`;
 		allowedKinds: jobContext.visuals.preferredKinds,
 	});
 	const visualIntentSummary = summarizeVisualIntentDecisions(visualIntentDecisions);
+
+	// Visual-floor observability — does the blueprint's `needs_visual` count
+	// meet the floor for visual-heavy topic sets? We log only (no enforcement
+	// yet) so we can quantify how often the prompt-level floor instruction is
+	// honoured before deciding whether to add deterministic promotion.
+	const visualHeavyTopicHits = countVisualHeavyTopicMatches(fullOutput.questions);
+	const visualFloor = visualHeavyTopicHits > 0 ?
+		Math.max(4, Math.floor(0.25 * fullOutput.questions.length)) : 0;
+	const visualFloorMet = visualFloor === 0 || visualIntentSummary.needs_visual_true >= visualFloor;
+	if (!visualFloorMet) {
+		logPracticeObs({
+			phase: "practice_generation_visual_floor_unmet",
+			correlation_id: correlationId,
+			floor: visualFloor,
+			actual_needs_visual_true: visualIntentSummary.needs_visual_true,
+			visual_heavy_topic_hits: visualHeavyTopicHits,
+			total_questions: fullOutput.questions.length,
+		});
+	}
+
 	await writeGenerationStep({
 		stepKey: "visual_intent_gate",
 		status: "ok",
-		metadata: visualIntentSummary,
+		metadata: {
+			...visualIntentSummary,
+			visual_floor: visualFloor,
+			visual_floor_met: visualFloorMet,
+			visual_heavy_topic_hits: visualHeavyTopicHits,
+		},
 	});
 	logPracticeObs({
 		phase: "practice_generation_visual_intent_gate",
 		correlation_id: correlationId,
 		...visualIntentSummary,
+		visual_floor: visualFloor,
+		visual_floor_met: visualFloorMet,
 	});
 
 	const countNonNullVisuals = () => fullOutput.questions.reduce((acc, q) => acc + (q.visual ? 1 : 0), 0);
@@ -1672,18 +1788,40 @@ ${JSON.stringify(blueprintSlots)}`;
 	const stemGroundingMode = getPracticeVisualStemGroundingMode();
 	const strictGroundingForVisuals = stemGroundingMode !== "off";
 	const enrichmentBatchSize = getPracticeVisualEnrichmentBatchSize();
-	const initialCandidateIndexes = selectVisualCandidateIndexes({
-		round: "initial",
-		questions: fullOutput.questions,
-		decisions: visualIntentDecisions,
-	});
+
+	// Per-question mode is opt-in via PRACTICE_VISUAL_ENRICHMENT_MODE and only
+	// applies to the 3call variant. 5call already has retry rounds that
+	// mitigate single-batch failure, so it stays on the batch path.
+	const enrichmentMode = getPracticeVisualEnrichmentMode();
+	const usePerQuestionEnrichment =
+		enrichmentMode === "per_question" && getPracticePipelineVariant() === "3call";
+
+	// Per-question mode widens the initial candidate set to {necessary, high,
+	// medium} — with parallel isolated calls, there's no penalty for going
+	// broader, and we want every `needs_visual_true` question to get a shot.
+	// Batch mode keeps today's hierarchical priority cascade.
+	const initialCandidateIndexes = usePerQuestionEnrichment
+		? selectByPriority(
+				visualIntentDecisions.filter(
+					(d) => d.needsVisual && fullOutput.questions[d.index]?.visual == null,
+				),
+				new Set(["necessary", "high", "medium"]),
+			)
+		: selectVisualCandidateIndexes({
+				round: "initial",
+				questions: fullOutput.questions,
+				decisions: visualIntentDecisions,
+			});
 	const initialCandidateBatch = initialCandidateIndexes.slice(0, enrichmentBatchSize);
 	const initialRequireAtLeastOneVisual = shouldRequireAtLeastOneVisual(
 		initialCandidateBatch,
 		visualIntentDecisions,
 	);
 	const initialCandidateIntent = buildCandidateIntent(initialCandidateBatch);
-	const visualEnrichmentResult = await generateVisualEnrichmentPass({
+	const enrichmentDriver = usePerQuestionEnrichment
+		? generateVisualEnrichmentPerQuestion
+		: generateVisualEnrichmentPass;
+	const visualEnrichmentResult = await enrichmentDriver({
 		output: fullOutput,
 		userId: resolved.userId,
 		subjectName: resolved.subjectName,
@@ -1705,8 +1843,9 @@ ${JSON.stringify(blueprintSlots)}`;
 		visualEnrichmentResult.patches.length > 0 ||
 		initialCandidateBatch.length > 0
 	) {
+		const perQ = visualEnrichmentResult.perQuestionStats;
 		await writeGenerationStep({
-			stepKey: "visual_enrichment",
+			stepKey: usePerQuestionEnrichment ? "visual_enrichment_per_question" : "visual_enrichment",
 			status: visualEnrichmentResult.ok ? "ok" : "error",
 			model: resolveChatModel("practice.generation.visual_enrichment").modelId,
 			feature: "practice.generation.visual_enrichment",
@@ -1715,9 +1854,18 @@ ${JSON.stringify(blueprintSlots)}`;
 			outputTokens: visualEnrichmentResult.outputTokens,
 			error: visualEnrichmentResult.ok ? null : "Visual enrichment failed.",
 			metadata: {
+				mode: usePerQuestionEnrichment ? "per_question" : "batch",
 				candidate_indexes: initialCandidateBatch.length,
 				patch_candidates: visualEnrichmentResult.patches.length,
 				required_candidate_round: initialRequireAtLeastOneVisual,
+				...(perQ
+					? {
+							k: perQ.k,
+							succeeded: perQ.succeeded,
+							failed: perQ.failed,
+							total_latency_ms_sum: perQ.totalLatencyMsSum,
+						}
+					: {}),
 			},
 		});
 	}
@@ -2306,6 +2454,54 @@ ${JSON.stringify(blueprintSlots)}`;
 }
 
 /** Validate body for API route / server action. */
+/**
+ * Visual-heavy chapter keywords. When ANY generated question's `topic_name`
+ * contains one of these substrings (case-insensitive), the visual-floor
+ * observability counter expects the blueprint to have flagged at least
+ * `floor(0.25 × total)` slots (minimum 4) as `needs_visual=true`.
+ *
+ * Observation-only today — the un-met-floor case logs to `practice_obs`
+ * but the run still proceeds. Once we have ≥2 weeks of data on how often
+ * the prompt-level floor instruction is honoured, we can decide whether to
+ * promote this to a deterministic enforcement step in the blueprint.
+ */
+const VISUAL_HEAVY_CHAPTER_KEYWORDS = [
+	"coordinate geometry",
+	"conic sections",
+	"straight lines",
+	"trigonometric functions",
+	"three dimensional geometry",
+	"three-dimensional geometry",
+	"frequency distribution",
+	"bivariate frequency",
+	"correlation",
+	"diagrammatic presentation",
+	"probability distributions",
+	"circuits",
+	"free-body",
+	"free body",
+	"optics",
+	"waves",
+	"molecular",
+];
+
+function countVisualHeavyTopicMatches(
+	questions: ReadonlyArray<{ topic_name?: string | null }>,
+): number {
+	let hits = 0;
+	for (const q of questions) {
+		const name = (q.topic_name ?? "").toLowerCase();
+		if (!name) continue;
+		for (const kw of VISUAL_HEAVY_CHAPTER_KEYWORDS) {
+			if (name.includes(kw)) {
+				hits += 1;
+				break;
+			}
+		}
+	}
+	return hits;
+}
+
 export function safeParseGenerationInput(input: unknown) {
 	return finalizePracticeConfigSchema.safeParse(input);
 }

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { LatexText } from "../latex-text";
 import { cn } from "@/lib/utils";
 import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
+import { VisualErrorBoundary } from "./visual-error-boundary";
 
 /**
  * Top-level question visual dispatcher.
@@ -149,7 +150,9 @@ export function QuestionVisual({
 				aria-hidden="true"
 			>
 				<div className="flex min-h-[120px] w-full items-center justify-center">
-					<RendererDispatch visual={visual} />
+					<VisualErrorBoundary kind={visual.spec.kind} altText={visual.altText}>
+						<RendererDispatch visual={visual} />
+					</VisualErrorBoundary>
 				</div>
 			</div>
 			<figcaption className="text-muted-foreground text-center text-xs">

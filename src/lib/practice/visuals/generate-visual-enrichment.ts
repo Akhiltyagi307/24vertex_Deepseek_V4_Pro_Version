@@ -100,12 +100,26 @@ function sanitizeVisualEnrichmentPatches(
 	return [...byIndex.values()];
 }
 
+/**
+ * Aggregate stats for the per-question driver. Undefined when the result
+ * came from the batch path. Lets the pipeline emit richer telemetry for
+ * the per_question mode (per-question success/failure counts, summed
+ * sequential latency vs wall-clock).
+ */
+export type PerQuestionEnrichmentStats = {
+	k: number;
+	succeeded: number;
+	failed: number;
+	totalLatencyMsSum: number;
+};
+
 export type GenerateVisualEnrichmentResult = {
 	ok: boolean;
 	patches: VisualPatch[];
 	modelMs: number;
 	inputTokens: number;
 	outputTokens: number;
+	perQuestionStats?: PerQuestionEnrichmentStats;
 };
 
 export async function generateVisualEnrichmentPass(args: {

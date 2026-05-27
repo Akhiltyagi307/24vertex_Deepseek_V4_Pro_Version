@@ -26,8 +26,62 @@ function renderKatexFragment(tex: string, displayMode: boolean): string | null {
 	}
 }
 
+type LatexNode =
+	| { type: "text"; value: string }
+	| { type: "math"; value: string; display: boolean };
+
 /**
- * Renders plain text with optional `$...$` inline fragments as KaTeX.
+ * Tokenises `text` into alternating text + math nodes. Recognises (in
+ * priority order):
+ *
+ *   `$$...$$` — display math (block, centered).
+ *   `\[...\]` — display math (LaTeX-conventional).
+ *   `$...$`   — inline math (the convention the LLM is instructed to use).
+ *   `\(...\)` — inline math (LaTeX-conventional alternative).
+ *
+ * Recognising `$$..$$` BEFORE `$..$` is critical — splitting on single `$`
+ * would parse `$$x$$` as empty + `x` + empty + content + empty, mangling
+ * display math.
+ *
+ * Exported for unit testing.
+ */
+export function parseLatexNodes(text: string): LatexNode[] {
+	if (!text || (!text.includes("$") && !text.includes("\\(") && !text.includes("\\["))) {
+		return [{ type: "text", value: text }];
+	}
+	const RE = /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^$\n]*\$|\\\([\s\S]*?\\\))/g;
+	const out: LatexNode[] = [];
+	let cursor = 0;
+	let m: RegExpExecArray | null;
+	while ((m = RE.exec(text)) != null) {
+		if (m.index > cursor) {
+			out.push({ type: "text", value: text.slice(cursor, m.index) });
+		}
+		const tok = m[0];
+		if (tok.startsWith("$$") && tok.endsWith("$$") && tok.length >= 4) {
+			out.push({ type: "math", value: tok.slice(2, -2).trim(), display: true });
+		} else if (tok.startsWith("\\[") && tok.endsWith("\\]")) {
+			out.push({ type: "math", value: tok.slice(2, -2).trim(), display: true });
+		} else if (tok.startsWith("\\(") && tok.endsWith("\\)")) {
+			out.push({ type: "math", value: tok.slice(2, -2).trim(), display: false });
+		} else if (tok.startsWith("$") && tok.endsWith("$") && tok.length >= 2) {
+			out.push({ type: "math", value: tok.slice(1, -1).trim(), display: false });
+		} else {
+			out.push({ type: "text", value: tok });
+		}
+		cursor = m.index + tok.length;
+	}
+	if (cursor < text.length) {
+		out.push({ type: "text", value: text.slice(cursor) });
+	}
+	return out.filter((n) => !(n.type === "text" && n.value === ""));
+}
+
+/**
+ * Renders plain text with optional KaTeX math fragments. Supports four
+ * delimiter conventions — see {@link parseLatexNodes}. The `displayMode`
+ * prop forces ALL math fragments to render as block math even when they
+ * arrived via inline delimiters.
  */
 export function LatexText({
 	text,
@@ -38,18 +92,7 @@ export function LatexText({
 	className?: string;
 	displayMode?: boolean;
 }) {
-	const nodes = React.useMemo(() => {
-		if (!text.includes("$")) {
-			return [{ type: "text" as const, value: text }];
-		}
-		const parts = text.split(/(\$[^$]*\$)/g).filter((p) => p.length > 0);
-		return parts.map((part) => {
-			if (part.startsWith("$") && part.endsWith("$") && part.length >= 2) {
-				return { type: "math" as const, value: part.slice(1, -1).trim() };
-			}
-			return { type: "text" as const, value: part };
-		});
-	}, [text]);
+	const nodes = React.useMemo(() => parseLatexNodes(text), [text]);
 
 	return (
 		<span className={cn("inline leading-relaxed", className)}>
@@ -57,7 +100,8 @@ export function LatexText({
 				if (node.type === "text") {
 					return <span key={i}>{node.value}</span>;
 				}
-				const html = renderKatexFragment(node.value, displayMode);
+				const isDisplay = displayMode || node.display;
+				const html = renderKatexFragment(node.value, isDisplay);
 				if (!html) {
 					return (
 						<code key={i} className="bg-muted rounded px-1 py-0.5 text-[0.9em]">

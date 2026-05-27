@@ -71,6 +71,7 @@ const VISUAL_RULE_ON = `Visual planning (VISUAL_POLICY.enabled is TRUE):
     visual_intent.priority: "necessary" (item is unsolvable without the figure) | "high" (figure makes the item materially clearer) | "medium" (figure is a nice-to-have).
     visual_intent.visual_idea: a CONCRETE 1-3 sentence brief of what the student should SEE — axes & curve shape, geometry labels, circuit/optics layout, molecule/scheme, map region, passage + line refs, chart type + series, or table column meanings. It is the renderer's spec, NOT a restatement of the eventual stem.
 - Visual BUDGET: VISUAL_POLICY.max_non_null_visuals is the cap. Mark only your top-priority slots needs_visual=true. Reserve "necessary" for items that cannot be assessed without the figure.
+- Visual FLOOR: when the test's topic set includes **visual-heavy chapters** — Coordinate Geometry, Conic Sections, Straight Lines, Trigonometric Functions, Three-Dimensional Geometry, Frequency Distribution, Bivariate Frequency, Correlation, Diagrammatic Presentation of Data, Probability distributions, Physics circuits / free-body / optics / waves, Chemistry molecular structures — AT LEAST floor(0.25 * total_slots) slots (minimum 4) must have needs_visual=true with priority in {necessary, high, medium}. Slots on definitional or recall items inside those chapters may still be needs_visual=false, but the count across the test must meet the floor or the run will be flagged as under-grounded.
 - Modality bias: prefer diagrams / plots / geometry / number lines / circuits / ray diagrams / molecules / maps / passages / charts over data_table when the skill is graphical or spatial. Use data_table only for items that truly require reading or comparing rows of numeric or categorical facts.
 - Accountancy / financial items: prefer accountancy_table (or data_table when accountancy_table is absent) for journals, ledgers, trial balance, statements, classified numeric cases. Still write a specific visual_idea (which rows / columns, period, missing amounts).
 - If VISUAL_POLICY.template_policy.enabled is true, choose a template id from the listed templates FIRST and set preferred_kind to that template's kind.
@@ -317,6 +318,14 @@ export async function generatePracticeBlueprint(args: {
 				:	null,
 		});
 		if (!check.ok) {
+			// Record the failed first attempt and try ONE repair turn that feeds
+			// the invariant error back to the model. The structured-output adapter
+			// already handles JSON / Zod-schema failures via `maxRepairAttempts`,
+			// but post-Zod runtime invariants (e.g. "priority must be 'none' when
+			// needs_visual is false") are checked by `validatePracticeGenerationBlueprint`
+			// AFTER `generateStructured` returns success — so the adapter never sees
+			// them. Without this repair turn, a single LLM slip-up aborts the whole
+			// pipeline (we observed two such failures in production today).
 			void recordAiCall({
 				feature: "practice.generation.blueprint",
 				model: modelId,
@@ -335,13 +344,35 @@ export async function generatePracticeBlueprint(args: {
 				status: "error",
 				error: check.message,
 			});
+
+			const repair = await attemptBlueprintRepair({
+				jobContext: args.jobContext,
+				promptRevision: args.promptRevision,
+				schema,
+				visualsOn,
+				resolved,
+				modelId,
+				originalOutput: parsed,
+				originalError: check.message,
+				abortSignal: args.abortSignal,
+			});
+			if (repair.ok) {
+				return {
+					ok: true,
+					blueprint: repair.blueprint,
+					model: modelId,
+					modelMs: (Date.now() - t0) + repair.repairMs,
+					inputTokens: (usage?.inputTokens ?? 0) + repair.inputTokens,
+					outputTokens: (usage?.outputTokens ?? 0) + repair.outputTokens,
+				};
+			}
 			return {
 				ok: false,
-				message: check.message,
+				message: repair.message,
 				model: modelId,
-				modelMs: Date.now() - t0,
-				inputTokens: usage?.inputTokens ?? 0,
-				outputTokens: usage?.outputTokens ?? 0,
+				modelMs: (Date.now() - t0) + repair.repairMs,
+				inputTokens: (usage?.inputTokens ?? 0) + repair.inputTokens,
+				outputTokens: (usage?.outputTokens ?? 0) + repair.outputTokens,
 			};
 		}
 
@@ -396,5 +427,143 @@ export async function generatePracticeBlueprint(args: {
 			inputTokens: 0,
 			outputTokens: 0,
 		};
+	}
+}
+
+/**
+ * One-shot repair pass for blueprints that pass JSON / Zod-schema validation
+ * but fail the post-Zod runtime invariant check in
+ * `validatePracticeGenerationBlueprint`. Feeds the original output + the exact
+ * error message back to the model and asks for a minimal fix.
+ *
+ * Returns `ok: true` only if the repaired blueprint passes validation.
+ * Both the failed first attempt (recorded by the caller) and this repair
+ * attempt land as separate `ai_calls` rows so dashboards can count repair
+ * frequency. No cascade — only ONE repair attempt; if it also fails, the
+ * caller surfaces the original failure to the pipeline (which aborts).
+ */
+async function attemptBlueprintRepair(args: {
+	jobContext: PracticeGenerationJobContext;
+	promptRevision: string;
+	schema: ReturnType<typeof createPracticeGenerationBlueprintSchema>;
+	visualsOn: boolean;
+	resolved: ReturnType<typeof resolveChatModel>;
+	modelId: string;
+	originalOutput: PracticeGenerationBlueprintGrouped;
+	originalError: string;
+	abortSignal?: AbortSignal;
+}): Promise<
+	| {
+			ok: true;
+			blueprint: PracticeGenerationBlueprintGrouped;
+			repairMs: number;
+			inputTokens: number;
+			outputTokens: number;
+	  }
+	| {
+			ok: false;
+			message: string;
+			repairMs: number;
+			inputTokens: number;
+			outputTokens: number;
+	  }
+> {
+	const t0 = Date.now();
+	const repairSystem = buildBlueprintSystemPrompt(args.visualsOn);
+	const repairUser = [
+		"BLUEPRINT REPAIR — previous attempt failed runtime validation.",
+		"",
+		"## Previous output (JSON)",
+		JSON.stringify(args.originalOutput),
+		"",
+		"## Validation error",
+		args.originalError,
+		"",
+		"## Instructions",
+		"Re-emit the FULL blueprint with the offending slot fixed. Keep all valid slots unchanged where possible. Common fixes:",
+		"  • If `visual_intent.priority` is anything other than `\"none\"`, then `needs_visual` MUST be `true`.",
+		"  • If `needs_visual` is `false`, then `visual_intent.priority` MUST be `\"none\"` and `preferred_kind` MUST be `null`.",
+		"  • Do NOT add or remove slots — preserve total counts per question type.",
+		"",
+		"## Original input (for context)",
+		buildBlueprintUserPrompt(args.jobContext),
+	].join("\n");
+
+	let inputTokens = 0;
+	let outputTokens = 0;
+	try {
+		const { object, usage, telemetry } = await generateStructured({
+			resolved: args.resolved,
+			schema: args.schema,
+			system: repairSystem,
+			prompt: repairUser,
+			maxOutputTokens: computeBlueprintMaxOutputTokens(args.jobContext.plan.expectedTypeCounts),
+			maxRetries: 0,
+			maxRepairAttempts: 0, // one shot — caller already absorbed the original failure
+			abortSignal: args.abortSignal,
+			providerOptions: {
+				openai: { strictJsonSchema: true },
+			},
+		});
+		inputTokens = usage?.inputTokens ?? 0;
+		outputTokens = usage?.outputTokens ?? 0;
+
+		const repaired = object as PracticeGenerationBlueprintGrouped;
+		const check = validatePracticeGenerationBlueprint({
+			blueprint: repaired,
+			allowedTopicIds: new Set(args.jobContext.plan.allowedTopicIds),
+			expectedTypeCounts: args.jobContext.plan.expectedTypeCounts,
+			visualPolicy:
+				args.visualsOn ?
+					{
+						enabled: true,
+						preferredKinds: args.jobContext.visuals.preferredKinds,
+					}
+				:	null,
+		});
+
+		const repairMs = Date.now() - t0;
+		void recordAiCall({
+			feature: "practice.generation.blueprint",
+			model: args.modelId,
+			userId: args.jobContext.userId,
+			promptId: args.promptRevision,
+			generationRunId: args.jobContext.generationRunId,
+			correlationId: args.jobContext.correlationId,
+			stepKey: "blueprint_repair",
+			inputTokens,
+			outputTokens,
+			reasoningTokens: telemetry.reasoningTokens,
+			cacheHitTokens: telemetry.cacheHitTokens,
+			cacheMissTokens: telemetry.cacheMissTokens,
+			provider: telemetry.provider,
+			latencyMs: repairMs,
+			status: check.ok ? "ok" : "error",
+			error: check.ok ? null : check.message,
+		});
+
+		if (check.ok) {
+			return { ok: true, blueprint: repaired, repairMs, inputTokens, outputTokens };
+		}
+		return { ok: false, message: check.message, repairMs, inputTokens, outputTokens };
+	} catch (error) {
+		const message = formatBlueprintError(error);
+		const repairMs = Date.now() - t0;
+		void recordAiCall({
+			feature: "practice.generation.blueprint",
+			model: args.modelId,
+			userId: args.jobContext.userId,
+			promptId: args.promptRevision,
+			generationRunId: args.jobContext.generationRunId,
+			correlationId: args.jobContext.correlationId,
+			stepKey: "blueprint_repair",
+			inputTokens,
+			outputTokens,
+			provider: args.resolved.provider,
+			latencyMs: repairMs,
+			status: "error",
+			error: message,
+		});
+		return { ok: false, message, repairMs, inputTokens, outputTokens };
 	}
 }
