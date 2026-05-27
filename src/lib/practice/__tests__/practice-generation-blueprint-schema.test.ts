@@ -210,6 +210,97 @@ describe("practice-generation-blueprint-schema", () => {
 		expect(check.ok).toBe(false);
 	});
 
+	it("snaps an invented preferred_kind to the first allowed kind instead of erroring", () => {
+		const schema = createPracticeGenerationBlueprintSchema(soloMcqCounts);
+		const blueprint = schema.parse({
+			slots_by_type: {
+				multiple_choice: [
+					{
+						slot_id: "q1",
+						topic_id: "11111111-1111-1111-1111-111111111111",
+						question_type: "multiple_choice",
+						difficulty_level: "medium",
+						skill_target: "read chart",
+						evidence_refs: [],
+						visual_intent: {
+							needs_visual: true,
+							priority: "high",
+							preferred_kind: "economics-sectors-chart-grade-10",
+							reason: "shows sectors",
+							visual_idea: "Three-sector bar chart from the chapter chunk.",
+							required: true,
+							purpose: null,
+						},
+					},
+				],
+				fill_in_blank: [],
+				short_answer: [],
+				long_answer: [],
+			},
+			notes: null,
+		});
+
+		const check = validatePracticeGenerationBlueprint({
+			blueprint,
+			allowedTopicIds: new Set(["11111111-1111-1111-1111-111111111111"]),
+			expectedTypeCounts: soloMcqCounts,
+			visualPolicy: {
+				enabled: true,
+				preferredKinds: ["statistics_chart", "economics_curve", "data_table"],
+			},
+		});
+		expect(check.ok).toBe(true);
+		// The invented kebab-case kind got snapped to the first allowed kind.
+		expect(blueprint.slots_by_type.multiple_choice[0]?.visual_intent?.preferred_kind).toBe(
+			"statistics_chart",
+		);
+	});
+
+	it("snaps an empty preferred_kind on a needs_visual=true slot to the first allowed kind", () => {
+		const schema = createPracticeGenerationBlueprintSchema(soloMcqCounts);
+		const blueprint = schema.parse({
+			slots_by_type: {
+				multiple_choice: [
+					{
+						slot_id: "q1",
+						topic_id: "11111111-1111-1111-1111-111111111111",
+						question_type: "multiple_choice",
+						difficulty_level: "medium",
+						skill_target: "read chart",
+						evidence_refs: [],
+						visual_intent: {
+							needs_visual: true,
+							priority: "high",
+							preferred_kind: "",
+							reason: null,
+							visual_idea: "Sectoral distribution chart from the chunk.",
+							required: true,
+							purpose: null,
+						},
+					},
+				],
+				fill_in_blank: [],
+				short_answer: [],
+				long_answer: [],
+			},
+			notes: null,
+		});
+
+		const check = validatePracticeGenerationBlueprint({
+			blueprint,
+			allowedTopicIds: new Set(["11111111-1111-1111-1111-111111111111"]),
+			expectedTypeCounts: soloMcqCounts,
+			visualPolicy: {
+				enabled: true,
+				preferredKinds: ["economics_curve", "statistics_chart"],
+			},
+		});
+		expect(check.ok).toBe(true);
+		expect(blueprint.slots_by_type.multiple_choice[0]?.visual_intent?.preferred_kind).toBe(
+			"economics_curve",
+		);
+	});
+
 	it("accepts needs_visual when visual_idea and preferred_kind match visual policy", () => {
 		const schema = createPracticeGenerationBlueprintSchema(soloMcqCounts);
 		const blueprint = schema.parse({

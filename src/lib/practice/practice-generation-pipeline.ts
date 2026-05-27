@@ -17,6 +17,8 @@ import { generateStructured, streamStructured } from "@/lib/ai/structured-output
 
 import {
 	getOpenAIPracticeChatModelFallback,
+	getPracticeBatchContractV2Enabled,
+	getPracticeBatchEditorPassEnabled,
 	getPracticeBlueprintLlmEnabled,
 	getPracticeParallelBatchesEnabled,
 	getPracticePipelineVariant,
@@ -29,6 +31,18 @@ import {
 	splitPracticeQuestionPlanIntoBatches,
 	type PracticeGenerationBatch,
 } from "@/lib/practice/practice-generation-batches";
+import {
+	auditPracticeGeneration,
+	normalizePracticeGenerationArtifacts,
+} from "@/lib/practice/practice-generation-batch-audit";
+import { buildBatchUserPromptTailV2 } from "@/lib/practice/practice-generation-batch-contract";
+import {
+	applyPracticeBatchEditorPatches,
+	runPracticeBatchEditorPass,
+} from "@/lib/practice/practice-generation-batch-editor";
+import { buildBatchSystemPromptV2 } from "@/lib/practice/practice-generation-batch-system-prompt";
+import { computePracticeBatchBudget } from "@/lib/practice/practice-generation-batch-budget";
+import { buildSisterBriefForBatch } from "@/lib/practice/practice-generation-batch-sister-brief";
 import { runPracticeValidationPass } from "@/lib/practice/practice-validation";
 import {
 	mapResolveToGenerateFailure,
@@ -1056,6 +1070,7 @@ BLUEPRINT_SLOTS_JSON:
 ${JSON.stringify(blueprintSlots)}`;
 
 		const parallelBatched = getPracticeParallelBatchesEnabled();
+		const v2BatchContract = parallelBatched && getPracticeBatchContractV2Enabled();
 		const m0 = Date.now();
 		let grouped: PracticeGenerationGroupedOutput;
 
@@ -1066,19 +1081,66 @@ ${JSON.stringify(blueprintSlots)}`;
 			});
 			const totalQuestionsInTest = blueprintSlots.length;
 
+			const v2Inputs = v2BatchContract
+				? {
+						userMessageSummary: {
+							schema_version: userPayload.schema_version,
+							intent: userPayload.intent,
+							test_parameters: userPayload.test_parameters,
+							constraints: userPayload.constraints,
+							topic_exemplar_hint: topicExemplarHint,
+							subjectName: resolved.subjectName,
+							student_grade: resolved.studentGrade,
+							subject_grade: resolved.subjectGrade,
+						},
+						generationSubject: {
+							subjectName: resolved.subjectName,
+							subjectGrade: resolved.subjectGrade,
+							subjectGroup: resolved.subjectGroup,
+							studentGrade: resolved.studentGrade,
+						},
+					}
+				: null;
+
 			const settled = await Promise.all(
 				batches.map(async (batch: PracticeGenerationBatch) => {
 					const batchSchema = createPracticeGenerationOutputSchema(batch.typeCounts, {
 						visualsEnabled: false,
 					});
-					const batchUserPrompt = `${userPrompt}\n\n${buildBatchUserPromptTail({
-						batch,
-						totalBatches: batches.length,
-						totalQuestionsInTest,
-					})}`;
-					const stepKey = `question_generation_batch_${batch.index + 1}_${batch.label}`;
+					let batchSystemPrompt = generationSystemPrompt;
+					let batchUserPrompt: string;
+					if (v2BatchContract && v2Inputs) {
+						const budget = computePracticeBatchBudget({
+							batch,
+							timeLimitSeconds: durationSeconds,
+							testTypeCounts: expectedTypeCounts,
+							difficulty: difficulty as "easy" | "medium" | "hard",
+						});
+						const sisterBrief = buildSisterBriefForBatch({ self: batch, allBatches: batches });
+						batchSystemPrompt = buildBatchSystemPromptV2({
+							batch,
+							userMessageSummary: v2Inputs.userMessageSummary,
+							generationSubject: v2Inputs.generationSubject,
+						});
+						batchUserPrompt = `${userPrompt}\n\n${buildBatchUserPromptTailV2({
+							batch,
+							totalBatches: batches.length,
+							totalQuestionsInTest,
+							budget,
+							sisterBrief,
+						})}`;
+					} else {
+						batchUserPrompt = `${userPrompt}\n\n${buildBatchUserPromptTail({
+							batch,
+							totalBatches: batches.length,
+							totalQuestionsInTest,
+						})}`;
+					}
+					const stepKey = `question_generation_batch_${batch.index + 1}_${batch.label}${
+						v2BatchContract ? "_v2" : ""
+					}`;
 					const result = await runModelOnceWithFallback(
-						generationSystemPrompt,
+						batchSystemPrompt,
 						batchUserPrompt,
 						batch.slots.length,
 						batchSchema,
@@ -1112,6 +1174,7 @@ ${JSON.stringify(blueprintSlots)}`;
 						batch_label: batch.label,
 						batch_size: batch.slots.length,
 						parallel_batched: true,
+						v2_batch_contract: v2BatchContract,
 					},
 				});
 			}
@@ -1132,6 +1195,100 @@ ${JSON.stringify(blueprintSlots)}`;
 				),
 			);
 			grouped = normalizeGroupedEstimatedTimesToPlan(merged, durationSeconds);
+
+			if (v2BatchContract && getPracticeBatchEditorPassEnabled()) {
+				const flatForAudit = flattenPracticeGenerationOutput(grouped);
+
+				// Deterministic pre-audit normalisation (no LLM). Cleans known
+				// writer-side artefacts so the audit + editor don't waste a
+				// pass on them.
+				const norm = normalizePracticeGenerationArtifacts(flatForAudit.questions);
+				if (norm.mcq_duplicate_correct_label_fixes > 0) {
+					logPracticeObs({
+						phase: "practice_generation_artifact_normalised",
+						correlation_id: correlationId,
+						mcq_duplicate_correct_label_fixes: norm.mcq_duplicate_correct_label_fixes,
+					});
+				}
+
+				const audit = auditPracticeGeneration({
+					questions: flatForAudit.questions,
+					expectedTimeSumMin: Math.round(durationSeconds * 0.6),
+					expectedTimeSumMax: Math.round(durationSeconds * 1.2),
+				});
+				await writeGenerationStep({
+					stepKey: "batch_audit",
+					status: "ok",
+					metadata: {
+						ok: audit.ok,
+						issue_count: audit.issues.length,
+						summary: audit.summary,
+						artifact_normalised: norm,
+					},
+				});
+				let flatMutated = norm.mcq_duplicate_correct_label_fixes > 0;
+				if (!audit.ok && audit.issues.length > 0) {
+					const editorResult = await runPracticeBatchEditorPass({
+						output: flatForAudit,
+						audit,
+						userId: resolved.userId,
+						correlationId,
+						generationRunId,
+						promptRevision: PRACTICE_PROMPT_REVISION,
+						abortSignal: opts.abortSignal,
+					});
+					cumulativeModelMs += editorResult.modelMs;
+					await writeGenerationStep({
+						stepKey: "batch_editor",
+						status: editorResult.ok ? "ok" : "error",
+						model: editorResult.model,
+						feature: "practice.generation.validation",
+						latencyMs: editorResult.modelMs,
+						inputTokens: editorResult.inputTokens,
+						outputTokens: editorResult.outputTokens,
+						error: editorResult.ok ? null : editorResult.message,
+						metadata: {
+							patch_count: editorResult.ok ? editorResult.patches.length : 0,
+							issue_count: audit.issues.length,
+						},
+					});
+					if (editorResult.ok && editorResult.patches.length > 0) {
+						const { applied, rejected } = applyPracticeBatchEditorPatches({
+							output: flatForAudit,
+							patches: editorResult.patches,
+						});
+						logPracticeObs({
+							phase: "practice_generation_batch_editor_applied",
+							correlation_id: correlationId,
+							applied,
+							rejected,
+						});
+						if (applied > 0) flatMutated = true;
+					}
+				}
+
+				// Re-pack flat output into grouped buckets if anything in this
+				// post-merge cleanup pass changed the questions — covers both
+				// the deterministic normaliser AND the editor's patches.
+				if (flatMutated) {
+					const re_grouped: PracticeGenerationGroupedOutput = {
+						questions_by_type: {
+							multiple_choice: [],
+							fill_in_blank: [],
+							short_answer: [],
+							long_answer: [],
+						},
+						generation_metadata: grouped.generation_metadata,
+					};
+					for (const q of flatForAudit.questions) {
+						const k = q.question_type as keyof typeof re_grouped.questions_by_type;
+						const { question_number: _unused, ...rest } = q;
+						void _unused;
+						re_grouped.questions_by_type[k].push(rest as never);
+					}
+					grouped = normalizeGroupedEstimatedTimesToPlan(re_grouped, durationSeconds);
+				}
+			}
 		} else {
 			generationCallCount++;
 			const r = await runModelOnceWithFallback(

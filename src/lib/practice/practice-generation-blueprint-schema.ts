@@ -16,10 +16,10 @@ const visualIntentSchema = z.object({
 	 * curve family, table role, map focus, etc.). Required when `needs_visual`
 	 * is true and visuals are enabled — validated in `validatePracticeGenerationBlueprint`.
 	 */
-	visual_idea: z.string().max(420).nullable(),
+	visual_idea: z.string().max(600).nullable(),
 	// Backward-compatible mirrors while prompts and telemetry migrate.
 	required: z.boolean().nullable(),
-	purpose: z.string().max(240).nullable(),
+	purpose: z.string().max(360).nullable(),
 });
 
 export type PracticeBlueprintVisualPolicy = {
@@ -31,7 +31,7 @@ const blueprintSlotBaseSchema = z.object({
 	slot_id: z.string().min(1).max(32),
 	topic_id: z.string().uuid(),
 	difficulty_level: difficultySchema,
-	skill_target: z.string().min(1).max(280),
+	skill_target: z.string().min(1).max(360),
 	evidence_refs: z.array(z.string().min(1).max(96)).max(8),
 	visual_intent: visualIntentSchema.nullable(),
 });
@@ -61,7 +61,7 @@ export function createPracticeGenerationBlueprintSchema(expectedTypeCounts: Prac
 			short_answer: z.array(blueprintShortSlotSchema).length(expectedTypeCounts.short_answer),
 			long_answer: z.array(blueprintLongSlotSchema).length(expectedTypeCounts.long_answer),
 		}),
-		notes: z.string().max(600).nullable(),
+		notes: z.string().max(1200).nullable(),
 	});
 }
 
@@ -175,16 +175,19 @@ export function validatePracticeGenerationBlueprint(args: {
 				}
 				const pk = vi.preferred_kind?.trim() ?? "";
 				if (!pk) {
-					return {
-						ok: false,
-						message: `Blueprint slot ${slot.slot_id}: visual_intent.preferred_kind must be set when needs_visual is true.`,
-					};
-				}
-				if (!allowedKindSet!.has(pk)) {
-					return {
-						ok: false,
-						message: `Blueprint slot ${slot.slot_id}: visual_intent.preferred_kind "${pk}" is not in visual_policy.preferred_kinds.`,
-					};
+					// Empty preferred_kind on a needs_visual=true slot is recoverable:
+					// snap to the first allowed kind. The downstream enrichment will
+					// pick the actual final kind based on the stem, so this default
+					// is just a directional hint.
+					vi.preferred_kind = visualPolicy!.preferredKinds[0]!;
+				} else if (!allowedKindSet!.has(pk)) {
+					// The blueprint LLM occasionally invents a kebab-cased kind ID
+					// that isn't in policy. Rather than failing the whole pass after
+					// 3 retries, snap to the first allowed kind and continue. The
+					// enrichment pass will refine. Log nothing here — the caller
+					// can detect this case by comparing the input vs output blueprint
+					// if it cares.
+					vi.preferred_kind = visualPolicy!.preferredKinds[0]!;
 				}
 			}
 		}

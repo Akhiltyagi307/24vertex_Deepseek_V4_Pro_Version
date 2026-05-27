@@ -17,7 +17,7 @@ export type PracticeGenerationSubjectContext = {
 	studentGrade: number | null;
 };
 
-type UserMessageSummary = Pick<
+export type UserMessageSummary = Pick<
 	PracticeUserMessagePayload,
 	"schema_version" | "intent" | "test_parameters" | "constraints"
 > & {
@@ -48,7 +48,7 @@ const BUCKET_TIME_WEIGHTS: Record<keyof PracticeQuestionTypeCounts, number> = {
 	long_answer: 4,
 };
 
-function computePerBucketTimeTargets(
+export function computePerBucketTimeTargets(
 	timeLimitSeconds: number,
 	counts: PracticeQuestionTypeCounts,
 ): { mcq: number; fib: number; sa: number; la: number } {
@@ -67,7 +67,7 @@ function computePerBucketTimeTargets(
 		};
 }
 
-function buildGradeBandSection(grade: number | null | undefined): string {
+export function buildGradeBandSection(grade: number | null | undefined): string {
 	if (grade == null || typeof grade !== "number" || !Number.isFinite(grade)) return "";
 	if (grade <= 8) {
 		return `### Grade band (about class ${grade})\n\n- Prefer shorter stems with fewer stacked clauses; one main task per question. Keep vocabulary aligned to NCERT tier for middle school.\n\n`;
@@ -83,7 +83,7 @@ function buildGradeBandSection(grade: number | null | undefined): string {
  * Reused at the very top AND at the very end of the system prompt so
  * recency on long inputs reinforces the same rules the validator enforces.
  */
-function buildHardGatesBlock(args: {
+export function buildHardGatesBlock(args: {
 	heading: string;
 	estimatedQuestionCount: number;
 	counts: PracticeQuestionTypeCounts;
@@ -145,7 +145,7 @@ ${visualLine}${visualExtras}${args.finalChecklistExtras ? `\n${args.finalCheckli
 }
 
 /** Universal anti-trivia and quality floor — applies to every subject and bucket. */
-function buildSubjectDisciplineBlock(difficulty: PracticeDifficulty): string {
+export function buildSubjectDisciplineBlock(difficulty: PracticeDifficulty): string {
 	const rememberCap =
 		difficulty === "easy" ?
 			"For an `easy` test, at most **35%** of items may be `Remember`-level recall."
