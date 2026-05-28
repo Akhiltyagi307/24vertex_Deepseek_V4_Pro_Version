@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { generateStructured } from "@/lib/ai/structured-output";
+import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
 
 import type { PracticeBatchAuditIssue, PracticeBatchAuditResult } from "./practice-generation-batch-audit";
 import type { PracticeGenerationOutput } from "./generation-schema";
@@ -159,7 +159,7 @@ export async function runPracticeBatchEditorPass(
 	].join("\n");
 
 	try {
-		const { object, usage, telemetry } = await generateStructured({
+		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
 			resolved,
 			schema: editorOutputSchema,
 			system: SYSTEM_PROMPT,
@@ -167,12 +167,13 @@ export async function runPracticeBatchEditorPass(
 			maxOutputTokens: 3_000,
 			maxRetries: 1,
 			abortSignal: args.abortSignal,
+			feature: "practice.generation.validation",
 			providerOptions: { openai: { strictJsonSchema: true } },
 		});
 		const latency = Date.now() - t0;
 		void recordAiCall({
 			feature: "practice.generation.validation",
-			model: modelId,
+			model: telemetry.modelId,
 			userId: args.userId,
 			promptId: args.promptRevision,
 			generationRunId: args.generationRunId,
@@ -191,7 +192,7 @@ export async function runPracticeBatchEditorPass(
 			ok: true,
 			patches: object.patches,
 			summary: object.summary,
-			model: modelId,
+			model: telemetry.modelId,
 			modelMs: latency,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,

@@ -7,16 +7,15 @@ import {
 	moderatePracticeGenerationText,
 	moderatePracticeQuestionsPerItem,
 } from "@/lib/ai/moderation";
-import {
-	buildOpenAiResolved,
-	resolveChatModel,
-	type ResolvedAiModel,
-} from "@/lib/ai/model-router";
+import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { generateStructured, streamStructured } from "@/lib/ai/structured-output";
+import {
+	generateStructuredWithProviderFallback,
+	providerFallbackStepMetadata,
+	streamStructuredWithProviderFallback,
+} from "@/lib/ai/structured-output";
 
 import {
-	getOpenAIPracticeChatModelFallback,
 	getPracticeBatchContractV2Enabled,
 	getPracticeBatchEditorPassEnabled,
 	getPracticeBlueprintLlmEnabled,
@@ -323,23 +322,6 @@ function practiceRepairMaxOutputTokens(estimatedQuestionCount: number): number {
 	return Math.min(9_000, Math.max(4_800, estimatedQuestionCount * 650));
 }
 
-/**
- * Errors that should trigger a fallback-model retry (not the same model
- * with `maxRetries`). Capacity / rate-limit / overload errors typically
- * persist for many seconds, so retrying the same model just delays a hard
- * fail; trying a different model recovers immediately.
- */
-function isRetryableForFallback(e: unknown): boolean {
-	if (APICallError.isInstance(e)) {
-		const code = e.statusCode;
-		if (code === 429 || code === 503 || code === 504) return true;
-	}
-	if (e instanceof Error && /\b(rate[ -]?limit|overloaded|timeout|capacity)\b/i.test(e.message)) {
-		return true;
-	}
-	return false;
-}
-
 async function runModelOnce(
 	systemPrompt: string,
 	userPrompt: string,
@@ -353,12 +335,12 @@ async function runModelOnce(
 		stepKey: string;
 		testId?: string | null;
 	},
-	resolved: ResolvedAiModel,
 ): Promise<
 	| {
 			ok: true;
 			object: PracticeGenerationGroupedOutput;
 			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
+			stepMetadata?: Record<string, string | boolean>;
 	  }
 	| {
 			ok: false;
@@ -367,6 +349,7 @@ async function runModelOnce(
 			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
 	  }
 > {
+	const resolved = resolveChatModel("practice.generation");
 	// Hard-cap output tokens at 12k regardless of question count. The previous
 	// scaling could request up to 32k for high-question tests, which exceeds
 	// per-request limits on some models and produces unpredictable cost. 12k
@@ -380,10 +363,11 @@ async function runModelOnce(
 		prompt: userPrompt,
 		maxOutputTokens,
 		// Lowered from 2 → 1 in v3.2.1: HTTP-layer retries silently doubled
-		// per-attempt cost on slow failures. Transient 429/503 are still
-		// recovered by the runModelOnceWithFallback() fallback-model path.
+		// per-attempt cost on slow failures. Transient 429/503 are recovered by
+		// generateStructuredWithProviderFallback / streamStructuredWithProviderFallback.
 		maxRetries: 1,
 		abortSignal: opts.abortSignal,
+		feature: "practice.generation",
 		providerOptions: {
 			openai: {
 				strictJsonSchema: isStrictJsonSchemaForGenerationEnabled(),
@@ -394,7 +378,7 @@ async function runModelOnce(
 	if (opts.useStreamObject) {
 		const t0 = Date.now();
 		try {
-			const result = streamStructured(baseArgs);
+			const result = streamStructuredWithProviderFallback(baseArgs);
 			const streamPartial = (async () => {
 				if (!opts.onPartialObject) {
 					return;
@@ -408,7 +392,7 @@ async function runModelOnce(
 			const callTelemetry = await result.telemetry;
 			void recordAiCall({
 				feature: "practice.generation",
-				model: chatModelId,
+				model: callTelemetry.modelId,
 				userId: studentUserId,
 				promptId: PRACTICE_PROMPT_REVISION,
 				inputTokens: usage?.inputTokens ?? 0,
@@ -431,8 +415,9 @@ async function runModelOnce(
 					inputTokens: usage?.inputTokens ?? 0,
 					outputTokens: usage?.outputTokens ?? 0,
 					latencyMs: Date.now() - t0,
-					model: chatModelId,
+					model: callTelemetry.modelId,
 				},
+				stepMetadata: providerFallbackStepMetadata(callTelemetry) ?? undefined,
 			};
 		} catch (e) {
 			logServerError("runPracticeGeneration.streamObject", e);
@@ -464,10 +449,11 @@ async function runModelOnce(
 
 	const t0 = Date.now();
 	try {
-		const { object, usage, telemetry: callTelemetry } = await generateStructured(baseArgs);
+		const { object, usage, telemetry: callTelemetry } =
+			await generateStructuredWithProviderFallback(baseArgs);
 		void recordAiCall({
 			feature: "practice.generation",
-			model: chatModelId,
+			model: callTelemetry.modelId,
 			userId: studentUserId,
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
@@ -490,8 +476,9 @@ async function runModelOnce(
 				inputTokens: usage?.inputTokens ?? 0,
 				outputTokens: usage?.outputTokens ?? 0,
 				latencyMs: Date.now() - t0,
-				model: chatModelId,
+				model: callTelemetry.modelId,
 			},
+			stepMetadata: providerFallbackStepMetadata(callTelemetry) ?? undefined,
 		};
 	} catch (e) {
 		logServerError("generatePracticeTest.generateObject", e);
@@ -522,7 +509,7 @@ async function runModelOnce(
 }
 
 /**
- * Tail-latency guard around `runModelOnceWithFallback`. Wraps the batch
+ * Tail-latency guard around `runModelOnce`. Wraps the batch
  * dispatch in a soft 75s timeout — if the slow batch exceeds that, abort
  * via AbortController and retry ONCE. The original observation: one batch
  * took 102.8s while siblings on identical input ran 22–43s (DeepSeek API
@@ -548,7 +535,7 @@ async function runBatchWithTailGuard(args: {
 	baseStepKey: string;
 	generationRunId: string | null;
 	correlationId: string;
-}): ReturnType<typeof runModelOnceWithFallback> {
+}): ReturnType<typeof runModelOnce> {
 	for (let attempt = 0; attempt < 2; attempt++) {
 		// Child abort controller so a tail-timeout cancels just this attempt
 		// without aborting the whole pipeline. Linked to the parent signal so
@@ -561,7 +548,7 @@ async function runBatchWithTailGuard(args: {
 			BATCH_TAIL_TIMEOUT_MS,
 		);
 		try {
-			const result = await runModelOnceWithFallback(
+			const result = await runModelOnce(
 				args.systemPrompt,
 				args.userPrompt,
 				args.slotCount,
@@ -603,73 +590,6 @@ async function runBatchWithTailGuard(args: {
 		message: `Batch ${args.baseStepKey} exhausted retry budget without resolution.`,
 		usage: { inputTokens: 0, outputTokens: 0, latencyMs: 0, model: "unknown" },
 	};
-}
-
-/**
- * Runs the primary model; on capacity / overload / 429, retries once with
- * the configured fallback model (if any). Logs which model produced the
- * eventual result for observability.
- */
-async function runModelOnceWithFallback(
-	systemPrompt: string,
-	userPrompt: string,
-	estimatedQuestionCount: number,
-	outputSchema: ReturnType<typeof createPracticeGenerationOutputSchema>,
-	opts: Pick<RunGenerationPipelineOptions, "useStreamObject" | "onPartialObject" | "abortSignal">,
-	studentUserId: string,
-	telemetry: { generationRunId: string | null; correlationId: string; stepKey: string },
-): Promise<
-	| {
-			ok: true;
-			object: PracticeGenerationGroupedOutput;
-			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
-	  }
-	| {
-			ok: false;
-			message: string;
-			usage: { inputTokens: number; outputTokens: number; latencyMs: number; model: string };
-	  }
-> {
-	const primaryResolved = resolveChatModel("practice.generation");
-	const first = await runModelOnce(
-		systemPrompt,
-		userPrompt,
-		estimatedQuestionCount,
-		outputSchema,
-		opts,
-		studentUserId,
-		telemetry,
-		primaryResolved,
-	);
-	if (first.ok) return first;
-
-	// Cross-provider fallback to OpenAI is intentional: DeepSeek V4 Pro has no
-	// configured structured-output fallback today, but a transient DeepSeek
-	// outage still benefits from one retry on the OpenAI fallback model
-	// (if configured). When the router already chose OpenAI, this is the same
-	// model swap as before the migration.
-	const fallbackModelId = getOpenAIPracticeChatModelFallback();
-	if (!fallbackModelId || !isRetryableForFallback(first.error)) {
-		return { ok: false, message: first.message, usage: first.usage };
-	}
-	const fallbackResolved = buildOpenAiResolved(fallbackModelId);
-	logServerError(
-		"generatePracticeTest.modelFallback",
-		`Primary model ${primaryResolved.modelId} failed retryably; retrying with fallback ${fallbackModelId}.`,
-		{ primaryError: first.message },
-	);
-	const second = await runModelOnce(
-		systemPrompt,
-		userPrompt,
-		estimatedQuestionCount,
-		outputSchema,
-		opts,
-		studentUserId,
-		telemetry,
-		fallbackResolved,
-	);
-	if (second.ok) return second;
-	return { ok: false, message: second.message, usage: second.usage };
 }
 
 function isPracticeGenerationRepairEnabled(): boolean {
@@ -728,7 +648,7 @@ async function runPracticeGenerationRepairGrouped(params: {
 	const resolved = resolveChatModel("practice.generation.repair");
 	const modelId = resolved.modelId;
 	try {
-		const { object, usage, telemetry: callTelemetry } = await generateStructured({
+		const { object, usage, telemetry: callTelemetry } = await generateStructuredWithProviderFallback({
 			resolved,
 			schema: params.generationOutputSchema,
 			system: buildPracticeGenerationRepairSystemPrompt(),
@@ -736,13 +656,14 @@ async function runPracticeGenerationRepairGrouped(params: {
 			maxOutputTokens: maxRepairTokens,
 			maxRetries: 1,
 			abortSignal: params.abortSignal,
+			feature: "practice.generation.repair",
 			providerOptions: {
 				openai: { strictJsonSchema: isStrictJsonSchemaForRepairEnabled() },
 			},
 		});
 		void recordAiCall({
 			feature: "practice.generation.repair",
-			model: modelId,
+			model: callTelemetry.modelId,
 			userId: params.studentUserId,
 			promptId: PRACTICE_PROMPT_REVISION,
 			inputTokens: usage?.inputTokens ?? 0,
@@ -1264,6 +1185,7 @@ ${JSON.stringify(blueprintSlots)}`;
 						batch_size: batch.slots.length,
 						parallel_batched: true,
 						v2_batch_contract: v2BatchContract,
+						...(result.ok && result.stepMetadata ? result.stepMetadata : {}),
 					},
 				});
 			}
@@ -1380,7 +1302,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			}
 		} else {
 			generationCallCount++;
-			const r = await runModelOnceWithFallback(
+			const r = await runModelOnce(
 				generationSystemPrompt,
 				generationUserPrompt,
 				expectedCount,
@@ -1403,6 +1325,7 @@ ${JSON.stringify(blueprintSlots)}`;
 				inputTokens: r.usage.inputTokens,
 				outputTokens: r.usage.outputTokens,
 				error: r.ok ? null : r.message,
+				metadata: r.ok && r.stepMetadata ? r.stepMetadata : {},
 			});
 			if (!r.ok) return { ok: false, message: r.message, code: "generation_failed" };
 

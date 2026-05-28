@@ -1,4 +1,4 @@
-import { convertToModelMessages, type UIMessage, streamText } from "ai";
+import { convertToModelMessages, type UIMessage } from "ai";
 import * as Sentry from "@sentry/nextjs";
 
 import {
@@ -6,6 +6,7 @@ import {
 	extractReasoningTokens,
 } from "@/lib/ai/deepseek-provider";
 import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/doubt-prompt-templates";
+import { streamTextWithProviderFallback } from "@/lib/ai/provider-fallback";
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
@@ -351,27 +352,28 @@ export async function POST(req: Request) {
 	}
 
 	const streamStartedAt = Date.now();
-	const result = streamText({
-		model: resolved.model,
-		system,
-		messages: modelMessages,
-		providerOptions: resolved.providerOptions,
-		// D29: surface AI SDK internals (token counts, model id, finish reason)
-		// to Sentry traces. `recordTelemetry` doesn't currently wire to OTel, so
-		// we manually forward in `onFinish` below; setting `isEnabled` lets the
-		// AI SDK emit OTLP spans if a tracer is configured (no-op otherwise).
-		experimental_telemetry: {
-			isEnabled: true,
-			functionId: "student.doubt-chat",
-			metadata: {
-				route: "/api/student/doubt-chat",
-				model: modelId,
+	const streamOutcome = streamTextWithProviderFallback({
+		feature: "doubt.chat",
+		resolved,
+		streamArgs: {
+			system,
+			messages: modelMessages,
+			// D29: surface AI SDK internals (token counts, model id, finish reason)
+			// to Sentry traces. `recordTelemetry` doesn't currently wire to OTel, so
+			// we manually forward in `onFinish` below; setting `isEnabled` lets the
+			// AI SDK emit OTLP spans if a tracer is configured (no-op otherwise).
+			experimental_telemetry: {
+				isEnabled: true,
+				functionId: "student.doubt-chat",
+				metadata: {
+					route: "/api/student/doubt-chat",
+					model: modelId,
+				},
 			},
-		},
-		// Cancel the model HTTP call when the client disconnects so we stop
-		// paying for tokens after the user closes the tab.
-		abortSignal: req.signal,
-		onFinish: async ({ text, totalUsage, finishReason, providerMetadata }) => {
+			// Cancel the model HTTP call when the client disconnects so we stop
+			// paying for tokens after the user closes the tab.
+			abortSignal: req.signal,
+			onFinish: async ({ text, totalUsage, finishReason, providerMetadata }) => {
 			const promptT = totalUsage?.inputTokens ?? null;
 			const compT = totalUsage?.outputTokens ?? null;
 			const reasoningTokens = extractReasoningTokens(
@@ -384,14 +386,17 @@ export async function POST(req: Request) {
 			// D29: forward usage/latency/model to Sentry with the route tag so
 			// dashboards can slice on this without joining against the DB.
 			Sentry.getCurrentScope().setTag("ai.route", "/api/student/doubt-chat");
-			Sentry.getCurrentScope().setTag("ai.provider", resolved.provider);
+			Sentry.getCurrentScope().setTag("ai.provider", streamOutcome.resolved.provider);
+			if (streamOutcome.providerFallback) {
+				Sentry.getCurrentScope().setTag("ai.provider_fallback", "true");
+			}
 			Sentry.addBreadcrumb({
 				category: "ai",
 				level: "info",
 				message: "doubt-chat stream finished",
 				data: {
-					provider: resolved.provider,
-					model: modelId,
+					provider: streamOutcome.resolved.provider,
+					model: streamOutcome.modelId,
 					promptTokens: promptT,
 					outputTokens: compT,
 					reasoningTokens,
@@ -404,7 +409,7 @@ export async function POST(req: Request) {
 			// Telemetry runs unconditionally — we want visibility on aborts/errors too.
 			void recordAiCall({
 				feature: "doubt.chat",
-				model: modelId,
+				model: streamOutcome.modelId,
 				userId: user.id,
 				promptId: dbPrompt?.id ?? null,
 				inputTokens: promptT ?? 0,
@@ -412,7 +417,7 @@ export async function POST(req: Request) {
 				reasoningTokens,
 				cacheHitTokens: cacheTokens.cacheHitTokens,
 				cacheMissTokens: cacheTokens.cacheMissTokens,
-				provider: resolved.provider,
+				provider: streamOutcome.resolved.provider,
 				latencyMs,
 				status: "ok",
 			});
@@ -432,11 +437,11 @@ export async function POST(req: Request) {
 						content: text,
 						prompt_tokens: promptT,
 						completion_tokens: compT,
-						model: modelId,
+						model: streamOutcome.modelId,
 					}),
 					supabase
 						.from("doubt_conversations")
-						.update({ updated_at: new Date().toISOString(), model: modelId })
+						.update({ updated_at: new Date().toISOString(), model: streamOutcome.modelId })
 						.eq("id", conversationId),
 				]);
 				if (insertResult.status === "fulfilled" && insertResult.value.error) {
@@ -468,8 +473,11 @@ export async function POST(req: Request) {
 					await consumeTokens(supabase, user.id, outputTokens - preDebit);
 				}
 			}
+			},
 		},
 	});
+
+	const result = streamOutcome.result;
 
 	// `sendReasoning: false` keeps DeepSeek's CoT server-side; the student sees
 	// only the final answer. Reasoning tokens are still billed and logged via

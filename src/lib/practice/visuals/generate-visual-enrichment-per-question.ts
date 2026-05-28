@@ -6,7 +6,7 @@ import { z } from "zod";
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { generateStructured } from "@/lib/ai/structured-output";
+import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
 import { getOpenAIPracticeChatModel } from "@/lib/env";
 import type { PracticeEvidenceMap } from "@/lib/practice/generation-evidence-pack";
 import { selectEvidenceForFailedIndexes } from "@/lib/practice/generation-evidence-pack";
@@ -313,9 +313,11 @@ async function runOneCall(args: {
 		let parsed:
 			| { action: "replace_visual"; index: number; value: unknown }
 			| { action: "null_visual"; index: number };
+		let callModelId = modelId;
+		let callProvider: "openai" | "deepseek" = resolved.provider;
 
 		if (resolved.provider === "deepseek") {
-			const structured = await generateStructured({
+			const structured = await generateStructuredWithProviderFallback({
 				resolved,
 				schema: perQuestionEnrichmentSchema,
 				system,
@@ -324,6 +326,7 @@ async function runOneCall(args: {
 				maxRetries: 0,
 				maxRepairAttempts: 1,
 				abortSignal: outerArgs.abortSignal,
+				feature: "practice.generation.visual_enrichment.per_question",
 			});
 			parsed = structured.object;
 			inputTokens = structured.usage.inputTokens ?? 0;
@@ -331,6 +334,8 @@ async function runOneCall(args: {
 			reasoningTokens = structured.telemetry.reasoningTokens;
 			cacheHitTokens = structured.telemetry.cacheHitTokens;
 			cacheMissTokens = structured.telemetry.cacheMissTokens;
+			callModelId = structured.telemetry.modelId;
+			callProvider = structured.telemetry.provider;
 		} else {
 			const result = await generateText({
 				model: getOpenAIProvider().responses(modelId),
@@ -384,7 +389,7 @@ async function runOneCall(args: {
 		const latencyMs = Date.now() - callT0;
 		void recordAiCall({
 			feature: "practice.generation.visual_enrichment.per_question",
-			model: modelId,
+			model: callModelId,
 			userId: outerArgs.userId,
 			promptId: null,
 			generationRunId: outerArgs.generationRunId ?? null,
@@ -395,7 +400,7 @@ async function runOneCall(args: {
 			reasoningTokens,
 			cacheHitTokens,
 			cacheMissTokens,
-			provider: resolved.provider,
+			provider: callProvider,
 			latencyMs,
 			status: "ok",
 		});

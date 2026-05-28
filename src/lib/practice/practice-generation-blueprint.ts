@@ -1,6 +1,6 @@
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { generateStructured } from "@/lib/ai/structured-output";
+import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
 
 import type { PracticeQuestionTypeCounts } from "./constants";
 import type { PracticeGenerationJobContext } from "./generation-job-context";
@@ -291,7 +291,7 @@ export async function generatePracticeBlueprint(args: {
 		args.jobContext.visuals.enabled && args.jobContext.visuals.preferredKinds.length > 0;
 
 	try {
-		const { object, usage, telemetry } = await generateStructured({
+		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
 			resolved,
 			schema,
 			system: buildBlueprintSystemPrompt(visualsOn),
@@ -299,6 +299,7 @@ export async function generatePracticeBlueprint(args: {
 			maxOutputTokens: computeBlueprintMaxOutputTokens(args.jobContext.plan.expectedTypeCounts),
 			maxRetries: 1,
 			abortSignal: args.abortSignal,
+			feature: "practice.generation.blueprint",
 			providerOptions: {
 				openai: { strictJsonSchema: true },
 			},
@@ -328,7 +329,7 @@ export async function generatePracticeBlueprint(args: {
 			// pipeline (we observed two such failures in production today).
 			void recordAiCall({
 				feature: "practice.generation.blueprint",
-				model: modelId,
+				model: telemetry.modelId,
 				userId: args.jobContext.userId,
 				promptId: args.promptRevision,
 				generationRunId: args.jobContext.generationRunId,
@@ -378,7 +379,7 @@ export async function generatePracticeBlueprint(args: {
 
 		void recordAiCall({
 			feature: "practice.generation.blueprint",
-			model: modelId,
+			model: telemetry.modelId,
 			userId: args.jobContext.userId,
 			promptId: args.promptRevision,
 			generationRunId: args.jobContext.generationRunId,
@@ -397,7 +398,7 @@ export async function generatePracticeBlueprint(args: {
 		return {
 			ok: true,
 			blueprint: parsed,
-			model: modelId,
+			model: telemetry.modelId,
 			modelMs: Date.now() - t0,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
@@ -492,7 +493,7 @@ async function attemptBlueprintRepair(args: {
 	let inputTokens = 0;
 	let outputTokens = 0;
 	try {
-		const { object, usage, telemetry } = await generateStructured({
+		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
 			resolved: args.resolved,
 			schema: args.schema,
 			system: repairSystem,
@@ -501,6 +502,7 @@ async function attemptBlueprintRepair(args: {
 			maxRetries: 0,
 			maxRepairAttempts: 0, // one shot — caller already absorbed the original failure
 			abortSignal: args.abortSignal,
+			feature: "practice.generation.blueprint",
 			providerOptions: {
 				openai: { strictJsonSchema: true },
 			},

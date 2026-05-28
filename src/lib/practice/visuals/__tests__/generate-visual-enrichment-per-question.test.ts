@@ -11,7 +11,7 @@ const logPracticeObsMock = vi.fn();
 const logServerErrorMock = vi.fn();
 
 vi.mock("@/lib/ai/structured-output", () => ({
-	generateStructured: (args: unknown) => generateStructuredMock(args),
+	generateStructuredWithProviderFallback: (args: unknown) => generateStructuredMock(args),
 }));
 
 vi.mock("@/lib/ai/model-router", () => ({
@@ -147,7 +147,13 @@ describe("generateVisualEnrichmentPerQuestion", () => {
 			return {
 				object: { action: "replace_visual", index: 0, value: SAMPLE_ENVELOPE },
 				usage: { inputTokens: 5_000, outputTokens: 300 },
-				telemetry: { reasoningTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0 },
+				telemetry: {
+					provider: "deepseek",
+					modelId: "deepseek-v4-flash-test",
+					reasoningTokens: 0,
+					cacheHitTokens: 0,
+					cacheMissTokens: 0,
+				},
 			};
 		});
 
@@ -168,7 +174,13 @@ describe("generateVisualEnrichmentPerQuestion", () => {
 			return {
 				object: { action: "replace_visual", index: n, value: SAMPLE_ENVELOPE },
 				usage: { inputTokens: 5_000, outputTokens: 300 },
-				telemetry: { reasoningTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0 },
+				telemetry: {
+					provider: "deepseek",
+					modelId: "deepseek-v4-flash-test",
+					reasoningTokens: 0,
+					cacheHitTokens: 0,
+					cacheMissTokens: 0,
+				},
 			};
 		});
 
@@ -191,11 +203,92 @@ describe("generateVisualEnrichmentPerQuestion", () => {
 		expect(result.perQuestionStats).toMatchObject({ succeeded: 0, failed: 3 });
 	});
 
+	it("passes per_question feature to the structured fallback wrapper", async () => {
+		generateStructuredMock.mockResolvedValueOnce({
+			object: { action: "null_visual", index: 0 },
+			usage: { inputTokens: 100, outputTokens: 50 },
+			telemetry: {
+				provider: "deepseek",
+				modelId: "deepseek-v4-flash-test",
+				reasoningTokens: 0,
+				cacheHitTokens: 0,
+				cacheMissTokens: 0,
+			},
+		});
+
+		await generateVisualEnrichmentPerQuestion(
+			commonArgs({
+				candidateIndexes: [0],
+				candidateIntent: [
+					{
+						index: 0,
+						priority: "high" as const,
+						reason: "t",
+						preferred_kind: "math_geometry" as QuestionVisualKind,
+					},
+				],
+			}),
+		);
+
+		expect(generateStructuredMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				feature: "practice.generation.visual_enrichment.per_question",
+			}),
+		);
+	});
+
+	it("records fallback model in ai_calls when wrapper telemetry includes providerFallback", async () => {
+		generateStructuredMock.mockResolvedValueOnce({
+			object: { action: "null_visual", index: 0 },
+			usage: { inputTokens: 100, outputTokens: 50 },
+			telemetry: {
+				provider: "openai",
+				modelId: "gpt-5.4-mini",
+				reasoningTokens: null,
+				cacheHitTokens: null,
+				cacheMissTokens: null,
+				providerFallback: {
+					primaryProvider: "deepseek",
+					primaryModelId: "deepseek-v4-flash-test",
+					fallbackModelId: "gpt-5.4-mini",
+					reason: "429",
+				},
+			},
+		});
+
+		await generateVisualEnrichmentPerQuestion(
+			commonArgs({
+				candidateIndexes: [0],
+				candidateIntent: [
+					{
+						index: 0,
+						priority: "high" as const,
+						reason: "t",
+						preferred_kind: "math_geometry" as QuestionVisualKind,
+					},
+				],
+			}),
+		);
+
+		expect(recordAiCallMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				model: "gpt-5.4-mini",
+				provider: "openai",
+			}),
+		);
+	});
+
 	it("emits one ai_calls row per candidate with the per_question feature name", async () => {
 		generateStructuredMock.mockImplementation(async () => ({
 			object: { action: "null_visual", index: 0 },
 			usage: { inputTokens: 1_000, outputTokens: 50 },
-			telemetry: { reasoningTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0 },
+			telemetry: {
+				provider: "deepseek",
+				modelId: "deepseek-v4-flash-test",
+				reasoningTokens: 0,
+				cacheHitTokens: 0,
+				cacheMissTokens: 0,
+			},
 		}));
 
 		await generateVisualEnrichmentPerQuestion(commonArgs());
@@ -221,7 +314,13 @@ describe("generateVisualEnrichmentPerQuestion", () => {
 			return {
 				object: { action: "null_visual", index: 0 },
 				usage: { inputTokens: 1_000, outputTokens: 50 },
-				telemetry: { reasoningTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0 },
+				telemetry: {
+					provider: "deepseek",
+					modelId: "deepseek-v4-flash-test",
+					reasoningTokens: 0,
+					cacheHitTokens: 0,
+					cacheMissTokens: 0,
+				},
 			};
 		});
 
@@ -246,7 +345,13 @@ describe("generateVisualEnrichmentPerQuestion", () => {
 			// LLM hallucinates a different index — driver should overwrite it.
 			object: { action: "replace_visual", index: 99, value: SAMPLE_ENVELOPE },
 			usage: { inputTokens: 5_000, outputTokens: 300 },
-			telemetry: { reasoningTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0 },
+			telemetry: {
+				provider: "deepseek",
+				modelId: "deepseek-v4-flash-test",
+				reasoningTokens: 0,
+				cacheHitTokens: 0,
+				cacheMissTokens: 0,
+			},
 		}));
 
 		const result = await generateVisualEnrichmentPerQuestion(

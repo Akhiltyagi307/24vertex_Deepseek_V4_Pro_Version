@@ -53,12 +53,9 @@ export {
 export {
 	applyTopicContextLimits,
 	fetchTopicContextChunksByTopicIds,
-	getTopicContextLimitsFromEnv,
 	logPracticeTopicContextStats,
 	sortRawChunksByTopicThenCreated,
-	TOPIC_CONTEXT_DEFAULT_LIMITS,
 	type RawTopicChunkRow,
-	type TopicContextLimits,
 } from "./topic-context-chunks";
 export {
 	createPracticeGenerationOutputSchema,

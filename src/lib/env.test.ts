@@ -6,6 +6,7 @@ import {
 	getOpenAIChatModel,
 	getOpenAIPracticeChatModel,
 	getOpenAIPracticeChatModelFallback,
+	isAiProviderFallbackEnabled,
 } from "@/lib/env";
 
 afterEach(() => {
@@ -121,5 +122,17 @@ describe("practice-specific model envs", () => {
 		expect(getOpenAIPracticeChatModelFallback()).toBe("gpt-5.5");
 		vi.stubEnv("OPENAI_PRACTICE_CHAT_MODEL_FALLBACK", undefined);
 		expect(getOpenAIPracticeChatModelFallback()).toBe("gpt-5.4-mini");
+	});
+});
+
+describe("isAiProviderFallbackEnabled", () => {
+	it("is enabled by default", () => {
+		vi.stubEnv("AI_PROVIDER_FALLBACK_ENABLED", undefined);
+		expect(isAiProviderFallbackEnabled()).toBe(true);
+	});
+
+	it("is disabled when env is false", () => {
+		vi.stubEnv("AI_PROVIDER_FALLBACK_ENABLED", "false");
+		expect(isAiProviderFallbackEnabled()).toBe(false);
 	});
 });
