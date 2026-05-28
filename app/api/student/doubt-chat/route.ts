@@ -1,11 +1,32 @@
 import { convertToModelMessages, type UIMessage, streamText } from "ai";
 import * as Sentry from "@sentry/nextjs";
 
+import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import {
 	extractDeepSeekCacheTokens,
 	extractReasoningTokens,
 } from "@/lib/ai/deepseek-provider";
-import { getDoubtModeTemplate, interpolateDoubtPromptTemplate } from "@/lib/ai/doubt-prompt-templates";
+
+/**
+ * Map a tutor mode to the AI-prompts feature key. The DB-prompt store keys are
+ * `doubt.<mode>` so admins can override each mode's template independently
+ * without redeploying. Centralised here so a new mode added in
+ * `DoubtTutorMode` is a TypeScript error until it gets a key.
+ */
+function doubtFeatureForMode(mode: DoubtTutorMode): string {
+	switch (mode) {
+		case "explain":
+			return "doubt.explain";
+		case "solve_with_me":
+			return "doubt.solve_with_me";
+		case "quiz_me":
+			return "doubt.quiz_me";
+	}
+}
+import {
+	getDoubtModeTemplateForScope,
+	interpolateDoubtPromptTemplate,
+} from "@/lib/ai/doubt-prompt-templates";
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { getActiveAiPrompt } from "@/lib/ai/prompt-store";
@@ -40,6 +61,16 @@ const DOUBT_CHAT_PRE_DEBIT_TOKENS = 150;
 const DOUBT_CHAT_HISTORY_TURN_CAP = 10;
 import { recordPracticeEvent } from "@/lib/practice/analytics";
 import { loadDoubtMessagesForConversationWithClient } from "@/lib/doubt/loaders";
+import {
+	buildScopeVocab,
+	OFF_TOPIC_USER_MESSAGE,
+	userTurnLikelyOutOfScope,
+} from "@/lib/doubt/scope-precheck";
+import {
+	stripImagePartsFromMessages,
+	stripReasoningPartsFromMessages,
+} from "@/lib/doubt/strip-model-parts";
+import { isDoubtScopePrecheckEnabled } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -49,32 +80,6 @@ function toUIMessageList(raw: unknown[]): UIMessage[] {
 	return raw as UIMessage[];
 }
 
-/**
- * Strip `reasoning` parts from prior assistant messages before forwarding to
- * DeepSeek. The DeepSeek thinking endpoint returns HTTP 400 when any input
- * message contains `reasoning_content`. The Vercel SDK normally treats
- * reasoning as a first-class message part and faithfully re-encodes it on
- * subsequent turns; for DeepSeek-mode doubt chat we drop it so the next turn
- * forwards just the visible text. Reasoning is still emitted to the client
- * by the assistant on each new turn (DeepSeek decides freshly whether to
- * think), so this only changes wire encoding, not behaviour.
- */
-function stripReasoningPartsFromMessages<T extends { role: string; content?: unknown }>(
-	messages: T[],
-): T[] {
-	return messages.map((msg) => {
-		if (msg.role !== "assistant") return msg;
-		const content = msg.content;
-		if (!Array.isArray(content)) return msg;
-		const filtered = content.filter((part) => {
-			if (!part || typeof part !== "object") return true;
-			const type = (part as { type?: unknown }).type;
-			return type !== "reasoning";
-		});
-		if (filtered.length === content.length) return msg;
-		return { ...msg, content: filtered };
-	});
-}
 
 function attachTopicContextChunksToScope(scope: DoubtScopeSuccess, chunkBlock: string): DoubtScopeSuccess {
 	if (scope.kind === "topic") {
@@ -111,6 +116,7 @@ export async function POST(req: Request) {
 		topicId,
 		conversationId: rawConvId,
 		tutorMode,
+		previousTutorMode,
 		attachmentIds,
 	} = parsed.data;
 	const messages = toUIMessageList(rawMessages);
@@ -249,28 +255,80 @@ export async function POST(req: Request) {
 		});
 	}
 
-	// Per the migration plan: turns with image attachments stay on OpenAI
-	// because `@ai-sdk/deepseek` doesn't list image input in its capability
-	// table. Text-only turns route via env (`AI_PROVIDER_DOUBT_CHAT`).
-	const resolved = resolveChatModel("doubt.chat", { hasAttachments });
-	const modelId = resolved.modelId;
-	const doubtFeature = tutorMode === "explain" ? "doubt.explain" : "doubt.solve_with_me";
-	const dbPrompt = await getActiveAiPrompt(doubtFeature);
-	const templateSrc = dbPrompt?.template?.trim()
-		? dbPrompt.template
-		: getDoubtModeTemplate(tutorMode);
-	const system = interpolateDoubtPromptTemplate(templateSrc, groundedScope);
+	// Off-topic pre-check (feature-flagged). Cheap vocabulary-overlap test that
+	// short-circuits a Pro call when a turn looks confidently off-topic — no
+	// image attachments here because vision turns may legitimately have no
+	// text overlap (e.g. "what's in this diagram"). The pre-check is also a
+	// no-op for chunk-only / non-topic chats where vocab is too sparse.
+	if (isDoubtScopePrecheckEnabled() && !hasAttachments) {
+		const chunkText =
+			groundedScope.kind === "topic"
+				? groundedScope.topic.contextChunksBlock ?? ""
+				: groundedScope.chapter.contextChunksBlock ?? "";
+		if (chunkText.length > 0) {
+			const verdict = userTurnLikelyOutOfScope(lastUserText, buildScopeVocab(chunkText));
+			if (!verdict.ok) {
+				void recordPracticeEvent(
+					supabase,
+					"doubt_chat_off_topic_blocked",
+					{
+						code: verdict.code,
+						user_tokens: verdict.userTokens,
+						vocab_size: verdict.vocabSize,
+						subject_id: subjectId,
+						topic_id: topicId,
+					},
+					{ studentId: user.id },
+				);
+				return new Response(
+					JSON.stringify({
+						error: OFF_TOPIC_USER_MESSAGE,
+						code: "off_topic",
+					}),
+					{ status: 422, headers: { "content-type": "application/json" } },
+				);
+			}
+		}
+	}
 
 	const conversationId = existing.id as string;
 
-	// Validate attachment ownership (must belong to this conversation, which
-	// we've already verified belongs to the user).
+	// Load attachments first so we can route based on KIND. A PDF-only turn
+	// stays on DeepSeek (text is extracted server-side and prepended to the
+	// user message). Only image attachments force the OpenAI fallback.
 	const attachments = await loadAttachmentsForRequest(supabase, conversationId, attachmentIds);
 	if (attachments.length !== attachmentIds.length) {
 		return new Response(
 			JSON.stringify({ error: "One or more attachments could not be found." }),
 			{ status: 400, headers: { "content-type": "application/json" } },
 		);
+	}
+	const hasImageAttachment = attachments.some((a) => a.kind === "image");
+
+	// Per the migration plan: turns with an image attachment stay on OpenAI
+	// (vision). Text-only turns AND pdf-only turns route via env
+	// (`AI_PROVIDER_DOUBT_CHAT`, currently `deepseek`).
+	const resolved = resolveChatModel("doubt.chat", { hasImageAttachment });
+	const modelId = resolved.modelId;
+	const doubtFeature = doubtFeatureForMode(tutorMode);
+	const dbPrompt = await getActiveAiPrompt(doubtFeature);
+	// When the admin has activated a DB-prompt override, use it verbatim —
+	// they're taking responsibility for the full template (including any
+	// subject-pack content). Otherwise compose preamble + subject pack
+	// (if matched) + scope + mode tail from the file-based templates.
+	const templateSrc = dbPrompt?.template?.trim()
+		? dbPrompt.template
+		: getDoubtModeTemplateForScope(groundedScope, tutorMode);
+	let system = interpolateDoubtPromptTemplate(templateSrc, groundedScope);
+
+	// Mode-switch handoff: if the previous turn was sent under a different mode,
+	// append a one-line ephemeral note so the model treats earlier turns as
+	// historical context under the old contract. Deliberately a SUFFIX (not a
+	// prefix) so it doesn't perturb DeepSeek's cached prefix on this turn — the
+	// note adds a few uncached tokens at the end, the rest of the prompt still
+	// hits prior-conversation cache as normal.
+	if (previousTutorMode && previousTutorMode !== tutorMode) {
+		system += `\n\nNote: the student just switched from ${previousTutorMode.replace("_", "-")} mode to ${tutorMode.replace("_", "-")} mode. Treat earlier turns as historical context only; respond to the next turn under the new mode.`;
 	}
 
 	const userMessageBase = {
@@ -348,6 +406,10 @@ export async function POST(req: Request) {
 	// way — safe to do unconditionally.
 	if (resolved.provider === "deepseek") {
 		modelMessages = stripReasoningPartsFromMessages(modelMessages);
+		// DeepSeek doesn't accept image inputs; strip any historical image parts
+		// the decorator re-attached and leave a text breadcrumb so the model
+		// still understands an image existed in that earlier turn.
+		modelMessages = stripImagePartsFromMessages(modelMessages);
 	}
 
 	const streamStartedAt = Date.now();

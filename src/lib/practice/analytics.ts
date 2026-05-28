@@ -42,7 +42,10 @@ export type PracticeEvent =
 	| "subscription_payment_failed"
 	| "coupon_redeemed"
 	| "paywall_shown"
-	| "upgrade_clicked";
+	| "upgrade_clicked"
+	// Doubt-chat off-topic pre-check fired (behind DOUBT_SCOPE_PRECHECK flag).
+	// Props: { code, user_tokens, vocab_size, subject_id, topic_id }.
+	| "doubt_chat_off_topic_blocked";
 
 /**
  * Record a practice analytics event. Fail-silent (never blocks user action).

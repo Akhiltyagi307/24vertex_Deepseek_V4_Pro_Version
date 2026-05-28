@@ -40,11 +40,34 @@ export type DoubtChatThreadProps = {
 	onOpenChats?: () => void;
 };
 
-export const SUGGESTED_PROMPTS = [
-	"Give me a 3-line summary",
-	"Explain the main idea in simple words",
-	"Ask me 5 practice questions",
-] as const;
+/**
+ * Suggested prompts shown in the empty state of a fresh chat.
+ *
+ * Mode-scoped because each mode has a different contract: showing
+ * "Ask me 5 practice questions" while Explain mode is selected actively
+ * contradicts the explain-mode system prompt, which is instructed not to
+ * quiz the student.
+ */
+export const SUGGESTED_PROMPTS_BY_MODE = {
+	explain: [
+		"Give me a 3-line summary",
+		"Explain the main idea in simple words",
+		"What's a common exam trap here?",
+	],
+	solve_with_me: [
+		"I have a problem to work through",
+		"Where do I start with this?",
+		"Check my approach",
+	],
+	quiz_me: [
+		"Quiz me — 5 questions",
+		"Mixed difficulty set, please",
+		"Just MCQs to warm up",
+	],
+} as const satisfies Record<import("@/lib/doubt/doubt-tutor-mode").DoubtTutorMode, readonly string[]>;
+
+/** @deprecated Use SUGGESTED_PROMPTS_BY_MODE keyed on the active tutor mode. */
+export const SUGGESTED_PROMPTS = SUGGESTED_PROMPTS_BY_MODE.explain;
 
 export function extractText(m: UIMessage): string {
 	if (!m.parts) return "";

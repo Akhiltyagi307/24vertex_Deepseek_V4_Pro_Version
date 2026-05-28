@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
+import { Check, Copy, Loader2, RefreshCw, Sparkle } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -11,11 +11,21 @@ export function MessageActions({
 	canRegenerate,
 	regenPending,
 	onRegenerate,
+	canRequestSimilar,
+	onRequestSimilar,
 }: {
 	text: string;
 	canRegenerate?: boolean;
 	regenPending?: boolean;
 	onRegenerate?: () => void;
+	/**
+	 * True when the surrounding mode + thread state make a "give me a similar
+	 * problem" follow-up meaningful — i.e. Solve-with-me mode and the last
+	 * assistant turn appears to contain a solved problem. The chip simply
+	 * dispatches a templated user message; no separate endpoint.
+	 */
+	canRequestSimilar?: boolean;
+	onRequestSimilar?: () => void;
 }) {
 	const [copied, setCopied] = useState(false);
 
@@ -83,6 +93,27 @@ export function MessageActions({
 						)}
 					</TooltipTrigger>
 					<TooltipContent>{regenPending ? "Regenerating" : "Regenerate"}</TooltipContent>
+				</Tooltip>
+			) : null}
+			{canRequestSimilar ? (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<button
+								type="button"
+								onClick={() => onRequestSimilar?.()}
+								aria-label="Give me a similar problem"
+								className={cn(
+									"text-muted-foreground hover:text-foreground hover:bg-muted/70 inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px]",
+									"focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+								)}
+							/>
+						}
+					>
+						<Sparkle className="size-3.5" aria-hidden />
+						<span>Similar one</span>
+					</TooltipTrigger>
+					<TooltipContent>Ask for a similar problem with different numbers</TooltipContent>
 				</Tooltip>
 			) : null}
 		</div>

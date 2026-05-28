@@ -452,3 +452,18 @@ export function getPublicRazorpayKeyId(): string {
 export function isSaasEnforcementEnabled(): boolean {
 	return readTrimmedEnv("SAAS_ENFORCEMENT").toLowerCase() === "true";
 }
+
+/**
+ * Off-topic pre-check for doubt chat. When enabled, the route handler runs a
+ * cheap vocabulary-overlap test on the user's turn before calling the LLM. If
+ * the turn looks confidently off-topic (zero overlap with the topic's context
+ * chunks AND > 40 chars), the request short-circuits with a 422 instead of
+ * burning a Pro call to refuse politely.
+ *
+ * Default OFF: needs production-data tuning of the overlap threshold before
+ * flipping on broadly. Telemetry event `doubt_chat_off_topic_blocked` lets us
+ * watch the false-positive rate during the soft rollout.
+ */
+export function isDoubtScopePrecheckEnabled(): boolean {
+	return readTrimmedEnv("DOUBT_SCOPE_PRECHECK").toLowerCase() === "true";
+}

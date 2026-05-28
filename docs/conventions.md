@@ -122,3 +122,30 @@ only be imported from server-side files in the allowlist defined in
 - New image origins go in BOTH `src/lib/security/csp.ts` (CSP `img-src`)
   AND `next.config.ts#images.remotePatterns` (Next image optimizer).
 - COOP and CORP are `same-origin`. COEP is intentionally absent.
+
+## Prompt cache hygiene
+
+DeepSeek's prefix cache is byte-exact: it serves matching tokens at ~120x
+cheaper but invalidates the moment the prefix shifts by a single byte.
+Doubt-tutor prompts are structured so the load-bearing block —
+`docs/doubt-shared-preamble.md` — is identical across modes and across all
+students. **Edits to that file invalidate the cached prefix for every
+active chat across all users on deploy.**
+
+Rules:
+
+- **Batch edits** to `docs/doubt-shared-preamble.md`,
+  `docs/explain-mode-prompt.md`, `docs/solve-with-me-mode-prompt.md`, and
+  `docs/quiz-me-mode-prompt.md`. Don't sprinkle whitespace fixes across
+  multiple PRs — each lands as a full cache miss for everyone.
+- **Verify with the fingerprint script.** `pnpm exec tsx scripts/check-doubt-prompt-fingerprint.ts`
+  emits the current preamble + each tail's SHA-256. Compare against the
+  baseline in `docs/doubt-prompt-fingerprint.json`; commit a new baseline
+  with each intentional edit. CI rejects PRs that change the rendered
+  prompt body without bumping the baseline.
+- **Test the cache prefix invariant.** The unit test
+  `src/lib/doubt/__tests__/doubt-helpers.test.ts > "shares an identical
+  preamble prefix across modes"` is the structural guard — never bypass.
+- **Watch the dashboard.** `ai_calls_doubt_cache_daily` view rolls up cache
+  hit rate per day per mode. A drop the day after a prompt change is the
+  expected pattern; a drop without a prompt change deserves investigation.

@@ -2,7 +2,7 @@
 
 import { act } from "react-dom/test-utils";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
 	MessageActions,
@@ -47,5 +47,46 @@ describe("MessageActions / TypingIndicator", () => {
 		const status = container.querySelector('[role="status"]');
 		expect(status).toBeTruthy();
 		expect(status?.getAttribute("aria-label")).toBe("Tutor is thinking");
+	});
+
+	it("renders the similar-problem chip when canRequestSimilar is true", async () => {
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+
+		const onRequestSimilar = vi.fn();
+		await act(async () => {
+			root!.render(
+				<MessageActions
+					text="A long enough text — at least 40 characters of solved problem content."
+					canRequestSimilar
+					onRequestSimilar={onRequestSimilar}
+				/>,
+			);
+		});
+
+		const button = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.getAttribute("aria-label") === "Give me a similar problem",
+		);
+		expect(button).toBeTruthy();
+		await act(async () => {
+			button!.click();
+		});
+		expect(onRequestSimilar).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not render the similar-problem chip without the flag", async () => {
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+
+		await act(async () => {
+			root!.render(<MessageActions text="hello" />);
+		});
+
+		const button = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.getAttribute("aria-label") === "Give me a similar problem",
+		);
+		expect(button).toBeUndefined();
 	});
 });
