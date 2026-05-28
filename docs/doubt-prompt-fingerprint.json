@@ -1,0 +1,69 @@
+{
+  "_note": "SHA-256 of each doubt-tutor prompt body. Run scripts/check-doubt-prompt-fingerprint.ts --write to update. See docs/conventions.md > Prompt cache hygiene.",
+  "files": {
+    "doubt-shared-preamble.md": {
+      "sha256": "7597f795be18f3bc5e8a6c1d64e5c97a00cf370a953c7705f78dc3387769a3b3",
+      "bodyChars": 4952
+    },
+    "explain-mode-prompt.md": {
+      "sha256": "7e3c3bb178a8609922996d245ccd0d335513d8655639754835205ac07d41e630",
+      "bodyChars": 4751
+    },
+    "solve-with-me-mode-prompt.md": {
+      "sha256": "bbe3bb62f815f8ea65780b910875a0837920ff87bc8edb449c1289fd3c86f0a5",
+      "bodyChars": 8055
+    },
+    "quiz-me-mode-prompt.md": {
+      "sha256": "3b76113840f4a98cd5a458685cac3441a6c3aba267307c569b28f2c1a17abd89",
+      "bodyChars": 7543
+    },
+    "doubt-subject-packs/mathematics.md": {
+      "sha256": "3b26d54f483f32611aedc71322454373fc0eda0de1b1da5b7aba83ba2e100d90",
+      "bodyChars": 2419
+    },
+    "doubt-subject-packs/science.md": {
+      "sha256": "e218e0cf78c8b8d888ab2a8d9f412114cf1eda46b68d6951f825c6f679c8d2e4",
+      "bodyChars": 2459
+    },
+    "doubt-subject-packs/physics.md": {
+      "sha256": "312ec7c2dd055997283ccf90a1ac9bdf5931290dc0a0619e66e08a99a1d2a9ab",
+      "bodyChars": 2783
+    },
+    "doubt-subject-packs/chemistry.md": {
+      "sha256": "70aada881f8493fc033446dd0897fa9df1b463de2aff6c48b8a9b976a2962f66",
+      "bodyChars": 2700
+    },
+    "doubt-subject-packs/biology.md": {
+      "sha256": "dc26d09772bb6cb61b9c0ec27f51db06407dee200eaf41a753f71af21acf2db9",
+      "bodyChars": 2788
+    },
+    "doubt-subject-packs/social-science.md": {
+      "sha256": "9b62b4889404e77ed423f4e295f7fca1ff9912b68a71f82fcd89f3c14d84edcf",
+      "bodyChars": 2644
+    },
+    "doubt-subject-packs/history.md": {
+      "sha256": "42a0aee3f621ba722062c9f39821a6357fa02dcb42aa4bfe435f6ca7b6941a59",
+      "bodyChars": 2429
+    },
+    "doubt-subject-packs/geography.md": {
+      "sha256": "b8581d0fff3e295779a9293f426159ccb4291c1f74bcd9b3fe39fbc304e61ac4",
+      "bodyChars": 2304
+    },
+    "doubt-subject-packs/political-science.md": {
+      "sha256": "0a0f562c9aa4452259e54c5cf8a7ed584653f16ac68f3590828fcd0be9ae6f5d",
+      "bodyChars": 2585
+    },
+    "doubt-subject-packs/economics.md": {
+      "sha256": "879ec83c85506a9487b77ed1e3c40a24b234fb8f2b84c42193b7def59f34c92b",
+      "bodyChars": 2606
+    },
+    "doubt-subject-packs/english.md": {
+      "sha256": "0386ad2f4327e1d0ba1fbb9ff543448ec3f8693dae959296ca79ccfb8c36f0c6",
+      "bodyChars": 3072
+    },
+    "doubt-subject-packs/computer-science.md": {
+      "sha256": "d5655fad8fbfe98b9b4427fce9933a64cc005098c68a8d9393bca37d575e6531",
+      "bodyChars": 3045
+    }
+  }
+}

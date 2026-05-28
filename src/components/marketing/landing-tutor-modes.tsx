@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { BookOpenCheck, ShieldCheck, Sparkles, Wand2 } from "lucide-react";
+import { BookOpenCheck, ListChecks, ShieldCheck, Sparkles, Wand2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +115,52 @@ const TUTOR_TABS: TutorModeTab[] = [
 				speaker: "tutor",
 				body: "Beautifully done. You did the whole problem. I just held the torch. Want to try one without help?",
 				annotation: "Builds confidence",
+			},
+		],
+	},
+	{
+		id: "quiz_me",
+		label: "Quiz me",
+		tagline: "When they want to test themselves, not be taught.",
+		icon: ListChecks,
+		useCase: "Day-before-the-test recall: rapid retrieval practice with instant grading.",
+		bestFor: "Revision and active recall before unit tests or boards",
+		subjectChip: "Class 9 · History · The French Revolution",
+		conversation: [
+			{
+				speaker: "student",
+				body: "Quiz me on the French Revolution. 5 questions.",
+			},
+			{
+				speaker: "tutor",
+				body: "5 questions — 3 MCQ, 2 short-answer, easier to harder. Ready?\n\n**Q1 (MCQ, 1 mark):** In which year did the Bastille fall?\n(a) 1776  (b) 1789  (c) 1791  (d) 1799",
+			},
+			{
+				speaker: "student",
+				body: "b",
+			},
+			{
+				speaker: "tutor",
+				body: "Correct. The fall of the Bastille on 14 July 1789 is the date most board questions key off.\n\n**Q2 (MCQ, 1 mark):** The Estates-General had three estates. The Third Estate represented…\n(a) clergy  (b) nobility  (c) common people  (d) the king's family",
+				annotation: "Grades + moves on",
+			},
+			{
+				speaker: "student",
+				body: "c",
+			},
+			{
+				speaker: "tutor",
+				body: "Right. Score so far: 2/2.\n\n**Q3 (Short answer, 2 marks):** Name any two demands made by the Third Estate before the Revolution.",
+				annotation: "Tracks score",
+			},
+			{
+				speaker: "student",
+				body: "Lower taxes and a voice in the assembly",
+			},
+			{
+				speaker: "tutor",
+				body: "Half marks — \"lower taxes\" is accepted, but \"a voice in the assembly\" needs to be sharper: the demand was *vote by head* (one person, one vote) rather than vote by estate. Score so far: 2.5/3.",
+				annotation: "Pinpoints the exact gap",
 			},
 		],
 	},

@@ -112,6 +112,11 @@ testsprite_tests/
 docs/*
 !docs/explain-mode-prompt.md
 !docs/solve-with-me-mode-prompt.md
+!docs/quiz-me-mode-prompt.md
+!docs/doubt-shared-preamble.md
+!docs/doubt-prompt-fingerprint.json
+!docs/doubt-subject-packs/
+!docs/doubt-subject-packs/*.md
 !docs/billing/
 !docs/billing/*.md
 !docs/practice/

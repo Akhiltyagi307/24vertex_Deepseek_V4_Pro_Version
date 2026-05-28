@@ -581,7 +581,12 @@ export function streamStructuredWithProviderFallback<TSchema extends z.ZodType>(
 ): StreamStructuredResult<z.infer<TSchema>> {
 	const primaryResolved = args.resolved;
 	const primary = streamStructured(args);
-	let fallbackStream: StreamStructuredResult<z.infer<TSchema>> | null = null;
+	// `let` with initial `null` gets narrowed to `null` by TS in nested
+	// closures because the assignment in the `.catch` below is cross-closure
+	// and not seen by control-flow analysis. The `as` here widens back to the
+	// declared union so the IIFEs reading `fallbackStream` after a runtime
+	// null-check don't collapse to `never`.
+	let fallbackStream = null as StreamStructuredResult<z.infer<TSchema>> | null;
 	let fallbackTelemetry: ProviderFallbackTelemetry | undefined;
 
 	const object = primary.object.catch(async (primaryError: unknown) => {
@@ -632,14 +637,20 @@ export function streamStructuredWithProviderFallback<TSchema extends z.ZodType>(
 	return {
 		partialObjectStream,
 		object,
+		// Capture `fallbackStream` into locals inside each async closure so TS
+		// doesn't narrow the outer `let`-declared variable to `never`. The
+		// outer var is mutated only inside the `object` `.catch` closure and
+		// the type checker can't track cross-closure assignments — `fb` here
+		// is just a read snapshot at the time the catch runs.
 		usage: (async () => {
 			try {
 				await primary.object;
 				return primary.usage;
 			} catch (primaryError) {
-				if (!fallbackStream) throw primaryError;
-				await fallbackStream.object;
-				return fallbackStream.usage;
+				const fb = fallbackStream;
+				if (!fb) throw primaryError;
+				await fb.object;
+				return fb.usage;
 			}
 		})(),
 		providerMetadata: (async () => {
@@ -647,9 +658,10 @@ export function streamStructuredWithProviderFallback<TSchema extends z.ZodType>(
 				await primary.object;
 				return primary.providerMetadata;
 			} catch (primaryError) {
-				if (!fallbackStream) throw primaryError;
-				await fallbackStream.object;
-				return fallbackStream.providerMetadata;
+				const fb = fallbackStream;
+				if (!fb) throw primaryError;
+				await fb.object;
+				return fb.providerMetadata;
 			}
 		})(),
 		telemetry: (async () => {
@@ -657,8 +669,9 @@ export function streamStructuredWithProviderFallback<TSchema extends z.ZodType>(
 				await primary.object;
 				return primary.telemetry;
 			} catch (primaryError) {
-				if (!fallbackStream) throw primaryError;
-				const telemetry = await fallbackStream.telemetry;
+				const fb = fallbackStream;
+				if (!fb) throw primaryError;
+				const telemetry = await fb.telemetry;
 				return {
 					...telemetry,
 					providerFallback: fallbackTelemetry,

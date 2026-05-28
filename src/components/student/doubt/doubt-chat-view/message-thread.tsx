@@ -53,6 +53,14 @@ export function MessageThread({
 	const router = useRouter();
 	const [input, setInput] = useState("");
 	const [tutorMode, setTutorMode] = useState<DoubtTutorMode>(initialTutorMode ?? "explain");
+	// "Mode-just-changed" UI signal — set when the user toggles the composer
+	// to a different mode than the last actually-sent turn used, cleared after
+	// the next message is sent. Purely visual; the server-side handoff goes
+	// through `previousTutorMode` in the request body.
+	const [pendingModeSwitch, setPendingModeSwitch] = useState<{
+		from: DoubtTutorMode;
+		to: DoubtTutorMode;
+	} | null>(null);
 	const [usage, setUsage] = useState<UsageSummary>(initialUsage);
 	const [entitlement, setEntitlement] = useState<EntitlementSummary>(initialEntitlement);
 	const [regenPending, setRegenPending] = useState(false);
@@ -67,6 +75,15 @@ export function MessageThread({
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const nextRequestAttachmentIdsRef = useRef<string[] | null>(null);
+
+	// Tracks the mode the last actually-sent turn was tagged with. When the
+	// user toggles the mode selector mid-chat this stays at the *old* mode
+	// until the next message goes out; the request body then surfaces both
+	// `tutorMode` (current) and `previousTutorMode` (this ref) so the server
+	// can append a one-line ephemeral "mode just switched" note to the system
+	// prompt for that turn. Initialised from the persisted last-user-message
+	// mode so a reload doesn't false-positive-switch on first send.
+	const lastSentModeRef = useRef<DoubtTutorMode>(initialTutorMode ?? "explain");
 
 	// Latest pending attachments are read via a ref so the transport closure
 	// doesn't re-create on every chip add/remove (which would tear down useChat).
@@ -87,12 +104,19 @@ export function MessageThread({
 				body: () => {
 					const attachmentIds = nextRequestAttachmentIdsRef.current ?? [];
 					nextRequestAttachmentIdsRef.current = null;
+					const previousMode = lastSentModeRef.current;
+					// Bump the ref *here*, not in onFinish, because the server-side
+					// system-prompt build happens at request time — once the request
+					// goes out under `tutorMode`, future requests should treat that
+					// as their predecessor regardless of whether this one succeeds.
+					lastSentModeRef.current = tutorMode;
 					return {
 						subjectId,
 						topicId,
 						conversationId,
 						tutorMode,
 						attachmentIds,
+						...(previousMode !== tutorMode ? { previousTutorMode: previousMode } : {}),
 					};
 				},
 			}),
@@ -116,6 +140,13 @@ export function MessageThread({
 								? "trial_expired"
 								: "expired";
 					paywall.show({ reason, message: parsed.error, surface: "doubt_chat" });
+					return;
+				}
+				if (parsed.code === "off_topic") {
+					toast.info(
+						parsed.error ??
+							"This looks like a different topic — try opening a new doubt chat on that topic.",
+					);
 					return;
 				}
 			} catch {
@@ -188,8 +219,26 @@ export function MessageThread({
 			void sendMessage({ text: t });
 			// Clear chips after the message goes — they're now bound to the row.
 			setPendingAttachments([]);
+			// The mode change has been carried out; clear the visual banner.
+			setPendingModeSwitch(null);
 		},
 		[busy, sendMessage],
+	);
+
+	const onTutorModeChange = useCallback(
+		(next: DoubtTutorMode) => {
+			if (next === tutorMode) return;
+			// Show the banner only when there's already history under the previous
+			// mode — a brand-new chat doesn't need a "switched from" hint.
+			const previousIsLive = lastSentModeRef.current;
+			if (messages.length > 0 && next !== previousIsLive) {
+				setPendingModeSwitch({ from: previousIsLive, to: next });
+			} else {
+				setPendingModeSwitch(null);
+			}
+			setTutorMode(next);
+		},
+		[tutorMode, messages.length],
 	);
 
 	const onRegenerate = useCallback(async () => {
@@ -232,18 +281,13 @@ export function MessageThread({
 		[submit, input],
 	);
 
+	const scopeNoun = topicName ?? chapterName ?? "this chapter";
 	const placeholder =
 		tutorMode === "solve_with_me"
-			? topicName
-				? `Work through a problem on ${topicName}…`
-				: chapterName
-					? `Work through a problem from ${chapterName}…`
-					: "Describe a problem to solve together…"
-			: topicName
-				? `Ask anything about ${topicName}…`
-				: chapterName
-					? `Ask anything about ${chapterName}…`
-					: "Ask a question about this chapter…";
+			? `Work through a problem on ${scopeNoun}…`
+			: tutorMode === "quiz_me"
+				? `Say "quiz me" to start, or pick a focus on ${scopeNoun}…`
+				: `Ask anything about ${scopeNoun}…`;
 
 	const empty = messages.length === 0;
 	const lastAssistantIsStreaming =
@@ -314,6 +358,7 @@ export function MessageThread({
 							<EmptyState
 								topicName={topicName}
 								chapterName={chapterName}
+								tutorMode={tutorMode}
 								onPick={(text) => {
 									setInput(text);
 									textareaRef.current?.focus();
@@ -379,6 +424,15 @@ export function MessageThread({
 								messages.slice(idx + 1).every((later) => later.role !== "assistant");
 							const canRegenerate =
 								isLastAssistant && !busy && !regenPending && Boolean(text);
+							// "Similar problem" affordance: only meaningful in solve-with-me
+							// on the last assistant turn, and only once the model has
+							// actually produced a non-trivial reply. We don't try to
+							// detect "this contains a final answer" with a regex — false
+							// negatives there would be annoying; better to show the chip
+							// liberally and trust the model to handle "give me another"
+							// gracefully if the prior turn was just a diagnostic question.
+							const canRequestSimilar =
+								isLastAssistant && !busy && tutorMode === "solve_with_me" && text.length > 40;
 							return (
 								<div
 									key={m.id}
@@ -399,6 +453,15 @@ export function MessageThread({
 												canRegenerate={canRegenerate}
 												regenPending={regenPending && isLastAssistant}
 												onRegenerate={canRegenerate ? () => void onRegenerate() : undefined}
+												canRequestSimilar={canRequestSimilar}
+												onRequestSimilar={
+													canRequestSimilar
+														? () =>
+																submit(
+																	"Give me a similar problem with different numbers, then let me try it.",
+																)
+														: undefined
+												}
 											/>
 										) : null}
 									</div>
@@ -452,7 +515,8 @@ export function MessageThread({
 				busy={busy}
 				placeholder={placeholder}
 				tutorMode={tutorMode}
-				onTutorModeChange={setTutorMode}
+				onTutorModeChange={onTutorModeChange}
+				pendingModeSwitch={pendingModeSwitch}
 				usage={usage}
 				entitlement={entitlement}
 				error={error ?? null}

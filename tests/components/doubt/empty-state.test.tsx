@@ -18,13 +18,15 @@ describe("EmptyState", () => {
 		document.body.replaceChildren();
 	});
 
-	it("renders the topic-specific welcome heading", async () => {
+	it("renders the topic-specific welcome heading (explain)", async () => {
 		container = document.createElement("div");
 		document.body.appendChild(container);
 		root = createRoot(container);
 
 		await act(async () => {
-			root!.render(<EmptyState topicName="Optics" chapterName={null} onPick={() => {}} />);
+			root!.render(
+				<EmptyState topicName="Optics" chapterName={null} tutorMode="explain" onPick={() => {}} />,
+			);
 		});
 
 		expect(container.textContent).toContain("Let's unpack Optics");
@@ -36,10 +38,49 @@ describe("EmptyState", () => {
 		root = createRoot(container);
 
 		await act(async () => {
-			root!.render(<EmptyState topicName={null} chapterName={null} onPick={() => {}} />);
+			root!.render(
+				<EmptyState topicName={null} chapterName={null} tutorMode="explain" onPick={() => {}} />,
+			);
 		});
 
 		expect(container.textContent).toContain("Let's unpack this chapter");
+	});
+
+	it("shows mode-specific headline and prompts for solve_with_me", async () => {
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+
+		await act(async () => {
+			root!.render(
+				<EmptyState
+					topicName="Trigonometry"
+					chapterName={null}
+					tutorMode="solve_with_me"
+					onPick={() => {}}
+				/>,
+			);
+		});
+
+		expect(container.textContent).toContain("Solve a problem on Trigonometry");
+		expect(container.textContent).toContain("I have a problem to work through");
+		// Explain-mode starter must not leak into solve mode.
+		expect(container.textContent).not.toContain("Give me a 3-line summary");
+	});
+
+	it("shows quiz-specific headline and prompts for quiz_me", async () => {
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+
+		await act(async () => {
+			root!.render(
+				<EmptyState topicName="Optics" chapterName={null} tutorMode="quiz_me" onPick={() => {}} />,
+			);
+		});
+
+		expect(container.textContent).toContain("Quiz yourself on Optics");
+		expect(container.textContent).toContain("Quiz me — 5 questions");
 	});
 
 	it("invokes onPick with the suggested prompt when clicked", async () => {
@@ -50,7 +91,9 @@ describe("EmptyState", () => {
 		const onPick = vi.fn();
 
 		await act(async () => {
-			root!.render(<EmptyState topicName="Optics" chapterName={null} onPick={onPick} />);
+			root!.render(
+				<EmptyState topicName="Optics" chapterName={null} tutorMode="explain" onPick={onPick} />,
+			);
 		});
 
 		const button = Array.from(container.querySelectorAll("button")).find(

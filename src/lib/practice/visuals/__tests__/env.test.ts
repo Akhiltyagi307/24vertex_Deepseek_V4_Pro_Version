@@ -65,7 +65,9 @@ describe("getPracticeVisualEnrichmentBatchSize", () => {
 		expect(getPracticeVisualEnrichmentBatchSize()).toBe(1);
 
 		process.env.PRACTICE_VISUAL_ENRICHMENT_BATCH_SIZE = "99";
-		expect(getPracticeVisualEnrichmentBatchSize()).toBe(6);
+		// Upper clamp was raised from 6 → 30 in commit 076707b (per-question
+		// visual enrichment). Test was not updated at the time.
+		expect(getPracticeVisualEnrichmentBatchSize()).toBe(30);
 	});
 });
 

@@ -37,7 +37,15 @@ export const doubtChatBodySchema = z.object({
 		.optional()
 		.transform((v) => (v === undefined ? null : v)),
 	conversationId: z.string().uuid("Open or start a chat before sending a message."),
-	tutorMode: z.enum(["explain", "solve_with_me"]).default("explain"),
+	tutorMode: z.enum(["explain", "solve_with_me", "quiz_me"]).default("explain"),
+	/**
+	 * The mode the *previous* turn was sent under. When this differs from
+	 * `tutorMode` we know the student just toggled modes in the composer and
+	 * we append a one-line ephemeral note to the system prompt for this turn
+	 * so the model treats earlier turns as historical context under the old
+	 * contract. Optional — legacy clients without it just don't get the note.
+	 */
+	previousTutorMode: z.enum(["explain", "solve_with_me", "quiz_me"]).optional(),
 	/**
 	 * IDs from `doubt_message_attachments` already uploaded to Storage. The
 	 * route validates ownership via the conversation join and then either

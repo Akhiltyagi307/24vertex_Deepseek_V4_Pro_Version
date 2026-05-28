@@ -1,28 +1,48 @@
+import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { cn } from "@/lib/utils";
 
-import { SUGGESTED_PROMPTS } from "./types";
+import { SUGGESTED_PROMPTS_BY_MODE } from "./types";
+
+const HEADLINE_BY_MODE: Record<DoubtTutorMode, (scope: string) => string> = {
+	explain: (scope) => `Let's unpack ${scope}`,
+	solve_with_me: (scope) => `Solve a problem on ${scope}`,
+	quiz_me: (scope) => `Quiz yourself on ${scope}`,
+};
+
+const SUBTEXT_BY_MODE: Record<DoubtTutorMode, string> = {
+	explain:
+		"Ask about concepts, worked examples, or definitions. Answers stay scoped to your curriculum for this chapter.",
+	solve_with_me:
+		"Paste or describe a problem and I'll coach you through it step by step — not just hand you the answer.",
+	quiz_me:
+		"Active recall practice. I ask one question at a time, grade your answer, and tell you where you're weak.",
+};
 
 export function EmptyState({
 	topicName,
 	chapterName,
+	tutorMode,
 	onPick,
 }: {
 	topicName: string | null;
 	chapterName: string | null;
+	tutorMode: DoubtTutorMode;
 	onPick: (text: string) => void;
 }) {
 	const scopeLabel = topicName ?? chapterName ?? "this chapter";
+	const prompts = SUGGESTED_PROMPTS_BY_MODE[tutorMode];
+	const headline = HEADLINE_BY_MODE[tutorMode](scopeLabel);
+	const subtext = SUBTEXT_BY_MODE[tutorMode];
 	return (
 		<div className="flex w-full flex-col items-center gap-4 pt-4 medium:pt-8">
 			<div className="flex w-full min-w-0 flex-col items-center gap-4 text-center medium:w-1/2">
 				<div className="min-w-0 w-full space-y-1.5">
 					<h3 className="text-foreground text-[17px] font-semibold tracking-tight">
-						{`Let's unpack ${scopeLabel}`}
+						{headline}
 					</h3>
 					<PageHeaderSubtext variant="wrap" className="text-center">
-						Ask about concepts, worked examples, or practice questions. Answers stay scoped to your
-						curriculum for this chapter.
+						{subtext}
 					</PageHeaderSubtext>
 				</div>
 				<div
@@ -32,7 +52,7 @@ export function EmptyState({
 						"medium:flex-wrap medium:justify-center medium:overflow-visible medium:px-0 medium:pb-0 medium:snap-none",
 					)}
 				>
-					{SUGGESTED_PROMPTS.map((p) => (
+					{prompts.map((p) => (
 						<button
 							key={p}
 							type="button"

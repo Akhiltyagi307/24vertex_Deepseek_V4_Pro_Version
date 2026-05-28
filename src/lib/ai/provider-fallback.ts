@@ -140,7 +140,11 @@ export function streamTextWithProviderFallback(
 			...args.streamArgs,
 			model: resolved.model,
 			providerOptions: resolved.providerOptions,
-		});
+			// AI SDK 6 types `streamText` as a discriminated union on either
+			// `messages` or `prompt`. The `Omit` on streamArgs flattens the
+			// union and TS can't statically prove which branch we're in. Cast
+			// at this single call site — doubt-chat always passes `messages`.
+		} as Parameters<typeof streamText>[0]);
 
 	try {
 		return {

@@ -17,7 +17,7 @@ import { TopicChatComposer } from "@/components/ui/multimodal-ai-chat-input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AnimatedMeter } from "@/components/student/subscription/animated-meter";
 import { formatTokens } from "@/lib/billing/format-tokens";
-import type { DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
+import { doubtTutorModeLabel, type DoubtTutorMode } from "@/lib/doubt/doubt-tutor-mode";
 import {
 	ATTACHMENT_MAX_PER_TURN,
 	IMAGE_MIME_ALLOWLIST,
@@ -40,6 +40,12 @@ export type ChatComposerProps = {
 	placeholder: string;
 	tutorMode: DoubtTutorMode;
 	onTutorModeChange: (mode: DoubtTutorMode) => void;
+	/**
+	 * Set when the user just toggled to a different mode than the last
+	 * actually-sent turn used; rendered as a small inline note above the
+	 * composer until the next message goes out. Null when no pending switch.
+	 */
+	pendingModeSwitch?: { from: DoubtTutorMode; to: DoubtTutorMode } | null;
 	usage: UsageSummary;
 	entitlement: EntitlementSummary;
 	error: Error | null;
@@ -67,6 +73,7 @@ export function ChatComposer({
 	placeholder,
 	tutorMode,
 	onTutorModeChange,
+	pendingModeSwitch,
 	usage,
 	entitlement,
 	error,
@@ -137,6 +144,24 @@ export function ChatComposer({
 						<AlertTitle>Something went wrong</AlertTitle>
 						<AlertDescription>{error.message}</AlertDescription>
 					</Alert>
+				) : null}
+
+				{pendingModeSwitch && !error ? (
+					<div
+						role="status"
+						aria-live="polite"
+						className={cn(
+							"mb-2 inline-flex w-full items-center gap-2 rounded-full border px-3 py-1.5 text-[12px]",
+							"border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300",
+						)}
+					>
+						<span className="inline-block size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+						<span className="min-w-0 truncate">
+							Switched to <strong className="font-semibold">{doubtTutorModeLabel(pendingModeSwitch.to)}</strong>{" "}
+							— your next message will be answered under that mode (previously{" "}
+							{doubtTutorModeLabel(pendingModeSwitch.from)}).
+						</span>
+					</div>
 				) : null}
 
 				{pendingAttachments.length > 0 ? (
@@ -234,12 +259,19 @@ export function ChatComposer({
 									className="border-input bg-background h-10 medium:h-9 min-w-0 max-w-[10.5rem] shrink medium:min-w-[9.5rem] medium:max-w-[14rem]"
 								>
 									<SelectValue placeholder="Explain">
-										{(v) => (v === "solve_with_me" ? "Solve with me" : "Explain")}
+										{(v) =>
+											v === "solve_with_me"
+												? "Solve with me"
+												: v === "quiz_me"
+													? "Quiz me"
+													: "Explain"
+										}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="explain">Explain</SelectItem>
 									<SelectItem value="solve_with_me">Solve with me</SelectItem>
+									<SelectItem value="quiz_me">Quiz me</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>

@@ -132,11 +132,16 @@ function deepseekModelIdForFeature(feature: AiFeatureKey): string {
 
 export type ResolveChatModelOptions = {
 	/**
-	 * For doubt chat: when the current turn has image attachments, the router
-	 * forces OpenAI because `@ai-sdk/deepseek` does not currently support
-	 * image input in its capability table. Other features ignore this flag.
+	 * For doubt chat: when the current turn has an image attachment, the
+	 * router forces OpenAI because `@ai-sdk/deepseek` does not list image
+	 * input in its capability table. PDFs do NOT trigger this — they go
+	 * through server-side text extraction (pdf-parse → pdfjs-dist → OCR) and
+	 * the resulting transcript is prepended to the user message, so DeepSeek
+	 * handles PDF-only turns natively.
+	 *
+	 * Other features ignore this flag.
 	 */
-	hasAttachments?: boolean;
+	hasImageAttachment?: boolean;
 };
 
 /**
@@ -152,9 +157,10 @@ export function resolveChatModel(
 	const envProvider = resolveProviderFromEnv(feature);
 
 	// Vision turns force OpenAI regardless of feature flag — see decision
-	// matrix in docs/deepseek-migration-plan.md §4.1.
+	// matrix in docs/deepseek-migration-plan.md §4.1. PDFs route to the env
+	// provider (DeepSeek by default) because text extraction happens upstream.
 	const provider: AiProvider =
-		feature === "doubt.chat" && opts.hasAttachments === true ? "openai" : envProvider;
+		feature === "doubt.chat" && opts.hasImageAttachment === true ? "openai" : envProvider;
 
 	if (provider === "deepseek") {
 		const modelId = deepseekModelIdForFeature(feature);

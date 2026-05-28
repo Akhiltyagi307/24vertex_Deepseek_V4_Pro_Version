@@ -85,6 +85,30 @@ vi.mock("@/lib/env", () => ({
 	getSupabasePublishableKey: () => "test",
 	getComplianceExportsBucket: () => "compliance-exports",
 	isProductionDeployment: () => false,
+	// Off-topic pre-check stays off in tests so existing fixtures (which were
+	// authored without vocab-overlap concerns) still 200. Tests that need to
+	// exercise the pre-check toggle this on explicitly.
+	isDoubtScopePrecheckEnabled: () => false,
+	// DeepSeek model getters — included so the test passes regardless of
+	// whether `.env.local` routes doubt.chat to OpenAI or DeepSeek. The
+	// model-router reads `process.env.AI_PROVIDER_DOUBT_CHAT` directly
+	// (bypassing this mock), so we must support both code paths.
+	getDeepSeekDoubtChatModel: () => "deepseek-test",
+	getDeepSeekPracticeChatModel: () => "deepseek-test",
+	getDeepSeekBlueprintModel: () => "deepseek-test",
+	getDeepSeekVisualEnrichmentModel: () => "deepseek-test",
+	getDeepSeekValidationModel: () => "deepseek-test",
+	getDeepSeekGradeSummaryModel: () => "deepseek-test",
+	getDeepSeekGradingChatModel: () => "deepseek-test",
+	getOpenAIChatModel: () => "gpt-test",
+	getOpenAIPracticeChatModel: () => "gpt-test",
+	getDeepSeekApiKey: () => "test-key",
+	getDeepSeekBaseUrl: () => "https://api.deepseek.com",
+	getDeepSeekReasoningEffort: () => "medium",
+	getDeepSeekBlueprintThinking: () => "enabled",
+	getDeepSeekVisualEnrichmentThinking: () => "enabled",
+	getDeepSeekValidationThinking: () => "enabled",
+	getDeepSeekGradeSummaryThinking: () => "enabled",
 }));
 const DEFAULT_SCOPE_OK = {
 	ok: true as const,
@@ -370,6 +394,18 @@ describe("POST /api/student/doubt-chat", () => {
 
 	it("returns the streamed Response on the success path", async () => {
 		const res = await POST(makeRequest(VALID_BODY));
+		expect(res.status).toBe(200);
+	});
+
+	it("accepts quiz_me as a tutor mode (schema + route)", async () => {
+		const res = await POST(makeRequest({ ...VALID_BODY, tutorMode: "quiz_me" }));
+		expect(res.status).toBe(200);
+	});
+
+	it("accepts previousTutorMode when the student switched modes mid-chat", async () => {
+		const res = await POST(
+			makeRequest({ ...VALID_BODY, tutorMode: "solve_with_me", previousTutorMode: "explain" }),
+		);
 		expect(res.status).toBe(200);
 	});
 

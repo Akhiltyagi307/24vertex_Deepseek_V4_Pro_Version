@@ -46,7 +46,9 @@
     "razorpay:seed-plans": "node scripts/seed-razorpay-plans.mjs",
     "admin:security-phase6": "node scripts/admin-security-phase6.mjs",
     "admin:password-hash-b64": "node scripts/admin-password-hash-b64.mjs",
-    "admin:totp-secret": "node scripts/admin-totp-secret.mjs"
+    "admin:totp-secret": "node scripts/admin-totp-secret.mjs",
+    "doubt:fingerprint": "tsx scripts/check-doubt-prompt-fingerprint.ts",
+    "doubt:fingerprint:write": "tsx scripts/check-doubt-prompt-fingerprint.ts --write"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^1.0.0",
