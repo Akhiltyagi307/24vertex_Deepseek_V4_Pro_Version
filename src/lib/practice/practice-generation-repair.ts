@@ -8,9 +8,6 @@ import type {
 	PracticeQualityGateFailureCode,
 } from "./practice-generation-quality-gates";
 
-const REPAIR_USER_BODY_MAX_CHARS = 380_000;
-const REPAIR_BASE_USER_APPEND_MAX_CHARS = 120_000;
-
 export type PracticeGenerationRepairReason =
 	| {
 			kind: "validation";
@@ -129,12 +126,7 @@ export function buildPracticeGenerationRepairUserPrompt(args: {
 	/** Full original generation context is expensive; keep OFF unless explicitly enabled. */
 	includeBaseUserPrompt?: boolean;
 }): string {
-	let body = args.failedGroupedJson;
-	if (body.length > REPAIR_USER_BODY_MAX_CHARS) {
-		body =
-			body.slice(0, REPAIR_USER_BODY_MAX_CHARS) +
-			"\n...(truncated for size; use REPAIR_PAYLOAD fields and ALLOWED_TOPIC_IDS.)";
-	}
+	const body = args.failedGroupedJson;
 	const lines: string[] = [];
 
 	if (args.reason.kind === "validation") {
@@ -200,11 +192,7 @@ export function buildPracticeGenerationRepairUserPrompt(args: {
 	);
 
 	if (args.targetedContextJson && args.targetedContextJson.trim()) {
-		let targeted = args.targetedContextJson;
-		if (targeted.length > REPAIR_BASE_USER_APPEND_MAX_CHARS) {
-			targeted = targeted.slice(0, REPAIR_BASE_USER_APPEND_MAX_CHARS) + "\n...(truncated)";
-		}
-		lines.push("", "TARGETED_CONTEXT_JSON:", targeted);
+		lines.push("", "TARGETED_CONTEXT_JSON:", args.targetedContextJson);
 	}
 
 	if (
@@ -213,14 +201,8 @@ export function buildPracticeGenerationRepairUserPrompt(args: {
 		args.baseUserPrompt.length > 0 &&
 		args.reason.kind === "quality"
 	) {
-		let ctx = args.baseUserPrompt;
-		if (ctx.length > REPAIR_BASE_USER_APPEND_MAX_CHARS) {
-			ctx = ctx.slice(0, REPAIR_BASE_USER_APPEND_MAX_CHARS) + "\n...(truncated)";
-		}
-		if (ctx) {
-			lines.push("", "GENERATION_CONTEXT_USER_MESSAGE:");
-			lines.push(ctx);
-		}
+		lines.push("", "GENERATION_CONTEXT_USER_MESSAGE:");
+		lines.push(args.baseUserPrompt);
 	}
 
 	return lines.join("\n");

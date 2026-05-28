@@ -5,107 +5,23 @@ import { logServerError } from "@/lib/server/log-supabase-error";
 import { tagTopicContextFetchFailed } from "./sentry-tags";
 import type { PracticeGroundingMeta, PracticeTopicChunkLine, PreFetchedTopicContext } from "./user-message";
 
-/**
- * Tunable limits for practice prompt size (per-topic then global trim).
- *
- * Defaults raised 2026-05 to widen the model's grounding window. Every value
- * is also overridable per-environment — see `.env.example` for the full list
- * of `PRACTICE_TOPIC_CONTEXT_*` variables.
- */
-export const TOPIC_CONTEXT_DEFAULT_LIMITS = {
-	maxContextChunksPerTopic: 33,
-	maxExerciseChunksPerTopic: 28,
-	maxQuestionBankChunksPerTopic: 5,
-	maxContextCharsPerTopic: 16_500,
-	maxExerciseCharsPerTopic: 13_200,
-	maxQuestionBankCharsPerTopic: 12_000,
-	maxTotalContextChars: 88_000,
-	maxTotalExerciseChars: 66_000,
-	maxTotalQuestionBankChars: 40_000,
-} as const;
-
-export type TopicContextLimits = {
-	maxContextChunksPerTopic: number;
-	maxExerciseChunksPerTopic: number;
-	maxQuestionBankChunksPerTopic: number;
-	maxContextCharsPerTopic: number;
-	maxExerciseCharsPerTopic: number;
-	maxQuestionBankCharsPerTopic: number;
-	maxTotalContextChars: number;
-	maxTotalExerciseChars: number;
-	maxTotalQuestionBankChars: number;
-};
-
 type TopicChunkBuckets = {
 	context: PracticeTopicChunkLine[];
 	exercise: PracticeTopicChunkLine[];
 	questionBank: PracticeTopicChunkLine[];
 };
 
-const DEFAULT_LIMITS: TopicContextLimits = { ...TOPIC_CONTEXT_DEFAULT_LIMITS };
-
-/** Hard ceiling so misconfigured env cannot OOM a Node process. */
-const ENV_LIMIT_CEILING = 500_000;
-
-function parseEnvPositiveInt(name: string, fallback: number, max: number): number {
-	const raw = process.env[name];
-	if (raw == null || raw === "") return fallback;
-	const n = Number.parseInt(raw, 10);
-	if (!Number.isFinite(n) || n < 0) return fallback;
-	return Math.min(n, max);
+function charSum(lines: PracticeTopicChunkLine[]): number {
+	return lines.reduce((a, c) => a + c.text.length, 0);
 }
 
-/**
- * Optional env overrides (see `.env.example`). Invalid values fall back to defaults.
- */
-export function getTopicContextLimitsFromEnv(): TopicContextLimits {
-	return {
-		maxContextChunksPerTopic: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_CONTEXT_CHUNKS_PER_TOPIC",
-			DEFAULT_LIMITS.maxContextChunksPerTopic,
-			10_000,
-		),
-		maxExerciseChunksPerTopic: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_EXERCISE_CHUNKS_PER_TOPIC",
-			DEFAULT_LIMITS.maxExerciseChunksPerTopic,
-			10_000,
-		),
-		maxQuestionBankChunksPerTopic: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_QUESTION_BANK_CHUNKS_PER_TOPIC",
-			DEFAULT_LIMITS.maxQuestionBankChunksPerTopic,
-			10_000,
-		),
-		maxContextCharsPerTopic: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_CONTEXT_CHARS_PER_TOPIC",
-			DEFAULT_LIMITS.maxContextCharsPerTopic,
-			ENV_LIMIT_CEILING,
-		),
-		maxExerciseCharsPerTopic: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_EXERCISE_CHARS_PER_TOPIC",
-			DEFAULT_LIMITS.maxExerciseCharsPerTopic,
-			ENV_LIMIT_CEILING,
-		),
-		maxQuestionBankCharsPerTopic: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_QUESTION_BANK_CHARS_PER_TOPIC",
-			DEFAULT_LIMITS.maxQuestionBankCharsPerTopic,
-			ENV_LIMIT_CEILING,
-		),
-		maxTotalContextChars: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_TOTAL_CONTEXT_CHARS",
-			DEFAULT_LIMITS.maxTotalContextChars,
-			ENV_LIMIT_CEILING,
-		),
-		maxTotalExerciseChars: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_TOTAL_EXERCISE_CHARS",
-			DEFAULT_LIMITS.maxTotalExerciseChars,
-			ENV_LIMIT_CEILING,
-		),
-		maxTotalQuestionBankChars: parseEnvPositiveInt(
-			"PRACTICE_TOPIC_CONTEXT_MAX_TOTAL_QUESTION_BANK_CHARS",
-			DEFAULT_LIMITS.maxTotalQuestionBankChars,
-			ENV_LIMIT_CEILING,
-		),
-	};
+function shuffleCopy<T>(arr: T[], random: () => number): T[] {
+	const out = [...arr];
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = Math.floor(random() * (i + 1));
+		[out[i], out[j]] = [out[j]!, out[i]!];
+	}
+	return out;
 }
 
 export type RawTopicChunkRow = {
@@ -136,34 +52,18 @@ export function sortRawChunksByTopicThenCreated(
 	});
 }
 
-type RawChunk = RawTopicChunkRow;
-
-function charSum(lines: PracticeTopicChunkLine[]): number {
-	return lines.reduce((a, c) => a + c.text.length, 0);
-}
-
-function shuffleCopy<T>(arr: T[], random: () => number): T[] {
-	const out = [...arr];
-	for (let i = out.length - 1; i > 0; i--) {
-		const j = Math.floor(random() * (i + 1));
-		[out[i], out[j]] = [out[j]!, out[i]!];
-	}
-	return out;
-}
-
 /**
- * Per-topic cap (chunk count + char budget), then global char trim by dropping
- * from the end of the last topics (canonical order preserved for remaining chunks).
+ * Shuffles exercise / question-bank chunks per topic (context stays in created_at order).
+ * All fetched chunks are included — no per-topic or global char/chunk caps.
  * Exported for unit tests.
  */
 export function applyTopicContextLimits(
 	raw: Map<string, TopicChunkBuckets>,
 	topicOrder: string[],
-	limits: TopicContextLimits = DEFAULT_LIMITS,
-	options: { random?: () => number } = {},
+	_options: { random?: () => number } = {},
 ): { byTopic: Map<string, TopicChunkBuckets>; truncated: boolean } {
 	const byTopic = new Map<string, TopicChunkBuckets>();
-	const random = options.random ?? Math.random;
+	const random = _options.random ?? Math.random;
 
 	for (const tid of topicOrder) {
 		const b = raw.get(tid) ?? { context: [], exercise: [], questionBank: [] };
@@ -174,72 +74,12 @@ export function applyTopicContextLimits(
 		});
 	}
 
-	let truncated = false;
-
-	for (const tid of topicOrder) {
-		const b = byTopic.get(tid);
-		if (!b) continue;
-
-		const capList = (arr: PracticeTopicChunkLine[], maxChunks: number, maxChars: number) => {
-			const out: PracticeTopicChunkLine[] = [];
-			let chars = 0;
-			for (const line of arr) {
-				if (out.length >= maxChunks) {
-					truncated = true;
-					break;
-				}
-				const nextLen = line.text.length;
-				if (chars + nextLen > maxChars) {
-					truncated = true;
-					break;
-				}
-				out.push(line);
-				chars += nextLen;
-			}
-			if (out.length < arr.length) truncated = true;
-			return out;
-		};
-
-		b.context = capList(b.context, limits.maxContextChunksPerTopic, limits.maxContextCharsPerTopic);
-		b.exercise = capList(b.exercise, limits.maxExerciseChunksPerTopic, limits.maxExerciseCharsPerTopic);
-		b.questionBank = capList(
-			b.questionBank,
-			limits.maxQuestionBankChunksPerTopic,
-			limits.maxQuestionBankCharsPerTopic,
-		);
-	}
-
-	const trimGlobal = (kind: keyof TopicChunkBuckets, maxGlobal: number) => {
-		let total = 0;
-		for (const tid of topicOrder) {
-			const b = byTopic.get(tid);
-			if (b) total += charSum(b[kind]);
-		}
-		if (total <= maxGlobal) return;
-		for (const tid of [...topicOrder].reverse()) {
-			const b = byTopic.get(tid);
-			if (!b) continue;
-			const arr = b[kind];
-			while (arr.length > 0 && total > maxGlobal) {
-				const removed = arr.pop()!;
-				total -= removed.text.length;
-				truncated = true;
-			}
-			if (total <= maxGlobal) return;
-		}
-	};
-
-	trimGlobal("context", limits.maxTotalContextChars);
-	trimGlobal("exercise", limits.maxTotalExerciseChars);
-	trimGlobal("questionBank", limits.maxTotalQuestionBankChars);
-
-	return { byTopic, truncated };
+	return { byTopic, truncated: false };
 }
 
 function buildMeta(
 	byTopic: Map<string, TopicChunkBuckets>,
 	topicOrder: string[],
-	truncated: boolean,
 	fetchError?: string,
 ): PracticeGroundingMeta {
 	let contextChunkCount = 0;
@@ -274,7 +114,7 @@ function buildMeta(
 		context_char_total: contextCharTotal,
 		exercise_char_total: exerciseCharTotal,
 		question_bank_char_total: questionBankCharTotal,
-		truncated,
+		truncated: false,
 		context_quality,
 		...(fetchError ? { fetch_error: fetchError } : {}),
 	};
@@ -312,7 +152,6 @@ export function logPracticeTopicContextStats(meta: PracticeGroundingMeta, contex
 export async function fetchTopicContextChunksByTopicIds(
 	admin: SupabaseClient,
 	topicIds: string[],
-	limits: TopicContextLimits = getTopicContextLimitsFromEnv(),
 ): Promise<PreFetchedTopicContext> {
 	const topicOrder = [...topicIds];
 	if (topicOrder.length === 0) {
@@ -357,7 +196,7 @@ export async function fetchTopicContextChunksByTopicIds(
 		};
 	}
 
-	const orderedRows = sortRawChunksByTopicThenCreated((data ?? []) as RawChunk[], topicOrder);
+	const orderedRows = sortRawChunksByTopicThenCreated((data ?? []) as RawTopicChunkRow[], topicOrder);
 
 	const raw = new Map<string, TopicChunkBuckets>();
 
@@ -378,8 +217,8 @@ export async function fetchTopicContextChunksByTopicIds(
 		}
 	}
 
-	const { byTopic, truncated } = applyTopicContextLimits(raw, topicOrder, limits);
-	const meta = buildMeta(byTopic, topicOrder, truncated);
+	const { byTopic } = applyTopicContextLimits(raw, topicOrder);
+	const meta = buildMeta(byTopic, topicOrder);
 	logPracticeTopicContextStats(meta);
 	return { byTopic, meta };
 }

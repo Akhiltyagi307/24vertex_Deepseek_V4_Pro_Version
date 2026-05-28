@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { resolveChatModel } from "@/lib/ai/model-router";
-import { generateStructured } from "@/lib/ai/structured-output";
+import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
 import { logServerError } from "@/lib/server/log-supabase-error";
 
 import type { PracticeQuestionTypeCounts } from "./constants";
@@ -154,7 +154,7 @@ export async function runPracticeValidationPass(
 	const resolved = resolveChatModel("practice.generation.validation");
 	const t0 = Date.now();
 	try {
-		const result = await generateStructured({
+		const result = await generateStructuredWithProviderFallback({
 			resolved,
 			schema: practiceValidationOutputSchema,
 			system: buildValidationSystemPrompt(),
@@ -163,12 +163,10 @@ export async function runPracticeValidationPass(
 				expectedTypeCounts: args.expectedTypeCounts,
 				allowedTopicIds: args.allowedTopicIds,
 			}),
-			// Output is small (just a list of issues) — keep budget tight so a
-			// hung call fails fast.
-			maxOutputTokens: 4_000,
 			maxRetries: 1,
 			abortSignal: args.abortSignal,
 			maxRepairAttempts: 1,
+			feature: "practice.generation.validation",
 		});
 
 		const latencyMs = Date.now() - t0;
@@ -177,7 +175,7 @@ export async function runPracticeValidationPass(
 
 		void recordAiCall({
 			feature: "practice.generation.validation",
-			model: resolved.modelId,
+			model: result.telemetry.modelId,
 			userId: args.studentUserId,
 			generationRunId: args.telemetry.generationRunId,
 			correlationId: args.telemetry.correlationId,
@@ -185,6 +183,7 @@ export async function runPracticeValidationPass(
 			stepKey: args.telemetry.stepKey,
 			inputTokens,
 			outputTokens,
+			provider: result.telemetry.provider,
 			latencyMs,
 			status: "ok",
 		});

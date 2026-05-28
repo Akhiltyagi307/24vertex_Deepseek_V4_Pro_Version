@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
 	applyTopicContextLimits,
 	sortRawChunksByTopicThenCreated,
-	TOPIC_CONTEXT_DEFAULT_LIMITS,
 	type RawTopicChunkRow,
 } from "../topic-context-chunks";
 import {
@@ -48,57 +47,24 @@ describe("sortRawChunksByTopicThenCreated", () => {
 });
 
 describe("applyTopicContextLimits", () => {
-	it("splits by max chunks per topic", () => {
+	it("includes all chunks without truncation", () => {
 		const raw = new Map<
 			string,
 			{ context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[]; questionBank: PracticeTopicChunkLine[] }
 		>();
 		raw.set(T1, {
 			context: Array.from({ length: 20 }, (_, i) => line(`c${i}`)),
-			exercise: [],
-			questionBank: [],
+			exercise: [line("ex0"), line("ex1")],
+			questionBank: [line("qb0")],
 		});
-		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1], {
-			...TOPIC_CONTEXT_DEFAULT_LIMITS,
-			maxContextChunksPerTopic: 3,
-			maxContextCharsPerTopic: 1_000_000,
-		});
-		expect(byTopic.get(T1)!.context).toHaveLength(3);
-		expect(truncated).toBe(true);
+		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1]);
+		expect(byTopic.get(T1)!.context).toHaveLength(20);
+		expect(byTopic.get(T1)!.exercise).toHaveLength(2);
+		expect(byTopic.get(T1)!.questionBank).toHaveLength(1);
+		expect(truncated).toBe(false);
 	});
 
-	it("enforces per-topic char budget", () => {
-		const raw = new Map();
-		raw.set(T1, {
-			context: [line("ab"), line("cd"), line("ef")],
-			exercise: [],
-			questionBank: [],
-		});
-		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1], {
-			...TOPIC_CONTEXT_DEFAULT_LIMITS,
-			maxContextChunksPerTopic: 10,
-			maxContextCharsPerTopic: 3,
-		});
-		expect(byTopic.get(T1)!.context).toHaveLength(1);
-		expect(truncated).toBe(true);
-	});
-
-	it("trims globally from last topic in order", () => {
-		const raw = new Map();
-		raw.set(T1, { context: [line("aaaa")], exercise: [], questionBank: [] });
-		raw.set(T2, { context: [line("bbbb")], exercise: [], questionBank: [] });
-		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1, T2], {
-			...TOPIC_CONTEXT_DEFAULT_LIMITS,
-			maxContextChunksPerTopic: 5,
-			maxContextCharsPerTopic: 10_000,
-			maxTotalContextChars: 4,
-		});
-		expect(byTopic.get(T1)!.context).toHaveLength(1);
-		expect(byTopic.get(T2)!.context).toHaveLength(0);
-		expect(truncated).toBe(true);
-	});
-
-	it("randomizes exercise and question-bank chunks before applying per-topic caps", () => {
+	it("randomizes exercise and question-bank chunks while preserving context order", () => {
 		const raw = new Map<
 			string,
 			{ context: PracticeTopicChunkLine[]; exercise: PracticeTopicChunkLine[]; questionBank: PracticeTopicChunkLine[] }
@@ -109,28 +75,31 @@ describe("applyTopicContextLimits", () => {
 			questionBank: Array.from({ length: 7 }, (_, i) => line(`qb${i}`)),
 		});
 
-		const { byTopic, truncated } = applyTopicContextLimits(
-			raw,
-			[T1],
-			{
-				...TOPIC_CONTEXT_DEFAULT_LIMITS,
-				maxExerciseChunksPerTopic: 2,
-				maxQuestionBankChunksPerTopic: 5,
-				maxContextCharsPerTopic: 1_000_000,
-				maxExerciseCharsPerTopic: 1_000_000,
-				maxQuestionBankCharsPerTopic: 1_000_000,
-				maxTotalContextChars: 1_000_000,
-				maxTotalExerciseChars: 1_000_000,
-				maxTotalQuestionBankChars: 1_000_000,
-			},
-			{ random: fixedRandom(0) },
-		);
+		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1], { random: fixedRandom(0) });
 
 		const pack = byTopic.get(T1)!;
 		expect(pack.context.map((c) => c.text)).toEqual(["ctx0", "ctx1", "ctx2"]);
-		expect(pack.exercise.map((c) => c.text)).toEqual(["ex1", "ex2"]);
-		expect(pack.questionBank.map((c) => c.text)).toEqual(["qb1", "qb2", "qb3", "qb4", "qb5"]);
-		expect(truncated).toBe(true);
+		expect(pack.exercise.map((c) => c.text)).toEqual(["ex1", "ex2", "ex3", "ex0"]);
+		expect(pack.questionBank.map((c) => c.text)).toEqual([
+			"qb1",
+			"qb2",
+			"qb3",
+			"qb4",
+			"qb5",
+			"qb6",
+			"qb0",
+		]);
+		expect(truncated).toBe(false);
+	});
+
+	it("never drops chunks from later topics in the order", () => {
+		const raw = new Map();
+		raw.set(T1, { context: [line("aaaa")], exercise: [], questionBank: [] });
+		raw.set(T2, { context: [line("bbbb")], exercise: [], questionBank: [] });
+		const { byTopic, truncated } = applyTopicContextLimits(raw, [T1, T2]);
+		expect(byTopic.get(T1)!.context).toHaveLength(1);
+		expect(byTopic.get(T2)!.context).toHaveLength(1);
+		expect(truncated).toBe(false);
 	});
 });
 

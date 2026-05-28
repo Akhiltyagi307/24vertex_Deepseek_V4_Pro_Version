@@ -16,6 +16,13 @@ import {
 	extractReasoningTokens,
 	type ProviderOptions,
 } from "./deepseek-provider";
+import {
+	buildProviderFallbackTelemetry,
+	logProviderFallbackAttempt,
+	resolveOpenAiFallbackResolved,
+	shouldAttemptProviderFallback,
+	type ProviderFallbackTelemetry,
+} from "./provider-fallback";
 import type { ResolvedAiModel } from "./model-router";
 
 /**
@@ -67,6 +74,7 @@ export type StructuredCallTelemetry = {
 	reasoningTokens: number | null;
 	cacheHitTokens: number | null;
 	cacheMissTokens: number | null;
+	providerFallback?: ProviderFallbackTelemetry;
 };
 
 export type GenerateStructuredArgs<TSchema extends z.ZodType> = {
@@ -199,14 +207,13 @@ function parseAndValidate<TSchema extends z.ZodType>(
 }
 
 function buildRepairPrompt(originalText: string, failure: { reason: string; detail: string }): string {
-	const truncatedOriginal = originalText.slice(0, 16_000);
 	return [
 		"Your previous response could not be used. Return ONLY a corrected JSON object — same schema, no prose, no markdown fences.",
 		`FAILURE_REASON: ${failure.reason}`,
 		`FAILURE_DETAIL: ${failure.detail}`,
 		"",
 		"PREVIOUS_RESPONSE:",
-		truncatedOriginal,
+		originalText,
 	].join("\n");
 }
 
@@ -317,6 +324,65 @@ export async function generateStructured<TSchema extends z.ZodType>(
 	);
 	(err as { code?: string }).code = "deepseek_structured_failure";
 	throw err;
+}
+
+/** Test-only override for {@link generateStructuredWithProviderFallback}. */
+let generateStructuredDelegate: typeof generateStructured | undefined;
+
+function invokeGenerateStructured<TSchema extends z.ZodType>(
+	args: GenerateStructuredArgs<TSchema>,
+): Promise<GenerateStructuredResult<z.infer<TSchema>>> {
+	const impl = generateStructuredDelegate ?? generateStructured;
+	return impl(args);
+}
+
+export type GenerateStructuredWithFallbackArgs<TSchema extends z.ZodType> =
+	GenerateStructuredArgs<TSchema> & {
+		/** Used in fallback logs (e.g. `practice.generation.blueprint`). */
+		feature?: string;
+	};
+
+/**
+ * Like {@link generateStructured} but retries once on OpenAI when the primary
+ * DeepSeek call fails with a retryable provider error (429 / overload / etc.).
+ */
+export async function generateStructuredWithProviderFallback<TSchema extends z.ZodType>(
+	args: GenerateStructuredWithFallbackArgs<TSchema>,
+): Promise<GenerateStructuredResult<z.infer<TSchema>>> {
+	const primaryResolved = args.resolved;
+	try {
+		return await invokeGenerateStructured(args);
+	} catch (primaryError) {
+		if (
+			!shouldAttemptProviderFallback({
+				primary: primaryResolved,
+				error: primaryError,
+				feature: args.feature,
+			})
+		) {
+			throw primaryError;
+		}
+		const fallbackResolved = resolveOpenAiFallbackResolved();
+		if (!fallbackResolved) throw primaryError;
+		logProviderFallbackAttempt({
+			feature: args.feature ?? "structured_output",
+			primaryModelId: primaryResolved.modelId,
+			fallbackModelId: fallbackResolved.modelId,
+			error: primaryError,
+		});
+		const result = await invokeGenerateStructured({ ...args, resolved: fallbackResolved });
+		return {
+			...result,
+			telemetry: {
+				...result.telemetry,
+				providerFallback: buildProviderFallbackTelemetry(
+					primaryResolved,
+					fallbackResolved.modelId,
+					primaryError,
+				),
+			},
+		};
+	}
 }
 
 /**
@@ -507,6 +573,115 @@ export function streamStructured<TSchema extends z.ZodType>(
 }
 
 /**
+ * Like {@link streamStructured} but retries once on OpenAI when the primary
+ * DeepSeek stream fails with a retryable provider error.
+ */
+export function streamStructuredWithProviderFallback<TSchema extends z.ZodType>(
+	args: GenerateStructuredWithFallbackArgs<TSchema>,
+): StreamStructuredResult<z.infer<TSchema>> {
+	const primaryResolved = args.resolved;
+	const primary = streamStructured(args);
+	let fallbackStream: StreamStructuredResult<z.infer<TSchema>> | null = null;
+	let fallbackTelemetry: ProviderFallbackTelemetry | undefined;
+
+	const object = primary.object.catch(async (primaryError: unknown) => {
+		if (
+			!shouldAttemptProviderFallback({
+				primary: primaryResolved,
+				error: primaryError,
+				feature: args.feature,
+			})
+		) {
+			throw primaryError;
+		}
+		const fallbackResolved = resolveOpenAiFallbackResolved();
+		if (!fallbackResolved) throw primaryError;
+		logProviderFallbackAttempt({
+			feature: args.feature ?? "structured_output_stream",
+			primaryModelId: primaryResolved.modelId,
+			fallbackModelId: fallbackResolved.modelId,
+			error: primaryError,
+		});
+		fallbackTelemetry = buildProviderFallbackTelemetry(
+			primaryResolved,
+			fallbackResolved.modelId,
+			primaryError,
+		);
+		fallbackStream = streamStructured({ ...args, resolved: fallbackResolved });
+		return fallbackStream.object;
+	});
+
+	const partialObjectStream: AsyncIterable<Partial<z.infer<TSchema>>> = {
+		[Symbol.asyncIterator]() {
+			let done = false;
+			return {
+				async next(): Promise<IteratorResult<Partial<z.infer<TSchema>>>> {
+					if (done) return { value: undefined, done: true };
+					done = true;
+					try {
+						const value = await object;
+						return { value, done: false };
+					} catch {
+						return { value: undefined, done: true };
+					}
+				},
+			};
+		},
+	};
+
+	return {
+		partialObjectStream,
+		object,
+		usage: (async () => {
+			try {
+				await primary.object;
+				return primary.usage;
+			} catch (primaryError) {
+				if (!fallbackStream) throw primaryError;
+				await fallbackStream.object;
+				return fallbackStream.usage;
+			}
+		})(),
+		providerMetadata: (async () => {
+			try {
+				await primary.object;
+				return primary.providerMetadata;
+			} catch (primaryError) {
+				if (!fallbackStream) throw primaryError;
+				await fallbackStream.object;
+				return fallbackStream.providerMetadata;
+			}
+		})(),
+		telemetry: (async () => {
+			try {
+				await primary.object;
+				return primary.telemetry;
+			} catch (primaryError) {
+				if (!fallbackStream) throw primaryError;
+				const telemetry = await fallbackStream.telemetry;
+				return {
+					...telemetry,
+					providerFallback: fallbackTelemetry,
+				};
+			}
+		})(),
+	};
+}
+
+/** Metadata fragment for `practice_generation_steps.metadata` when fallback ran. */
+export function providerFallbackStepMetadata(
+	telemetry: StructuredCallTelemetry,
+): Record<string, string | boolean> | null {
+	if (!telemetry.providerFallback) return null;
+	return {
+		provider_fallback: true,
+		primary_model: telemetry.providerFallback.primaryModelId,
+		fallback_model: telemetry.providerFallback.fallbackModelId,
+		fallback_reason: telemetry.providerFallback.reason,
+	};
+}
+
+/**
  * Test-only handles for the internal parsing helpers. Not part of the public
  * API; subject to change without notice.
  */
@@ -516,4 +691,7 @@ export const __testOnly = {
 	buildJsonModePreamble,
 	buildRepairPrompt,
 	mergeProviderOptions,
+	setGenerateStructuredDelegate: (fn: typeof generateStructured | undefined) => {
+		generateStructuredDelegate = fn;
+	},
 };

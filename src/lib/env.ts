@@ -202,6 +202,14 @@ export function getOpenAIPracticeChatModelFallback(): string | null {
 	return getOpenAIChatModelFallback();
 }
 
+/**
+ * When false (`AI_PROVIDER_FALLBACK_ENABLED=false`), DeepSeek 429/503 failures
+ * do not retry on OpenAI. Default: enabled.
+ */
+export function isAiProviderFallbackEnabled(): boolean {
+	return process.env.AI_PROVIDER_FALLBACK_ENABLED?.trim().toLowerCase() !== "false";
+}
+
 // ============================================================
 // DeepSeek (V4 Pro) — used when the model router selects "deepseek"
 // for a feature. OpenAI helpers above remain the fallback path

@@ -5,7 +5,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { generateStructured } from "@/lib/ai/structured-output";
+import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
 import { consumeTest } from "@/lib/billing/entitlements";
 import { notifyTestReportReady } from "@/lib/notifications/report-ready";
 import {
@@ -191,20 +191,21 @@ async function runGradingChunk(
 	const modelId = resolved.modelId;
 	return withPracticeAiAttempts("gradePracticeTest.chunk", async () => {
 		const t0 = Date.now();
-		const { object, usage, telemetry } = await generateStructured({
+		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
 			resolved,
 			schema: gradingChunkSchema,
 			system: systemPrompt,
 			prompt: userPrompt,
 			maxOutputTokens,
 			maxRetries: 2,
+			feature: "practice.grade.chunk",
 			providerOptions: {
 				openai: { strictJsonSchema: isStrictJsonSchemaForGradingEnabled() },
 			},
 		});
 		void recordAiCall({
 			feature: "practice.grade.chunk",
-			model: modelId,
+			model: telemetry.modelId,
 			userId,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,
@@ -252,7 +253,7 @@ async function runSummaryObject(
 		const t0 = Date.now();
 		const resolved = resolveChatModel("practice.grade.summary");
 		const modelId = resolved.modelId;
-		const { object, usage, telemetry } = await generateStructured({
+		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
 			resolved,
 			schema: practiceGradingSummarySchema,
 			system: [
@@ -264,13 +265,14 @@ async function runSummaryObject(
 			prompt,
 			maxOutputTokens: 2_500,
 			maxRetries: 2,
+			feature: "practice.grade.summary",
 			providerOptions: {
 				openai: { strictJsonSchema: isStrictJsonSchemaForGradingEnabled() },
 			},
 		});
 		void recordAiCall({
 			feature: "practice.grade.summary",
-			model: modelId,
+			model: telemetry.modelId,
 			userId,
 			inputTokens: usage?.inputTokens ?? 0,
 			outputTokens: usage?.outputTokens ?? 0,

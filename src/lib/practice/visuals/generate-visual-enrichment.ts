@@ -11,7 +11,7 @@ import {
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
-import { generateStructured } from "@/lib/ai/structured-output";
+import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
 import { getOpenAIPracticeChatModel } from "@/lib/env";
 import type { PracticeEvidenceMap } from "@/lib/practice/generation-evidence-pack";
 import { selectEvidenceForFailedIndexes } from "@/lib/practice/generation-evidence-pack";
@@ -208,7 +208,7 @@ export async function generateVisualEnrichmentPass(args: {
 		let cacheMissTokens: number | null = null;
 
 		if (resolved.provider === "deepseek") {
-			const structured = await generateStructured({
+			const structured = await generateStructuredWithProviderFallback({
 				resolved,
 				schema: visualEnrichmentOutputSchema,
 				system,
@@ -217,6 +217,7 @@ export async function generateVisualEnrichmentPass(args: {
 				maxRetries: 0,
 				maxRepairAttempts: 1,
 				abortSignal: args.abortSignal,
+				feature: "practice.generation.visual_enrichment",
 			});
 			rawPatches = structured.object.patches.map((p): VisualPatch =>
 				p.action === "replace_visual"
