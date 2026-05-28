@@ -41,4 +41,13 @@ jobs:
         run: pnpm exec tsc --noEmit
 
       - name: Vitest (full suite)
+        # `src/db/index.ts` throws at module load when DATABASE_URL is unset.
+        # Several modules transitively import it, so vitest test-file
+        # discovery itself fails without a value here. The dummy URL only
+        # satisfies module-load; the `postgres` client is lazy and tests
+        # that need a real connection are guarded by
+        # `it.skipIf(!process.env.ADMIN_INTEGRATION_TESTS)` (see admin-panel
+        # workflow for the integration step that provides the real secret).
+        env:
+          DATABASE_URL: postgres://ci-dummy:ci-dummy@127.0.0.1:5432/ci_test
         run: pnpm vitest run
