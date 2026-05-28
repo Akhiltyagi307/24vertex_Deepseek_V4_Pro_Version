@@ -575,6 +575,7 @@ async function runBatchWithTailGuard(args: {
 				return {
 					ok: false,
 					message: `Batch ${args.baseStepKey} timed out after ${(BATCH_TAIL_TIMEOUT_MS / 1000).toFixed(0)}s on both attempts.`,
+					error: e,
 					usage: { inputTokens: 0, outputTokens: 0, latencyMs: BATCH_TAIL_TIMEOUT_MS, model: "unknown" },
 				};
 			}
@@ -588,6 +589,7 @@ async function runBatchWithTailGuard(args: {
 	return {
 		ok: false,
 		message: `Batch ${args.baseStepKey} exhausted retry budget without resolution.`,
+		error: null,
 		usage: { inputTokens: 0, outputTokens: 0, latencyMs: 0, model: "unknown" },
 	};
 }

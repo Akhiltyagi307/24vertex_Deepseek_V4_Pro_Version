@@ -1,16 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildPublicMarketingCsp, resolveCspPolicyForPath } from "@/lib/security/csp";
 
 describe("buildPublicMarketingCsp", () => {
-	const originalNodeEnv = process.env.NODE_ENV;
-
 	afterEach(() => {
-		process.env.NODE_ENV = originalNodeEnv;
+		// `vi.unstubAllEnvs` restores process.env to its state at module load,
+		// which is what we want after each NODE_ENV override. Using vi helpers
+		// rather than direct `process.env.NODE_ENV = ...` because Node 22's
+		// types declare NODE_ENV as read-only.
+		vi.unstubAllEnvs();
 	});
 
 	it("omits build-time hashes in development so unsafe-inline can allow next-themes", () => {
-		process.env.NODE_ENV = "development";
+		vi.stubEnv("NODE_ENV", "development");
 		const csp = buildPublicMarketingCsp();
 		expect(csp).toMatch(/'unsafe-inline'/);
 		expect(csp).not.toMatch(/'sha256-/);
