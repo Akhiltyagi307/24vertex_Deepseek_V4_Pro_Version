@@ -41,10 +41,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-	SubjectCard,
-	subjectStatusLabelToDashboardStatus,
-} from "@/components/student/dashboard-subject-card";
+import { subjectStatusLabelToDashboardStatus } from "@/components/student/dashboard-subject-card";
+import { SubjectTileLink } from "@/components/student/subject-tile-link";
 import { cn } from "@/lib/utils";
 import {
 	averageTestScorePercentForSubject,
@@ -396,113 +394,46 @@ export function StudentPerformanceView({
 									</span>
 								);
 
-								if (!hasTopics) {
-									const noTopicsHint = parentViewer
-										? "No catalog topics for this grade yet."
-										: "No catalog topics for your grade yet.";
-									return (
-										<motion.div key={s.subjectId} className="min-h-0" variants={item}>
-											<Link
-												href={href}
-												scroll
-												aria-label={`Open ${s.subjectName} performance. ${noTopicsHint}`}
-												className={cn(
-													"group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-												)}
-											>
-												<SubjectCard
-													subject={s.subjectName}
-													lastTestDate=""
-													subtitle={undefined}
-													topicsAttempted={0}
-													topicsTotal={0}
-													testsTaken={0}
-													avgScore={0}
-													status="ready_to_start"
-													showCta={false}
-													showTileHint
-													metricsIconSlot={iconEl}
-													density="compact"
-												/>
-											</Link>
-										</motion.div>
-									);
-								}
-
-								if (!hasTrackerRows) {
-									const trackerHint = parentViewer
-										? "Topics load after curriculum links."
-										: "Topics load after curriculum is linked.";
-									return (
-										<motion.div key={s.subjectId} className="min-h-0" variants={item}>
-											<Link
-												href={href}
-												scroll
-												aria-label={`Open ${s.subjectName} performance. ${trackerHint}`}
-												className={cn(
-													"group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-												)}
-											>
-												<SubjectCard
-													subject={s.subjectName}
-													lastTestDate=""
-													subtitle={undefined}
-													topicsAttempted={0}
-													topicsTotal={s.topicTotal}
-													testsTaken={0}
-													avgScore={0}
-													status="ready_to_start"
-													showCta={false}
-													showTileHint
-													metricsIconSlot={iconEl}
-													density="compact"
-												/>
-											</Link>
-										</motion.div>
-									);
-								}
-
+								const noTopicsHint = parentViewer
+									? "No catalog topics for this grade yet."
+									: "No catalog topics for your grade yet.";
+								const trackerHint = parentViewer
+									? "Topics load after curriculum links."
+									: "Topics load after curriculum is linked.";
 								const noTestsHint = parentViewer
 									? "No tests yet. Open subject to view topics."
 									: "No tests yet. Open subject to start.";
-								const subjectLinkAria = !hasAttempts
-									? st.lastTestDate
-										? `Open ${s.subjectName} performance. Last test ${lastLabel}.`
-										: `Open ${s.subjectName} performance. ${noTestsHint}`
-									: `Open ${s.subjectName} performance`;
-
+								const ariaLabel = !hasTopics
+									? `Open ${s.subjectName} performance. ${noTopicsHint}`
+									: !hasTrackerRows
+										? `Open ${s.subjectName} performance. ${trackerHint}`
+										: !hasAttempts
+											? st.lastTestDate
+												? `Open ${s.subjectName} performance. Last test ${lastLabel}.`
+												: `Open ${s.subjectName} performance. ${noTestsHint}`
+											: `Open ${s.subjectName} performance`;
 								return (
-									<motion.div key={s.subjectId} className="min-h-0" variants={item}>
-										<Link
-											href={href}
-											scroll
-											aria-label={subjectLinkAria}
-											className={cn(
-												"group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-											)}
-										>
-											<SubjectCard
-												subject={s.subjectName}
-												lastTestDate={lastLabel}
-												subtitle={undefined}
-												topicsAttempted={s.attemptedCount}
-												topicsTotal={s.topicTotal}
-												testsTaken={st.testsTakenTotal}
-												avgScore={hasAttempts ? avgScore : 0}
-												status={!hasAttempts ? "ready_to_start" : cardStatus}
-												showCta={false}
-												showTileHint
-												topicStatusCounts={{
-													good: st.good,
-													satisfactory: st.satisfactory,
-													bad: st.bad,
-													notTested: st.notTested,
-												}}
-												metricsIconSlot={iconEl}
-												density="compact"
-											/>
-										</Link>
-									</motion.div>
+									<SubjectTileLink
+										key={s.subjectId}
+										href={href}
+										ariaLabel={ariaLabel}
+										icon={iconEl}
+										itemVariants={item}
+										subjectName={s.subjectName}
+										lastTestDate={hasTopics && hasTrackerRows ? lastLabel : ""}
+										topicsAttempted={hasTopics && hasTrackerRows ? s.attemptedCount : 0}
+										topicsTotal={hasTopics ? s.topicTotal : 0}
+										testsTaken={hasTopics && hasTrackerRows ? st.testsTakenTotal : 0}
+										avgScore={hasTopics && hasTrackerRows && hasAttempts ? avgScore : 0}
+										status={hasTopics && hasTrackerRows && hasAttempts ? cardStatus : "ready_to_start"}
+										topicStatusCounts={
+											hasTopics && hasTrackerRows
+												? { good: st.good, satisfactory: st.satisfactory, bad: st.bad, notTested: st.notTested }
+												: undefined
+										}
+										motionClassName="min-h-0"
+										linkClassName="group/tile block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+									/>
 								);
 							})}
 						</motion.div>
