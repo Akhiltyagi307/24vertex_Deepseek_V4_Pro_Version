@@ -739,26 +739,22 @@ export async function executeValidatorRun(
 	output: PracticeGenerationOutput,
 	context: ExecuteMeta,
 ): Promise<RunValidatorPassResult> {
-	try {
-		const groundingMode = getPracticeVisualStemGroundingMode();
-		const result = buildDeterministicPatches(output, groundingMode);
+	const groundingMode = getPracticeVisualStemGroundingMode();
+	const result = buildDeterministicPatches(output, groundingMode);
 
-		logPracticeObs({
-			phase: "practice_generation_validator_pass",
-			correlation_id: context.correlationId,
-			mode: "deterministic",
-			grounding_mode: groundingMode,
-			patch_candidates: result.patches.length,
-			checked_visuals: result.checkedVisuals,
-			nullified_visuals: result.nullifiedVisuals,
-			schema_invalid_visuals: result.schemaInvalidVisuals,
-			grounding_mismatched_visuals: result.groundingMismatchedVisuals,
-			generic_scaffold_visuals: result.genericScaffoldVisuals,
-			topic_incoherent_visuals: result.topicIncoherentVisuals,
-		});
+	logPracticeObs({
+		phase: "practice_generation_validator_pass",
+		correlation_id: context.correlationId,
+		mode: "deterministic",
+		grounding_mode: groundingMode,
+		patch_candidates: result.patches.length,
+		checked_visuals: result.checkedVisuals,
+		nullified_visuals: result.nullifiedVisuals,
+		schema_invalid_visuals: result.schemaInvalidVisuals,
+		grounding_mismatched_visuals: result.groundingMismatchedVisuals,
+		generic_scaffold_visuals: result.genericScaffoldVisuals,
+		topic_incoherent_visuals: result.topicIncoherentVisuals,
+	});
 
-		return { ok: true, patches: result.patches };
-	} catch (e) {
-		throw e;
-	}
+	return { ok: true, patches: result.patches };
 }

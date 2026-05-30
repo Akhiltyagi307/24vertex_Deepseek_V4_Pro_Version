@@ -254,58 +254,36 @@ export function normalizeGroupedEstimatedTimesToPlan(
 	return clone;
 }
 
+type GroupedBucketDraft =
+	PracticeGenerationGroupedOutput["questions_by_type"][PracticeGenerationBucketKey][number];
+
+/** Normalize one grouped bucket into flat questions. `options` is only carried for MCQ. */
+function flattenGroupedBucket(
+	items: GroupedBucketDraft[],
+	questionType: PracticeGenerationBucketKey,
+): GeneratedPracticeQuestion[] {
+	return items.map((q) => ({
+		question_number: 0,
+		topic_id: q.topic_id,
+		topic_name: q.topic_name,
+		question_text: q.question_text,
+		question_type: questionType,
+		difficulty_level: q.difficulty_level,
+		options: questionType === "multiple_choice" ? q.options : null,
+		answer_key: q.answer_key,
+		estimated_time_seconds: q.estimated_time_seconds,
+		visual: q.visual ?? null,
+	}));
+}
+
 export function flattenPracticeGenerationOutput(
 	raw: PracticeGenerationGroupedOutput,
 ): PracticeGenerationOutput {
 	const queues: Record<PracticeGenerationBucketKey, GeneratedPracticeQuestion[]> = {
-		multiple_choice: raw.questions_by_type.multiple_choice.map((q) => ({
-			question_number: 0,
-			topic_id: q.topic_id,
-			topic_name: q.topic_name,
-			question_text: q.question_text,
-			question_type: "multiple_choice",
-			difficulty_level: q.difficulty_level,
-			options: q.options,
-			answer_key: q.answer_key,
-			estimated_time_seconds: q.estimated_time_seconds,
-			visual: q.visual ?? null,
-		})),
-		fill_in_blank: raw.questions_by_type.fill_in_blank.map((q) => ({
-			question_number: 0,
-			topic_id: q.topic_id,
-			topic_name: q.topic_name,
-			question_text: q.question_text,
-			question_type: "fill_in_blank",
-			difficulty_level: q.difficulty_level,
-			options: null,
-			answer_key: q.answer_key,
-			estimated_time_seconds: q.estimated_time_seconds,
-			visual: q.visual ?? null,
-		})),
-		short_answer: raw.questions_by_type.short_answer.map((q) => ({
-			question_number: 0,
-			topic_id: q.topic_id,
-			topic_name: q.topic_name,
-			question_text: q.question_text,
-			question_type: "short_answer",
-			difficulty_level: q.difficulty_level,
-			options: null,
-			answer_key: q.answer_key,
-			estimated_time_seconds: q.estimated_time_seconds,
-			visual: q.visual ?? null,
-		})),
-		long_answer: raw.questions_by_type.long_answer.map((q) => ({
-			question_number: 0,
-			topic_id: q.topic_id,
-			topic_name: q.topic_name,
-			question_text: q.question_text,
-			question_type: "long_answer",
-			difficulty_level: q.difficulty_level,
-			options: null,
-			answer_key: q.answer_key,
-			estimated_time_seconds: q.estimated_time_seconds,
-			visual: q.visual ?? null,
-		})),
+		multiple_choice: flattenGroupedBucket(raw.questions_by_type.multiple_choice, "multiple_choice"),
+		fill_in_blank: flattenGroupedBucket(raw.questions_by_type.fill_in_blank, "fill_in_blank"),
+		short_answer: flattenGroupedBucket(raw.questions_by_type.short_answer, "short_answer"),
+		long_answer: flattenGroupedBucket(raw.questions_by_type.long_answer, "long_answer"),
 	};
 
 	const questions: GeneratedPracticeQuestion[] = [];

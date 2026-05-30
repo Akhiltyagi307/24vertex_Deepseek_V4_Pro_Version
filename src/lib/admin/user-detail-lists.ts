@@ -6,13 +6,13 @@ import "server-only";
  * outside this repo — see PRODUCT.md.
  */
 
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { subjects } from "@/db/schema/academic";
 import { notifications } from "@/db/schema/comms-audit";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { fetchSubjectNameMap } from "@/lib/academic/subject-names";
 import { assignmentConfigSchema } from "@/lib/assignments/schemas";
 
 /** Single-line preview for L2 tables (notifications, long titles). */
@@ -73,11 +73,7 @@ export async function adminListAssignmentSubmissionsForStudent(
 
 	const configs = raw.map((r) => assignmentConfigSchema.safeParse(r.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
-	const subjectRows =
-		subjectIds.length > 0 ?
-			await db.select({ id: subjects.id, name: subjects.name }).from(subjects).where(inArray(subjects.id, subjectIds))
-		:	[];
-	const subjectMap = new Map(subjectRows.map((r) => [r.id, r.name]));
+	const subjectMap = await fetchSubjectNameMap(subjectIds);
 
 	const rows: AdminUserAssignmentSubmissionRow[] = raw.map((r, index) => ({
 		submission_id: r.submissionId,
@@ -195,11 +191,7 @@ export async function adminListAssignmentsForTeacher(
 
 	const configs = raw.map((r) => assignmentConfigSchema.safeParse(r.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
-	const subjectRows =
-		subjectIds.length > 0 ?
-			await db.select({ id: subjects.id, name: subjects.name }).from(subjects).where(inArray(subjects.id, subjectIds))
-		:	[];
-	const subjectMap = new Map(subjectRows.map((r) => [r.id, r.name]));
+	const subjectMap = await fetchSubjectNameMap(subjectIds);
 
 	const rows: AdminTeacherAssignmentRow[] = raw.map((r, index) => ({
 		id: r.id,

@@ -46,73 +46,102 @@ export async function buildComplianceExportZip(input: {
 	const userId = input.subjectUserId;
 	const manifest: ComplianceExportManifest = {};
 
-	const profileRows = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(500);
-	const perfRows = await db.select().from(performanceTracker).where(eq(performanceTracker.studentId, userId)).limit(50_000);
-	const testRows = await db.select().from(tests).where(eq(tests.studentId, userId)).limit(50_000);
-	const testIds = testRows.map((t) => t.id);
+	// Wave 1: every read that depends only on userId (and the request id) is
+	// independent — issue them concurrently instead of ~20 serial round-trips.
+	// postgres.js multiplexes these over its connection pool, queueing any excess.
+	const [
+		profileRows,
+		perfRows,
+		testRows,
+		qFlagRows,
+		feedbackRows,
+		submissionRows,
+		notifRows,
+		prefRows,
+		linkRows,
+		subRows,
+		paymentRows,
+		redemptionRows,
+		trialRows,
+		auditRows,
+		adminLogRows,
+		consentRows,
+		dsrRows,
+		emailRows,
+		aiRows,
+		doubtConvos,
+	] = await Promise.all([
+		db.select().from(profiles).where(eq(profiles.id, userId)).limit(500),
+		db.select().from(performanceTracker).where(eq(performanceTracker.studentId, userId)).limit(50_000),
+		db.select().from(tests).where(eq(tests.studentId, userId)).limit(50_000),
+		db.select().from(questionFlags).where(eq(questionFlags.studentId, userId)).limit(50_000),
+		db.select().from(userFeedbackReports).where(eq(userFeedbackReports.userId, userId)).limit(10_000),
+		db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.studentId, userId)).limit(50_000),
+		db.select().from(notifications).where(eq(notifications.recipientId, userId)).limit(50_000),
+		db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(100),
+		db
+			.select()
+			.from(parentStudentLinks)
+			.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId)))
+			.limit(10_000),
+		db.select().from(subscriptions).where(eq(subscriptions.profileId, userId)).limit(500),
+		db.select().from(payments).where(eq(payments.profileId, userId)).limit(50_000),
+		db.select().from(couponRedemptions).where(eq(couponRedemptions.profileId, userId)).limit(10_000),
+		db.select().from(freeTrialClaims).where(eq(freeTrialClaims.firstProfileId, userId)).limit(100),
+		db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).limit(100_000),
+		db.select().from(adminActionLog).where(eq(adminActionLog.targetId, userId)).limit(50_000),
+		db.select().from(parentalConsents).where(eq(parentalConsents.studentId, userId)).limit(1000),
+		db
+			.select()
+			.from(complianceRequests)
+			.where(
+				or(eq(complianceRequests.subjectUserId, userId), eq(complianceRequests.id, input.complianceRequestId))!,
+			)
+			.limit(1000),
+		db.select().from(emailLog).where(eq(emailLog.recipientId, userId)).limit(50_000),
+		db.select().from(aiCalls).where(eq(aiCalls.userId, userId)).limit(100_000),
+		db.select().from(doubtConversations).where(eq(doubtConversations.studentId, userId)).limit(10_000),
+	]);
 
+	const testIds = testRows.map((t) => t.id);
+	const subIds = subRows.map((s) => s.id);
+	const convoIds = doubtConvos.map((c) => c.id);
+
+	// Wave 2: reads scoped by the id-sets from wave 1. The three gated groups are
+	// mutually independent, so run them — and the reads within each — concurrently.
 	let questionRows: (typeof questions.$inferSelect)[] = [];
 	let answerRows: (typeof studentAnswers.$inferSelect)[] = [];
 	let reportRows: (typeof testReports.$inferSelect)[] = [];
 	let adminMsgRows: (typeof adminTestMessages.$inferSelect)[] = [];
-	if (testIds.length) {
-		questionRows = await db.select().from(questions).where(inArray(questions.testId, testIds)).limit(500_000);
-		answerRows = await db.select().from(studentAnswers).where(inArray(studentAnswers.testId, testIds)).limit(500_000);
-		reportRows = await db.select().from(testReports).where(eq(testReports.studentId, userId)).limit(50_000);
-		adminMsgRows = await db.select().from(adminTestMessages).where(inArray(adminTestMessages.testId, testIds)).limit(20_000);
-	}
-
-	const qFlagRows = await db.select().from(questionFlags).where(eq(questionFlags.studentId, userId)).limit(50_000);
-	const feedbackRows = await db
-		.select()
-		.from(userFeedbackReports)
-		.where(eq(userFeedbackReports.userId, userId))
-		.limit(10_000);
-	const submissionRows = await db
-		.select()
-		.from(assignmentSubmissions)
-		.where(eq(assignmentSubmissions.studentId, userId))
-		.limit(50_000);
-	const notifRows = await db.select().from(notifications).where(eq(notifications.recipientId, userId)).limit(50_000);
-	const prefRows = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(100);
-	const linkRows = await db
-		.select()
-		.from(parentStudentLinks)
-		.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId)))
-		.limit(10_000);
-	const subRows = await db.select().from(subscriptions).where(eq(subscriptions.profileId, userId)).limit(500);
-	const subIds = subRows.map((s) => s.id);
 	let usageRows: (typeof usagePeriods.$inferSelect)[] = [];
-	if (subIds.length) {
-		usageRows = await db.select().from(usagePeriods).where(inArray(usagePeriods.subscriptionId, subIds)).limit(10_000);
-	}
-	const paymentRows = await db.select().from(payments).where(eq(payments.profileId, userId)).limit(50_000);
-	const redemptionRows = await db.select().from(couponRedemptions).where(eq(couponRedemptions.profileId, userId)).limit(10_000);
-	const trialRows = await db.select().from(freeTrialClaims).where(eq(freeTrialClaims.firstProfileId, userId)).limit(100);
-	const auditRows = await db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).limit(100_000);
-	const adminLogRows = await db.select().from(adminActionLog).where(eq(adminActionLog.targetId, userId)).limit(50_000);
-	const consentRows = await db.select().from(parentalConsents).where(eq(parentalConsents.studentId, userId)).limit(1000);
-	const dsrRows = await db
-		.select()
-		.from(complianceRequests)
-		.where(
-			or(eq(complianceRequests.subjectUserId, userId), eq(complianceRequests.id, input.complianceRequestId))!,
-		)
-		.limit(1000);
-	const emailRows = await db.select().from(emailLog).where(eq(emailLog.recipientId, userId)).limit(50_000);
-	const aiRows = await db.select().from(aiCalls).where(eq(aiCalls.userId, userId)).limit(100_000);
-	const doubtConvos = await db.select().from(doubtConversations).where(eq(doubtConversations.studentId, userId)).limit(10_000);
-	const convoIds = doubtConvos.map((c) => c.id);
 	let doubtMsgRows: (typeof doubtMessages.$inferSelect)[] = [];
 	let doubtAttRows: (typeof doubtMessageAttachments.$inferSelect)[] = [];
-	if (convoIds.length) {
-		doubtMsgRows = await db.select().from(doubtMessages).where(inArray(doubtMessages.conversationId, convoIds)).limit(200_000);
-		doubtAttRows = await db
-			.select()
-			.from(doubtMessageAttachments)
-			.where(inArray(doubtMessageAttachments.conversationId, convoIds))
-			.limit(50_000);
-	}
+	await Promise.all([
+		(async () => {
+			if (!testIds.length) return;
+			[questionRows, answerRows, reportRows, adminMsgRows] = await Promise.all([
+				db.select().from(questions).where(inArray(questions.testId, testIds)).limit(500_000),
+				db.select().from(studentAnswers).where(inArray(studentAnswers.testId, testIds)).limit(500_000),
+				db.select().from(testReports).where(eq(testReports.studentId, userId)).limit(50_000),
+				db.select().from(adminTestMessages).where(inArray(adminTestMessages.testId, testIds)).limit(20_000),
+			]);
+		})(),
+		(async () => {
+			if (!subIds.length) return;
+			usageRows = await db.select().from(usagePeriods).where(inArray(usagePeriods.subscriptionId, subIds)).limit(10_000);
+		})(),
+		(async () => {
+			if (!convoIds.length) return;
+			[doubtMsgRows, doubtAttRows] = await Promise.all([
+				db.select().from(doubtMessages).where(inArray(doubtMessages.conversationId, convoIds)).limit(200_000),
+				db
+					.select()
+					.from(doubtMessageAttachments)
+					.where(inArray(doubtMessageAttachments.conversationId, convoIds))
+					.limit(50_000),
+			]);
+		})(),
+	]);
 
 	// Build signed download URLs for each attachment so the export ZIP gives
 	// the user a real way to retrieve their uploaded files (GDPR data
@@ -130,28 +159,33 @@ export async function buildComplianceExportZip(input: {
 		expires_at: string | null;
 		error: string | null;
 	};
-	const attachmentDownloads: AttachmentDownload[] = [];
+	let attachmentDownloads: AttachmentDownload[] = [];
 	if (doubtAttRows.length > 0) {
 		const supabase = createServiceRoleClient();
 		const expiresAt = new Date(Date.now() + ATTACHMENT_DOWNLOAD_TTL_SECONDS * 1000).toISOString();
-		for (const row of doubtAttRows) {
-			const path = row.storagePath as string;
-			const { data, error } = await supabase.storage
-				.from("doubt-attachments")
-				.createSignedUrl(path, ATTACHMENT_DOWNLOAD_TTL_SECONDS);
-			attachmentDownloads.push({
-				attachment_id: row.id,
-				conversation_id: row.conversationId,
-				message_id: row.messageId ?? null,
-				kind: row.kind,
-				mime: row.mime,
-				size_bytes: row.sizeBytes,
-				storage_path: path,
-				download_url: data?.signedUrl ?? null,
-				expires_at: data?.signedUrl ? expiresAt : null,
-				error: error?.message ?? null,
-			});
-		}
+		// Sign every attachment URL concurrently (each call is independent); the
+		// mapped array preserves row order. Per-row failures are captured in the
+		// row's `error` field exactly as the serial loop did.
+		attachmentDownloads = await Promise.all(
+			doubtAttRows.map(async (row): Promise<AttachmentDownload> => {
+				const path = row.storagePath as string;
+				const { data, error } = await supabase.storage
+					.from("doubt-attachments")
+					.createSignedUrl(path, ATTACHMENT_DOWNLOAD_TTL_SECONDS);
+				return {
+					attachment_id: row.id,
+					conversation_id: row.conversationId,
+					message_id: row.messageId ?? null,
+					kind: row.kind,
+					mime: row.mime,
+					size_bytes: row.sizeBytes,
+					storage_path: path,
+					download_url: data?.signedUrl ?? null,
+					expires_at: data?.signedUrl ? expiresAt : null,
+					error: error?.message ?? null,
+				};
+			}),
+		);
 	}
 
 	const slices: { name: string; rows: unknown[] }[] = [

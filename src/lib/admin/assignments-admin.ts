@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { subjects } from "@/db/schema/academic";
 import { profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { fetchSubjectNameMap } from "@/lib/academic/subject-names";
 import { assignmentConfigSchema } from "@/lib/assignments/schemas";
 
 export type AdminAssignmentListRow = {
@@ -85,11 +86,7 @@ export async function adminListAssignments(input: {
 			[...configByAssignment.values()].flatMap((result) => (result.success ? [result.data.subject_id] : [])),
 		),
 	];
-	const subjectRows =
-		subjectIds.length > 0 ?
-			await db.select({ id: subjects.id, name: subjects.name }).from(subjects).where(inArray(subjects.id, subjectIds))
-		:	[];
-	const subjectMap = new Map(subjectRows.map((r) => [r.id, r.name]));
+	const subjectMap = await fetchSubjectNameMap(subjectIds);
 
 	const rows: AdminAssignmentListRow[] = raw.map((r) => {
 		const config = configByAssignment.get(r.id);

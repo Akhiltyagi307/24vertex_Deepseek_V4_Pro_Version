@@ -289,6 +289,9 @@ function extractReactionEquation(text: string): string | null {
 		.trim();
 }
 
+const GRAVITATION_ESCAPE_CUE_RE =
+	/\bescape[-\s]?(speed|velocity)|escape\s+from\s+earth|v_esc|v_e|speed\s+at\s+infinity|at\s+infinity|moon|escapes?\s+earth|reaches\s+infinity|far\s+away\s+from\s+earth\b/;
+
 function buildGravitationGeometryEnvelope(
 	questionText: string,
 	visualIdea: string | null | undefined,
@@ -300,7 +303,7 @@ function buildGravitationGeometryEnvelope(
 		/\bneutral\s+point|two[-\s]?sphere|between\s+them|sphere\s+example\b/.test(stemCtx) ||
 		/\bdepth\s+d|below\s+earth|inside\s+earth|halfway\s+(down|to)|weight\s+.*halfway|surface\s+gravity|g\s*\(d\)|radius\s+cubed|mass\s+is\s+proportional|smaller\s+sphere|r_e\s*-\s*d\b/.test(stemCtx) ||
 		/\bheight\s+h|above\s+earth|above\s+.*surface|small\s+height\b/.test(stemCtx) ||
-		/\bescape[-\s]?(speed|velocity)|escape\s+from\s+earth|v_esc|v_e|speed\s+at\s+infinity|at\s+infinity|moon|escapes?\s+earth|reaches\s+infinity|far\s+away\s+from\s+earth\b/.test(stemCtx);
+		GRAVITATION_ESCAPE_CUE_RE.test(stemCtx);
 	const captionBase =
 		visualIdea && visualIdea.trim().length >= 8 ?
 			shortCaptionFromIdea(visualIdea, 120)
@@ -326,10 +329,7 @@ function buildGravitationGeometryEnvelope(
 		};
 	}
 
-	const stemHasEscapeCue =
-		/\bescape[-\s]?(speed|velocity)|escape\s+from\s+earth|v_esc|v_e|speed\s+at\s+infinity|at\s+infinity|moon|escapes?\s+earth|reaches\s+infinity|far\s+away\s+from\s+earth\b/.test(
-			stemCtx,
-		);
+	const stemHasEscapeCue = GRAVITATION_ESCAPE_CUE_RE.test(stemCtx);
 
 	if (
 		!stemHasEscapeCue &&
@@ -362,13 +362,8 @@ function buildGravitationGeometryEnvelope(
 	}
 
 	if (
-		/\bescape[-\s]?(speed|velocity)|escape\s+from\s+earth|v_esc|v_e|speed\s+at\s+infinity|at\s+infinity|moon|escapes?\s+earth|reaches\s+infinity|far\s+away\s+from\s+earth\b/.test(
-			stemCtx,
-		) ||
-		(!hasStemCategory &&
-			/\bescape[-\s]?(speed|velocity)|escape\s+from\s+earth|v_esc|v_e|speed\s+at\s+infinity|at\s+infinity|moon|escapes?\s+earth|reaches\s+infinity|far\s+away\s+from\s+earth\b/.test(
-				ideaCtx,
-			))
+		GRAVITATION_ESCAPE_CUE_RE.test(stemCtx) ||
+		(!hasStemCategory && GRAVITATION_ESCAPE_CUE_RE.test(ideaCtx))
 	) {
 		const compareMoon = /\bmoon\b/.test(stemCtx) || (!hasStemCategory && /\bmoon\b/.test(ideaCtx));
 		return {

@@ -16,7 +16,7 @@ import { triggerPracticeWorkerInBackground } from "@/lib/admin/practice-worker-t
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
 import { logPracticeObs } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { createServiceRoleClient, type ServiceRoleClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -83,8 +83,7 @@ function backoffMinutes(attempts: number): number {
 	return Math.min(30, Math.max(1, 2 ** (attempts - 1)));
 }
 
-async function markJobDone(jobId: string) {
-	const admin = createServiceRoleClient();
+async function markJobDone(admin: ServiceRoleClient, jobId: string) {
 	const { error } = await admin
 		.from("practice_jobs")
 		.update({ status: "done", error: null, updated_at: new Date().toISOString() })
@@ -94,8 +93,7 @@ async function markJobDone(jobId: string) {
 	}
 }
 
-async function markJobFailure(job: ClaimedJob, message: string) {
-	const admin = createServiceRoleClient();
+async function markJobFailure(admin: ServiceRoleClient, job: ClaimedJob, message: string) {
 	const isDead = job.attempts >= job.max_attempts;
 	const next = new Date(Date.now() + backoffMinutes(job.attempts) * 60_000);
 	const { error } = await admin
@@ -588,15 +586,15 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 			const out = await withTimeout(handlerPromise, perJobTimeoutMs(job.job_type), job.job_type);
 
 			if (out.ok) {
-				await markJobDone(job.id);
+				await markJobDone(admin, job.id);
 				return { id: job.id, ok: true as const, type: job.job_type };
 			}
-			await markJobFailure(job, out.message);
+			await markJobFailure(admin, job, out.message);
 			return { id: job.id, ok: false as const, type: job.job_type, message: out.message };
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "Unknown worker error";
 			try {
-				await markJobFailure(job, msg);
+				await markJobFailure(admin, job, msg);
 			} catch (markError) {
 				logServerError("runPracticeJobs.markJobFailure", markError, {
 					jobId: job.id,

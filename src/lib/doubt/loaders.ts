@@ -8,7 +8,6 @@ import { getEntitlements, type EntitlementSnapshot } from "@/lib/billing/entitle
 import { createClient } from "@/lib/supabase/server";
 import { isPostgresUndefinedColumnError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import {
-	averageTestScorePercentForSubject,
 	buildSubjectCardTrackerStats,
 	dominantStatusFromTrackerStats,
 	emptySubjectCardTrackerStats,
@@ -85,6 +84,10 @@ function buildDoubtPickerPerformance(
 ): DoubtPickerPerformance {
 	const topicStatusById: Record<string, TrackerStatus> = {};
 	const needsImprovementCountByChapterKey: Record<string, number> = {};
+	// Single pass accumulates per-subject weak-topic counts and score sums so the
+	// enrolled-subject loop below is O(subjects), not O(subjects × rows).
+	const weakTopicCountBySubject = new Map<string, number>();
+	const scoreAccBySubject = new Map<string, { sum: number; n: number }>();
 	for (const r of rows) {
 		topicStatusById[r.topicId] = r.status;
 		if (r.status === "satisfactory" || r.status === "bad") {
@@ -92,21 +95,28 @@ function buildDoubtPickerPerformance(
 			needsImprovementCountByChapterKey[ck] =
 				(needsImprovementCountByChapterKey[ck] ?? 0) + 1;
 		}
+		if (r.status !== "good") {
+			weakTopicCountBySubject.set(r.subjectId, (weakTopicCountBySubject.get(r.subjectId) ?? 0) + 1);
+		}
+		if (r.status !== "not_tested" && r.averageScore != null && Number.isFinite(r.averageScore)) {
+			const acc = scoreAccBySubject.get(r.subjectId);
+			if (acc) {
+				acc.sum += r.averageScore;
+				acc.n += 1;
+			} else {
+				scoreAccBySubject.set(r.subjectId, { sum: r.averageScore, n: 1 });
+			}
+		}
 	}
 	const trackerMap = buildSubjectCardTrackerStats(rows);
 	const bySubjectId: DoubtPickerPerformance["bySubjectId"] = {};
 	for (const sid of enrolledSubjectIds) {
 		const st = trackerMap.get(sid) ?? emptySubjectCardTrackerStats;
-		let weakTopicCount = 0;
-		for (const r of rows) {
-			if (r.subjectId === sid && r.status !== "good") {
-				weakTopicCount += 1;
-			}
-		}
+		const acc = scoreAccBySubject.get(sid);
 		bySubjectId[sid] = {
-			avgScorePercent: averageTestScorePercentForSubject(rows, sid),
+			avgScorePercent: acc && acc.n ? Math.round(acc.sum / acc.n) : null,
 			dominantStatus: dominantStatusFromTrackerStats(st),
-			weakTopicCount,
+			weakTopicCount: weakTopicCountBySubject.get(sid) ?? 0,
 		};
 	}
 	return { bySubjectId, topicStatusById, needsImprovementCountByChapterKey };
@@ -186,16 +196,20 @@ export async function loadDoubtPageBundle(userId: string) {
 		return { ok: false as const, code: "not_student" as const };
 	}
 
-	const subj = await loadStudentSubjects(supabase, profileRow);
-	const conversations = await loadDoubtConversationsList(userId);
-	const entitlement = toDoubtChatEntitlement(await getEntitlements(supabase, userId));
-
-	const perfBundle = await loadStudentPerformanceBundle(supabase, userId, {
-		grade: profileRow.grade,
-		stream: profileRow.stream,
-		elective_subject_id: profileRow.elective_subject_id,
-		role: profileRow.role,
-	});
+	// These four loads are independent (each derives only from profileRow/userId);
+	// run them concurrently instead of serially on this user-facing page load.
+	const [subj, conversations, entitlementsSnapshot, perfBundle] = await Promise.all([
+		loadStudentSubjects(supabase, profileRow),
+		loadDoubtConversationsList(userId),
+		getEntitlements(supabase, userId),
+		loadStudentPerformanceBundle(supabase, userId, {
+			grade: profileRow.grade,
+			stream: profileRow.stream,
+			elective_subject_id: profileRow.elective_subject_id,
+			role: profileRow.role,
+		}),
+	]);
+	const entitlement = toDoubtChatEntitlement(entitlementsSnapshot);
 
 	const enrolledIdsForPerf = perfBundle.enrolledSubjects.map((s) => s.id);
 	const doubtPickerPerformance = buildDoubtPickerPerformance(perfBundle.rows, enrolledIdsForPerf);
@@ -225,8 +239,10 @@ export async function loadDoubtPageBundleForStudentProfile(studentId: string) {
 		return { ok: false as const, code: "not_student" as const };
 	}
 
-	const subj = await loadStudentSubjects(supabase, profileRow);
-	const conversations = await loadDoubtConversationsList(studentId);
+	const [subj, conversations] = await Promise.all([
+		loadStudentSubjects(supabase, profileRow),
+		loadDoubtConversationsList(studentId),
+	]);
 
 	return {
 		ok: true as const,
