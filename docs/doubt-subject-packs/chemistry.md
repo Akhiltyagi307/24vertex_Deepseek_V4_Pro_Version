@@ -14,10 +14,10 @@ Inserted between the shared preamble and the per-conversation scope block when t
 - Reaction conditions on the arrow not the reactant — `CH₄ + Cl₂ →(UV light) CH₃Cl + HCl` not "CH₄ + Cl₂ + UV → …".
 
 **Notation and presentation:**
-- Chemical formulas with proper subscripts: `H₂O`, `H₂SO₄`, `Ca(OH)₂`. Inside LaTeX use `$H_2O$` or Unicode subscripts.
-- Charges on ions as superscripts: `Na⁺`, `Ca²⁺`, `SO₄²⁻`, `Al³⁺` (number then sign).
+- Render formulae and equations with mhchem inside math — it typesets subscripts, charges, and arrows correctly: `$\ce{H2O}$`, `$\ce{H2SO4}$`, `$\ce{Ca(OH)2}$`.
+- Ion charges via mhchem: `$\ce{Na+}$`, `$\ce{Ca^2+}$`, `$\ce{SO4^2-}$`, `$\ce{Al^3+}$` (number then sign).
+- Reactions: `$\ce{2H2 + O2 -> 2H2O}$` (irreversible `->`), `$\ce{N2 + 3H2 <=> 2NH3}$` (reversible `<=>`). Add state symbols where CBSE expects them: `$\ce{NaCl(aq)}$`.
 - Oxidation states with Roman numerals or +/− Arabic: K(I), Mn(VII), or +1, +7. Inside ionic formulas, use Arabic numerals; in coordination compound names, Roman.
-- Reaction arrows: `→` for irreversible, `⇌` for reversible. Mechanism arrows (curly arrows) for movement of electron pairs.
 
 **CBSE marking specifics:**
 - A balanced equation is worth marks even without explanation — encourage the student to write it before any prose.

@@ -103,7 +103,7 @@ const DISTRESS_PATTERNS: RegExp[] = [
 	/\bsuicid(?:e|al)\b/i,
 	/\bself[\s-]?harm/i,
 	/\bcut(?:ting)?\s+myself\b/i,
-	/\bno\s+(?:reason|point)\s+(?:to|in)\s+(?:living|life|being\s+alive)\b/i,
+	/\bno\s+(?:reason|point)\s+(?:to|in)\s+(?:living|live|life|being\s+alive|be\s+alive)\b/i,
 	/\bbetter\s+off\s+dead\b/i,
 	/\b(?:i'?m|i\s+am|being)\s+abused\b/i,
 	/\b(?:hits?|beats?|hurts?)\s+me\s+at\s+home\b/i,
@@ -120,10 +120,12 @@ const EMAIL_RE = /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi;
  * Indian mobile numbers in the shapes students actually paste:
  *   +91 98765 43210 / 09876543210 / 9876543210 / 98765-43210
  * Requires the leading mobile digit [6-9] and a 10-digit body so it doesn't
- * grab arbitrary long integers from a math problem as eagerly. Still imperfect
- * — which is exactly why redaction defaults OFF.
+ * grab arbitrary long integers from a math problem as eagerly. Digit-class
+ * lookarounds (not `\b`) anchor the edges so an optional `0`/`91` prefix that
+ * sits flush against the number still matches. Still imperfect — which is
+ * exactly why redaction defaults OFF.
  */
-const PHONE_RE = /(?:\+?91[\s-]?|0)?\b[6-9]\d{4}[\s-]?\d{5}\b/g;
+const PHONE_RE = /(?<!\d)(?:\+?91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}(?!\d)/g;
 
 export type PiiCounts = { emails: number; phones: number };
 

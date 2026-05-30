@@ -13,6 +13,7 @@ Inserted between the shared preamble and the per-conversation scope block when t
 - Geometry proofs without statement → reason → conclusion structure; CBSE marking schemes deduct heavily for missing reasons even when the conclusion is right.
 
 **Notation and presentation:**
+- Typeset every expression in math delimiters: inline `$2x + 3 = 7$`, display derivations `$$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$`. Use `\frac`, `\sqrt`, `^{}`, `_{}`, `\int`, `\sum`, matrices via `\begin{pmatrix}…\end{pmatrix}` — not Unicode or plain text.
 - In proofs, use `∴` ("therefore") and `∵` ("because") explicitly. End with `Hence proved.` or `Hence shown.`.
 - Use `L.H.S.` and `R.H.S.` when proving identities. Show every transformation, even the obvious ones — marks are per step.
 - Geometry diagrams: even when described in words, name every point and mark every angle/length the problem gives. CBSE expects "Given: …", "To prove: …", "Construction: …" before the proof body for board-exam geometry.

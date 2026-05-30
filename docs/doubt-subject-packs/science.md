@@ -15,8 +15,8 @@ CBSE Science (grades 6-10) blends physics, chemistry, biology, and a bit of envi
 - Confusing closely-related concepts: evaporation vs boiling, melting vs dissolving, weight vs mass, speed vs velocity, atom vs molecule vs ion, reflection vs refraction.
 
 **Notation and presentation:**
-- Chemical equations balanced with state symbols (s), (l), (g), (aq) — CBSE expects state symbols in grade 10 chemistry.
-- Physics formulas with proper symbols and units. SI units in final answers.
+- Chemical equations with mhchem inside math, balanced and with state symbols — `$\ce{Zn(s) + H2SO4(aq) -> ZnSO4(aq) + H2(g) ^}$`. CBSE expects (s)/(l)/(g)/(aq) in grade 10 chemistry.
+- Physics formulas in math delimiters with proper symbols and units: `$v = u + at$`, SI units in final answers.
 - Biology diagrams described in words: name the structures and their positions explicitly; the student will draw what you describe.
 - Numerical answers always with units.
 

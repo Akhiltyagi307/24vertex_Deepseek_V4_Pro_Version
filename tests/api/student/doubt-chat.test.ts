@@ -24,8 +24,17 @@ import { makeMockAi, makeMockBilling, makeMockRateLimit, makeMockSupabase } from
 // Hoisted shared state. Types are deliberately wide so a single test can flip
 // the mock to a different verdict (e.g. paywall vs unauthorized) without
 // fighting TypeScript narrowing on the initial value.
-const { mockSupabase, mockServiceRoleSupabase, mockAi, mockRateLimit, mockBilling, resolveScopeMock, loadThreadMock } =
-	vi.hoisted(() => ({
+const {
+	mockSupabase,
+	mockServiceRoleSupabase,
+	mockAi,
+	mockRateLimit,
+	mockBilling,
+	resolveScopeMock,
+	loadThreadMock,
+	dbPromptMock,
+	safetyInputMock,
+} = vi.hoisted(() => ({
 	mockSupabase: { current: null as unknown },
 	mockServiceRoleSupabase: { current: null as unknown },
 	mockAi: { current: null as unknown },
@@ -33,7 +42,11 @@ const { mockSupabase, mockServiceRoleSupabase, mockAi, mockRateLimit, mockBillin
 	mockBilling: { current: null as unknown },
 	resolveScopeMock: { current: null as null | (() => Promise<unknown>) },
 	loadThreadMock: { current: null as null | (() => Promise<unknown[]>) },
-	}));
+	// Active DB-prompt override returned by getActiveAiPrompt (null = file default).
+	dbPromptMock: { current: null as unknown },
+	// Override for the deterministic input safety screen. null = permissive default.
+	safetyInputMock: { current: null as null | ((text: string) => unknown) },
+}));
 
 type RateLimitBindings = ReturnType<typeof makeMockRateLimit>;
 type BillingBindings = ReturnType<typeof makeMockBilling>;
@@ -69,10 +82,25 @@ vi.mock("@/lib/ai/record-ai-call", () => ({
 	recordAiCall: async () => undefined,
 }));
 vi.mock("@/lib/ai/prompt-store", () => ({
-	getActiveAiPrompt: async () => null,
+	getActiveAiPrompt: async () => dbPromptMock.current,
 }));
 vi.mock("@/lib/practice/analytics", () => ({
 	recordPracticeEvent: async () => undefined,
+}));
+// The deterministic safety screen hits the DB (blacklist) + writes flags, so the
+// server module is mocked. `ensureDoubtSafetyFloor` / `SAFE_OUTPUT_PLACEHOLDER`
+// are imported by the route from the PURE detectors module (not mocked), so the
+// safety-floor behaviour runs for real.
+vi.mock("@/lib/doubt/safety", () => ({
+	screenDoubtInput: async (text: string) =>
+		safetyInputMock.current
+			? safetyInputMock.current(text)
+			: { block: false, blockMessage: null, redactedText: text, categories: [], distress: false, pii: false },
+	screenDoubtOutput: async () => ({ safe: true, categories: [] }),
+	flagDoubtSafety: async () => undefined,
+	flagDoubtAttachmentInjection: async () => undefined,
+	flagDoubtImageForReview: async () => undefined,
+	shouldSampleImageForReview: () => false,
 }));
 vi.mock("@/lib/server/log-supabase-error", () => ({
 	logSupabaseError: () => undefined,
@@ -159,6 +187,8 @@ vi.mock("@/lib/doubt/loaders", () => ({
 			? loadThreadMock.current()
 			: Promise.resolve([{ id: "m1", role: "user", parts: [{ type: "text", text: "hello" }] }]),
 }));
+
+import { DOUBT_SAFETY_FLOOR } from "@/lib/doubt/safety-detectors";
 
 import { POST } from "@/app/api/student/doubt-chat/route";
 
@@ -250,6 +280,8 @@ describe("POST /api/student/doubt-chat", () => {
 		mockRateLimit.current = makeMockRateLimit({ doubtChat: { ok: true } });
 		mockBilling.current = makeMockBilling({ canStartDoubtChat: { ok: true } });
 		resolveScopeMock.current = null;
+		dbPromptMock.current = null;
+		safetyInputMock.current = null;
 		loadThreadMock.current = async () => [
 			{ id: "m1", role: "user", parts: [{ type: "text", text: "hello" }] },
 		];
@@ -508,6 +540,8 @@ describe("POST /api/student/doubt-chat", () => {
 
 		expect(priorText).toContain("[Attached PDF 1: worksheet.pdf]");
 		expect(priorText).toContain("The Himalayas extend west to east");
+		// Untrusted-content fence is prepended above the transcript.
+		expect(priorText).toContain("student-provided file content");
 		expect(latestText).not.toContain("[Attached PDF 1:");
 	});
 
@@ -568,5 +602,82 @@ describe("POST /api/student/doubt-chat", () => {
 			.join("\n");
 		expect(priorText).toContain("[Attached PDF 1: scan.pdf]");
 		expect(priorText).toContain("Text extraction returned empty content");
+	});
+
+	it("returns 422 blocked_content when the input safety screen blocks the turn", async () => {
+		safetyInputMock.current = () => ({
+			block: true,
+			blockMessage: "Let's keep this chat respectful so I can help you learn.",
+			redactedText: "blocked",
+			categories: [
+				{ kind: "slur", severity: "high", source: "heuristic_slur", reason: "input matched slur pattern" },
+			],
+			distress: false,
+			pii: false,
+		});
+		const res = await POST(makeRequest(VALID_BODY));
+		expect(res.status).toBe(422);
+		const body = await res.json();
+		expect(body.code).toBe("blocked_content");
+		expect(body.error).toContain("respectful");
+	});
+
+	it("does not block but still streams a 200 when the input screen flags distress", async () => {
+		safetyInputMock.current = (text: string) => ({
+			block: false,
+			blockMessage: null,
+			redactedText: text,
+			categories: [
+				{ kind: "distress", severity: "critical", source: "heuristic_distress", reason: "severe-distress pattern" },
+			],
+			distress: true,
+			pii: false,
+		});
+		const res = await POST(makeRequest(VALID_BODY));
+		expect(res.status).toBe(200);
+	});
+
+	it("appends the non-negotiable safety floor to an admin DB-prompt override", async () => {
+		dbPromptMock.current = {
+			id: "prompt-1",
+			template: "Answer the student's chemistry questions briefly.",
+			version: 1,
+			isActive: true,
+		};
+		const streamSpy = vi.fn((_args: { system?: string }) => ({
+			toUIMessageStreamResponse: () => new Response("ok", { status: 200 }),
+			text: "ok",
+			usage: { inputTokens: 1, outputTokens: 1 },
+			totalUsage: { inputTokens: 1, outputTokens: 1 },
+			finishReason: "stop" as const,
+		}));
+		(mockAi.current as AiBindings).streamText = streamSpy as unknown as AiBindings["streamText"];
+
+		const res = await POST(makeRequest(VALID_BODY));
+		expect(res.status).toBe(200);
+
+		const systemArg = (streamSpy.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ?? "";
+		expect(systemArg).toContain("Answer the student's chemistry questions briefly.");
+		expect(systemArg).toContain(DOUBT_SAFETY_FLOOR);
+	});
+
+	it("does NOT re-append the safety floor for file-based prompts (anchor present)", async () => {
+		// dbPromptMock stays null → route uses the file preamble, which already
+		// carries the crisis-line anchors, so the floor must not be duplicated.
+		const streamSpy = vi.fn((_args: { system?: string }) => ({
+			toUIMessageStreamResponse: () => new Response("ok", { status: 200 }),
+			text: "ok",
+			usage: { inputTokens: 1, outputTokens: 1 },
+			totalUsage: { inputTokens: 1, outputTokens: 1 },
+			finishReason: "stop" as const,
+		}));
+		(mockAi.current as AiBindings).streamText = streamSpy as unknown as AiBindings["streamText"];
+
+		const res = await POST(makeRequest(VALID_BODY));
+		expect(res.status).toBe(200);
+
+		const systemArg = (streamSpy.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ?? "";
+		// The file preamble carries the anchor, so the explicit floor block is absent.
+		expect(systemArg).not.toContain("Safety (non-negotiable");
 	});
 });

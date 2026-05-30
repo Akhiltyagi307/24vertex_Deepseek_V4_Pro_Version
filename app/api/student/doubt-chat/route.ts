@@ -71,6 +71,15 @@ import {
 	stripImagePartsFromMessages,
 	stripReasoningPartsFromMessages,
 } from "@/lib/doubt/strip-model-parts";
+import {
+	flagDoubtAttachmentInjection,
+	flagDoubtImageForReview,
+	flagDoubtSafety,
+	screenDoubtInput,
+	screenDoubtOutput,
+	shouldSampleImageForReview,
+} from "@/lib/doubt/safety";
+import { ensureDoubtSafetyFloor, SAFE_OUTPUT_PLACEHOLDER } from "@/lib/doubt/safety-detectors";
 import { isDoubtScopePrecheckEnabled } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -256,6 +265,65 @@ export async function POST(req: Request) {
 		});
 	}
 
+	// Deterministic safety screen (no LLM). Runs on every turn, independent of
+	// the off-topic flag below. Hard content (slurs / sexual harassment / admin
+	// blacklist) blocks the turn; distress and PII are flagged for human review
+	// but never block — the model still answers, and its prompt routes severe
+	// distress to crisis lines. The screen fails open internally, so a screening
+	// fault can never wedge the chat. `redactedText` is the original text unless
+	// PII redaction-at-rest is enabled (off by default).
+	const inputScreen = await screenDoubtInput(lastUserText);
+	if (inputScreen.block) {
+		void flagDoubtSafety({ conversationId: existing.id as string, categories: inputScreen.categories });
+		void recordPracticeEvent(
+			supabase,
+			"doubt_chat_input_blocked",
+			{
+				sources: inputScreen.categories.map((c) => c.source),
+				subject_id: subjectId,
+				topic_id: topicId,
+			},
+			{ studentId: user.id },
+		);
+		return new Response(
+			JSON.stringify({ error: inputScreen.blockMessage, code: "blocked_content" }),
+			{ status: 422, headers: { "content-type": "application/json" } },
+		);
+	}
+	if (inputScreen.distress) {
+		void flagDoubtSafety({
+			conversationId: existing.id as string,
+			categories: inputScreen.categories.filter((c) => c.kind === "distress"),
+		});
+		void recordPracticeEvent(
+			supabase,
+			"doubt_chat_distress_flagged",
+			{ subject_id: subjectId, topic_id: topicId },
+			{ studentId: user.id },
+		);
+	}
+	if (inputScreen.pii) {
+		void flagDoubtSafety({
+			conversationId: existing.id as string,
+			categories: inputScreen.categories.filter((c) => c.kind === "pii"),
+		});
+		void recordPracticeEvent(
+			supabase,
+			"doubt_chat_pii_detected",
+			{ redacted: inputScreen.redactedText !== lastUserText },
+			{ studentId: user.id },
+		);
+	}
+	if (inputScreen.categories.some((c) => c.kind === "injection")) {
+		void flagDoubtSafety({
+			conversationId: existing.id as string,
+			categories: inputScreen.categories.filter((c) => c.kind === "injection"),
+		});
+	}
+	// Text persisted for the user turn (and therefore fed to the model from the
+	// DB thread). Identical to lastUserText unless PII redaction is enabled.
+	const contentToStore = inputScreen.redactedText;
+
 	// Off-topic pre-check (feature-flagged). Cheap vocabulary-overlap test that
 	// short-circuits a Pro call when a turn looks confidently off-topic — no
 	// image attachments here because vision turns may legitimately have no
@@ -312,6 +380,25 @@ export async function POST(req: Request) {
 	}
 	const hasImageAttachment = attachments.some((a) => a.kind === "image");
 
+	// Image content can't be screened deterministically without a vision model
+	// (excluded by design). Record every image turn for audit, and sample a
+	// configurable fraction into the human review queue (rate defaults to 0).
+	if (hasImageAttachment) {
+		void recordPracticeEvent(
+			supabase,
+			"doubt_chat_image_attached",
+			{
+				subject_id: subjectId,
+				topic_id: topicId,
+				image_count: attachments.filter((a) => a.kind === "image").length,
+			},
+			{ studentId: user.id },
+		);
+		if (shouldSampleImageForReview()) {
+			void flagDoubtImageForReview({ conversationId });
+		}
+	}
+
 	// Per the migration plan: turns with an image attachment stay on OpenAI
 	// (vision). Text-only turns AND pdf-only turns route via env
 	// (`AI_PROVIDER_DOUBT_CHAT`, currently `deepseek`).
@@ -336,10 +423,16 @@ export async function POST(req: Request) {
 		system += `\n\nNote: the student just switched from ${previousTutorMode.replace("_", "-")} mode to ${tutorMode.replace("_", "-")} mode. Treat earlier turns as historical context only; respond to the next turn under the new mode.`;
 	}
 
+	// Safety floor: guarantee the non-negotiable safety rules are present even
+	// when an admin DB-prompt override replaced the file preamble verbatim. No-op
+	// for file-based prompts (they already carry the crisis-line anchors), so the
+	// DeepSeek cached prefix is unaffected.
+	system = ensureDoubtSafetyFloor(system);
+
 	const userMessageBase = {
 		conversation_id: conversationId,
 		role: "user" as const,
-		content: lastUserText,
+		content: contentToStore,
 		prompt_tokens: null,
 		completion_tokens: null,
 		model: null,
@@ -391,6 +484,20 @@ export async function POST(req: Request) {
 		supabase,
 		conversationId,
 		threadFromDb,
+		{
+			// Fires only for freshly-extracted attachments on this turn (historical
+			// rows already have ocr_text and are skipped), so we don't re-flag the
+			// same upload every follow-up turn.
+			onAttachmentInjectionDetected: (attachmentId) => {
+				void flagDoubtAttachmentInjection({ attachmentId });
+				void recordPracticeEvent(
+					supabase,
+					"doubt_chat_attachment_injection_flagged",
+					{ attachment_id: attachmentId },
+					{ studentId: user.id },
+				);
+			},
+		},
 	);
 
 	let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>>;
@@ -495,12 +602,29 @@ export async function POST(req: Request) {
 			const billableTurn = finishReason === "stop" || finishReason === "length";
 			let asstErr: { message: string } | null = null;
 			if (billableTurn) {
+				// Deterministic output guard (no LLM). The student may have seen the
+				// streamed tokens once, but if the completed answer trips a slur /
+				// profanity / blacklist rule we persist a safe placeholder instead of
+				// the raw text — so history reloads and the parent view never show it —
+				// and raise a flag for review. Clean output (the overwhelming common
+				// case) is stored verbatim.
+				const outputScreen = await screenDoubtOutput(text);
+				const safeContent = outputScreen.safe ? text : SAFE_OUTPUT_PLACEHOLDER;
+				if (!outputScreen.safe) {
+					void flagDoubtSafety({ conversationId, categories: outputScreen.categories });
+					void recordPracticeEvent(
+						supabase,
+						"doubt_chat_output_flagged",
+						{ sources: outputScreen.categories.map((c) => c.source) },
+						{ studentId: user.id },
+					);
+				}
 				// Run the two independent writes in parallel — saves 150–300ms per turn.
 				const [insertResult, updateResult] = await Promise.allSettled([
 					supabase.from("doubt_messages").insert({
 						conversation_id: conversationId,
 						role: "assistant",
-						content: text,
+						content: safeContent,
 						prompt_tokens: promptT,
 						completion_tokens: compT,
 						model: streamOutcome.modelId,

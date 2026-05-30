@@ -3,11 +3,27 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UIMessage } from "ai";
 
+import {
+	detectInjection,
+	UNTRUSTED_ATTACHMENT_PREFACE,
+	UNTRUSTED_IMAGE_CAVEAT,
+} from "@/lib/doubt/safety-detectors";
+
 import { extractPdfText } from "./extract-pdf";
 import type { AttachmentRow } from "./types";
 
 const BUCKET = "doubt-attachments";
 const SIGNED_URL_TTL_SECONDS = 60 * 30; // 30 min — covers the model call window.
+
+export type DecorateAttachmentOptions = {
+	/**
+	 * Invoked (best-effort, fire-and-forget) when a freshly-extracted PDF's text
+	 * contains a prompt-injection pattern. Only fires for newly-extracted rows —
+	 * historical attachments already carry `ocr_text` and are skipped — so a
+	 * malicious upload is flagged once, not on every follow-up turn.
+	 */
+	onAttachmentInjectionDetected?: (attachmentId: string) => void;
+};
 
 /**
  * Resolve attachment rows into model-friendly inputs:
@@ -25,6 +41,7 @@ export async function decorateUserMessageWithAttachments(
 	supabase: SupabaseClient,
 	userMessage: UIMessage,
 	attachments: AttachmentRow[],
+	opts?: DecorateAttachmentOptions,
 ): Promise<UIMessage> {
 	if (attachments.length === 0) return userMessage;
 
@@ -55,6 +72,18 @@ export async function decorateUserMessageWithAttachments(
 		}
 	}
 
+	// Deterministic prompt-injection scan on freshly-extracted PDF text. The
+	// structural fence below neutralises injections regardless; this only raises
+	// an audit flag so we can see attempts. Only newly-extracted rows are scanned.
+	if (opts?.onAttachmentInjectionDetected) {
+		for (const pdf of pdfsToExtract) {
+			const t = (pdf.ocrText ?? "").trim();
+			if (t.length > 0 && detectInjection(t)) {
+				opts.onAttachmentInjectionDetected(pdf.id);
+			}
+		}
+	}
+
 	// Sign image URLs so the model can actually fetch them. Each URL is
 	// short-lived; we don't expose the bucket publicly.
 	const signedImages: { url: string; mime: string }[] = [];
@@ -77,21 +106,34 @@ export async function decorateUserMessageWithAttachments(
 		})
 		.join("\n\n");
 
-	// Reconstruct parts. We only mutate the text part (prepend transcripts) and
-	// append image parts.
+	// Fence the untrusted attachment content with an explicit caveat so the model
+	// treats extracted file text / image text as DATA, not instructions
+	// (prompt-injection defense). Lives in the per-message content, not the
+	// cached system preamble, so it costs nothing in prefix-cache terms.
+	const cautionLines: string[] = [];
+	if (pdfRows.length > 0 || imageRows.length > 0) cautionLines.push(UNTRUSTED_ATTACHMENT_PREFACE);
+	if (imageRows.length > 0) cautionLines.push(UNTRUSTED_IMAGE_CAVEAT);
+	const attachmentPreamble = [cautionLines.join("\n"), transcripts]
+		.filter((s) => s.length > 0)
+		.join("\n\n");
+
+	// Reconstruct parts. We only mutate the text part (prepend the fenced
+	// attachment block) and append image parts.
 	const newParts: UIMessage["parts"] = [];
 	let textPrepended = false;
 	for (const p of userMessage.parts ?? []) {
 		if (!textPrepended && p.type === "text") {
-			const merged = transcripts ? `${transcripts}\n\n${(p as { text: string }).text ?? ""}` : (p as { text: string }).text ?? "";
+			const merged = attachmentPreamble
+				? `${attachmentPreamble}\n\n${(p as { text: string }).text ?? ""}`
+				: (p as { text: string }).text ?? "";
 			newParts.push({ ...p, text: merged } as typeof p);
 			textPrepended = true;
 		} else {
 			newParts.push(p);
 		}
 	}
-	if (!textPrepended && transcripts) {
-		newParts.unshift({ type: "text", text: transcripts } as unknown as UIMessage["parts"][number]);
+	if (!textPrepended && attachmentPreamble) {
+		newParts.unshift({ type: "text", text: attachmentPreamble } as unknown as UIMessage["parts"][number]);
 	}
 	for (const img of signedImages) {
 		// AI SDK v6 file part shape (used for both images and other media):
@@ -185,6 +227,7 @@ export async function decorateThreadMessagesWithBoundAttachments(
 	supabase: SupabaseClient,
 	conversationId: string,
 	messages: UIMessage[],
+	opts?: DecorateAttachmentOptions,
 ): Promise<UIMessage[]> {
 	if (messages.length === 0) return messages;
 	const userMessageIds = messages
@@ -201,7 +244,7 @@ export async function decorateThreadMessagesWithBoundAttachments(
 		if (!message || message.role !== "user" || typeof message.id !== "string") continue;
 		const attachments = byMessageId.get(message.id);
 		if (!attachments || attachments.length === 0) continue;
-		decorated[i] = await decorateUserMessageWithAttachments(supabase, message, attachments);
+		decorated[i] = await decorateUserMessageWithAttachments(supabase, message, attachments, opts);
 	}
 	return decorated;
 }

@@ -5,8 +5,22 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+// Enables mhchem (\ce{...}, \pu{...}) for chemistry equations. Patches the same
+// singleton `katex` instance that `rehype-katex` renders with. The KaTeX
+// stylesheet itself is loaded by the route layout (katex-route-layout / parent).
+import "katex/dist/contrib/mhchem.mjs";
 
+import { normalizeTutorMarkdownMath } from "@/lib/doubt/tutor-math";
 import { cn } from "@/lib/utils";
+
+/**
+ * `rehype-katex` options. `strict: "ignore"` silences warnings for the mhchem /
+ * Unicode constructs the model emits; `throwOnError: false` renders a soft error
+ * node instead of crashing the whole message — important while streaming, when a
+ * half-emitted `$$` is briefly unbalanced. `trust: false` (default) keeps
+ * `\href`/raw HTML out of the output.
+ */
+const REHYPE_KATEX_OPTIONS = { strict: "ignore" as const, throwOnError: false };
 
 /**
  * URL schemes the tutor renderer is willing to surface. The model output is
@@ -41,6 +55,11 @@ function TutorMarkdownImpl({
 	children: string;
 	className?: string;
 }) {
+	// Rewrite \(...\)/\[...\] → $-delimiters and wrap Unicode math so remark-math
+	// + rehype-katex typeset everything the model emits (code/display blocks are
+	// protected inside the normalizer).
+	const normalized = useMemo(() => normalizeTutorMarkdownMath(children), [children]);
+
 	const components: Components = useMemo(
 		() => ({
 			h1: ({ children: c, id }) => (
@@ -161,12 +180,12 @@ function TutorMarkdownImpl({
 		>
 			<ReactMarkdown
 				remarkPlugins={[remarkGfm, remarkMath]}
-				rehypePlugins={[rehypeKatex]}
+				rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
 				components={components}
 				skipHtml
 				urlTransform={safeMarkdownUrl}
 			>
-				{children}
+				{normalized}
 			</ReactMarkdown>
 		</div>
 	);

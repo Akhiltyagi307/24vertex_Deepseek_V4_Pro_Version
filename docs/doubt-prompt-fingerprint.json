@@ -2,8 +2,8 @@
   "_note": "SHA-256 of each doubt-tutor prompt body. Run scripts/check-doubt-prompt-fingerprint.ts --write to update. See docs/conventions.md > Prompt cache hygiene.",
   "files": {
     "doubt-shared-preamble.md": {
-      "sha256": "7597f795be18f3bc5e8a6c1d64e5c97a00cf370a953c7705f78dc3387769a3b3",
-      "bodyChars": 4952
+      "sha256": "cbddfa7c9ef5f3076f84543485d2df3d31eb122e1eef1d23b973dc6eca79818f",
+      "bodyChars": 5871
     },
     "explain-mode-prompt.md": {
       "sha256": "7e3c3bb178a8609922996d245ccd0d335513d8655639754835205ac07d41e630",
@@ -18,20 +18,20 @@
       "bodyChars": 7543
     },
     "doubt-subject-packs/mathematics.md": {
-      "sha256": "3b26d54f483f32611aedc71322454373fc0eda0de1b1da5b7aba83ba2e100d90",
-      "bodyChars": 2419
+      "sha256": "a690c296a8946870a69cd69b47e5c830e4a543197b6e865816dcfc790c4ec825",
+      "bodyChars": 2681
     },
     "doubt-subject-packs/science.md": {
-      "sha256": "e218e0cf78c8b8d888ab2a8d9f412114cf1eda46b68d6951f825c6f679c8d2e4",
-      "bodyChars": 2459
+      "sha256": "c6bf4938be26db78147ffe154de5b4c7a954df622f446bb88760c9bc7aacd3fb",
+      "bodyChars": 2557
     },
     "doubt-subject-packs/physics.md": {
-      "sha256": "312ec7c2dd055997283ccf90a1ac9bdf5931290dc0a0619e66e08a99a1d2a9ab",
-      "bodyChars": 2783
+      "sha256": "d8dd33eb28507863e36b9696b8ae9cdf96eb5df7176fa1d14f5976c71f466486",
+      "bodyChars": 2934
     },
     "doubt-subject-packs/chemistry.md": {
-      "sha256": "70aada881f8493fc033446dd0897fa9df1b463de2aff6c48b8a9b976a2962f66",
-      "bodyChars": 2700
+      "sha256": "a0437005a73919e8e4099b9ffbb0a177994c2798cfe0ccb00bbe5fd66ffb2e32",
+      "bodyChars": 2807
     },
     "doubt-subject-packs/biology.md": {
       "sha256": "dc26d09772bb6cb61b9c0ec27f51db06407dee200eaf41a753f71af21acf2db9",

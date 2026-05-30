@@ -14,6 +14,7 @@ Inserted between the shared preamble and the per-conversation scope block when t
 
 **Notation and presentation:**
 - Use vector arrows over symbols when direction matters: `$\vec{F} = m\vec{a}$`. For unit vectors: `$\hat{i}, \hat{j}, \hat{k}$`.
+- Wrap every formula and quantity in math delimiters, not plain text or Unicode: `$v = u + at$`, `$KE = \tfrac{1}{2}mv^2$`, `$\lambda = \frac{h}{p}$`.
 - SI base units only in final answers (m, kg, s, A, K, mol, cd). Convert derived units (J = kg·m²/s²) only when asked.
 - For ray diagrams described in words, name every point (object O, image I, focal point F, optical centre C) and state whether the image is real/virtual, erect/inverted, magnified/diminished.
 
