@@ -475,3 +475,42 @@ export function isSaasEnforcementEnabled(): boolean {
 export function isDoubtScopePrecheckEnabled(): boolean {
 	return readTrimmedEnv("DOUBT_SCOPE_PRECHECK").toLowerCase() === "true";
 }
+
+/**
+ * Master switch for the deterministic doubt-chat safety screen (input/output
+ * moderation, distress + PII flagging, attachment injection fences). Defaults
+ * ON — it is a child-safety backstop, so it should be enabled unless explicitly
+ * disabled for an emergency rollback (`DOUBT_SAFETY_MODERATION=false`). The
+ * screen fails OPEN internally (a screening bug never blocks a student), so the
+ * only reason to flip this is to silence it entirely.
+ */
+export function isDoubtSafetyModerationEnabled(): boolean {
+	return readTrimmedEnv("DOUBT_SAFETY_MODERATION").toLowerCase() !== "false";
+}
+
+/**
+ * Redact detected PII (emails / phone numbers) from a student's turn before it
+ * is persisted and sent to the model. Defaults OFF: the phone heuristic can
+ * false-positive on a legitimate 10-digit math answer, and over-redacting would
+ * corrupt the lesson. When off, PII is still detected and flagged for review —
+ * just not stripped. Flip `DOUBT_PII_REDACTION=true` to enable stripping.
+ */
+export function isDoubtPiiRedactionEnabled(): boolean {
+	return readTrimmedEnv("DOUBT_PII_REDACTION").toLowerCase() === "true";
+}
+
+/**
+ * Fraction (0..1) of image-attachment turns to flag into the moderation review
+ * queue. We cannot screen image *content* without a vision model (excluded by
+ * design), so images are surfaced for human spot-review at this rate. Every
+ * image turn is recorded in analytics regardless; this only controls how many
+ * also raise a low-severity review flag. Defaults 0 (mechanism present, off) to
+ * avoid flooding the queue until a rate is chosen. `DOUBT_IMAGE_REVIEW_SAMPLE_RATE=0.05`.
+ */
+export function getDoubtImageReviewSampleRate(): number {
+	const raw = Number.parseFloat(readTrimmedEnv("DOUBT_IMAGE_REVIEW_SAMPLE_RATE"));
+	if (!Number.isFinite(raw)) return 0;
+	if (raw < 0) return 0;
+	if (raw > 1) return 1;
+	return raw;
+}

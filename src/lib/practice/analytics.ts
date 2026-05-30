@@ -45,7 +45,15 @@ export type PracticeEvent =
 	| "upgrade_clicked"
 	// Doubt-chat off-topic pre-check fired (behind DOUBT_SCOPE_PRECHECK flag).
 	// Props: { code, user_tokens, vocab_size, subject_id, topic_id }.
-	| "doubt_chat_off_topic_blocked";
+	| "doubt_chat_off_topic_blocked"
+	// Deterministic doubt-chat safety screen (no-LLM). Props include the matched
+	// category sources + severity; never the offending text.
+	| "doubt_chat_input_blocked"
+	| "doubt_chat_distress_flagged"
+	| "doubt_chat_pii_detected"
+	| "doubt_chat_output_flagged"
+	| "doubt_chat_attachment_injection_flagged"
+	| "doubt_chat_image_attached";
 
 /**
  * Record a practice analytics event. Fail-silent (never blocks user action).
