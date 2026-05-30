@@ -167,14 +167,11 @@ export function PracticeTestSession({
 		let fp = "";
 		try {
 			const key = "vertex24_practice_fp_v1";
-			const legacyKey = "vertex24_practice_fp_v1";
-			fp = sessionStorage.getItem(key) ?? sessionStorage.getItem(legacyKey) ?? "";
+			fp = sessionStorage.getItem(key) ?? "";
 			if (!fp) {
 				fp = crypto.randomUUID().replace(/-/g, "").slice(0, 40);
-				sessionStorage.setItem(key, fp);
-			} else {
-				sessionStorage.setItem(key, fp);
 			}
+			sessionStorage.setItem(key, fp);
 		} catch {
 			fp = `t${Date.now().toString(36)}`;
 		}

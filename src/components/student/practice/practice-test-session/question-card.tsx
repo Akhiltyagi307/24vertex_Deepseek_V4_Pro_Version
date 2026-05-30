@@ -25,10 +25,14 @@ import {
 } from "@/lib/practice/practice-session-utils";
 import { cn } from "@/lib/utils";
 
-import { LatexText } from "../latex-text";
 import { QuestionVisual } from "../visuals/question-visual";
 import type { PracticeSessionQuestion } from "@/components/student/practice/practice-session-types";
 import { difficultyClass } from "./shared";
+
+const LazyLatexText = dynamic(
+	() => import("../latex-text").then((m) => m.LatexText),
+	{ ssr: false },
+);
 
 const PracticeRichAnswerEditor = dynamic(
 	() =>
@@ -198,7 +202,7 @@ export function QuestionCard({
 							</div>
 						</div>
 						<CardTitle className="text-foreground max-w-prose text-balance text-base font-semibold leading-relaxed tracking-tight medium:text-lg">
-							<LatexText text={active.question_text} />
+							<LazyLatexText text={active.question_text} />
 						</CardTitle>
 						<QuestionVisual visual={active.visual} />
 					</CardHeader>
@@ -231,7 +235,7 @@ export function QuestionCard({
 													<span className="border-foreground/15 bg-muted text-foreground/90 mr-2 inline-flex size-7 items-center justify-center rounded-md border-2 font-mono text-xs font-semibold tabular-nums dark:border-border">
 														{letter}
 													</span>
-													<LatexText text={text} />
+													<LazyLatexText text={text} />
 												</FieldLabel>
 											</Field>
 										);
