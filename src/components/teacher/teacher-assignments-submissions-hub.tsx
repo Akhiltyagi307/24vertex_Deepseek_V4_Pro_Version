@@ -78,21 +78,18 @@ function lifecycleShortLabel(status: string): string {
 	return map[status] ?? status.replaceAll("_", " ");
 }
 
+const SUBMISSION_STATUS_BADGE_VARIANT: Partial<Record<string, "default" | "secondary" | "destructive" | "outline">> = {
+	graded: "default",
+	failed_generation: "destructive",
+	grading_failed: "destructive",
+	ready: "outline",
+	pending_materialize: "outline",
+};
+
 function submissionStatusBadgeVariant(
 	status: string,
 ): "default" | "secondary" | "destructive" | "outline" {
-	switch (status) {
-		case "graded":
-			return "default";
-		case "failed_generation":
-		case "grading_failed":
-			return "destructive";
-		case "ready":
-		case "pending_materialize":
-			return "outline";
-		default:
-			return "secondary";
-	}
+	return SUBMISSION_STATUS_BADGE_VARIANT[status] ?? "secondary";
 }
 
 function topicPerfBadgeVariant(status: TrackerTopicStatus): "default" | "secondary" | "destructive" {
