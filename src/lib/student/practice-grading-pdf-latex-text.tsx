@@ -8,6 +8,8 @@ import { parseLatexNodes, type LatexNode } from "@/lib/practice/parse-latex-node
 
 const PDF_INK = "#252525";
 
+type PdfStyle = Parameters<typeof StyleSheet.create>[0][string];
+
 const styles = StyleSheet.create({
 	block: { width: "100%" },
 	line: {
@@ -53,10 +55,13 @@ function PdfMathFragment({
 	tex: string;
 	display: boolean;
 	inlineHeight: number;
-	textStyle?: object;
+	textStyle?: PdfStyle;
 }): ReactElement {
 	if (!katexRenders(tex)) {
-		return <Text style={[styles.fallbackMath, textStyle]}>{tex}</Text>;
+		const fallbackStyle = textStyle
+			? [styles.fallbackMath, textStyle]
+			: styles.fallbackMath;
+		return <Text style={fallbackStyle}>{tex}</Text>;
 	}
 	if (display) {
 		return (
@@ -75,7 +80,7 @@ function PdfMathFragment({
 function renderInlineLine(
 	nodes: LatexNode[],
 	inlineHeight: number,
-	textStyle: object | undefined,
+	textStyle: PdfStyle | undefined,
 	keyPrefix: string,
 ): ReactElement {
 	const parts: ReactNode[] = [];
@@ -119,7 +124,7 @@ export function PdfLatexText({
 	inlineMathHeight = 10,
 }: {
 	children: string;
-	style?: object;
+	style?: PdfStyle;
 	inlineMathHeight?: number;
 }): ReactElement {
 	const normalized = normalizeKatexMath(children);
