@@ -447,17 +447,7 @@ function pickFallbackCandidateForKind(
 		case "map_visual":
 		case "chemistry_cell_diagram":
 		case "physics_field_diagram":
-		case "physics_wave_diagram": {
-			const base = buildFallbackByKind(kind, questionText);
-			if (!base) return null;
-			if (ideaTrim.length >= 8 && typeof base === "object" && base !== null && "caption" in base) {
-				return {
-					...(base as QuestionVisualEnvelope),
-					caption: shortCaptionFromIdea(ideaTrim, 120),
-				};
-			}
-			return base;
-		}
+		case "physics_wave_diagram":
 		case "economics_curve":
 		case "accountancy_table":
 		case "india_map": {

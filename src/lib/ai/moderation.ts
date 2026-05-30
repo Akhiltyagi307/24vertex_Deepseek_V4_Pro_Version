@@ -78,24 +78,26 @@ export type PerQuestionModerationResult =
 	| { ok: true; flagged: [] }
 	| { ok: false; flagged: PerQuestionFlag[] };
 
-/**
- * Per-question regex + profanity moderation. Free (no embedding call). Use this
- * before the blob-level {@link moderatePracticeGenerationText} so a single
- * tainted question does not invalidate the whole generation — caller can drop
- * the flagged indices and keep the rest.
- */
-export async function moderatePracticeQuestionsPerItem(
-	questionTexts: string[],
-): Promise<PerQuestionModerationResult> {
-	if (!(await isModerationPreCheckEnabled()) || questionTexts.length === 0) {
-		return { ok: true, flagged: [] };
-	}
+export type CompiledBlacklistRule = { id: string; re: RegExp };
 
+/**
+ * Shared moderation inputs (feature-flag state + compiled regex blacklist).
+ * A caller that runs both {@link moderatePracticeQuestionsPerItem} and
+ * {@link moderatePracticeGenerationText} back-to-back (the generation pipeline)
+ * can load this once and pass it into both, so the flag query and the blacklist
+ * query+compile happen a single time instead of once per pass.
+ */
+export type ModerationContext = {
+	enabled: boolean;
+	blacklist: CompiledBlacklistRule[];
+};
+
+async function loadQuestionGeneratorRegexBlacklist(): Promise<CompiledBlacklistRule[]> {
 	const rules = await db
 		.select()
 		.from(contentBlacklist)
 		.where(eq(contentBlacklist.appliesTo, "question_generator"));
-	const compiledRegex: { id: string; re: RegExp }[] = [];
+	const compiledRegex: CompiledBlacklistRule[] = [];
 	for (const row of rules) {
 		if (row.patternType !== "regex") continue;
 		try {
@@ -104,6 +106,36 @@ export async function moderatePracticeQuestionsPerItem(
 			/* invalid regex — skip */
 		}
 	}
+	return compiledRegex;
+}
+
+/** Load the shared {@link ModerationContext} once for back-to-back passes. */
+export async function loadModerationContext(): Promise<ModerationContext> {
+	if (!(await isModerationPreCheckEnabled())) {
+		return { enabled: false, blacklist: [] };
+	}
+	return { enabled: true, blacklist: await loadQuestionGeneratorRegexBlacklist() };
+}
+
+/**
+ * Per-question regex + profanity moderation. Free (no embedding call). Use this
+ * before the blob-level {@link moderatePracticeGenerationText} so a single
+ * tainted question does not invalidate the whole generation — caller can drop
+ * the flagged indices and keep the rest.
+ *
+ * Pass a shared {@link ModerationContext} to reuse one flag + blacklist load
+ * across both passes; omit it and the function loads its own (standalone use).
+ */
+export async function moderatePracticeQuestionsPerItem(
+	questionTexts: string[],
+	ctx?: ModerationContext,
+): Promise<PerQuestionModerationResult> {
+	const enabled = ctx ? ctx.enabled : await isModerationPreCheckEnabled();
+	if (!enabled || questionTexts.length === 0) {
+		return { ok: true, flagged: [] };
+	}
+
+	const compiledRegex = ctx ? ctx.blacklist : await loadQuestionGeneratorRegexBlacklist();
 
 	const flagged: PerQuestionFlag[] = [];
 	for (let i = 0; i < questionTexts.length; i++) {
@@ -136,29 +168,22 @@ export async function moderatePracticeQuestionsPerItem(
  * embedding rules carried marginal value (we kept all the regex coverage).
  * See docs/deepseek-migration-plan.md §4.5.
  */
-export async function moderatePracticeGenerationText(blob: string): Promise<ModerationOutcome> {
-	if (!(await isModerationPreCheckEnabled())) {
+export async function moderatePracticeGenerationText(
+	blob: string,
+	ctx?: ModerationContext,
+): Promise<ModerationOutcome> {
+	const enabled = ctx ? ctx.enabled : await isModerationPreCheckEnabled();
+	if (!enabled) {
 		return { ok: true };
 	}
 	if (DEFAULT_PROFANITY.test(blob)) {
 		return { ok: false, reason: "profanity_pattern", source: "profanity" };
 	}
 
-	const rules = await db
-		.select()
-		.from(contentBlacklist)
-		.where(eq(contentBlacklist.appliesTo, "question_generator"));
-
-	for (const row of rules) {
-		if (row.patternType === "regex") {
-			try {
-				const re = new RegExp(row.pattern, "i");
-				if (re.test(blob)) {
-					return { ok: false, reason: `regex:${row.id}`, source: "regex_blacklist" };
-				}
-			} catch {
-				/* invalid regex — skip */
-			}
+	const compiledRegex = ctx ? ctx.blacklist : await loadQuestionGeneratorRegexBlacklist();
+	for (const { id, re } of compiledRegex) {
+		if (re.test(blob)) {
+			return { ok: false, reason: `regex:${id}`, source: "regex_blacklist" };
 		}
 	}
 

@@ -4,11 +4,12 @@ import { cache } from "react";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { subjects, topics } from "@/db/schema/academic";
+import { topics } from "@/db/schema/academic";
 import { performanceTracker } from "@/db/schema/assessment";
 import { practiceJobs } from "@/db/schema/practice-tables";
 import { profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { fetchSubjectNameMap } from "@/lib/academic/subject-names";
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
 import {
 	listTeacherPerformanceDirectoryStudents,
@@ -184,14 +185,7 @@ export async function listTeacherAssignmentSummaries(
 
 	const configs = assignmentRows.map((row) => assignmentConfigSchema.safeParse(row.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
-	const subjectRows =
-		subjectIds.length > 0 ?
-			await db
-				.select({ id: subjects.id, name: subjects.name })
-				.from(subjects)
-				.where(inArray(subjects.id, subjectIds))
-		:	[];
-	const subjectNameById = new Map(subjectRows.map((row) => [row.id, row.name]));
+	const subjectNameById = await fetchSubjectNameMap(subjectIds);
 
 	return assignmentRows.flatMap((row, index) => {
 		const config = configs[index];
@@ -253,14 +247,7 @@ export async function listTeacherAssignmentSubmissionRows(
 
 	const configs = rows.map((row) => assignmentConfigSchema.safeParse(row.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
-	const subjectRows =
-		subjectIds.length > 0 ?
-			await db
-				.select({ id: subjects.id, name: subjects.name })
-				.from(subjects)
-				.where(inArray(subjects.id, subjectIds))
-		:	[];
-	const subjectNameById = new Map(subjectRows.map((row) => [row.id, row.name]));
+	const subjectNameById = await fetchSubjectNameMap(subjectIds);
 
 	return rows.flatMap((row, index) => {
 		const config = configs[index];
@@ -468,14 +455,7 @@ export async function listAssignmentCardsForStudentIds(studentIds: string[]): Pr
 
 	const configs = rows.map((row) => assignmentConfigSchema.safeParse(row.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
-	const subjectRows =
-		subjectIds.length > 0 ?
-			await db
-				.select({ id: subjects.id, name: subjects.name })
-				.from(subjects)
-				.where(inArray(subjects.id, subjectIds))
-		:	[];
-	const subjectNameById = new Map(subjectRows.map((row) => [row.id, row.name]));
+	const subjectNameById = await fetchSubjectNameMap(subjectIds);
 
 	return rows.flatMap((row, index) => {
 		const config = configs[index];

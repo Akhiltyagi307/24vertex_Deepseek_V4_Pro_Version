@@ -294,10 +294,16 @@ export async function POST(req: Request) {
 
 	const conversationId = existing.id as string;
 
-	// Load attachments first so we can route based on KIND. A PDF-only turn
-	// stays on DeepSeek (text is extracted server-side and prepended to the
-	// user message). Only image attachments force the OpenAI fallback.
-	const attachments = await loadAttachmentsForRequest(supabase, conversationId, attachmentIds);
+	// Load attachments (needed to route based on KIND — a PDF-only turn stays on
+	// DeepSeek, only image attachments force the OpenAI fallback) and the admin
+	// DB-prompt override concurrently. The prompt lookup depends only on tutorMode,
+	// so it need not wait on the attachment round-trip; both are awaited together,
+	// so the early-return below leaves no floating promise.
+	const doubtFeature = doubtFeatureForMode(tutorMode);
+	const [attachments, dbPrompt] = await Promise.all([
+		loadAttachmentsForRequest(supabase, conversationId, attachmentIds),
+		getActiveAiPrompt(doubtFeature),
+	]);
 	if (attachments.length !== attachmentIds.length) {
 		return new Response(
 			JSON.stringify({ error: "One or more attachments could not be found." }),
@@ -311,8 +317,6 @@ export async function POST(req: Request) {
 	// (`AI_PROVIDER_DOUBT_CHAT`, currently `deepseek`).
 	const resolved = resolveChatModel("doubt.chat", { hasImageAttachment });
 	const modelId = resolved.modelId;
-	const doubtFeature = doubtFeatureForMode(tutorMode);
-	const dbPrompt = await getActiveAiPrompt(doubtFeature);
 	// When the admin has activated a DB-prompt override, use it verbatim —
 	// they're taking responsibility for the full template (including any
 	// subject-pack content). Otherwise compose preamble + subject pack

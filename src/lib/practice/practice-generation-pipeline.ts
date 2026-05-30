@@ -4,6 +4,7 @@ import { APICallError, NoObjectGeneratedError } from "ai";
 
 import {
 	insertHeuristicModerationFlag,
+	loadModerationContext,
 	moderatePracticeGenerationText,
 	moderatePracticeQuestionsPerItem,
 } from "@/lib/ai/moderation";
@@ -1536,8 +1537,12 @@ ${JSON.stringify(blueprintSlots)}`;
 
 			cumulativeValidationMs += Date.now() - v0;
 
+			// One shared flag + blacklist load for both passes below (they must stay
+			// sequential — the blob pass runs on the per-item survivors).
+			const moderationCtx = await loadModerationContext();
 			const perItem = await moderatePracticeQuestionsPerItem(
 				flattened.questions.map((q) => q.question_text),
+				moderationCtx,
 			);
 			if (!perItem.ok) {
 				const retainedCount = flattened.questions.length - perItem.flagged.length;
@@ -1567,7 +1572,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			}
 
 			const modBlob = JSON.stringify(flattened.questions);
-			const mod = await moderatePracticeGenerationText(modBlob);
+			const mod = await moderatePracticeGenerationText(modBlob, moderationCtx);
 			if (!mod.ok) {
 				try {
 					await insertHeuristicModerationFlag({
