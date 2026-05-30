@@ -49,7 +49,7 @@ export function AssignmentPublishedSuccessDialog({
 						</DialogDescription>
 					</div>
 				</DialogHeader>
-				<DialogFooter className="flex-col gap-2 px-6 py-5 sm:flex-col sm:items-stretch">
+				<DialogFooter className="flex-col gap-2 px-6 py-5 medium:flex-col medium:items-stretch">
 					<Button render={<Link href="/teacher/submissions?tab=ongoing" />} nativeButton={false}>
 						View submissions
 					</Button>

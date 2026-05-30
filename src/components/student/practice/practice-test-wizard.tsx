@@ -572,6 +572,15 @@ export function PracticeTestWizard({
 							paywall: true,
 						} as GeneratePracticeResult;
 					}
+					if (res.status === 429) {
+						const j = (await res.json().catch(() => ({}))) as { message?: string };
+						return {
+							ok: false,
+							code: "rate_limited",
+							message:
+								j.message ?? "You're generating tests too quickly. Please wait a moment and try again.",
+						} as GeneratePracticeResult;
+					}
 					if (!res.ok) {
 						const j = (await res.json().catch(() => ({}))) as { message?: string };
 						return {

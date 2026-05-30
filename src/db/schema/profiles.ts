@@ -26,7 +26,10 @@ export const profiles = pgTable(
 		schoolName: varchar("school_name", { length: 300 }),
 		parentName: varchar("parent_name", { length: 200 }),
 		parentEmail: varchar("parent_email", { length: 320 }),
-		studentLinkCode: varchar("student_link_code", { length: 6 }),
+		// L-2: 8 to match 20260619100000_extend_student_link_code_to_8_chars.sql
+		// (live column is varchar(8) for the XXX12345 format). Leaving this at 6
+		// would make a Drizzle push try to truncate the column.
+		studentLinkCode: varchar("student_link_code", { length: 8 }),
 		bio: text("bio"),
 		phone: varchar("phone", { length: 32 }),
 		website: varchar("website", { length: 500 }),

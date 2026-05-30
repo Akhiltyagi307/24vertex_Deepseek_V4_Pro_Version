@@ -62,7 +62,7 @@ async function runTrialEmails(request: Request): Promise<Response> {
 		.limit(500);
 	if (error) {
 		logSupabaseError("billing.trial_emails.select", error);
-		return Response.json({ ok: false }, { status: 500 });
+		return Response.json({ success: false, ok: false }, { status: 500 });
 	}
 
 	let sent = 0;

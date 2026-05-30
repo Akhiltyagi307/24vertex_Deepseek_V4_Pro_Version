@@ -54,7 +54,7 @@ async function runWeeklyDigest(request: Request): Promise<Response> {
 	const recipients = getAdminNotificationRecipients();
 	if (recipients.length === 0) {
 		return Response.json(
-			{ ok: false, message: "No admin notification recipients configured (ADMIN_NOTIFICATION_EMAILS or ADMIN_EMAIL)." },
+			{ success: false, ok: false, message: "No admin notification recipients configured (ADMIN_NOTIFICATION_EMAILS or ADMIN_EMAIL)." },
 			{ status: 500 },
 		);
 	}
@@ -63,7 +63,7 @@ async function runWeeklyDigest(request: Request): Promise<Response> {
 	const dedup = await digestAlreadySentThisWeek(digestWeek);
 	if (dedup.readError) {
 		return Response.json(
-			{ ok: false, skipped: true, digest_week: digestWeek, reason: "dedup_check_failed", error: dedup.readError },
+			{ success: false, ok: false, skipped: true, digest_week: digestWeek, reason: "dedup_check_failed", error: dedup.readError },
 			{ status: 503 },
 		);
 	}
@@ -100,7 +100,7 @@ async function runWeeklyDigest(request: Request): Promise<Response> {
 
 	if (sentTo.length === 0) {
 		return Response.json(
-			{ ok: false, message: "All admin recipients failed.", failed, digest_week: digestWeek },
+			{ success: false, ok: false, message: "All admin recipients failed.", failed, digest_week: digestWeek },
 			{ status: 500 },
 		);
 	}

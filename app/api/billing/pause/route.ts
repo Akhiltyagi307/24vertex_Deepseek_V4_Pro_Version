@@ -21,7 +21,7 @@ const RATE_WINDOW_SEC = 60;
  */
 export async function POST(req: Request) {
 	const auth = await getApiRequestUser(req);
-	if (!auth) return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+	if (!auth) return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	const { user } = auth;
 
 	const rl = await rlConsume({
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 	});
 	if (!rl.allowed) {
 		return Response.json(
-			{ ok: false, code: "rate_limited", message: "Too many pause attempts." },
+			{ success: false, ok: false, code: "rate_limited", message: "Too many pause attempts." },
 			{ status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000))) } },
 		);
 	}
@@ -44,17 +44,17 @@ export async function POST(req: Request) {
 		.maybeSingle<{ id: string; status: string; razorpay_subscription_id: string | null }>();
 	if (subErr || !sub) {
 		if (subErr) logSupabaseError("billing.pause.sub", subErr);
-		return Response.json({ ok: false, message: "Subscription not found." }, { status: 404 });
+		return Response.json({ success: false, ok: false, message: "Subscription not found." }, { status: 404 });
 	}
 	if (!sub.razorpay_subscription_id) {
-		return Response.json({ ok: false, message: "Subscription not linked to Razorpay." }, { status: 409 });
+		return Response.json({ success: false, ok: false, message: "Subscription not linked to Razorpay." }, { status: 409 });
 	}
 	if (sub.status === "paused") {
 		return Response.json({ ok: true, deduped: true });
 	}
 	if (sub.status !== "active") {
 		return Response.json(
-			{ ok: false, code: "wrong_status", message: `Pause requires active status (got ${sub.status}).` },
+			{ success: false, ok: false, code: "wrong_status", message: `Pause requires active status (got ${sub.status}).` },
 			{ status: 409 },
 		);
 	}
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 		await pauseSubscription(sub.razorpay_subscription_id, { pauseAt: "now" });
 	} catch (e) {
 		logServerError("billing.pause.razorpay", e);
-		return Response.json({ ok: false, message: "Razorpay rejected the pause." }, { status: 502 });
+		return Response.json({ success: false, ok: false, message: "Razorpay rejected the pause." }, { status: 502 });
 	}
 
 	// Mirror state locally and stash quota for restoration on resume.

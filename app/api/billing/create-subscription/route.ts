@@ -53,12 +53,12 @@ export async function POST(req: Request) {
 	const json = await req.json().catch(() => null);
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid request." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid request." }, { status: 400 });
 	}
 
 	const auth = await getApiRequestUser(req);
 	if (!auth) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 	const { supabase, user } = auth;
 
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 	} catch {
 		return Response.json(
 			{
-				ok: false,
+				success: false, ok: false,
 				message:
 					"Billing is not fully configured: set NEXT_PUBLIC_RAZORPAY_KEY_ID (or RAZORPAY_KEY_ID) in the environment.",
 			},
@@ -85,10 +85,10 @@ export async function POST(req: Request) {
 		.maybeSingle();
 	if (planErr || !plan) {
 		if (planErr) logSupabaseError("billing.create-subscription.plan", planErr, { planCode: parsed.data.planCode });
-		return Response.json({ ok: false, message: "Plan not found." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Plan not found." }, { status: 400 });
 	}
 	if (!isPlanCode(plan.code)) {
-		return Response.json({ ok: false, message: "Invalid plan code." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Invalid plan code." }, { status: 500 });
 	}
 
 	const { data: callerProfile } = await admin
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
 	let targetProfileId = user.id;
 	if (parsed.data.billingProfileId) {
 		if (callerProfile?.role !== "parent" || parsed.data.billingProfileId === user.id) {
-			return Response.json({ ok: false, message: "Not allowed to bill this account." }, { status: 403 });
+			return Response.json({ success: false, ok: false, message: "Not allowed to bill this account." }, { status: 403 });
 		}
 		const { data: linkRow } = await supabase
 			.from("parent_student_links")
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
 			.eq("status", "active")
 			.maybeSingle();
 		if (!linkRow) {
-			return Response.json({ ok: false, message: "Student not linked to your account." }, { status: 403 });
+			return Response.json({ success: false, ok: false, message: "Student not linked to your account." }, { status: 403 });
 		}
 		const { data: billedProfile } = await admin
 			.from("profiles")
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
 			.eq("id", parsed.data.billingProfileId)
 			.maybeSingle();
 		if (billedProfile?.role !== "student") {
-			return Response.json({ ok: false, message: "Invalid billing profile." }, { status: 400 });
+			return Response.json({ success: false, ok: false, message: "Invalid billing profile." }, { status: 400 });
 		}
 		targetProfileId = parsed.data.billingProfileId;
 	}
@@ -154,12 +154,12 @@ export async function POST(req: Request) {
 		.maybeSingle();
 	if (subErr || !subRow) {
 		if (subErr) logSupabaseError("billing.create-subscription.sub", subErr, { profileId: targetProfileId });
-		return Response.json({ ok: false, message: "Subscription record missing." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Subscription record missing." }, { status: 500 });
 	}
 	if (!plan.razorpay_plan_id) {
 		return Response.json(
 			{
-				ok: false,
+				success: false, ok: false,
 				message:
 					"This plan is not linked to Razorpay yet. Run `pnpm razorpay:seed-plans`, copy each plan id from the Razorpay dashboard into the `plans.razorpay_plan_id` column in Supabase, then retry checkout.",
 			},
@@ -174,7 +174,7 @@ export async function POST(req: Request) {
 		const billedForChild = targetProfileId !== user.id;
 		return Response.json(
 			{
-				ok: false,
+				success: false, ok: false,
 				message: billedForChild
 					? "This student already has an active paid subscription. Use Razorpay or cancel at period end before starting a new checkout."
 					: "You already have an active billing subscription. Open Subscription to manage payment or change plans.",
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
 				.eq("profile_id", targetProfileId);
 			return Response.json(
 				{
-					ok: false,
+					success: false, ok: false,
 					code: "customer_collision",
 					message:
 						"This email is already linked to a different 24Vertex account in Razorpay. Contact support to resolve before subscribing.",
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
 			);
 		}
 		logServerError("billing.create-subscription.customer", e);
-		return Response.json({ ok: false, message: "Could not create Razorpay customer." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not create Razorpay customer." }, { status: 500 });
 	}
 
 	// Monthly plans renew for 10 years (≈120 cycles); annual for 10 years (10 cycles).
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
 			planCode: parsed.data.planCode,
 		});
 		if (!q.ok) {
-			return Response.json({ ok: false, message: q.message }, { status: 400 });
+			return Response.json({ success: false, ok: false, message: q.message }, { status: 400 });
 		}
 		offerId = q.offerId;
 		vertex24CouponId = q.couponId;
@@ -283,7 +283,7 @@ export async function POST(req: Request) {
 				start_mode: parsed.data.startMode,
 			},
 		});
-		return Response.json({ ok: false, message: "Could not start Razorpay checkout." }, { status: 502 });
+		return Response.json({ success: false, ok: false, message: "Could not start Razorpay checkout." }, { status: 502 });
 	}
 
 	const { error: updErr } = await admin

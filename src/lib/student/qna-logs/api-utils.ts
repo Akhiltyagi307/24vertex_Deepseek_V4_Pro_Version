@@ -23,8 +23,30 @@ export function qnaJson<T>(body: T, init?: ResponseInit) {
 	});
 }
 
+/** Maps an HTTP status to a canonical {@link ApiErrorCode}-style code (B3). */
+function qnaCodeForStatus(status: number): string {
+	switch (status) {
+		case 400:
+			return "validation_error";
+		case 401:
+			return "unauthorized";
+		case 403:
+			return "forbidden";
+		case 404:
+			return "not_found";
+		case 409:
+			return "conflict";
+		case 429:
+			return "rate_limited";
+		default:
+			return status >= 500 ? "internal_error" : "error";
+	}
+}
+
 export function qnaError(status: number, message: string) {
-	return qnaJson({ error: message }, { status });
+	// B3 unification: canonical `{ success, code, message }` + legacy `error`
+	// alias (== message) so existing readers keep working.
+	return qnaJson({ success: false, code: qnaCodeForStatus(status), message, error: message }, { status });
 }
 
 export async function qnaRateLimitCheck(args: {
@@ -37,7 +59,12 @@ export async function qnaRateLimitCheck(args: {
 	if (result.ok) return null;
 	const retryAfterSec = Math.max(1, Math.ceil((result.resetAt.getTime() - Date.now()) / 1000));
 	return qnaJson(
-		{ error: "Too many requests. Try again shortly." },
+		{
+			success: false,
+			code: "rate_limited",
+			message: "Too many requests. Try again shortly.",
+			error: "Too many requests. Try again shortly.",
+		},
 		{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 	);
 }

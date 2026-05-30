@@ -33,6 +33,28 @@ export interface ApiFailure {
 	requestId?: string;
 }
 
+/**
+ * Recommended stable `code` values for {@link fail} (B3 unification). Advisory
+ * only — the `code` param stays `string` so existing call sites with bespoke
+ * codes still compile; prefer these on new/converted routes so clients can
+ * branch on `code` reliably across the whole API surface.
+ */
+export type ApiErrorCode =
+	| "validation_error"
+	| "unauthorized"
+	| "forbidden"
+	| "not_found"
+	| "rate_limited"
+	| "quota_tests"
+	| "quota_tokens"
+	| "trial_expired"
+	| "subscription_expired"
+	| "paywall"
+	| "conflict"
+	| "bad_signature"
+	| "database_error"
+	| "internal_error";
+
 interface ResponseOptions {
 	/** When provided, the response includes the correlation id and echoes it as the x-request-id response header. */
 	request?: Request;

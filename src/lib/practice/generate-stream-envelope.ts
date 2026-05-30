@@ -86,6 +86,7 @@ export function httpStatusForGenerateFailure(
 	failure: Extract<GeneratePracticeResult, { ok: false }>,
 ): number {
 	if (failure.paywall) return 402;
+	if (failure.code === "rate_limited") return 429;
 	if (failure.code === "unauthorized") return 401;
 	if (failure.code === "validation_error" || failure.code === "generation_invalid") return 400;
 	if (failure.code === "stale_selection" || failure.code === "subject_not_enrolled" || failure.code === "subject_mismatch" || failure.code === "inactive_topic" || failure.code === "not_student") {

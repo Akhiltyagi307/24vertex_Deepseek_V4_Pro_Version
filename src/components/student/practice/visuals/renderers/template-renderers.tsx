@@ -191,7 +191,7 @@ export function MapVisual({ spec }: { spec: MapVisualSpec }): React.ReactElement
 					<span>{titleCase(spec.scope)} map</span>
 					<span>{titleCase(spec.mapStyle)}</span>
 				</div>
-				<div className="grid gap-2 sm:grid-cols-2">
+				<div className="grid gap-2 medium:grid-cols-2">
 					{spec.regions.map((region) => (
 						<div key={`${region.id}-${region.role}`} className="rounded border border-border bg-card px-3 py-2">
 							<div className="text-sm font-medium text-foreground">{region.label}</div>
@@ -209,7 +209,7 @@ export function ChemistryCellDiagram({ spec }: { spec: ChemistryCellDiagramSpec 
 	return (
 		<div className="w-full max-w-[620px]">
 			<PanelTitle>{titleCase(spec.cellType)} cell</PanelTitle>
-			<div className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_auto_1fr]">
+			<div className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 medium:grid-cols-[1fr_auto_1fr]">
 				<ElectrodeCard label="Anode" electrode={spec.anode} />
 				<div className="flex flex-col items-center justify-center text-center text-xs text-muted-foreground">
 					<div className="rounded-full border border-border bg-card px-3 py-1">e- flow</div>

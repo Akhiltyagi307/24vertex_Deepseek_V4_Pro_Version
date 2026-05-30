@@ -24,14 +24,14 @@ const cancelBodySchema = z.object({
 export async function POST(req: Request) {
 	const user = await getServerUser();
 	if (!user) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 	const supabase = await createClient();
 
 	const rawBody = await req.json().catch(() => ({}));
 	const parsedBody = cancelBodySchema.safeParse(rawBody);
 	if (!parsedBody.success) {
-		return Response.json({ ok: false, message: "Invalid request." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid request." }, { status: 400 });
 	}
 	const billingProfileId = parsedBody.data.billingProfileId;
 
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 	let targetProfileId = user.id;
 	if (billingProfileId && billingProfileId !== user.id) {
 		if (callerProfile?.role !== "parent") {
-			return Response.json({ ok: false, message: "Forbidden." }, { status: 403 });
+			return Response.json({ success: false, ok: false, message: "Forbidden." }, { status: 403 });
 		}
 		const { data: linkRow } = await supabase
 			.from("parent_student_links")
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 			.eq("status", "active")
 			.maybeSingle();
 		if (!linkRow) {
-			return Response.json({ ok: false, message: "Student not linked." }, { status: 403 });
+			return Response.json({ success: false, ok: false, message: "Student not linked." }, { status: 403 });
 		}
 		targetProfileId = billingProfileId;
 	}
@@ -67,10 +67,10 @@ export async function POST(req: Request) {
 		.maybeSingle();
 	if (error || !sub) {
 		if (error) logSupabaseError("billing.cancel.load", error, { profileId: targetProfileId });
-		return Response.json({ ok: false, message: "No subscription to cancel." }, { status: 404 });
+		return Response.json({ success: false, ok: false, message: "No subscription to cancel." }, { status: 404 });
 	}
 	if (!sub.razorpay_subscription_id) {
-		return Response.json({ ok: false, message: "No paid subscription to cancel." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "No paid subscription to cancel." }, { status: 400 });
 	}
 
 	// Idempotency: if `cancel_at_period_end` is already true, the soft cancel
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
 		await cancelSubscription(sub.razorpay_subscription_id, { cancelAtCycleEnd: true });
 	} catch (e) {
 		logServerError("billing.cancel.rzp", e);
-		return Response.json({ ok: false, message: "Razorpay refused the cancellation." }, { status: 502 });
+		return Response.json({ success: false, ok: false, message: "Razorpay refused the cancellation." }, { status: 502 });
 	}
 
 	await admin

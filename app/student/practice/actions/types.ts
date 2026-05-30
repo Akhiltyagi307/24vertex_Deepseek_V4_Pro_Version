@@ -45,6 +45,7 @@ export type GeneratePracticeFailure = {
 		| FinalizePracticeFailure["code"]
 		| "generation_failed"
 		| "generation_invalid"
+		| "rate_limited"
 		| "quota_tests"
 		| "trial_expired"
 		| "subscription_expired";
@@ -54,6 +55,12 @@ export type GeneratePracticeFailure = {
 	correlationId?: string;
 	/** When true the client should surface the paywall dialog instead of an inline error. */
 	paywall?: boolean;
+	/**
+	 * For `code: "rate_limited"` — ISO timestamp when the limit window resets,
+	 * or null if unknown. The generate-stream route maps this to a `Retry-After`
+	 * header so the client can show a precise retry hint (H-3).
+	 */
+	resetAt?: string | null;
 };
 
 export type GeneratePracticeResult = GeneratePracticeSuccess | GeneratePracticeFailure;

@@ -56,12 +56,12 @@ export async function POST(request: Request) {
 	try {
 		json = await request.json();
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid JSON." }, { status: 400 });
 	}
 
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid payload." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid payload." }, { status: 400 });
 	}
 
 	const supabase = await createClient();
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 		data: { user },
 	} = await supabase.auth.getUser();
 	if (!user) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
 	const [profile] = await db
@@ -80,14 +80,14 @@ export async function POST(request: Request) {
 
 	const role = profile?.role;
 	if (!role || !portalMatchesProfileRole(parsed.data.portal as FeedbackPortal, role)) {
-		return Response.json({ ok: false, message: "Portal does not match your account." }, { status: 403 });
+		return Response.json({ success: false, ok: false, message: "Portal does not match your account." }, { status: 403 });
 	}
 
 	const rl = await consumeFeedbackSubmitRateLimit(user.id);
 	if (!rl.ok) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return Response.json(
-			{ ok: false, message: "You've submitted too many reports recently. Try again later." },
+			{ success: false, ok: false, message: "You've submitted too many reports recently. Try again later." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
 	if (error || !row) {
 		logSupabaseError("feedback.insert", error ?? { message: "no row returned" }, { userId: user.id });
-		return Response.json({ ok: false, message: "Could not submit your report." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not submit your report." }, { status: 500 });
 	}
 
 	return Response.json({ ok: true, reportId: row.id as string });

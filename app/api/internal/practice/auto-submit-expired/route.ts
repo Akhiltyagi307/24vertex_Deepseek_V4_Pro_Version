@@ -24,7 +24,7 @@ async function runAutoSubmitExpired(): Promise<Response> {
 		.limit(100);
 	if (error) {
 		logSupabaseError("runAutoSubmitExpired.tests.select", error);
-		return Response.json({ ok: false, message: "Could not load tests." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not load tests." }, { status: 500 });
 	}
 
 	const now = Date.now();

@@ -2,7 +2,6 @@ import {
 	boolean,
 	decimal,
 	index,
-	integer,
 	jsonb,
 	pgTable,
 	text,
@@ -12,28 +11,13 @@ import {
 	varchar,
 } from "drizzle-orm/pg-core";
 
-import { subjects } from "./academic";
 import { tests } from "./assessment";
 import { organizations } from "./organizations";
 
-export const teacherAssignments = pgTable(
-	"teacher_assignments",
-	{
-		id: uuid("id").defaultRandom().primaryKey(),
-		teacherId: uuid("teacher_id").notNull(),
-		grade: integer("grade").notNull(),
-		section: varchar("section", { length: 5 }).notNull(),
-		subjectId: uuid("subject_id")
-			.notNull()
-			.references(() => subjects.id),
-		createdAt: timestamp("created_at").defaultNow(),
-	},
-	(t) => [
-		unique().on(t.teacherId, t.grade, t.section, t.subjectId),
-		index("idx_teacher_assign_teacher").on(t.teacherId),
-		index("idx_teacher_assign_grade_section").on(t.grade, t.section),
-	],
-);
+// NOTE: the legacy `teacher_assignments` table + its Drizzle def were removed
+// (L-4). The live DB table was dropped by 20260428203000 / 20260520130000 and
+// never recreated (the 20260618130000 hardening only recreated `assignments`
+// and `assignment_submissions`). No code queried the Drizzle symbol.
 
 export const assignments = pgTable(
 	"assignments",

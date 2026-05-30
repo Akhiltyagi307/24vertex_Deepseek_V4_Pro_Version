@@ -548,5 +548,20 @@ export async function POST(req: Request) {
 	// `sendReasoning: false` keeps DeepSeek's CoT server-side; the student sees
 	// only the final answer. Reasoning tokens are still billed and logged via
 	// onFinish above, but we never include them in the user-facing stream.
-	return result.toUIMessageStreamResponse({ headers, sendReasoning: false });
+	return result.toUIMessageStreamResponse({
+		headers,
+		sendReasoning: false,
+		// M-4: a mid-stream model/transport failure would otherwise surface as
+		// the AI SDK's default masked "An error occurred." with no server log.
+		// Log it (no PII — message only) and return a stable, friendly string so
+		// the client renders a consistent error rather than an opaque one.
+		onError: (error) => {
+			logSupabaseError(
+				"doubt_chat.stream_error",
+				{ message: error instanceof Error ? error.message : String(error) },
+				{ conversationId },
+			);
+			return "The tutor ran into a problem while answering. Please try again.";
+		},
+	});
 }

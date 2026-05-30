@@ -15,7 +15,7 @@ async function handle(request: Request): Promise<Response> {
 		return Response.json({ ok: true, summary });
 	} catch (e) {
 		Sentry.captureException(e, { tags: { component: "billing.reconcile", phase: "run" } });
-		return Response.json({ ok: false, message: e instanceof Error ? e.message : String(e) }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: e instanceof Error ? e.message : String(e) }, { status: 500 });
 	}
 }
 

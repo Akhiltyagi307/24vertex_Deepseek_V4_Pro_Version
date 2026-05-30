@@ -24,17 +24,17 @@ export async function POST(request: Request) {
 	try {
 		json = await request.json();
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid JSON." }, { status: 400 });
 	}
 
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid payload." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid payload." }, { status: 400 });
 	}
 
 	const user = await getServerUser();
 	if (!user) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
 	const rl = await consumeStudentRateLimit({
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 	if (!rl.ok) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return Response.json(
-			{ ok: false, message: "Too many submit attempts. Try again shortly." },
+			{ success: false, ok: false, message: "Too many submit attempts. Try again shortly." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 		status: ["in_progress", "grading", "grading_failed"],
 	});
 	if (!owned.ok) {
-		return Response.json({ ok: false, message: owned.message }, { status: 403 });
+		return Response.json({ success: false, ok: false, message: owned.message }, { status: 403 });
 	}
 
 	const result = await executePracticeTestSubmit(

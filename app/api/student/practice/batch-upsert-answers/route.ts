@@ -53,17 +53,17 @@ export async function POST(request: Request) {
 	try {
 		json = await request.json();
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid JSON." }, { status: 400 });
 	}
 
 	const parsed = batchSchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid payload." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid payload." }, { status: 400 });
 	}
 
 	const user = await getServerUser();
 	if (!user) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
 	const rl = await consumeStudentRateLimit({
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 	if (!rl.ok) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return Response.json(
-			{ ok: false, message: "Too many save attempts. Try again shortly." },
+			{ success: false, ok: false, message: "Too many save attempts. Try again shortly." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 		.eq("test_id", parsed.data.testId);
 
 	if (qErr || !qRows?.length) {
-		return Response.json({ ok: false, message: "Questions not found." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Questions not found." }, { status: 400 });
 	}
 
 	const qTypes = new Map(qRows.map((r) => [r.id as string, r.question_type as string]));
@@ -104,14 +104,14 @@ export async function POST(request: Request) {
 	for (const item of parsed.data.items) {
 		const qt = qTypes.get(item.questionId);
 		if (!qt) {
-			return Response.json({ ok: false, message: "Question not in this test." }, { status: 400 });
+			return Response.json({ success: false, ok: false, message: "Question not in this test." }, { status: 400 });
 		}
 		const expectedKind =
 			qt === "multiple_choice" ? "mcq"
 			: qt === "numerical" ? "numerical"
 			: "text";
 		if (item.studentAnswer.kind !== expectedKind) {
-			return Response.json({ ok: false, message: "Answer type mismatch." }, { status: 400 });
+			return Response.json({ success: false, ok: false, message: "Answer type mismatch." }, { status: 400 });
 		}
 		writeRows.push({
 			test_id: testId,
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
 	const { error: upErr } = await writeStudentAnswerRows(supabase, writeRows);
 	if (upErr) {
 		logSupabaseError("batch-upsert-answers.write", upErr, { testId, userId: user.id });
-		return Response.json({ ok: false, message: friendlyError() }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: friendlyError() }, { status: 500 });
 	}
 
 	return Response.json({ ok: true as const });

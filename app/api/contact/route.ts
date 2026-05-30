@@ -30,7 +30,7 @@ export type ContactFieldErrorCode =
 	| "inquiry_invalid";
 
 type ContactErrorResponse = {
-	ok: false;
+	success: false, ok: false;
 	message: string;
 	field?: "name" | "email" | "phone" | "message" | "inquiryType";
 	code?: ContactFieldErrorCode;
@@ -91,7 +91,7 @@ export async function POST(request: Request): Promise<Response> {
 	try {
 		json = await request.json();
 	} catch {
-		return jsonError({ ok: false, message: "Invalid JSON." }, 400);
+		return jsonError({ success: false, ok: false, message: "Invalid JSON." }, 400);
 	}
 
 	const parsed = bodySchema.safeParse(json);
@@ -102,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
 		const message = humanMessageForCode(code) ?? "Please check the form fields.";
 		return jsonError(
 			{
-				ok: false,
+				success: false, ok: false,
 				message,
 				field:
 					fieldPath === "name" ||
@@ -131,7 +131,7 @@ export async function POST(request: Request): Promise<Response> {
 		if (!parsedPhone) {
 			return jsonError(
 				{
-					ok: false,
+					success: false, ok: false,
 					field: "phone",
 					code: "phone_invalid",
 					message: "Enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9).",
@@ -146,7 +146,7 @@ export async function POST(request: Request): Promise<Response> {
 	const rate = await consumeContactSubmitRateLimit(ip);
 	if (!rate.ok) {
 		return jsonError(
-			{ ok: false, message: "Too many messages. Try again later." },
+			{ success: false, ok: false, message: "Too many messages. Try again later." },
 			429,
 		);
 	}
@@ -154,7 +154,7 @@ export async function POST(request: Request): Promise<Response> {
 	const notifyEmail = getContactNotificationEmail();
 	if (!notifyEmail) {
 		return jsonError(
-			{ ok: false, message: "Contact is not configured yet. Please try again later." },
+			{ success: false, ok: false, message: "Contact is not configured yet. Please try again later." },
 			503,
 		);
 	}
@@ -195,14 +195,14 @@ ${
 		});
 		if (error) {
 			return jsonError(
-				{ ok: false, message: "Could not send your message." },
+				{ success: false, ok: false, message: "Could not send your message." },
 				500,
 			);
 		}
 		return Response.json({ ok: true } satisfies ContactOkResponse);
 	} catch {
 		return jsonError(
-			{ ok: false, message: "Could not send your message." },
+			{ success: false, ok: false, message: "Could not send your message." },
 			500,
 		);
 	}

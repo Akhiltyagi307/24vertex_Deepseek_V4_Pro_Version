@@ -27,12 +27,12 @@ export async function POST(request: Request) {
 	try {
 		json = await request.json();
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid JSON." }, { status: 400 });
 	}
 
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid payload." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid payload." }, { status: 400 });
 	}
 
 	const supabase = await createClient();
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 		data: { user },
 	} = await supabase.auth.getUser();
 	if (!user) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
 	const rl = await consumeStudentRateLimit({
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 	if (!rl.ok) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return Response.json(
-			{ ok: false, message: "You've reported too many questions recently. Try again later." },
+			{ success: false, ok: false, message: "You've reported too many questions recently. Try again later." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 		.eq("id", parsed.data.questionId)
 		.maybeSingle();
 	if (!qRow) {
-		return Response.json({ ok: false, message: "Question not found." }, { status: 404 });
+		return Response.json({ success: false, ok: false, message: "Question not found." }, { status: 404 });
 	}
 
 	const { error } = await supabase.from("question_flags").insert({
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 			questionId: parsed.data.questionId,
 			userId: user.id,
 		});
-		return Response.json({ ok: false, message: "Could not submit your report." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not submit your report." }, { status: 500 });
 	}
 
 	try {

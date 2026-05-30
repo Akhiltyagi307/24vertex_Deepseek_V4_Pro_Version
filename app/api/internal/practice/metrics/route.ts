@@ -36,7 +36,7 @@ async function runMetricsRollup(): Promise<Response> {
 		tests.error ?? reports.error ?? jobs.error ?? flags.error;
 	if (sourceError) {
 		logSupabaseError("runMetricsRollup.sourceQuery", sourceError, { since });
-		return Response.json({ ok: false, message: "Could not load practice metrics." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not load practice metrics." }, { status: 500 });
 	}
 
 	const testsRows = tests.data ?? [];
@@ -93,7 +93,7 @@ async function runMetricsRollup(): Promise<Response> {
 	});
 	if (insertError) {
 		logSupabaseError("runMetricsRollup.practice_analytics_events.insert", insertError, { since });
-		return Response.json({ ok: false, message: "Could not store practice metrics." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not store practice metrics." }, { status: 500 });
 	}
 
 	return Response.json({ ok: true, payload });

@@ -26,8 +26,31 @@ function assertNoPlaintextAdminPasswordInProd(): void {
 	}
 }
 
+/**
+ * C-1: Block production boot unless `SAAS_ENFORCEMENT` is explicitly `"true"`
+ * or `"false"`. `isSaasEnforcementEnabled()` treats any non-"true" value
+ * (including unset) as OFF, so a deploy that simply forgets the var silently
+ * disables ALL billing/quota enforcement (fail-open). Forcing an explicit
+ * value here fails the deployment fast instead of shipping free access.
+ * Mirrors {@link assertNoPlaintextAdminPasswordInProd}. Kept inline (no
+ * `@/lib/env` import) since this runs at the very start of `register()`.
+ */
+function assertSaasEnforcementConfiguredInProd(): void {
+	const isProd =
+		process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+	if (!isProd) return;
+	const raw = process.env.SAAS_ENFORCEMENT?.trim().toLowerCase();
+	if (raw !== "true" && raw !== "false") {
+		throw new Error(
+			'SAAS_ENFORCEMENT must be explicitly set to "true" or "false" in production. ' +
+				"An unset/ambiguous value silently disables all billing and quota enforcement.",
+		);
+	}
+}
+
 export async function register() {
 	assertNoPlaintextAdminPasswordInProd();
+	assertSaasEnforcementConfiguredInProd();
 	if (!sentryDsnConfigured()) return;
 	if (process.env.NEXT_RUNTIME === "nodejs") {
 		await import("./sentry.server.config");

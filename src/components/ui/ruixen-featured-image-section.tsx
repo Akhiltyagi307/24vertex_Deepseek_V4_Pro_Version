@@ -197,7 +197,7 @@ export default function RuixenFeaturedImageSection() {
 				</div>
 
 				<div className="relative mt-10 flex justify-center">
-					<div className="flex flex-row flex-wrap items-center justify-center gap-3 lg:gap-5">
+					<div className="flex flex-row flex-wrap items-center justify-center gap-3 xl:gap-5">
 						{tabs.map((tab, tabIndex) => (
 							<FeatureTab
 								{...tab}

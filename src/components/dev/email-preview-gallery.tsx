@@ -50,8 +50,8 @@ export function EmailPreviewGallery({ samples }: Props): React.ReactElement {
 	}, [filtered]);
 
 	return (
-		<div className="flex min-h-[calc(100vh-8rem)] flex-col gap-6 lg:flex-row">
-			<aside className="w-full shrink-0 lg:w-80">
+		<div className="flex min-h-[calc(100vh-8rem)] flex-col gap-6 xl:flex-row">
+			<aside className="w-full shrink-0 xl:w-80">
 				<label className="sr-only" htmlFor="email-preview-search">
 					Search templates
 				</label>

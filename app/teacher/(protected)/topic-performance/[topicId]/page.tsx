@@ -108,7 +108,7 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 	const backHref = breakdownListHref(filters);
 
 	return (
-		<div className="mx-auto w-full max-w-6xl px-4 py-4 md:px-6 md:py-6">
+		<div className="mx-auto w-full max-w-6xl px-4 py-4 medium:px-6 medium:py-6">
 			<p className="mb-4 text-muted-foreground text-sm">
 				<Link href={backHref} className="underline underline-offset-4 hover:text-foreground">
 					Topic performance
