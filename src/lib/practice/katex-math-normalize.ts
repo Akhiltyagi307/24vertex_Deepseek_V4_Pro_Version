@@ -377,6 +377,13 @@ function widenMathSpans(s: string): string {
 	// (1) Dash normalization. Done first so the dashes become valid glue.
 	let out = s.replace(/[–—]/g, "-");
 
+	// (3a) Mid-word split where the opening `$` landed one letter too late, e.g.
+	// `forc$e \times displacement = 5$` → `$force \times displacement = 5$`.
+	out = out.replace(
+		/([A-Za-z]{2,})\$([A-Za-z])(\s*(?:\\[a-zA-Z]+|[=+\-*/<>,]|-?\d)[\s\S]*?\$)/g,
+		(_full, prefix: string, letter: string, mathTail: string) => `$${prefix}${letter}${mathTail}`,
+	);
+
 	// (3) Mid-word function-name split. Process before the iterate-until-stable
 	// merge so the merge sees fewer mid-word artifacts.
 	out = out.replace(
@@ -408,6 +415,9 @@ function widenMathSpans(s: string): string {
 		`\\$([^$]+)\\$(${glue})\\$([^$]+)\\$`,
 		"g",
 	);
+	// Adjacent `$a$ $b$` with only whitespace — common when the LLM splits units
+	// (`$5$ $N \times 0$`) or equation fragments across spans.
+	const mergeSpaceSeparated = /\$([^$]+)\$\s+\$([^$]+)\$/g;
 	const mergeRightPlain = new RegExp(
 		`\\$([^$]+)\\$(${glue})(${mathToken})(?![A-Za-z_])`,
 		"g",
@@ -422,6 +432,7 @@ function widenMathSpans(s: string): string {
 	do {
 		prev = out;
 		out = out.replace(mergeBothWrapped, (_m, a, g, b) => `$${a}${g}${b}$`);
+		out = out.replace(mergeSpaceSeparated, (_m, a, b) => `$${a} ${b}$`);
 		out = out.replace(mergeRightPlain, (_m, a, g, b) => `$${a}${g}${b}$`);
 		out = out.replace(mergeLeftPlain, (_m, lead, a, g, b) => `${lead}$${a}${g}${b}$`);
 		iterations += 1;

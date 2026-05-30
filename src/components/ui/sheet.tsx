@@ -15,8 +15,24 @@ function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
 }
 
-function SheetClose({ ...props }: SheetPrimitive.Close.Props) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
+function SheetClose({
+  render,
+  nativeButton,
+  ...props
+}: SheetPrimitive.Close.Props) {
+  // Base UI defaults `nativeButton` to true; polymorphic `render` (e.g. Next.js Link → <a>)
+  // must use false or dev warns. Coalesce so `undefined` never loses to a later spread.
+  const effectiveNativeButton =
+    render != null ? (nativeButton ?? false) : (nativeButton ?? true)
+
+  return (
+    <SheetPrimitive.Close
+      data-slot="sheet-close"
+      {...props}
+      render={render}
+      nativeButton={effectiveNativeButton}
+    />
+  )
 }
 
 function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {

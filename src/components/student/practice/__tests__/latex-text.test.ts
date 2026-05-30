@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseLatexNodes } from "../latex-text";
+import { parseLatexNodes } from "@/lib/practice/parse-latex-nodes";
 
 describe("parseLatexNodes", () => {
 	it("returns a single text node when no delimiters are present", () => {

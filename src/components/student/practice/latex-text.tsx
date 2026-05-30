@@ -9,7 +9,10 @@ import "katex/dist/katex.min.css";
 // visual that uses KaTeX. No new dependency — ships with `katex`.
 import "katex/dist/contrib/mhchem.mjs";
 
+import { parseLatexNodes } from "@/lib/practice/parse-latex-nodes";
 import { cn } from "@/lib/utils";
+
+export { parseLatexNodes } from "@/lib/practice/parse-latex-nodes";
 
 function renderKatexFragment(tex: string, displayMode: boolean): string | null {
 	try {
@@ -24,57 +27,6 @@ function renderKatexFragment(tex: string, displayMode: boolean): string | null {
 	} catch {
 		return null;
 	}
-}
-
-type LatexNode =
-	| { type: "text"; value: string }
-	| { type: "math"; value: string; display: boolean };
-
-/**
- * Tokenises `text` into alternating text + math nodes. Recognises (in
- * priority order):
- *
- *   `$$...$$` — display math (block, centered).
- *   `\[...\]` — display math (LaTeX-conventional).
- *   `$...$`   — inline math (the convention the LLM is instructed to use).
- *   `\(...\)` — inline math (LaTeX-conventional alternative).
- *
- * Recognising `$$..$$` BEFORE `$..$` is critical — splitting on single `$`
- * would parse `$$x$$` as empty + `x` + empty + content + empty, mangling
- * display math.
- *
- * Exported for unit testing.
- */
-export function parseLatexNodes(text: string): LatexNode[] {
-	if (!text || (!text.includes("$") && !text.includes("\\(") && !text.includes("\\["))) {
-		return [{ type: "text", value: text }];
-	}
-	const RE = /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^$\n]*\$|\\\([\s\S]*?\\\))/g;
-	const out: LatexNode[] = [];
-	let cursor = 0;
-	let m: RegExpExecArray | null;
-	while ((m = RE.exec(text)) != null) {
-		if (m.index > cursor) {
-			out.push({ type: "text", value: text.slice(cursor, m.index) });
-		}
-		const tok = m[0];
-		if (tok.startsWith("$$") && tok.endsWith("$$") && tok.length >= 4) {
-			out.push({ type: "math", value: tok.slice(2, -2).trim(), display: true });
-		} else if (tok.startsWith("\\[") && tok.endsWith("\\]")) {
-			out.push({ type: "math", value: tok.slice(2, -2).trim(), display: true });
-		} else if (tok.startsWith("\\(") && tok.endsWith("\\)")) {
-			out.push({ type: "math", value: tok.slice(2, -2).trim(), display: false });
-		} else if (tok.startsWith("$") && tok.endsWith("$") && tok.length >= 2) {
-			out.push({ type: "math", value: tok.slice(1, -1).trim(), display: false });
-		} else {
-			out.push({ type: "text", value: tok });
-		}
-		cursor = m.index + tok.length;
-	}
-	if (cursor < text.length) {
-		out.push({ type: "text", value: text.slice(cursor) });
-	}
-	return out.filter((n) => !(n.type === "text" && n.value === ""));
 }
 
 /**

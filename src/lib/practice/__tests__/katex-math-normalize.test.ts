@@ -159,6 +159,14 @@ describe("normalizeKatexMath — widen post-pass", () => {
 		expect(normalizeKatexMath(input)).toBe("te$st$");
 	});
 
+	it("heals mid-word split before a math tail: forc$e \\times ... → $force \\times ...$", () => {
+		const input =
+			"Therefore, work done = forc$e \\times displacement = 5$ $N \\times 0$ m = 0 J.";
+		const out = normalizeKatexMath(input);
+		expect(out).toContain("$force \\times displacement = 5 N \\times 0$");
+		expect(out).not.toContain("forc$e");
+	});
+
 	it("converts standalone en-dash and em-dash to ASCII hyphen", () => {
 		const input = "$a$ – $b$ — $c$";
 		const out = normalizeKatexMath(input);

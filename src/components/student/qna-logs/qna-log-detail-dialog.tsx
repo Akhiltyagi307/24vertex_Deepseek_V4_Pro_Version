@@ -276,11 +276,13 @@ function AnswerKeySection({ detail }: { detail: QnaLogDetail }) {
 	if (detail.testStatus !== "graded" || !detail.correctAnswerDisplay?.trim()) return null;
 	return (
 		<ReportSection label="Answer key (practice set)" tone="answerKey">
-			<p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{detail.correctAnswerDisplay}</p>
+			<div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+				<LazyLatexText text={detail.correctAnswerDisplay} />
+			</div>
 			{detail.correctAnswerSummary?.trim() &&
 			detail.correctAnswerSummary.trim() !== detail.correctAnswerDisplay.trim() ? (
 				<p className="mt-3 border-t border-border/50 pt-3 text-sm italic leading-relaxed text-muted-foreground">
-					At a glance: {detail.correctAnswerSummary.trim()}
+					At a glance: <LazyLatexText text={detail.correctAnswerSummary.trim()} />
 				</p>
 			) : null}
 		</ReportSection>

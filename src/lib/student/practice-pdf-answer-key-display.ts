@@ -1,3 +1,4 @@
+import { normalizeKatexMath } from "@/lib/practice/katex-math-normalize";
 import { practiceAnswerKeySchema } from "@/lib/practice/generation-schema";
 
 export type FormatGenerationAnswerParams = {
@@ -29,31 +30,31 @@ export function formatGenerationAnswerForPdf(params: FormatGenerationAnswerParam
 	if (questionType === "multiple_choice" && opts && letter) {
 		const optText = opts[letter] ?? opts[letter.toLowerCase() as keyof typeof opts];
 		if (optText) {
-			lines.push(`Correct answer: ${letter} — ${optText}`);
+			lines.push(`Correct answer: ${letter} — ${normalizeKatexMath(optText)}`);
 		} else {
 			lines.push(`Correct answer: ${letter}`);
 		}
 	} else {
-		lines.push(`Correct answer: ${key.correct_answer}`);
+		lines.push(`Correct answer: ${normalizeKatexMath(key.correct_answer)}`);
 	}
 
 	if (key.explanation?.trim()) {
 		lines.push("");
 		lines.push("Explanation");
-		lines.push(key.explanation.trim());
+		lines.push(normalizeKatexMath(key.explanation.trim()));
 	}
 
 	if (key.common_mistakes?.length) {
 		lines.push("");
 		lines.push("Common mistakes");
 		for (const m of key.common_mistakes) {
-			if (m?.trim()) lines.push(`• ${m.trim()}`);
+			if (m?.trim()) lines.push(`• ${normalizeKatexMath(m.trim())}`);
 		}
 	}
 
 	if (key.related_concept?.trim()) {
 		lines.push("");
-		lines.push(`Related concept: ${key.related_concept.trim()}`);
+		lines.push(`Related concept: ${normalizeKatexMath(key.related_concept.trim())}`);
 	}
 
 	return lines.filter(Boolean).join("\n");

@@ -12,6 +12,7 @@ import {
 } from "@/lib/student/practice-grading-pdf-chunks";
 import type { GradedQuestionItem, PracticeGradingSummary } from "@/lib/practice/grading-schema";
 import type { QuestionVisualEnvelope } from "@/lib/practice/visuals/types";
+import { PdfLatexText } from "@/lib/student/practice-grading-pdf-latex-text";
 import { QuestionVisualPdf } from "@/lib/student/practice-grading-pdf-visual";
 import {
 	PDF_BRAND,
@@ -1018,20 +1019,19 @@ function AnswerSectionsStack({
 		<>
 			<SectionLabel>Your answer</SectionLabel>
 			<ContentCard variant="student" charCount={studentAnswer.length} tier="tight">
-				<Text style={styles.bodyCompact} wrap>
-					{studentAnswer}
-				</Text>
+				<PdfLatexText style={styles.bodyCompact}>{studentAnswer}</PdfLatexText>
 			</ContentCard>
 			{summary?.trim() ? (
-				<Text style={styles.atGlance} wrap>
-					At a glance: {summary.trim()}
-				</Text>
+				<View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
+					<Text style={styles.atGlance}>At a glance: </Text>
+					<PdfLatexText style={styles.atGlance} inlineMathHeight={9}>
+						{summary.trim()}
+					</PdfLatexText>
+				</View>
 			) : null}
 			<SectionLabel>Answer key (practice set)</SectionLabel>
 			<ContentCard variant="key" charCount={answerKey.length} tier="normal">
-				<Text style={styles.bodyCompact} wrap>
-					{answerKey || "—"}
-				</Text>
+				<PdfLatexText style={styles.bodyCompact}>{answerKey || "—"}</PdfLatexText>
 			</ContentCard>
 		</>
 	);
@@ -1075,9 +1075,7 @@ function renderQuestionPages(
 
 				<SectionLabel>Question</SectionLabel>
 				<ContentCard variant="default" charCount={q.question_text.length} tier="loose">
-					<Text style={styles.body} wrap>
-						{q.question_text}
-					</Text>
+					<PdfLatexText style={styles.body}>{q.question_text}</PdfLatexText>
 					<QuestionVisualPdf visual={q.visual} />
 				</ContentCard>
 
@@ -1098,9 +1096,7 @@ function renderQuestionPages(
 					<>
 						<SectionLabel>Coach note</SectionLabel>
 						<ContentCard variant="default" charCount={coach.text.length}>
-							<Text style={styles.body} wrap>
-								{coach.text}
-							</Text>
+							<PdfLatexText style={styles.body}>{coach.text}</PdfLatexText>
 						</ContentCard>
 					</>
 				) : null}
@@ -1109,9 +1105,7 @@ function renderQuestionPages(
 					<>
 						<SectionLabel>Walk through it</SectionLabel>
 						<ContentCard variant="key" charCount={walk.text.length}>
-							<Text style={styles.body} wrap>
-								{walk.text}
-							</Text>
+							<PdfLatexText style={styles.body}>{walk.text}</PdfLatexText>
 						</ContentCard>
 					</>
 				) : null}
