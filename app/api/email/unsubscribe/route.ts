@@ -89,7 +89,7 @@ async function handle(request: NextRequest, method: "GET" | "POST"): Promise<Nex
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return method === "POST"
 			? NextResponse.json(
-					{ ok: false, error: "rate_limited" },
+					{ success: false, ok: false, error: "rate_limited" },
 					{ status: 429, headers: { ...noindexHeaders(), "Retry-After": String(retryAfterSec) } },
 				)
 			: new NextResponse(renderConfirmationHtml("invalid"), {
@@ -114,7 +114,7 @@ async function handle(request: NextRequest, method: "GET" | "POST"): Promise<Nex
 				const flag = params.get("List-Unsubscribe")?.trim();
 				if (flag && flag !== "One-Click") {
 					return NextResponse.json(
-						{ ok: false, error: "Unsupported one-click body." },
+						{ success: false, ok: false, error: "Unsupported one-click body." },
 						{ status: 400, headers: noindexHeaders() },
 					);
 				}
@@ -127,7 +127,7 @@ async function handle(request: NextRequest, method: "GET" | "POST"): Promise<Nex
 	const token = request.nextUrl.searchParams.get("t")?.trim();
 	if (!token) {
 		return method === "POST"
-			? NextResponse.json({ ok: false, error: "missing token" }, { status: 400, headers: noindexHeaders() })
+			? NextResponse.json({ success: false, ok: false, error: "missing token" }, { status: 400, headers: noindexHeaders() })
 			: new NextResponse(renderConfirmationHtml("invalid"), {
 					status: 400,
 					headers: { ...noindexHeaders(), "content-type": "text/html; charset=utf-8" },
@@ -149,7 +149,7 @@ async function handle(request: NextRequest, method: "GET" | "POST"): Promise<Nex
 		const looksWellFormed = token.split(".").length === 2;
 		const state = looksWellFormed ? "expired" : "invalid";
 		return method === "POST"
-			? NextResponse.json({ ok: false, error: state }, { status: 410, headers: noindexHeaders() })
+			? NextResponse.json({ success: false, ok: false, error: state }, { status: 410, headers: noindexHeaders() })
 			: new NextResponse(renderConfirmationHtml(state), {
 					status: state === "expired" ? 410 : 400,
 					headers: { ...noindexHeaders(), "content-type": "text/html; charset=utf-8" },
@@ -159,7 +159,7 @@ async function handle(request: NextRequest, method: "GET" | "POST"): Promise<Nex
 	const result = await flipEmailNotificationsOff(decoded.userId);
 	if (!result.ok) {
 		return method === "POST"
-			? NextResponse.json({ ok: false, error: result.error }, { status: 500, headers: noindexHeaders() })
+			? NextResponse.json({ success: false, ok: false, error: result.error }, { status: 500, headers: noindexHeaders() })
 			: new NextResponse(renderConfirmationHtml("invalid"), {
 					status: 500,
 					headers: { ...noindexHeaders(), "content-type": "text/html; charset=utf-8" },

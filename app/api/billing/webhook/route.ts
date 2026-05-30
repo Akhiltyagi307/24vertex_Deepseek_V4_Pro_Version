@@ -78,14 +78,14 @@ export async function POST(req: Request) {
 			signature_header_length: typeof signature === "string" ? signature.length : 0,
 			body_byte_length: Buffer.byteLength(raw, "utf8"),
 		});
-		return Response.json({ ok: false, message: "Bad signature." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Bad signature." }, { status: 400 });
 	}
 
 	let body: RazorpayWebhookBody;
 	try {
 		body = JSON.parse(raw) as RazorpayWebhookBody;
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid JSON." }, { status: 400 });
 	}
 
 	const admin = createServiceRoleClient();
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
 			tags: { component: "billing.webhook", phase: "dedup_insert", event: body.event },
 		});
 		logServerError("billing.webhook.dedup_insert", insertErr);
-		return Response.json({ ok: false }, { status: 500 });
+		return Response.json({ success: false, ok: false }, { status: 500 });
 	}
 
 	if (!inserted) {
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
 			.from("billing_events")
 			.update({ error: err instanceof Error ? err.message : String(err) })
 			.eq("razorpay_event_id", eventId);
-		return Response.json({ ok: false }, { status: 500 });
+		return Response.json({ success: false, ok: false }, { status: 500 });
 	}
 
 	return Response.json({ ok: true });

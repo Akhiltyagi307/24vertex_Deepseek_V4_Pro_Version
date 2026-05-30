@@ -34,7 +34,7 @@ const RATE_WINDOW_SEC = 60;
 export async function POST(req: Request) {
 	const auth = await getApiRequestUser(req);
 	if (!auth) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 	const { user, supabase } = auth;
 	void supabase;
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 	const json = await req.json().catch(() => null);
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid request." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid request." }, { status: 400 });
 	}
 
 	const rl = await rlConsume({
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 	if (!rl.allowed) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return Response.json(
-			{ ok: false, code: "rate_limited", message: "Too many plan-change attempts. Slow down." },
+			{ success: false, ok: false, code: "rate_limited", message: "Too many plan-change attempts. Slow down." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
@@ -74,27 +74,27 @@ export async function POST(req: Request) {
 		}>();
 	if (subErr) {
 		logSupabaseError("billing.change-plan.sub", subErr, { profileId: user.id });
-		return Response.json({ ok: false, message: "Subscription lookup failed." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Subscription lookup failed." }, { status: 500 });
 	}
 	if (!subRow) {
-		return Response.json({ ok: false, message: "No subscription found." }, { status: 404 });
+		return Response.json({ success: false, ok: false, message: "No subscription found." }, { status: 404 });
 	}
 	if (!subRow.razorpay_subscription_id) {
 		return Response.json(
-			{ ok: false, message: "Subscription is not linked to Razorpay; can't change plan." },
+			{ success: false, ok: false, message: "Subscription is not linked to Razorpay; can't change plan." },
 			{ status: 409 },
 		);
 	}
 
 	if (!isPlanCode(subRow.plan_code) || !PAID_CHECKOUT_PLAN_CODES.includes(subRow.plan_code as PlanCode)) {
 		return Response.json(
-			{ ok: false, message: "Plan changes are only supported between paid plans (pro_monthly ↔ pro_annual)." },
+			{ success: false, ok: false, message: "Plan changes are only supported between paid plans (pro_monthly ↔ pro_annual)." },
 			{ status: 409 },
 		);
 	}
 
 	if (subRow.plan_code === parsed.data.newPlanCode) {
-		return Response.json({ ok: false, message: "Already on this plan." }, { status: 409 });
+		return Response.json({ success: false, ok: false, message: "Already on this plan." }, { status: 409 });
 	}
 
 	// State-machine: only allow plan change while active. Past_due / cancelled
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 	if (!isSubscriptionStatus(subRow.status) || !canTransition(subRow.status, "active") || subRow.status !== "active") {
 		return Response.json(
 			{
-				ok: false,
+				success: false, ok: false,
 				code: "wrong_status",
 				message: `Plan changes require an active subscription (current: ${subRow.status}).`,
 			},
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
 		.maybeSingle();
 	if (newPlanErr || !newPlan?.razorpay_plan_id) {
 		if (newPlanErr) logSupabaseError("billing.change-plan.plan", newPlanErr);
-		return Response.json({ ok: false, message: "Target plan is not seeded in Razorpay." }, { status: 503 });
+		return Response.json({ success: false, ok: false, message: "Target plan is not seeded in Razorpay." }, { status: 503 });
 	}
 
 	const when = parsed.data.when ?? defaultWhenForChange(subRow.plan_code as PlanCode, parsed.data.newPlanCode);
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
 		.single<{ id: string }>();
 	if (insertErr || !planChangeRow) {
 		logSupabaseError("billing.change-plan.insert_audit", insertErr, { subId: subRow.id });
-		return Response.json({ ok: false, message: "Could not record plan change." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not record plan change." }, { status: 500 });
 	}
 
 	try {
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
 			.update({ error_message: e instanceof Error ? e.message : String(e) })
 			.eq("id", planChangeRow.id);
 		return Response.json(
-			{ ok: false, message: "Razorpay rejected the plan change.", code: "razorpay_error" },
+			{ success: false, ok: false, message: "Razorpay rejected the plan change.", code: "razorpay_error" },
 			{ status: 502 },
 		);
 	}

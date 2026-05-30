@@ -31,8 +31,8 @@ function routeTagFromPathname(pathname: string): string {
 			if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) return ":id";
 			// Bare integer
 			if (/^\d+$/.test(seg)) return ":id";
-			// Tracker / link codes (XX#### or 24+-char tokens)
-			if (/^[A-Z]{2}\d{4}$/.test(seg)) return ":code";
+			// Tracker / link codes (legacy XX#### and current XXX##### — L-3) or 24+-char tokens
+			if (/^[A-Z]{2,3}\d{4,5}$/.test(seg)) return ":code";
 			if (/^[A-Za-z0-9_-]{24,}$/.test(seg)) return ":token";
 			return seg;
 		})

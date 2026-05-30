@@ -23,7 +23,7 @@ import {
 	getPracticeParallelBatchesEnabled,
 	getPracticePipelineVariant,
 } from "@/lib/env";
-import { preflightPracticeTestQuota } from "@/lib/billing/entitlements";
+import { consumeTest, preflightPracticeTestQuota, refundTest } from "@/lib/billing/entitlements";
 import { buildDeterministicPracticeBlueprint } from "@/lib/practice/practice-generation-blueprint-deterministic";
 import {
 	buildBatchUserPromptTail,
@@ -117,6 +117,7 @@ import {
 	appendGenerationStep,
 	attachTestIdToRunAiCalls,
 	finishGenerationRun,
+	markGenerationRunAbortedIfRunning,
 	startGenerationRun,
 	updateGenerationRunConfigSnapshot,
 	type PracticeGenerationRequestMode,
@@ -238,7 +239,14 @@ export async function preflightPracticeGeneration(
 > {
 	const rateGate = await consumeGenerationRateLimit(supabase);
 	if (!rateGate.ok) {
-		return { ok: false, result: { ok: false, code: "generation_failed", message: rateGate.message } };
+		// H-3: surface a real rate-limit signal. Previously this collapsed to
+		// `generation_failed` (HTTP 400) and dropped `resetAt`, so the client
+		// could not distinguish a rate-limit from a generic failure or show a
+		// retry hint. `rate_limited` maps to HTTP 429 + `Retry-After`.
+		return {
+			ok: false,
+			result: { ok: false, code: "rate_limited", message: rateGate.message, resetAt: rateGate.resetAt },
+		};
 	}
 
 	// Single auth.getUser() per request — `resolvePracticeConfigForStudent`
@@ -734,6 +742,13 @@ async function runPracticeGenerationRepairGrouped(params: {
 }
 
 /**
+ * Carries the practice_generation_runs row id out of the core so the wrapper
+ * can run an idempotent `aborted` safety-net in its `finally` (H-5 — there is
+ * no DB reaper for this table).
+ */
+type GenerationRunState = { generationRunId: string | null };
+
+/**
  * One shared path for persisting a generated test after validation (topic context, model, dedup, RPC, billing, embeddings).
  * Used by the server action and the streaming API route.
  */
@@ -745,23 +760,35 @@ export async function runPracticeGenerationAfterResolve(
 ): Promise<GeneratePracticeResult> {
 	const correlationId = newPracticeCorrelationId();
 	const pipelineT0 = Date.now();
-	return withPracticeSpan(
-		"practice_generate",
-		{
-			correlation_id: correlationId,
-			student_id: resolved.userId,
-			subject_id: parsed.subjectId,
-		},
-		() =>
-			runPracticeGenerationAfterResolveCore(
-				supabase,
-				parsed,
-				resolved,
-				opts,
-				correlationId,
-				pipelineT0,
-			),
-	);
+	// H-5: if the core throws before finalizing, mark the run `aborted` here so
+	// the row doesn't sit at `running` forever and skew funnel/success metrics.
+	// markGenerationRunAbortedIfRunning is a no-op once a terminal status was
+	// written, so this never clobbers a real succeeded/failed outcome.
+	const runState: GenerationRunState = { generationRunId: null };
+	try {
+		return await withPracticeSpan(
+			"practice_generate",
+			{
+				correlation_id: correlationId,
+				student_id: resolved.userId,
+				subject_id: parsed.subjectId,
+			},
+			() =>
+				runPracticeGenerationAfterResolveCore(
+					supabase,
+					parsed,
+					resolved,
+					opts,
+					correlationId,
+					pipelineT0,
+					runState,
+				),
+		);
+	} finally {
+		if (runState.generationRunId) {
+			await markGenerationRunAbortedIfRunning(runState.generationRunId);
+		}
+	}
 }
 
 async function runPracticeGenerationAfterResolveCore(
@@ -771,6 +798,7 @@ async function runPracticeGenerationAfterResolveCore(
 	opts: RunGenerationPipelineOptions,
 	correlationId: string,
 	pipelineT0: number,
+	runState: GenerationRunState,
 ): Promise<GeneratePracticeResult> {
 	let cumulativeModelMs = 0;
 	let cumulativeValidationMs = 0;
@@ -797,6 +825,7 @@ async function runPracticeGenerationAfterResolveCore(
 		},
 		startedAt: new Date(pipelineT0),
 	});
+	runState.generationRunId = generationRunId;
 	let stepOrder = 0;
 	const nextStepOrder = () => {
 		stepOrder += 1;
@@ -2256,6 +2285,52 @@ ${JSON.stringify(blueprintSlots)}`;
 		})),
 	);
 
+	// H-2: charge the test quota at generation time — atomically and
+	// fail-closed — immediately before persisting. A quota/billing failure here
+	// persists nothing (no orphan test row), so "generate but never submit" can
+	// no longer run the model for free, and a billing infra error blocks the
+	// test instead of handing it out free. The old best-effort grade-time
+	// consume was removed. If persistence below fails after this succeeds, we
+	// refund (compensating action) so the student isn't charged for a test that
+	// never got created.
+	const consume = await consumeTest(supabase, resolved.userId);
+	if (!consume.ok) {
+		const consumeCode: GeneratePracticeFailure["code"] =
+			consume.code === "quota_tests" ? "quota_tests"
+			: consume.code === "trial_expired" ? "trial_expired"
+			: consume.code === "database_error" ? "database_error"
+			: "subscription_expired";
+		const consumeIsPaywall = consumeCode !== "database_error";
+		if (consumeIsPaywall) {
+			void recordPracticeEvent(
+				supabase,
+				"paywall_shown",
+				{ surface: "practice_generate", reason: consume.code },
+				{ studentId: resolved.userId },
+			);
+		}
+		if (generationRunId) {
+			await finishGenerationRun({
+				runId: generationRunId,
+				status: "failed",
+				failureCode: consumeCode,
+				failureMessage: consume.message,
+				timingsMs: {
+					...timingsMs,
+					modelMs: cumulativeModelMs,
+					validationMs: cumulativeValidationMs,
+					totalDurationMs: Date.now() - pipelineT0,
+				},
+			});
+		}
+		return {
+			ok: false,
+			code: consumeCode,
+			message: consume.message,
+			...(consumeIsPaywall ? { paywall: true } : {}),
+		};
+	}
+
 	const rpcT0 = Date.now();
 	let newTestId: unknown = null;
 	let rpcErr: PracticePersistRpcError | null = null;
@@ -2299,6 +2374,10 @@ ${JSON.stringify(blueprintSlots)}`;
 	});
 
 	if (rpcErr || !newTestId) {
+		// We consumed a test credit just above; persistence failed, so refund it
+		// (compensating action) — the student must not be charged for a test
+		// that was never created.
+		await refundTest(supabase, resolved.userId);
 		if (rpcErr) {
 			logSupabaseError("generatePracticeTest.practice_generate_test", rpcErr, { correlationId });
 		}

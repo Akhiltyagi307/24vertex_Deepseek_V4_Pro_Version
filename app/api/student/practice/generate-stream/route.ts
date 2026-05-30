@@ -30,24 +30,29 @@ function isPracticeStreamingEnabled(): boolean {
  */
 export async function POST(request: Request) {
 	if (!isPracticeStreamingEnabled()) {
-		return Response.json({ ok: false, message: "Streaming disabled." }, { status: 404 });
+		return Response.json({ success: false, code: "not_found", message: "Streaming disabled." }, { status: 404 });
 	}
 
 	let json: unknown;
 	try {
 		json = await request.json();
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, code: "validation_error", message: "Invalid JSON." }, { status: 400 });
 	}
 
 	const parsed = safeParseGenerationInput(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Validation error: invalid configuration." }, { status: 400 });
+		// TC001/H-3: include a stable `code` so clients (and the backend test
+		// suite) can branch on the failure type, not just the HTTP status.
+		return Response.json(
+			{ success: false, code: "validation_error", message: "Validation error: invalid configuration." },
+			{ status: 400 },
+		);
 	}
 
 	const auth = await getApiRequestUser(request);
 	if (!auth) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, code: "unauthorized", message: "Unauthorized." }, { status: 401 });
 	}
 	const { supabase } = auth;
 
@@ -55,19 +60,29 @@ export async function POST(request: Request) {
 	if (!gate.ok) {
 		const r = gate.result;
 		if (r.ok) {
-			return Response.json({ ok: false, message: "Unexpected preflight state." }, { status: 500 });
+			return Response.json(
+				{ success: false, code: "internal_error", message: "Unexpected preflight state." },
+				{ status: 500 },
+			);
 		}
 		// HTTP status mapping centralized in `httpStatusForGenerateFailure` so the
 		// server-action and streaming-route paths can't drift apart silently.
+		const status = httpStatusForGenerateFailure(r);
+		const headers: Record<string, string> = {};
+		if (r.code === "rate_limited" && r.resetAt) {
+			const secs = Math.max(0, Math.ceil((new Date(r.resetAt).getTime() - Date.now()) / 1000));
+			headers["Retry-After"] = String(secs);
+		}
 		return Response.json(
 			{
-				ok: false,
-				message: r.message,
+				success: false,
 				code: r.code,
+				message: r.message,
 				...(r.paywall ? { paywall: true } : {}),
 				...(r.correlationId ? { correlationId: r.correlationId } : {}),
+				...(r.code === "rate_limited" ? { resetAt: r.resetAt ?? null } : {}),
 			},
-			{ status: httpStatusForGenerateFailure(r) },
+			{ status, headers },
 		);
 	}
 

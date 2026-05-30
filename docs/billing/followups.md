@@ -54,6 +54,7 @@ These pieces would round out the user experience but weren't required for correc
 ## Operational notes
 
 - **Vault secrets `app_base_url` and `cron_secret` must be set on both projects.** All 7 billing cron schedules read these from `vault.decrypted_secrets`. If a fresh project doesn't have them, the cron job runs but the HTTP POST 401s.
+- **(M-10) The vault `cron_secret` MUST equal the deployed `CRON_SECRET` env var**, byte-for-byte. The cron job signs `Authorization: Bearer <vault cron_secret>`, but `assertCronRequestAuthorized` (`src/lib/internal/cron-auth.ts`) validates against `process.env.CRON_SECRET` with a timing-safe compare. These are two independent sources — rotating one without the other makes **every** internal cron (dunning, reconcile, coupon-expiry, etc.) silently 401 daily with no app-visible error. When rotating `CRON_SECRET`, update the Supabase vault secret on both projects in the same change. A lightweight admin health-check that pings one internal route with the vault secret and reports a mismatch is a recommended (not-yet-built) follow-up.
 - **Reconciliation drift table is admin-internal (RLS deny-all).** Inspect via `/admin/billing/reconciliation`.
 - **`billing_action_failures` is the catch-all surface** for non-fatal billing side-effect failures. Open rows = work for an admin.
 

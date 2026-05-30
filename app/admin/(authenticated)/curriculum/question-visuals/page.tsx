@@ -26,7 +26,7 @@ export default async function AdminQuestionVisualsPage() {
 			/>
 			{rows.length === 0 ?
 				<p className="text-muted-foreground text-sm">No questions with stored visuals yet.</p>
-			:	<ul className="grid gap-6 lg:grid-cols-2">
+			:	<ul className="grid gap-6 xl:grid-cols-2">
 					{rows.map((row) => {
 						const parsed = parseStoredQuestionVisualFromMetadata(row.metadata);
 						return (

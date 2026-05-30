@@ -98,7 +98,7 @@ export function TeacherOrgStudentsTab({
 				</p>
 			</div>
 
-			<div className="grid gap-4 sm:grid-cols-3">
+			<div className="grid gap-4 medium:grid-cols-3">
 				<div className="space-y-2">
 					<label htmlFor="orgRosterGrade" className="font-medium text-foreground text-sm">
 						Grade
@@ -183,9 +183,9 @@ export function TeacherOrgStudentsTab({
 					<div className="border-b border-border bg-muted/40 px-4 py-2">
 						<div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3 text-muted-foreground text-xs font-medium uppercase tracking-wide">
 							<span>Name</span>
-							<span className="hidden sm:block">Grade</span>
-							<span className="hidden sm:block">Section</span>
-							<span className="text-right sm:text-left">Link code</span>
+							<span className="hidden medium:block">Grade</span>
+							<span className="hidden medium:block">Section</span>
+							<span className="text-right medium:text-left">Link code</span>
 						</div>
 						<p className="mt-1 text-[11px] text-muted-foreground">
 							Codes are sensitive. Reveal them only when you need to copy or share one.
@@ -195,12 +195,12 @@ export function TeacherOrgStudentsTab({
 						{rows.map((row) => (
 							<li
 								key={row.id}
-								className="grid grid-cols-1 gap-1 px-4 py-3 text-sm last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:gap-3"
+								className="grid grid-cols-1 gap-1 px-4 py-3 text-sm last:border-b-0 medium:grid-cols-[minmax(0,1fr)_auto_auto_auto] medium:items-center medium:gap-3"
 							>
 								<span className="font-medium">{row.fullName}</span>
-								<span className="text-muted-foreground sm:text-left">{row.grade ?? "—"}</span>
-								<span className="text-muted-foreground sm:text-left">{row.section?.trim() || "—"}</span>
-								<span className="sm:text-left">
+								<span className="text-muted-foreground medium:text-left">{row.grade ?? "—"}</span>
+								<span className="text-muted-foreground medium:text-left">{row.section?.trim() || "—"}</span>
+								<span className="medium:text-left">
 									<SensitiveLinkCode code={row.studentLinkCode} />
 								</span>
 							</li>

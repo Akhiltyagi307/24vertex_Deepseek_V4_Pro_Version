@@ -22,11 +22,11 @@ export async function POST(request: Request) {
 	try {
 		json = await request.json();
 	} catch {
-		return Response.json({ ok: false, message: "Invalid JSON." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid JSON." }, { status: 400 });
 	}
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid payload." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid payload." }, { status: 400 });
 	}
 
 	const supabase = await createClient();
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 		data: { user },
 	} = await supabase.auth.getUser();
 	if (!user) {
-		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return Response.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
 	const rl = await consumeStudentRateLimit({
@@ -46,14 +46,14 @@ export async function POST(request: Request) {
 	if (!rl.ok) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return Response.json(
-			{ ok: false, message: "Too many tab-blur events. Slow down." },
+			{ success: false, ok: false, message: "Too many tab-blur events. Slow down." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
 
 	const gate = await assertTestOwnedInProgress(supabase, parsed.data.testId, user.id);
 	if (!gate.ok) {
-		return Response.json({ ok: false, message: gate.message }, { status: 403 });
+		return Response.json({ success: false, ok: false, message: gate.message }, { status: 403 });
 	}
 
 	const { data: row, error: selErr } = await supabase
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 		.maybeSingle();
 
 	if (selErr) {
-		return Response.json({ ok: false, message: "Could not read test." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not read test." }, { status: 500 });
 	}
 
 	const next = Number((row as { tab_blur_count?: number } | null)?.tab_blur_count ?? 0) + 1;
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 		.eq("student_id", user.id);
 
 	if (upErr) {
-		return Response.json({ ok: false, message: "Could not update test." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not update test." }, { status: 500 });
 	}
 
 	return Response.json({ ok: true });

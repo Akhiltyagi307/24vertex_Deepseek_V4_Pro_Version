@@ -206,3 +206,51 @@ describe("scrubSentryEvent — JWT and token redaction (Phase 4.6)", () => {
 		expect(event.message).toContain("keep=ok");
 	});
 });
+
+describe("scrubSentryEvent — extra / contexts / tags / breadcrumb.data (M-3)", () => {
+	it("redacts emails and tokens nested inside event.extra", () => {
+		const event = {
+			extra: {
+				note: "contacting alice@example.com",
+				nested: { sig: "0123456789abcdef0123456789abcdef0123456789abcdef" },
+			},
+		} as Record<string, unknown>;
+		scrubSentryEvent(event);
+		const extra = event.extra as { note: string; nested: { sig: string } };
+		expect(extra.note).toBe("contacting [email]");
+		expect(extra.nested.sig).toBe("[token]");
+	});
+
+	it("redacts values under sensitive keys wholesale, regardless of type", () => {
+		const event = {
+			extra: {
+				answer_key: ["B", "C", "A"],
+				razorpay_signature: "abcd",
+				password: "hunter2",
+				keep: "ok",
+			},
+		} as Record<string, unknown>;
+		scrubSentryEvent(event);
+		const extra = event.extra as Record<string, unknown>;
+		expect(extra.answer_key).toBe("[redacted]");
+		expect(extra.razorpay_signature).toBe("[redacted]");
+		expect(extra.password).toBe("[redacted]");
+		expect(extra.keep).toBe("ok");
+	});
+
+	it("redacts PII inside breadcrumb.data (console-integration structured args)", () => {
+		const event = {
+			breadcrumbs: [{ category: "console", message: "log", data: { studentEmail: "x", value: "ping alice@example.com" } }],
+		} as Record<string, unknown>;
+		scrubSentryEvent(event);
+		const data = (event.breadcrumbs as Array<{ data: Record<string, unknown> }>)[0]!.data;
+		expect(data.value).toBe("ping [email]");
+	});
+
+	it("does not hang on a circular structure (cycle guard)", () => {
+		const cyclic: Record<string, unknown> = { a: 1 };
+		cyclic.self = cyclic;
+		const event = { extra: cyclic } as Record<string, unknown>;
+		expect(() => scrubSentryEvent(event)).not.toThrow();
+	});
+});

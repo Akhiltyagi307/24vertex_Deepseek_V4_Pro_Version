@@ -127,6 +127,41 @@ function scrubHeaders(headers: Record<string, unknown>): Record<string, unknown>
 }
 
 /**
+ * Object keys whose VALUE should be redacted wholesale regardless of type
+ * (M-3). Matches as a substring (case-insensitive) so `razorpay_signature`,
+ * `answer_key`, `user_email`, `access_token` etc. are all caught. Deliberately
+ * does NOT include a bare `key` token (too broad — would hit `keyboard`,
+ * `monkey`); `api_key`/`apikey` are covered explicitly.
+ */
+const SENSITIVE_OBJECT_KEY_RE =
+	/(authorization|cookie|token|secret|password|passwd|pwd|signature|api[_-]?key|apikey|email|recipient|answer|prompt|\botp\b|totp)/i;
+
+const MAX_REDACT_DEPTH = 6;
+
+/**
+ * Recursively redact PII from an arbitrary JSON-ish value (M-3). Strings get
+ * the same regex treatment as everywhere else; object values under a sensitive
+ * key are dropped entirely. Bounded by {@link MAX_REDACT_DEPTH} and a cycle
+ * guard so a pathological/self-referential payload can't hang beforeSend.
+ * Returns a redacted copy (does not mutate the input).
+ */
+function deepRedact(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+	if (typeof value === "string") return redactPii(value);
+	if (value === null || typeof value !== "object") return value;
+	if (depth >= MAX_REDACT_DEPTH) return "[redacted-depth]";
+	if (seen.has(value as object)) return "[circular]";
+	seen.add(value as object);
+	if (Array.isArray(value)) {
+		return value.map((item) => deepRedact(item, depth + 1, seen));
+	}
+	const out: Record<string, unknown> = {};
+	for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+		out[k] = SENSITIVE_OBJECT_KEY_RE.test(k) ? "[redacted]" : deepRedact(v, depth + 1, seen);
+	}
+	return out;
+}
+
+/**
  * Drop request body / query string / cookies (could contain prompts, answers,
  * payment payloads, tokens), redact sensitive headers, redact emails inside
  * breadcrumb messages, and remove user.email if it slipped in via the SDK's
@@ -144,9 +179,12 @@ export function scrubSentryEvent<T>(event: T): T {
 			cookies?: unknown;
 			headers?: Record<string, unknown>;
 		};
-		breadcrumbs?: Array<{ message?: string }>;
+		breadcrumbs?: Array<{ message?: string; data?: unknown }>;
 		user?: { id?: string; email?: string; ip_address?: string; username?: string };
 		message?: string;
+		extra?: unknown;
+		contexts?: unknown;
+		tags?: unknown;
 	};
 	if (e.request) {
 		if (e.request.data !== undefined) e.request.data = "[redacted]";
@@ -160,7 +198,26 @@ export function scrubSentryEvent<T>(event: T): T {
 	if (Array.isArray(e.breadcrumbs)) {
 		for (const b of e.breadcrumbs) {
 			if (typeof b.message === "string") b.message = redactPii(b.message);
+			// M-3: console-integration breadcrumbs route structured args into
+			// `breadcrumb.data` — previously unscrubbed, so a console.log of a
+			// student answer / email / signature leaked verbatim.
+			if (b.data && typeof b.data === "object") {
+				b.data = deepRedact(b.data, 0, new WeakSet());
+			}
 		}
+	}
+
+	// M-3: `extra`, `contexts`, and `tags` were never walked. Any PII captured
+	// via Sentry.setExtra / setContext / setTag (or `captureException(e, { extra })`)
+	// previously reached Sentry storage unredacted.
+	if (e.extra && typeof e.extra === "object") {
+		e.extra = deepRedact(e.extra, 0, new WeakSet());
+	}
+	if (e.contexts && typeof e.contexts === "object") {
+		e.contexts = deepRedact(e.contexts, 0, new WeakSet());
+	}
+	if (e.tags && typeof e.tags === "object") {
+		e.tags = deepRedact(e.tags, 0, new WeakSet());
 	}
 
 	// User identifiers: redact email/username outright; hash user.id and

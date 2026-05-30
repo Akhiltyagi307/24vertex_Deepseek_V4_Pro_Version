@@ -41,7 +41,7 @@ async function runCleanupEmpty(request: Request): Promise<Response> {
 		.limit(500);
 	if (selErr) {
 		logSupabaseError("doubt_chat_cleanup.select", selErr);
-		return Response.json({ ok: false, message: "Could not load candidates." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not load candidates." }, { status: 500 });
 	}
 
 	const candidateIds = (candidates ?? []).map((r) => r.id as string);
@@ -60,7 +60,7 @@ async function runCleanupEmpty(request: Request): Promise<Response> {
 		.limit(candidateIds.length * 10);
 	if (msgErr) {
 		logSupabaseError("doubt_chat_cleanup.message_lookup", msgErr);
-		return Response.json({ ok: false, message: "Could not check messages." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not check messages." }, { status: 500 });
 	}
 	const nonEmpty = new Set((nonEmptyRows ?? []).map((r) => r.conversation_id as string));
 	const emptyIds = candidateIds.filter((id) => !nonEmpty.has(id));
@@ -81,7 +81,7 @@ async function runCleanupEmpty(request: Request): Promise<Response> {
 		.in("id", emptyIds);
 	if (delErr) {
 		logSupabaseError("doubt_chat_cleanup.delete", delErr, { count: emptyIds.length });
-		return Response.json({ ok: false, message: "Could not delete." }, { status: 500 });
+		return Response.json({ success: false, ok: false, message: "Could not delete." }, { status: 500 });
 	}
 
 	if (idempotencyKey && claim.kind === "fresh") {

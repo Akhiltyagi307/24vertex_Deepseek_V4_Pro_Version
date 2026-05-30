@@ -6,7 +6,6 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { generateStructuredWithProviderFallback } from "@/lib/ai/structured-output";
-import { consumeTest } from "@/lib/billing/entitlements";
 import { notifyTestReportReady } from "@/lib/notifications/report-ready";
 import {
 	formatGradingFeedbackForStorage,
@@ -791,18 +790,10 @@ async function gradePracticeTestWithAiInner(
 
 	trace.timingsMs.finalizeTest = mark();
 
-	// Best-effort quota deduction. If this fails, the test is already marked
-	// graded and the student sees their report — admin reconciles billing
-	// from logs rather than punishing the student for an internal glitch.
-	const billingAfter = await consumeTest(supabase, userId);
-	if (!billingAfter.ok) {
-		logServerError("gradePracticeTestWithAi.consumeTest", new Error(billingAfter.message), {
-			testId,
-			jobId: ctx.jobId,
-			correlationId: ctx.correlationId,
-			code: billingAfter.code,
-		});
-	}
+	// H-2: test quota is now consumed at generation time (atomically,
+	// fail-closed) in the generation pipeline, not here at grade time. Grading
+	// no longer touches billing — this avoids the double-charge risk and the
+	// old fail-open free-report path.
 
 	try {
 		await notifyTestReportReady({

@@ -27,7 +27,7 @@ const QUOTE_RATE_WINDOW_SEC = 60;
 export async function GET(req: NextRequest) {
 	const auth = await getApiRequestUser(req);
 	if (!auth) {
-		return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+		return NextResponse.json({ success: false, ok: false, message: "Unauthorized." }, { status: 401 });
 	}
 
 	const rl = await rlConsume({
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 	if (!rl.allowed) {
 		const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000));
 		return NextResponse.json(
-			{ ok: false, code: "rate_limited", message: "Too many coupon checks. Slow down." },
+			{ success: false, ok: false, code: "rate_limited", message: "Too many coupon checks. Slow down." },
 			{ status: 429, headers: { "Retry-After": String(retryAfterSec) } },
 		);
 	}
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 		coupon: sp.get("coupon") ?? "",
 	});
 	if (!parsed.success) {
-		return NextResponse.json({ ok: false, message: "Invalid query." }, { status: 400 });
+		return NextResponse.json({ success: false, ok: false, message: "Invalid query." }, { status: 400 });
 	}
 
 	const q = await quoteCheckoutCouponForPlan({
@@ -57,10 +57,10 @@ export async function GET(req: NextRequest) {
 		planCode: parsed.data.planCode,
 	});
 	if (!q.ok) {
-		return NextResponse.json({ ok: false, message: q.message, code: q.code }, { status: 400 });
+		return NextResponse.json({ success: false, ok: false, message: q.message, code: q.code }, { status: 400 });
 	}
 	if (!isPlanCode(q.planCode)) {
-		return NextResponse.json({ ok: false, message: "Invalid plan." }, { status: 400 });
+		return NextResponse.json({ success: false, ok: false, message: "Invalid plan." }, { status: 400 });
 	}
 
 	return NextResponse.json({

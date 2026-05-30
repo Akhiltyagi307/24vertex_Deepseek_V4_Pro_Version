@@ -60,8 +60,15 @@ export type AdminAckEnvelope = {
 };
 
 export type AdminErrorEnvelope = {
-	error: string;
+	// B3 unification: canonical `{ success, code, message }` fields so every API
+	// route (admin + student + billing) shares one error shape a client can
+	// branch on via `success`/`code`. `error` is kept as a legacy alias (== message)
+	// so existing admin clients/tests that read `.error` keep working; remove it
+	// in a follow-up once those readers migrate to `message`.
+	success: false;
 	code?: string;
+	message: string;
+	error: string;
 	details?: unknown;
 };
 
@@ -107,7 +114,7 @@ export function adminErrorResponse(
 	message: string,
 	opts: AdminResponseOptions & { code?: string; details?: unknown } = {},
 ): NextResponse<AdminErrorEnvelope> {
-	const body: AdminErrorEnvelope = { error: message };
+	const body: AdminErrorEnvelope = { success: false, message, error: message };
 	if (opts.code) body.code = opts.code;
 	if (opts.details !== undefined) body.details = opts.details;
 	return NextResponse.json(body, {

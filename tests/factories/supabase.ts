@@ -20,7 +20,7 @@
 
 export type MockUser = { id: string; email?: string };
 
-export type MockTableResult = { data?: unknown; error?: unknown };
+export type MockTableResult = { data?: unknown; error?: unknown; count?: number | null };
 export type MockRpcResult = { data?: unknown; error?: unknown };
 
 export type MockTableProvider =
@@ -110,6 +110,14 @@ export function makeMockSupabase(initial: MockSupabaseOptions = {}): MockSupabas
 			"like",
 			"ilike",
 			"is",
+			// M-5: these were missing — calling them returned `undefined`, breaking
+			// the chain and producing confusing failures / false-greens for routes
+			// that use `.not()` (e.g. auto-submit-expired), `.filter()`
+			// (weekly-digest), `.match()`, `.overlaps()`.
+			"not",
+			"filter",
+			"match",
+			"overlaps",
 			"or",
 			"order",
 			"limit",

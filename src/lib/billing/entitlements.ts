@@ -382,7 +382,11 @@ export const getCachedEntitlementsForProfile = cache(async (profileId: string): 
 
 export type ConsumeResult =
 	| { ok: true }
-	| { ok: false; code: "quota_tests" | "quota_tokens" | "trial_expired" | "expired" | "no_subscription"; message: string };
+	| {
+			ok: false;
+			code: "quota_tests" | "quota_tokens" | "trial_expired" | "expired" | "no_subscription" | "database_error";
+			message: string;
+	  };
 
 const QUOTA_TEST_MESSAGE = "You've used all the tests included in your current plan.";
 const QUOTA_TOKEN_MESSAGE =
@@ -440,8 +444,15 @@ export async function consumeTest(
 	const { data, error } = await supabase.rpc("billing_consume_test", { p_profile_id: profileId });
 	if (error) {
 		logSupabaseError("billing.consume_test.rpc", error, { profileId });
-		// Fail-open in case of infra error; rate-limit still applies.
-		return { ok: true };
+		// Fail-CLOSED (H-2c): a billing infra error must not hand out a free
+		// test. The generation pipeline aborts on this and persists nothing, so
+		// no test is created and nothing is charged (the errored RPC rolled
+		// back). Previously this returned { ok: true } (fail-open).
+		return {
+			ok: false,
+			code: "database_error",
+			message: "Could not verify your plan usage. Please try again in a moment.",
+		};
 	}
 	if (data === false) {
 		return { ok: false, code: "quota_tests", message: QUOTA_TEST_MESSAGE };
@@ -454,6 +465,21 @@ export async function consumeTest(
 	void emitTestsUsageThresholdIfAny(supabase, profileId);
 
 	return { ok: true };
+}
+
+/**
+ * Compensating action for the generation pipeline (H-2): if a test credit was
+ * consumed but the test then failed to persist, refund the credit so the
+ * student is not charged for a test that does not exist. No-op when enforcement
+ * is off. Best-effort — logs and returns on failure (the alternative, throwing,
+ * would mask the original persist error the caller is already surfacing).
+ */
+export async function refundTest(supabase: SupabaseClient, profileId: string): Promise<void> {
+	if (!isSaasEnforcementEnabled()) return;
+	const { error } = await supabase.rpc("billing_refund_test", { p_profile_id: profileId, p_amount: 1 });
+	if (error) {
+		logSupabaseError("billing.refund_test.rpc", error, { profileId });
+	}
 }
 
 async function emitTestsUsageThresholdIfAny(_supabase: SupabaseClient, profileId: string): Promise<void> {

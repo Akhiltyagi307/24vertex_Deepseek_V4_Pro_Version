@@ -165,11 +165,29 @@ describe("POST /api/student/practice/generate-stream", () => {
 			result: {
 				ok: false,
 				code: "generation_failed",
-				message: "Rate limited.",
+				message: "Generic failure.",
 			},
 		});
 		const res = await POST(makeRequest(DEFAULT_BODY));
 		expect(res.status).toBe(400);
+	});
+
+	it("returns 429 with Retry-After and code 'rate_limited' on a rate-limit (H-3)", async () => {
+		pipelineMock.current.preflightPracticeGeneration = async () => ({
+			ok: false,
+			result: {
+				ok: false,
+				code: "rate_limited",
+				message: "You have generated too many practice tests in the last hour.",
+				resetAt: new Date(Date.now() + 60_000).toISOString(),
+			},
+		});
+		const res = await POST(makeRequest(DEFAULT_BODY));
+		expect(res.status).toBe(429);
+		expect(res.headers.get("Retry-After")).toBeTruthy();
+		const body = await res.json();
+		expect(body.success).toBe(false);
+		expect(body.code).toBe("rate_limited");
 	});
 
 	it("streams a final 'done' envelope on success", async () => {

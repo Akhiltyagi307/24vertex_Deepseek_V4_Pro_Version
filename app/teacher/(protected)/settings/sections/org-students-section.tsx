@@ -75,7 +75,7 @@ export function TeacherOrgStudentsDeferredTab({
 				<div className="h-5 w-44 animate-pulse rounded bg-muted-foreground/15" />
 				<div className="h-4 w-full max-w-xl animate-pulse rounded bg-muted-foreground/10" />
 			</div>
-			<div className="grid gap-4 sm:grid-cols-3">
+			<div className="grid gap-4 medium:grid-cols-3">
 				<div className="h-10 animate-pulse rounded-md bg-muted-foreground/10" />
 				<div className="h-10 animate-pulse rounded-md bg-muted-foreground/10" />
 				<div className="h-10 animate-pulse rounded-md bg-muted-foreground/10" />

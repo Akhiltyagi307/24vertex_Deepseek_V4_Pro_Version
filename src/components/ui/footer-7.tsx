@@ -120,7 +120,7 @@ export const Footer7 = ({
 						</ul>
 					) : null}
 				</div>
-				<div className="grid w-full min-w-0 gap-8 sm:grid-cols-2 medium:gap-10 xl:grid-cols-4 xl:gap-8">
+				<div className="grid w-full min-w-0 gap-8 medium:grid-cols-2 medium:gap-10 xl:grid-cols-4 xl:gap-8">
 					{sections.map((section) => (
 						<div key={section.title} className="min-w-0">
 							<h3 className="mb-3 text-sm font-semibold text-foreground">{section.title}</h3>

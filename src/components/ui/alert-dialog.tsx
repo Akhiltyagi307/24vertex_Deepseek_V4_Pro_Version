@@ -69,7 +69,7 @@ function AlertDialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
 	return (
 		<div
 			data-slot="alert-dialog-header"
-			className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+			className={cn("flex flex-col gap-2 text-center medium:text-left", className)}
 			{...props}
 		/>
 	)
@@ -79,7 +79,7 @@ function AlertDialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDiv
 	return (
 		<div
 			data-slot="alert-dialog-footer"
-			className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+			className={cn("flex flex-col-reverse gap-2 medium:flex-row medium:justify-end", className)}
 			{...props}
 		/>
 	)

@@ -31,12 +31,12 @@ const bodySchema = z
 
 export async function POST(req: Request) {
 	const auth = await getApiRequestUser(req);
-	if (!auth) return Response.json({ ok: false }, { status: 401 });
+	if (!auth) return Response.json({ success: false, ok: false }, { status: 401 });
 
 	const json = await req.json().catch(() => null);
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {
-		return Response.json({ ok: false, message: "Invalid event payload." }, { status: 400 });
+		return Response.json({ success: false, ok: false, message: "Invalid event payload." }, { status: 400 });
 	}
 
 	const admin = createServiceRoleClient();

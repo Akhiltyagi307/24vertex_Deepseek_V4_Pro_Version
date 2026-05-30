@@ -77,13 +77,21 @@ describe("admin response envelope", () => {
 			const res = adminErrorResponse("Rate limited", { status: 429, code: "rate_limited" });
 			expect(res.status).toBe(429);
 			const body = await res.json();
-			expect(body).toEqual({ error: "Rate limited", code: "rate_limited" });
+			// B3: canonical { success, code, message } + legacy `error` alias.
+			expect(body).toEqual({
+				success: false,
+				code: "rate_limited",
+				message: "Rate limited",
+				error: "Rate limited",
+			});
 		});
 
 		it("can carry a Zod-flatten payload via details", async () => {
 			const res = adminErrorResponse("Invalid body", { details: { fieldErrors: { email: ["bad"] } } });
 			const body = await res.json();
 			expect(body).toEqual({
+				success: false,
+				message: "Invalid body",
 				error: "Invalid body",
 				details: { fieldErrors: { email: ["bad"] } },
 			});

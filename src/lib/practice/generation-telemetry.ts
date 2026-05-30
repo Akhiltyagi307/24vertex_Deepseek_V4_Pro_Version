@@ -156,6 +156,30 @@ export async function attachTestIdToRunAiCalls(runId: string, testId: string): P
 	}
 }
 
+/**
+ * H-5 safety net: mark a run `aborted` ONLY if it is still `running`. The
+ * `status = 'running'` predicate makes this idempotent and safe to call
+ * unconditionally from a `finally` — it is a no-op once a terminal status
+ * (`succeeded`/`failed`/`aborted`) has already been written, so it can never
+ * clobber a real outcome. Closes the "stuck running forever" gap where the
+ * pipeline throws before reaching a terminal {@link finishGenerationRun}.
+ */
+export async function markGenerationRunAbortedIfRunning(runId: string): Promise<void> {
+	try {
+		await db
+			.update(practiceGenerationRuns)
+			.set({
+				status: "aborted",
+				failureCode: "aborted",
+				failureMessage: "Generation pipeline threw before finalizing the run.",
+				finishedAt: new Date(),
+			})
+			.where(and(eq(practiceGenerationRuns.id, runId), eq(practiceGenerationRuns.status, "running")));
+	} catch (error) {
+		safeLogTelemetryFailure("markGenerationRunAbortedIfRunning", error, { runId });
+	}
+}
+
 export async function finishGenerationRun(input: FinishGenerationRunInput): Promise<void> {
 	try {
 		const totals = await summarizeRunAiCalls(input.runId);
