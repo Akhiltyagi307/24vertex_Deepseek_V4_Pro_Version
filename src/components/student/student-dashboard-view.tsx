@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ActivityIcon, FlameIcon, LineChartIcon } from "lucide-react";
 import * as React from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -8,10 +7,10 @@ import { motion, useReducedMotion } from "motion/react";
 import { SubjectTopicRadarChart } from "@/components/charts/subject-topic-radar-chart";
 import { pageHeaderSubtextScrollClass, pageHeaderSubtextTextClass } from "@/components/student/page-header-subtext";
 import {
-	SubjectCard,
 	type SubjectCardTopicStatusCounts,
 	subjectStatusLabelToDashboardStatus,
 } from "@/components/student/dashboard-subject-card";
+import { SubjectTileLink } from "@/components/student/subject-tile-link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	Card,
@@ -304,114 +303,43 @@ export function StudentDashboardView({
 											"group/tile block h-full min-h-0 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 										);
 
-										if (!hasTopics) {
-											const noTopicsHint = isParent
-												? "No catalog topics for this grade yet."
-												: "No catalog topics for your grade yet.";
-											return (
-												<motion.div
-													key={s.subjectId}
-													className="flex min-h-0 min-w-0 xl:h-full"
-													variants={item}
-												>
-													<Link
-														href={href}
-														scroll
-														aria-label={`Open ${s.subjectName} performance. ${noTopicsHint}`}
-														className={tileLinkClassName}
-													>
-														<SubjectCard
-															subject={s.subjectName}
-															lastTestDate=""
-															topicsAttempted={0}
-															topicsTotal={0}
-															testsTaken={0}
-															avgScore={0}
-															status="ready_to_start"
-															showCta={false}
-															showTileHint
-															metricsIconSlot={subjectIcon}
-															density="compact"
-															className="min-h-0 w-full flex-1"
-														/>
-													</Link>
-												</motion.div>
-											);
-										}
-
-										if (!hasTrackerRows) {
-											const trackerHint = isParent
-												? "Topics load after curriculum links."
-												: "Topics load after curriculum is linked.";
-											return (
-												<motion.div
-													key={s.subjectId}
-													className="flex min-h-0 min-w-0 xl:h-full"
-													variants={item}
-												>
-													<Link
-														href={href}
-														scroll
-														aria-label={`Open ${s.subjectName} performance. ${trackerHint}`}
-														className={tileLinkClassName}
-													>
-														<SubjectCard
-															subject={s.subjectName}
-															lastTestDate=""
-															topicsAttempted={0}
-															topicsTotal={s.topicTotal}
-															testsTaken={0}
-															avgScore={0}
-															status="ready_to_start"
-															showCta={false}
-															showTileHint
-															metricsIconSlot={subjectIcon}
-															density="compact"
-															className="min-h-0 w-full flex-1"
-														/>
-													</Link>
-												</motion.div>
-											);
-										}
-
+										const noTopicsHint = isParent
+											? "No catalog topics for this grade yet."
+											: "No catalog topics for your grade yet.";
+										const trackerHint = isParent
+											? "Topics load after curriculum links."
+											: "Topics load after curriculum is linked.";
 										const noTestsHint = isParent
 											? "No tests yet. Open subject to view topics."
 											: "No tests yet. Open subject to start.";
-										const subjectLinkAria = !hasAttempts
-											? s.lastTestDateIso
-												? `Open ${s.subjectName} performance. Last test ${lastLabel}.`
-												: `Open ${s.subjectName} performance. ${noTestsHint}`
-											: `Open ${s.subjectName} performance`;
-
+										const ariaLabel = !hasTopics
+											? `Open ${s.subjectName} performance. ${noTopicsHint}`
+											: !hasTrackerRows
+												? `Open ${s.subjectName} performance. ${trackerHint}`
+												: !hasAttempts
+													? s.lastTestDateIso
+														? `Open ${s.subjectName} performance. Last test ${lastLabel}.`
+														: `Open ${s.subjectName} performance. ${noTestsHint}`
+													: `Open ${s.subjectName} performance`;
 										return (
-											<motion.div
+											<SubjectTileLink
 												key={s.subjectId}
-												className="flex min-h-0 min-w-0 xl:h-full"
-												variants={item}
-											>
-												<Link
-													href={href}
-													scroll
-													aria-label={subjectLinkAria}
-													className={tileLinkClassName}
-												>
-													<SubjectCard
-														subject={s.subjectName}
-														lastTestDate={lastLabel}
-														topicsAttempted={s.attemptedCount}
-														topicsTotal={s.topicTotal}
-														testsTaken={s.testsTaken}
-														avgScore={hasAttempts ? avgScore : 0}
-														status={!hasAttempts ? "ready_to_start" : cardStatus}
-														showCta={false}
-														showTileHint
-														topicStatusCounts={topicStatusCounts}
-														metricsIconSlot={subjectIcon}
-														density="compact"
-														className="min-h-0 w-full flex-1"
-													/>
-												</Link>
-											</motion.div>
+												href={href}
+												ariaLabel={ariaLabel}
+												icon={subjectIcon}
+												itemVariants={item}
+												subjectName={s.subjectName}
+												lastTestDate={hasTopics && hasTrackerRows ? lastLabel : ""}
+												topicsAttempted={hasTopics && hasTrackerRows ? s.attemptedCount : 0}
+												topicsTotal={hasTopics ? s.topicTotal : 0}
+												testsTaken={hasTopics && hasTrackerRows ? s.testsTaken : 0}
+												avgScore={hasTopics && hasTrackerRows && hasAttempts ? avgScore : 0}
+												status={hasTopics && hasTrackerRows && hasAttempts ? cardStatus : "ready_to_start"}
+												topicStatusCounts={hasTopics && hasTrackerRows ? topicStatusCounts : undefined}
+												motionClassName="flex min-h-0 min-w-0 xl:h-full"
+												linkClassName={tileLinkClassName}
+												cardClassName="min-h-0 w-full flex-1"
+											/>
 										);
 									})}
 								</motion.div>
