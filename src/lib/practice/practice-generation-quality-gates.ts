@@ -144,18 +144,78 @@ function findNearDuplicatePairCount(questions: PracticeGenerationOutput["questio
 }
 
 /**
- * Content words (length ≥ 4) from the stem for overlap with topic corpus.
+ * Short domain tokens that survive the length-≥4 filter — accounting,
+ * finance, business, and ratio abbreviations that DO appear in topic
+ * corpora and stems. Without these, `Rs.`, `Dr.`, `Cr.`, `GST`, `P&L`
+ * (post-strip → `p l` → `p` and `l`) and similar collapse to <4 chars
+ * and the chunk-alignment gate cannot use them as signal — which is
+ * the structural reason narrow-corpus subjects like Financial
+ * Accounting Part 2 fire `chunk_alignment_weak` at high rates even on
+ * faithful restatements of the source chunks.
+ */
+const SHORT_DOMAIN_TOKENS = new Set([
+	"dr",
+	"cr",
+	"rs",
+	"gst",
+	"tds",
+	"pnl",
+	"agm",
+	"egm",
+	"fy",
+	"ay",
+	"hra",
+	"roi",
+	"roe",
+	"eps",
+	"ebit",
+	"mou",
+	"npv",
+	"irr",
+	"crr",
+	"slr",
+	"rbi",
+	"sebi",
+	"ifrs",
+	"gaap",
+	"ind",
+	"as",
+]);
+
+/**
+ * Content words (length ≥ 4) from the stem for overlap with topic corpus,
+ * plus a small allowlist of domain abbreviations from {@link SHORT_DOMAIN_TOKENS}.
  */
 function extractSignificantStemTokens(stem: string): string[] {
 	const lower = stem.toLowerCase().replace(/[^a-z0-9]+/g, " ");
 	const parts = lower.split(/\s+/).filter(Boolean);
 	const out: string[] = [];
 	for (const p of parts) {
-		if (p.length < 4) continue;
+		if (p.length < 4 && !SHORT_DOMAIN_TOKENS.has(p)) continue;
 		if (STEM_STOPWORDS.has(p)) continue;
 		out.push(p);
 	}
 	return out;
+}
+
+/**
+ * Count the unique tokens that the alignment gate would consider as
+ * "significant" inside a given corpus. Used to relax the required-match
+ * threshold when the topic corpus is small (e.g. Financial Accounting
+ * Part 2 topics whose median unique gate-token count is ~99 vs ~375 for
+ * Business Studies). Cheap because the function runs once per topic at
+ * gate evaluation time, not per question.
+ */
+function countUniqueCorpusGateTokens(corpus: string): number {
+	const lower = corpus.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+	const seen = new Set<string>();
+	for (const p of lower.split(/\s+/)) {
+		if (!p) continue;
+		if (p.length < 4 && !SHORT_DOMAIN_TOKENS.has(p)) continue;
+		if (STEM_STOPWORDS.has(p)) continue;
+		seen.add(p);
+	}
+	return seen.size;
 }
 
 function normalizeLeakText(s: string): string {
@@ -228,6 +288,12 @@ function gateVisualLeaksAnswer(questions: PracticeGenerationOutput["questions"])
 	};
 }
 
+/** Below this unique-token count the corpus is considered narrow and the
+ * gate relaxes its match requirement by 1 (floor 1). Tuned against the
+ * observed median for narrow-corpus subjects (~99 unique gate-tokens for
+ * FA Part 2) vs broad ones (~375 for Business Studies). */
+const NARROW_CORPUS_UNIQUE_TOKEN_THRESHOLD = 180;
+
 function gateChunkAlignmentLexical(
 	questions: PracticeGenerationOutput["questions"],
 	corpusByTopicId: ReadonlyMap<string, string>,
@@ -235,6 +301,17 @@ function gateChunkAlignmentLexical(
 ): PracticeQualityGateResult {
 	if (!isChunkAlignmentLexicalEnabled()) return { ok: true };
 	if (contextQuality === "no_context") return { ok: true };
+
+	// Cache narrow-ness per topic so we don't tokenize the same corpus once
+	// per question on the same topic.
+	const narrowCorpusByTopic = new Map<string, boolean>();
+	const isNarrow = (topicId: string, corpus: string): boolean => {
+		const cached = narrowCorpusByTopic.get(topicId);
+		if (cached !== undefined) return cached;
+		const narrow = countUniqueCorpusGateTokens(corpus) < NARROW_CORPUS_UNIQUE_TOKEN_THRESHOLD;
+		narrowCorpusByTopic.set(topicId, narrow);
+		return narrow;
+	};
 
 	const failedIndexes: number[] = [];
 	for (let i = 0; i < questions.length; i++) {
@@ -252,6 +329,7 @@ function gateChunkAlignmentLexical(
 		let required = 1;
 		if (tokens.length >= 4) required = 2;
 		if (tokens.length >= 10) required = Math.max(2, Math.floor(tokens.length * 0.25));
+		if (isNarrow(q.topic_id, corpus)) required = Math.max(1, required - 1);
 
 		if (matches.length < required) failedIndexes.push(i);
 	}

@@ -377,7 +377,29 @@ async function runOneCall(args: {
 				// Edge case: the LLM emitted something the structured-output adapter
 				// accepted but the strict envelope schema (re-applied here for the
 				// final patch shape) rejects. Treat as null_visual rather than
-				// failing the whole per-question call.
+				// failing the whole per-question call. We log the rejection in dev
+				// so cross-subject visual-yield regressions can be diagnosed without
+				// having to re-instrument — the prior silent drop made e.g. the
+				// Class-10 Science 0/15 → 1/15 yield indistinguishable from "the
+				// model declined to draw the visual".
+				if (process.env.NODE_ENV !== "production") {
+					const cv = candidateValue as Record<string, unknown> | null | undefined;
+					const spec = (cv?.spec ?? {}) as Record<string, unknown>;
+					const kindLabel = `${String(spec.kind ?? "?")}${spec.subKind ? `/${String(spec.subKind)}` : ""}`;
+					const issueSummary = reParse.error.issues
+						.slice(0, 4)
+						.map((iss) => `${iss.path.join(".")}: ${iss.message}`)
+						.join(" | ");
+					let bodyPreview = "";
+					try {
+						bodyPreview = JSON.stringify(candidateValue).slice(0, 500);
+					} catch {
+						bodyPreview = "(unstringifiable)";
+					}
+					console.error(
+						`[visual_enrichment.per_question] envelope reparse failed — index=${index} kind=${kindLabel} issues="${issueSummary}" body=${bodyPreview}`,
+					);
+				}
 				patch = { action: "null_visual", index };
 			} else {
 				patch = { action: "replace_visual", index, value: reParse.data };

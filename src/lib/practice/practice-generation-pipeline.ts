@@ -509,12 +509,19 @@ async function runModelOnce(
 }
 
 /**
- * Tail-latency guard around `runModelOnce`. Wraps the batch
- * dispatch in a soft 75s timeout — if the slow batch exceeds that, abort
- * via AbortController and retry ONCE. The original observation: one batch
- * took 102.8s while siblings on identical input ran 22–43s (DeepSeek API
- * tail-latency outlier). Without this, the slow call alone could double a
- * test's wall time.
+ * Tail-latency guard around `runModelOnce`. Wraps the batch dispatch in a
+ * soft timeout — if the slow batch exceeds it, abort via AbortController
+ * and retry ONCE. The original 75s ceiling was tuned for the case "one
+ * batch took 102.8s while siblings ran 22–43s" — but DeepSeek's actual
+ * tail is thick enough that batches on 25-30k-token prompts (e.g. content-
+ * heavy subjects like Financial Accounting Part 2) routinely take 60–90s,
+ * and the 75s abort fires mid-response. When the abort lands during HTTP
+ * body streaming, the Vercel AI SDK surfaces it as
+ * `AI_APICallError: Failed to process successful response` (truncated
+ * body); when it lands before body data, it surfaces as the bare
+ * `tail_timeout` we set as the abort reason. Both modes were causing 100%
+ * failure on FA Part 2 generation. Default bumped to 150s with env
+ * override so we can re-tune without a deploy.
  *
  * The retry uses a fresh telemetry stepKey (suffixed `_retry`) so the
  * `practice_generation_steps` dashboard can count tail events vs first-pass
@@ -523,7 +530,15 @@ async function runModelOnce(
  * One retry only. If the retry also tails-out, return the timeout failure
  * — better than waiting forever.
  */
-const BATCH_TAIL_TIMEOUT_MS = 75_000;
+const BATCH_TAIL_TIMEOUT_MS_DEFAULT = 200_000;
+function batchTailTimeoutMs(): number {
+	const raw = process.env.PRACTICE_BATCH_TAIL_TIMEOUT_MS?.trim();
+	if (!raw) return BATCH_TAIL_TIMEOUT_MS_DEFAULT;
+	const n = Number.parseInt(raw, 10);
+	return Number.isFinite(n) && n >= 10_000 && n <= 600_000
+		? n
+		: BATCH_TAIL_TIMEOUT_MS_DEFAULT;
+}
 
 async function runBatchWithTailGuard(args: {
 	systemPrompt: string;
@@ -536,6 +551,7 @@ async function runBatchWithTailGuard(args: {
 	generationRunId: string | null;
 	correlationId: string;
 }): ReturnType<typeof runModelOnce> {
+	const timeoutMs = batchTailTimeoutMs();
 	for (let attempt = 0; attempt < 2; attempt++) {
 		// Child abort controller so a tail-timeout cancels just this attempt
 		// without aborting the whole pipeline. Linked to the parent signal so
@@ -545,7 +561,7 @@ async function runBatchWithTailGuard(args: {
 		args.opts.abortSignal?.addEventListener?.("abort", onParentAbort);
 		const timeoutId = setTimeout(
 			() => ac.abort(new Error("tail_timeout")),
-			BATCH_TAIL_TIMEOUT_MS,
+			timeoutMs,
 		);
 		try {
 			const result = await runModelOnce(
@@ -574,9 +590,9 @@ async function runBatchWithTailGuard(args: {
 			if (isTailTimeout) {
 				return {
 					ok: false,
-					message: `Batch ${args.baseStepKey} timed out after ${(BATCH_TAIL_TIMEOUT_MS / 1000).toFixed(0)}s on both attempts.`,
+					message: `Batch ${args.baseStepKey} timed out after ${(timeoutMs / 1000).toFixed(0)}s on both attempts.`,
 					error: e,
-					usage: { inputTokens: 0, outputTokens: 0, latencyMs: BATCH_TAIL_TIMEOUT_MS, model: "unknown" },
+					usage: { inputTokens: 0, outputTokens: 0, latencyMs: timeoutMs, model: "unknown" },
 				};
 			}
 			throw e;
@@ -1408,7 +1424,27 @@ ${JSON.stringify(blueprintSlots)}`;
 				inputTokens: repaired.inputTokens,
 				outputTokens: repaired.outputTokens,
 				error: repaired.ok ? null : repaired.message,
-				metadata: { reason_kind: reason.kind },
+				metadata: {
+					reason_kind: reason.kind,
+					// Capturing the diagnostic code + truncated message + details so
+					// the practice_generation_steps table is enough to attribute a
+					// repair to a specific gate (validation vs quality kind, plus
+					// e.g. "visual_leaks_answer"). Previously only `reason_kind`
+					// was stored, which meant every quality-driven repair looked
+					// identical in telemetry — making subject-specific repair
+					// patterns invisible.
+					reason_code: "code" in reason ? reason.code : undefined,
+					reason_message:
+						"message" in reason && typeof reason.message === "string"
+							? reason.message.slice(0, 600)
+							: undefined,
+					gate_details:
+						reason.kind === "quality" && reason.gateDetails ? reason.gateDetails : undefined,
+					failed_indexes:
+						reason.kind === "quality" && Array.isArray(reason.failedIndexes)
+							? reason.failedIndexes
+							: undefined,
+				},
 			});
 			if (!repaired.ok) return false;
 			grouped = normalizeGroupedEstimatedTimesToPlan(repaired.object, durationSeconds);
