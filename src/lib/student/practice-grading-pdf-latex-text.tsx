@@ -1,17 +1,14 @@
 import { Math as PdfMath } from "@react-pdf/math";
-import { StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
+import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactElement, ReactNode } from "react";
 import katex from "katex";
-
-// `@react-pdf/renderer` doesn't re-export the single-style `Style` type (its
-// source `@react-pdf/types` isn't hoisted), but it does export `Styles`
-// (`{ [key: string]: Style }`), so index it to recover a single style object.
-type PdfStyle = Styles[string];
 
 import { normalizeKatexMath } from "@/lib/practice/katex-math-normalize";
 import { parseLatexNodes, type LatexNode } from "@/lib/practice/parse-latex-nodes";
 
 const PDF_INK = "#252525";
+
+type PdfStyle = Parameters<typeof StyleSheet.create>[0][string];
 
 const styles = StyleSheet.create({
 	block: { width: "100%" },
@@ -61,9 +58,10 @@ function PdfMathFragment({
 	textStyle?: PdfStyle;
 }): ReactElement {
 	if (!katexRenders(tex)) {
-		return (
-			<Text style={textStyle ? [styles.fallbackMath, textStyle] : styles.fallbackMath}>{tex}</Text>
-		);
+		const fallbackStyle = textStyle
+			? [styles.fallbackMath, textStyle]
+			: styles.fallbackMath;
+		return <Text style={fallbackStyle}>{tex}</Text>;
 	}
 	if (display) {
 		return (
