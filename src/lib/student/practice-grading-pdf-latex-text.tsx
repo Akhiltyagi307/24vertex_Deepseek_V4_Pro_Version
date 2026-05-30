@@ -1,7 +1,12 @@
 import { Math as PdfMath } from "@react-pdf/math";
-import { StyleSheet, Text, View } from "@react-pdf/renderer";
+import { StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
 import type { ReactElement, ReactNode } from "react";
 import katex from "katex";
+
+// `@react-pdf/renderer` doesn't re-export the single-style `Style` type (its
+// source `@react-pdf/types` isn't hoisted), but it does export `Styles`
+// (`{ [key: string]: Style }`), so index it to recover a single style object.
+type PdfStyle = Styles[string];
 
 import { normalizeKatexMath } from "@/lib/practice/katex-math-normalize";
 import { parseLatexNodes, type LatexNode } from "@/lib/practice/parse-latex-nodes";
@@ -53,10 +58,12 @@ function PdfMathFragment({
 	tex: string;
 	display: boolean;
 	inlineHeight: number;
-	textStyle?: object;
+	textStyle?: PdfStyle;
 }): ReactElement {
 	if (!katexRenders(tex)) {
-		return <Text style={[styles.fallbackMath, textStyle]}>{tex}</Text>;
+		return (
+			<Text style={textStyle ? [styles.fallbackMath, textStyle] : styles.fallbackMath}>{tex}</Text>
+		);
 	}
 	if (display) {
 		return (
@@ -75,7 +82,7 @@ function PdfMathFragment({
 function renderInlineLine(
 	nodes: LatexNode[],
 	inlineHeight: number,
-	textStyle: object | undefined,
+	textStyle: PdfStyle | undefined,
 	keyPrefix: string,
 ): ReactElement {
 	const parts: ReactNode[] = [];
@@ -119,7 +126,7 @@ export function PdfLatexText({
 	inlineMathHeight = 10,
 }: {
 	children: string;
-	style?: object;
+	style?: PdfStyle;
 	inlineMathHeight?: number;
 }): ReactElement {
 	const normalized = normalizeKatexMath(children);
