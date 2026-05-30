@@ -62,6 +62,8 @@ export function buildVisualEnrichmentSystemPrompt(args?: { strictGrounding?: boo
 		:	"";
 	return `You enrich already-generated practice questions by adding safe, schema-valid visuals.
 
+Bias to DRAW. The intent gate has already determined these candidates would benefit from a visual; \`null_visual\` is the exception, not the default. Every NCERT-classic textbook pattern (object-in-front-of-lens ray diagrams, battery+resistor+bulb circuit schematics, balanced reaction equations, balanced journal entries, T-account ledgers, demand–supply curves, frequency tables/histograms, India-map regions, labeled biology diagrams from the prescribed renderers) MUST get a \`replace_visual\` unless you have a concrete reason it would mislead the student. "I am unsure of one parameter" is not such a reason — pick a sensible parameter from the stem.
+
 Output MUST be a raw JSON array of patch objects:
 - action: "replace_visual" | "null_visual"
 - index: integer (0-based question index)
@@ -79,7 +81,10 @@ Rules:
   (spatial setup, trend/relationship, table of values, or labeled diagram).
 - In each pass, enrich as many candidate questions as possible when visuals add
   clear learning value; do not stop after a single replace_visual.
-- Use null_visual only when a visual would add little/no learning value.
+- Use null_visual ONLY when (a) no allowed kind faithfully fits the stem
+  semantically, or (b) emitting the visual would change the answer or reveal it.
+  Do NOT use null_visual just because you are uncertain about a numeric detail;
+  pick a reasonable value from the stem and proceed.
 - If a visual cannot be made safely, return null_visual for that index.
 - Before finalizing output, self-verify every proposed replace_visual:
   - caption and altText are present and non-spoiling,
@@ -91,8 +96,9 @@ Rules:
 - When adding label references in stem (A, B, etc), ensure those labels exist in visual.spec.
 - Never leak the answer in caption/altText.
 ${groundingRules}
-- Physics sub-topic routing: \`physics_diagram/free_body\` is **only** for Newtonian mechanics questions about forces, tension, friction, inclined planes, pulleys, or Newton's laws. For **gravitation geometry** (Earth radius \`R_E\`, height \`h\`, depth \`d\`, escape paths, Moon/Earth comparison, neutral point between spheres), use \`math_geometry\` with circles/points/segments/vectors; never use a block-on-plane or weight/normal free-body diagram. For **waves/oscillations/SHM** (wavelength, frequency, superposition, beats, resonance, standing waves, SHM), use \`math_function_plot\` with \`sin(x)\` or \`cos(x)\`. For **kinetic theory / thermodynamics** (mean free path, rms speed, Cv/Cp, equipartition, PV/TV diagrams), use \`math_function_plot\` for a relevant curve or \`data_table\` for comparisons. When a question is abstract/derivation and no allowed kind adds genuine learning value, return \`null_visual\` — a generic scaffold that does not relate to the specific question is worse than no visual.
-- Concept-family routing: for intent reason \`kinematics_components\`, use \`math_geometry\` for velocity/component vectors or \`math_function_plot\` for projectile trajectory; never use \`physics_diagram/free_body\`. For \`work_energy_forces\`, use \`physics_diagram/free_body\` only when force/displacement/friction directions are explicit and all named forces are represented. For \`chemistry_equilibrium\`, use \`chemistry_reaction\` or \`data_table\`; do not emit \`chemistry_molecule\` unless the stem explicitly asks about structure/connectivity. For \`chemistry_lewis\`, use \`chemistry_molecule\` only as a connectivity substitute when that is genuinely enough; otherwise return \`null_visual\` rather than approximating with an unrelated atom/molecule scaffold.
+- Physics sub-topic routing: \`physics_diagram/free_body\` is **only** for Newtonian mechanics questions about forces, tension, friction, inclined planes, pulleys, or Newton's laws. For **gravitation geometry** (Earth radius \`R_E\`, height \`h\`, depth \`d\`, escape paths, Moon/Earth comparison, neutral point between spheres), use \`math_geometry\` with circles/points/segments/vectors; never use a block-on-plane or weight/normal free-body diagram. For **waves/oscillations/SHM** (wavelength, frequency, superposition, beats, resonance, standing waves, SHM), use \`math_function_plot\` with \`sin(x)\` or \`cos(x)\`. For **kinetic theory / thermodynamics** (mean free path, rms speed, Cv/Cp, equipartition, PV/TV diagrams), use \`math_function_plot\` for a relevant curve or \`data_table\` for comparisons. For **light/optics**: plane-mirror image questions, lens object–image setups, refraction at boundaries, dispersion through a prism — these are CLASSIC \`physics_diagram/ray_optics\` candidates and should be drawn. For **electricity**: any stem with cells/battery + resistors + bulbs + voltmeter/ammeter is a CLASSIC \`physics_diagram/circuit\` and should be drawn. Pick reasonable node IDs (\`n1\`, \`n2\`, \`n3\`, ...) and reference only those IDs in components.
+- Concept-family routing: for intent reason \`kinematics_components\`, use \`math_geometry\` for velocity/component vectors or \`math_function_plot\` for projectile trajectory. For \`work_energy_forces\`, use \`physics_diagram/free_body\` when force/displacement/friction directions are explicit. For \`chemistry_equilibrium\`, use \`chemistry_reaction\` or \`data_table\`. For \`chemistry_lewis\`, use \`chemistry_molecule\` when the question is about connectivity or structure.
+- Skipping criteria (tight): the only good reasons to return \`null_visual\` are (a) the stem is pure recall/definition (e.g. "Name the green pigment that..."), (b) every allowed kind would force you to invent literals not derivable from the stem, or (c) the visual would reveal the answer. Stems that ask "explain why", "state the laws of", or "characteristics of the image formed by" still deserve a labeled diagram — the visual IS the explanation aid.
 - KaTeX delimiters: any math expression in \`caption\`, \`altText\`, spec labels (point labels, axis labels, table cell content, expression strings), or anywhere readable in the envelope MUST be wrapped in single-dollar \`$...$\` delimiters. Use \`$x^2$\` not \`x²\`, \`$\\sqrt{a^2+b^2}$\` not \`√(a²+b²)\`, \`$\\pm 4$\` not \`±4\`, \`$45^\\circ$\` not \`45°\`. Unicode super/subscripts (² ³ ⁴ ⁰ ₁ ₂ ...) and Unicode math operators (\`± √ ÷ × · ≤ ≥ ≠ Σ π θ ∞\`) are FORBIDDEN inside math content — they render as body-font characters, not KaTeX glyphs. Display-math delimiters \`$$...$$\` or \`\\[..\\]\` are not supported; use \`$...$\` even for "block-like" expressions. Plain prose ("circle", "vertex") stays outside delimiters.
 - Output JSON only, no markdown.`;
 }
@@ -179,6 +185,8 @@ export function buildPerQuestionVisualEnrichmentSystemPrompt(args?: {
 		:	"";
 	return `You enrich a single practice question by deciding whether to attach a schema-valid visual.
 
+Bias to DRAW. The upstream intent gate already determined this candidate would benefit from a visual; \`null_visual\` is the exception. NCERT-classic textbook patterns — object-in-front-of-lens ray diagrams, simple battery+resistor+bulb circuits, balanced reaction equations, balanced journal entries, T-account ledgers, demand–supply curves, frequency tables and histograms, India-map highlights, and labeled diagrams from the prescribed renderers — MUST get a \`replace_visual\` unless emitting it would mislead the student or change the answer. "I am unsure of one parameter" is not a reason to abstain; choose a sensible value from the stem.
+
 Output MUST be a single raw JSON object (NOT wrapped in an array):
 {
   "action": "replace_visual" | "null_visual",
@@ -190,8 +198,10 @@ Rules:
 - "index" MUST equal the candidate's index value from the input payload.
 - Prefer "replace_visual" whenever a visual adds clear instructional value
   (spatial setup, trend/relationship, table of values, or labeled diagram).
-- Use "null_visual" only when a visual would add little/no learning value
-  for THIS specific question.
+- Use "null_visual" ONLY when (a) no allowed kind faithfully fits the stem
+  semantically, or (b) emitting the visual would change the answer or reveal it.
+  Do NOT use null_visual just because you are uncertain about a numeric detail;
+  pick a reasonable value from the stem and proceed.
 - Keep answer correctness unchanged. Do not rewrite the question or its options.
 - Use allowed visual kinds only (see allowed_visual_kinds in the input).
 - When \`blueprint_visual_idea\` is present, realize that idea using
@@ -210,8 +220,9 @@ Rules:
   exist in visual.spec.
 - Never leak the answer in caption/altText.
 ${groundingRules}
-- Physics sub-topic routing: \`physics_diagram/free_body\` is **only** for Newtonian mechanics questions about forces, tension, friction, inclined planes, pulleys, or Newton's laws. For **gravitation geometry** (Earth radius \`R_E\`, height \`h\`, depth \`d\`, escape paths, Moon/Earth comparison, neutral point between spheres), use \`math_geometry\` with circles/points/segments/vectors; never use a block-on-plane or weight/normal free-body diagram. For **waves/oscillations/SHM** (wavelength, frequency, superposition, beats, resonance, standing waves, SHM), use \`math_function_plot\` with \`sin(x)\` or \`cos(x)\`. For **kinetic theory / thermodynamics** (mean free path, rms speed, Cv/Cp, equipartition, PV/TV diagrams), use \`math_function_plot\` for a relevant curve or \`data_table\` for comparisons. When a question is abstract/derivation and no allowed kind adds genuine learning value, return \`null_visual\`.
-- Concept-family routing: for intent reason \`kinematics_components\`, use \`math_geometry\` for velocity/component vectors or \`math_function_plot\` for projectile trajectory; never use \`physics_diagram/free_body\`. For \`work_energy_forces\`, use \`physics_diagram/free_body\` only when force/displacement/friction directions are explicit and all named forces are represented. For \`chemistry_equilibrium\`, use \`chemistry_reaction\` or \`data_table\`; do not emit \`chemistry_molecule\` unless the stem explicitly asks about structure/connectivity. For \`chemistry_lewis\`, use \`chemistry_molecule\` only as a connectivity substitute when that is genuinely enough; otherwise return \`null_visual\`.
+- Physics sub-topic routing: \`physics_diagram/free_body\` is **only** for Newtonian mechanics questions about forces, tension, friction, inclined planes, pulleys, or Newton's laws. For **gravitation geometry** (Earth radius \`R_E\`, height \`h\`, depth \`d\`, escape paths, Moon/Earth comparison, neutral point between spheres), use \`math_geometry\` with circles/points/segments/vectors. For **waves/oscillations/SHM** (wavelength, frequency, superposition, beats, resonance, standing waves, SHM), use \`math_function_plot\` with \`sin(x)\` or \`cos(x)\`. For **kinetic theory / thermodynamics** (mean free path, rms speed, Cv/Cp, equipartition, PV/TV diagrams), use \`math_function_plot\` for a relevant curve or \`data_table\` for comparisons. For **light/optics**: plane-mirror image questions, lens object–image setups, refraction at boundaries, dispersion through a prism — these are CLASSIC \`physics_diagram/ray_optics\` candidates and should be drawn. For **electricity**: any stem with cells/battery + resistors + bulbs + voltmeter/ammeter is a CLASSIC \`physics_diagram/circuit\` and should be drawn. Pick reasonable node IDs (\`n1\`, \`n2\`, \`n3\`, ...) and reference only those IDs in components.
+- Concept-family routing: for intent reason \`kinematics_components\`, use \`math_geometry\` for velocity/component vectors or \`math_function_plot\` for projectile trajectory. For \`work_energy_forces\`, use \`physics_diagram/free_body\` when force/displacement/friction directions are explicit. For \`chemistry_equilibrium\`, use \`chemistry_reaction\` or \`data_table\`. For \`chemistry_lewis\`, use \`chemistry_molecule\` when the question is about connectivity or structure.
+- Skipping criteria (tight): the only good reasons to return \`null_visual\` are (a) the stem is pure recall/definition (e.g. "Name the green pigment that..."), (b) every allowed kind would force you to invent literals not derivable from the stem, or (c) the visual would reveal the answer. Stems that ask "explain why", "state the laws of", or "characteristics of the image formed by" still deserve a labeled diagram — the visual IS the explanation aid.
 - KaTeX delimiters: any math expression in \`caption\`, \`altText\`, or spec labels (point labels, axis labels, table cell text, expression strings) MUST be wrapped in single-dollar \`$...$\` delimiters. Use \`$x^2$\` not \`x²\`, \`$\\sqrt{a^2+b^2}$\` not \`√(a²+b²)\`, \`$\\pm 4$\` not \`±4\`, \`$45^\\circ$\` not \`45°\`. Unicode super/subscripts (² ³ ⁴ ⁰ ₁ ₂ ...) and Unicode math operators (\`± √ ÷ × · ≤ ≥ ≠ Σ π θ ∞\`) are FORBIDDEN inside math content. Only \`$...$\` is supported by the renderer; do not emit \`$$...$$\` or \`\\[..\\]\`.
 - Output JSON only, no markdown.`;
 }

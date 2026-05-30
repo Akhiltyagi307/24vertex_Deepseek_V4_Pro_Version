@@ -52,11 +52,41 @@ export function logSupabaseError(
 	console.error(headline);
 }
 
+/** Pluck AI SDK APICallError fields (`responseBody`, `statusCode`, `url`)
+ * when present, plus the underlying `cause` for any wrapped Error. The
+ * Vercel AI SDK puts the raw failing HTTP body in `responseBody` and the
+ * inner JSON-parse / zod error in `cause` — without surfacing those the
+ * top-line `Failed to process successful response` message is useless for
+ * diagnosis. Truncate responseBody so we never blow up logs on a 100k
+ * token reply.
+ */
+function extractCauseDetails(error: Error): Record<string, unknown> | null {
+	const e = error as unknown as Record<string, unknown>;
+	const out: Record<string, unknown> = {};
+	if (e.cause instanceof Error) {
+		out.cause_name = e.cause.name;
+		out.cause_message = e.cause.message;
+	} else if (e.cause != null) {
+		out.cause = e.cause;
+	}
+	if (typeof e.statusCode === "number") out.status = e.statusCode;
+	if (typeof e.url === "string") out.url = e.url;
+	if (typeof e.responseBody === "string" && e.responseBody.length > 0) {
+		const body = e.responseBody;
+		out.response_body =
+			body.length > 4000 ? `${body.slice(0, 4000)}…(+${body.length - 4000} bytes)` : body;
+	}
+	return Object.keys(out).length === 0 ? null : out;
+}
+
 export function logServerError(context: string, error: unknown, metadata?: LogMetadata): void {
 	if (error instanceof Error) {
 		const headline = formatErrorHeadline(context, error.message, error.name, metadata);
 		if (process.env.NODE_ENV === "development") {
-			console.error(headline, { stack: error.stack ?? "" });
+			const detail: Record<string, unknown> = { stack: error.stack ?? "" };
+			const cause = extractCauseDetails(error);
+			if (cause) Object.assign(detail, cause);
+			console.error(headline, detail);
 			return;
 		}
 		console.error(headline);

@@ -14,6 +14,7 @@ export type VisualIntentReason =
 	| "work_energy_forces"
 	| "chemistry_equilibrium"
 	| "chemistry_lewis"
+	| "accountancy_document"
 	| "blueprint_intent"
 	| "text_sufficient";
 
@@ -51,6 +52,15 @@ const CHEMISTRY_EQUILIBRIUM_RE =
 	/\b(equilibrium|equilibrium\s+constant|k_?c\b|k_?p\b|k_?sp\b|q_?sp\b|solubility\s+product|sparingly\s+soluble|precipitat|common\s+ion|ionic\s+product|⇌|<=>)\b/i;
 const CHEMISTRY_LEWIS_RE =
 	/\b(lewis\s+(?:symbol|structure|picture|dot)|valence\s+electrons?|lone\s+pairs?|bonding\s+pairs?|octet\s+rule|duplet|shared\s+pair|electron\s+dot)\b/i;
+/**
+ * Accountancy stems that imply an `accountancy_table` visual when posting,
+ * preparing, or showing balanced book-keeping work. We avoid bare "debit"
+ * and "credit" — those appear in pure theory items too — and only fire on
+ * cues that strongly suggest a tabular stimulus (journal/ledger/cash
+ * book/trial balance/balance sheet/P&L preparation or completion).
+ */
+const ACCOUNTANCY_DOCUMENT_RE =
+	/\b(journal\s+(?:entry|entries|the)|journalise|journalize|post(?:ed|ing)?\s+(?:to|from)\s+(?:the\s+)?(?:ledger|journal)|ledger\s+(?:account|posting|format|of)|t[-\s]?account|trial\s+balance|balance\s+sheet|profit\s+and\s+loss(?:\s+account|\s+statement)?|income\s+statement|cash\s+book|petty\s+cash\s+book|bank\s+reconciliation|rectification\s+(?:entry|entries|of\s+errors?)|prepare\s+(?:the\s+)?(?:journal|ledger|trial\s+balance|balance\s+sheet|profit\s+and\s+loss|p&l|cash\s+book|trading\s+account)|show\s+the\s+(?:journal|ledger|trial\s+balance|balance\s+sheet|cash\s+book)|record\s+(?:the\s+)?(?:above\s+)?(?:transactions?|journal\s+entry|entries))\b/i;
 
 function priorityRank(priority: VisualNeedPriority): number {
 	switch (priority) {
@@ -124,6 +134,8 @@ function pickPreferredKind(args: {
 			["chemistry_reaction", "data_table", "chemistry_molecule"]
 		: args.reason === "chemistry_lewis" ?
 			["chemistry_molecule", "data_table", "chemistry_reaction"]
+		: args.reason === "accountancy_document" ?
+			["accountancy_table", "data_table"]
 		: args.reason === "process_or_timeline" ?
 			["timeline", "flowchart", "source_extract", "data_table"]
 		: args.reason === "gravitation_geometry" ?
@@ -205,6 +217,9 @@ function inferStemIntent(questionText: string): {
 	}
 	if (CHEMISTRY_LEWIS_RE.test(text)) {
 		return { needsVisual: true, priority: "high", reason: "chemistry_lewis" };
+	}
+	if (ACCOUNTANCY_DOCUMENT_RE.test(text)) {
+		return { needsVisual: true, priority: "high", reason: "accountancy_document" };
 	}
 	if (EXPLICIT_VISUAL_CUE_RE.test(text)) {
 		return { needsVisual: true, priority: "necessary", reason: "explicit_instruction" };

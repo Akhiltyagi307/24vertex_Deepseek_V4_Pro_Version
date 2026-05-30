@@ -234,6 +234,209 @@ export const ADDED_EXEMPLARS: ReadonlyArray<VisualExemplar> = [
 		subjects: ["accountancy"],
 	},
 	{
+		stem: "Pass the journal entry for goods worth ₹20,000 purchased on credit from Sharma & Co. on 10 Jun 2026, including 5% trade discount.",
+		topicKeywords: ["journal entry", "credit purchase", "trade discount"],
+		visual: {
+			caption: "Journal entry for credit purchase with trade discount.",
+			altText:
+				"Two-row journal entry recording a credit purchase from Sharma & Co. with the trade discount applied before posting.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "journal_entry",
+				rows: [
+					{
+						date: "2026-06-10",
+						particulars: "Purchases A/c Dr.\n  To Sharma & Co. A/c",
+						debit: 19000,
+						credit: 19000,
+						narration: "Being goods purchased on credit (less 5% trade discount on ₹20,000).",
+					},
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "From the following balances of M/s Patel Traders as on 31 Mar 2026, prepare the trial balance.",
+		topicKeywords: ["trial balance", "ledger balances", "preparation"],
+		visual: {
+			caption: "Trial balance of M/s Patel Traders as on 31 Mar 2026.",
+			altText:
+				"Trial balance listing capital, drawings, purchases, sales, debtors, creditors, cash, and rent with debit and credit totals tallied.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "trial_balance",
+				rows: [
+					{ particulars: "Capital A/c", debit: null, credit: 200000 },
+					{ particulars: "Drawings A/c", debit: 30000, credit: null },
+					{ particulars: "Purchases A/c", debit: 150000, credit: null },
+					{ particulars: "Sales A/c", debit: null, credit: 240000 },
+					{ particulars: "Sundry Debtors", debit: 60000, credit: null },
+					{ particulars: "Sundry Creditors", debit: null, credit: 45000 },
+					{ particulars: "Cash in Hand", debit: 15000, credit: null },
+					{ particulars: "Rent Paid", debit: 12000, credit: null },
+					{ particulars: "Wages", debit: 18000, credit: null },
+					{ particulars: "Bank Loan", debit: null, credit: 50000 },
+					{ particulars: "Furniture", debit: 250000, credit: null },
+					{ particulars: "Total", debit: 535000, credit: 535000 },
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "Prepare the balance sheet of Kumar Enterprises as on 31 Mar 2026 from the trial balance and adjustments given.",
+		topicKeywords: ["balance sheet", "final accounts", "schedule iii"],
+		visual: {
+			caption: "Balance sheet of Kumar Enterprises as on 31 Mar 2026.",
+			altText:
+				"Horizontal-format balance sheet showing equity & liabilities on the left and assets on the right, with totals on both sides matching at ₹4,80,000.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "balance_sheet",
+				assetsSide: [
+					{ particulars: "Non-Current Assets", amount: null, indent: 0, bold: true },
+					{ particulars: "Furniture & Fixtures", amount: 120000, indent: 1, bold: false },
+					{ particulars: "Plant & Machinery", amount: 200000, indent: 1, bold: false },
+					{ particulars: "Current Assets", amount: null, indent: 0, bold: true },
+					{ particulars: "Inventory", amount: 70000, indent: 1, bold: false },
+					{ particulars: "Sundry Debtors", amount: 55000, indent: 1, bold: false },
+					{ particulars: "Cash & Bank", amount: 35000, indent: 1, bold: false },
+					{ particulars: "Total Assets", amount: 480000, indent: 0, bold: true },
+				],
+				equityAndLiabilitiesSide: [
+					{ particulars: "Capital & Reserves", amount: null, indent: 0, bold: true },
+					{ particulars: "Capital A/c", amount: 300000, indent: 1, bold: false },
+					{ particulars: "Net Profit (transferred)", amount: 45000, indent: 1, bold: false },
+					{ particulars: "Non-Current Liabilities", amount: null, indent: 0, bold: true },
+					{ particulars: "Long-Term Bank Loan", amount: 90000, indent: 1, bold: false },
+					{ particulars: "Current Liabilities", amount: null, indent: 0, bold: true },
+					{ particulars: "Sundry Creditors", amount: 35000, indent: 1, bold: false },
+					{ particulars: "Outstanding Wages", amount: 10000, indent: 1, bold: false },
+					{ particulars: "Total Equity & Liabilities", amount: 480000, indent: 0, bold: true },
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "Prepare the profit & loss statement of Meera Traders for the year ended 31 Mar 2026 from the following trial balance figures.",
+		topicKeywords: ["profit and loss", "final accounts", "trading account"],
+		visual: {
+			caption: "Profit & Loss statement of Meera Traders for FY 2025-26.",
+			altText:
+				"Vertical P&L statement listing revenue, cost of goods sold, gross profit, operating expenses, and net profit.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "p_and_l",
+				rows: [
+					{ particulars: "Revenue from Operations (Sales)", amount: 600000, indent: 0, bold: true },
+					{ particulars: "Less: Cost of Goods Sold", amount: 360000, indent: 1, bold: false },
+					{ particulars: "  Opening Stock", amount: 40000, indent: 2, bold: false },
+					{ particulars: "  Add: Purchases", amount: 380000, indent: 2, bold: false },
+					{ particulars: "  Less: Closing Stock", amount: 60000, indent: 2, bold: false },
+					{ particulars: "Gross Profit", amount: 240000, indent: 0, bold: true },
+					{ particulars: "Operating Expenses", amount: null, indent: 0, bold: true },
+					{ particulars: "  Salaries", amount: 80000, indent: 2, bold: false },
+					{ particulars: "  Rent", amount: 36000, indent: 2, bold: false },
+					{ particulars: "  Depreciation on Furniture", amount: 12000, indent: 2, bold: false },
+					{ particulars: "  Other Office Expenses", amount: 18000, indent: 2, bold: false },
+					{ particulars: "Total Operating Expenses", amount: 146000, indent: 0, bold: false },
+					{ particulars: "Net Profit", amount: 94000, indent: 0, bold: true },
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "Prepare the single column cash book of Rohan Stationers for the week starting 1 Apr 2026 from the given receipts and payments.",
+		topicKeywords: ["cash book", "single column", "receipts payments"],
+		visual: {
+			caption: "Single column cash book of Rohan Stationers (1–7 Apr 2026).",
+			altText:
+				"Single column cash book with dated rows for opening balance, sales receipts, rent paid, drawings, purchases, and closing balance carry-down — debit and credit columns total equally.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "cash_book",
+				rows: [
+					{
+						date: "2026-04-01",
+						particulars: "To Balance b/d (opening cash)",
+						debit: 15000,
+						credit: null,
+						narration: null,
+					},
+					{
+						date: "2026-04-02",
+						particulars: "To Sales A/c",
+						debit: 8000,
+						credit: null,
+						narration: null,
+					},
+					{
+						date: "2026-04-03",
+						particulars: "By Rent A/c",
+						debit: null,
+						credit: 4000,
+						narration: null,
+					},
+					{
+						date: "2026-04-05",
+						particulars: "By Purchases A/c",
+						debit: null,
+						credit: 6500,
+						narration: null,
+					},
+					{
+						date: "2026-04-06",
+						particulars: "To Sales A/c",
+						debit: 5500,
+						credit: null,
+						narration: null,
+					},
+					{
+						date: "2026-04-07",
+						particulars: "By Drawings A/c",
+						debit: null,
+						credit: 2000,
+						narration: null,
+					},
+					{
+						date: "2026-04-07",
+						particulars: "By Balance c/d (closing cash)",
+						debit: null,
+						credit: 16000,
+						narration: null,
+					},
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
+		stem: "Pass the rectification entry for a credit sale of ₹4,000 to Arjun wrongly debited to the purchases account.",
+		topicKeywords: ["rectification", "errors", "two-sided"],
+		visual: {
+			caption: "Rectification entry for misclassified credit sale.",
+			altText:
+				"Two-row rectification journal entry reversing the wrong debit to Purchases and recording the correct debit to Arjun, with Sales credited.",
+			spec: {
+				kind: "accountancy_table",
+				subKind: "rectification",
+				rows: [
+					{
+						date: "2026-03-31",
+						particulars: "Arjun A/c Dr.\n  To Purchases A/c\n  To Sales A/c",
+						debit: 4000,
+						credit: 4000,
+						narration: "Being rectification of credit sale wrongly debited to Purchases.",
+					},
+				],
+			},
+		},
+		subjects: ["accountancy"],
+	},
+	{
 		stem: "In the market diagram, identify the segment representing excess supply at the imposed price floor.",
 		topicKeywords: ["price floor", "market intervention", "excess supply"],
 		visual: {

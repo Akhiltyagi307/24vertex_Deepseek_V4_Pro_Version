@@ -190,7 +190,13 @@ describe("getPracticeGenerationSubjectPreamble", () => {
 			subjectGrade: 12,
 		});
 		expect(accountancy).not.toContain("Theory items use `visual: null`");
-		expect(accountancy).toContain("Theory items may stay textual");
+		expect(accountancy).toContain("Theory items typically stay textual");
+		// Visuals must not be hard-mandated (the old "MUST emit accountancy_table"
+		// clause was driving the model into a prompt contradiction during parallel
+		// batch drafting where the schema forces `visual: null`).
+		expect(accountancy).not.toContain(
+			"MUST emit an `accountancy_table` visual showing either the GIVEN",
+		);
 	});
 });
 

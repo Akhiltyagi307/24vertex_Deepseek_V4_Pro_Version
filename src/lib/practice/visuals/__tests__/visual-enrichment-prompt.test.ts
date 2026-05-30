@@ -48,12 +48,19 @@ describe("visual-enrichment prompt", () => {
 		expect(system).toContain("blueprint_visual_idea");
 	});
 
-	it("instructs concept-family routing and nulls unsafe scaffolds", () => {
+	it("instructs concept-family routing and a draw-by-default bias", () => {
 		const system = buildVisualEnrichmentSystemPrompt();
 		expect(system).toContain("kinematics_components");
 		expect(system).toContain("chemistry_equilibrium");
 		expect(system).toContain("chemistry_lewis");
-		expect(system).toContain("return `null_visual` rather than approximating");
+		// The prompt now biases toward drawing instead of returning null when
+		// uncertain — the previous "otherwise return `null_visual` rather than
+		// approximating with an unrelated atom/molecule scaffold" tail was
+		// drowning the upstream intent-gate decisions and producing very low
+		// per-subject visual yield (Class-10 Science fell to 0–2/15).
+		expect(system).toContain("Bias to DRAW");
+		expect(system).toContain("Skipping criteria");
+		expect(system).not.toContain("return `null_visual` rather than approximating");
 	});
 
 	it("embeds candidate indexes, allowed kinds and questions", () => {

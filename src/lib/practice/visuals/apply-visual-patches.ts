@@ -33,7 +33,31 @@ export function applyVisualPatches(
 		switch (patch.action) {
 			case "replace_visual": {
 				const parsed = questionVisualEnvelopeSchema.safeParse(patch.value);
-				if (!parsed.success) continue;
+				if (!parsed.success) {
+					// The validator pass silently dropped bad envelopes — we now log
+					// the failure shape in dev so cross-subject visual-yield regressions
+					// can be diagnosed without re-instrumenting. Format: top-level kind,
+					// up to 4 issue paths, and a truncated body. Production stays quiet.
+					if (process.env.NODE_ENV !== "production") {
+						const issueSummary = parsed.error.issues
+							.slice(0, 4)
+							.map((iss) => `${iss.path.join(".")}: ${iss.message}`)
+							.join(" | ");
+						const value = patch.value as Record<string, unknown> | null | undefined;
+						const spec = (value?.spec ?? {}) as Record<string, unknown>;
+						const kindLabel = `${String(spec.kind ?? "?")}${spec.subKind ? `/${String(spec.subKind)}` : ""}`;
+						let bodyPreview = "";
+						try {
+							bodyPreview = JSON.stringify(patch.value).slice(0, 400);
+						} catch {
+							bodyPreview = "(unstringifiable)";
+						}
+						console.error(
+							`[applyVisualPatches] replace_visual dropped — index=${idx} kind=${kindLabel} issues="${issueSummary}" body=${bodyPreview}`,
+						);
+					}
+					continue;
+				}
 				question.visual = parsed.data;
 				applied++;
 				break;
