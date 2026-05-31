@@ -5,6 +5,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
 	redeemCoupon,
 	type StagedCheckoutCoupon,
@@ -26,6 +27,12 @@ export function CouponRedeemForm({ billingProfileId, onCheckoutDiscountStaged }:
 	const [code, setCode] = React.useState("");
 	const [pending, startTransition] = React.useTransition();
 	const router = useRouter();
+
+	const trimmedCode = code.trim();
+	// Permissive client-side format check — the server stays authoritative. We only
+	// nudge the user once they've typed something that clearly isn't a coupon yet.
+	const looksValid = trimmedCode.length >= 4 && /^[A-Z0-9-]+$/.test(trimmedCode);
+	const showFormatHint = trimmedCode.length > 0 && !looksValid;
 
 	function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
@@ -72,6 +79,7 @@ export function CouponRedeemForm({ billingProfileId, onCheckoutDiscountStaged }:
 					onChange={(e) => setCode(e.target.value.toUpperCase())}
 					placeholder="ENTER COUPON CODE"
 					aria-label="Coupon code"
+					aria-describedby="coupon-code-hint"
 					maxLength={40}
 					autoComplete="off"
 					spellCheck={false}
@@ -81,11 +89,22 @@ export function CouponRedeemForm({ billingProfileId, onCheckoutDiscountStaged }:
 					type="submit"
 					size="sm"
 					variant="ghost"
-					disabled={pending || code.trim().length === 0}
+					disabled={pending || !looksValid}
 				>
 					{pending ? "Applying…" : "Apply"}
 				</Button>
 			</div>
+			<p
+				id="coupon-code-hint"
+				className={cn(
+					"mt-1.5 px-3 text-xs",
+					showFormatHint ? "text-muted-foreground" : "sr-only",
+				)}
+			>
+				{showFormatHint
+					? "Codes are at least 4 characters — letters, numbers, and dashes only."
+					: "Enter your coupon code, then select Apply."}
+			</p>
 		</form>
 	);
 }

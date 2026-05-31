@@ -1,4 +1,5 @@
 import type { GeneratePracticeResult } from "../../../app/student/practice/actions/types";
+import type { GenerationChecklistBucket } from "./generation-progress-buckets";
 
 /**
  * NDJSON envelopes emitted by `/api/student/practice/generate-stream`.
@@ -34,8 +35,24 @@ export type GenerateStreamErrorEnvelope = {
 	message: string;
 };
 
+/**
+ * Progress envelope for the in-flight generation checklist. Emitted directly
+ * (NOT throttled like `partial`), one per pipeline step, already collapsed to a
+ * stable student-facing bucket. Added after `partial`/`done`/`error`; the client
+ * reader ignores unknown `type`s, so this is backward-compatible.
+ */
+export type GenerateStreamStageEnvelope = {
+	type: "stage";
+	bucket: GenerationChecklistBucket;
+	status: "active" | "done" | "error";
+	/** 1-based position of this bucket, for "step i of n". */
+	index: number;
+	total: number;
+};
+
 export type GenerateStreamEnvelope =
 	| GenerateStreamPartialEnvelope
+	| GenerateStreamStageEnvelope
 	| GenerateStreamDoneEnvelope
 	| GenerateStreamErrorEnvelope;
 
@@ -74,6 +91,12 @@ export function envelopeForThrown(e: unknown): GenerateStreamErrorEnvelope {
 
 export function envelopeForPartial(partial: unknown): GenerateStreamPartialEnvelope {
 	return { type: "partial", partial };
+}
+
+export function envelopeForStage(
+	stage: Omit<GenerateStreamStageEnvelope, "type">,
+): GenerateStreamStageEnvelope {
+	return { type: "stage", ...stage };
 }
 
 /**

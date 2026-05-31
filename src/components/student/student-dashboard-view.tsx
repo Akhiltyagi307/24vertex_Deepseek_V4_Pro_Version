@@ -22,9 +22,12 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { DashboardOtherSubjectsTable } from "@/components/student/dashboard-other-subjects-table";
+import { OnboardingChecklist } from "@/components/student/onboarding-checklist";
+import { StudentOnboarding } from "@/components/onboarding/student-onboarding";
 import { StudentDashboardAssignmentsUrgencyCard } from "@/components/student/student-dashboard-assignments-urgency-card";
 import { StudentDashboardLeaderboardCard } from "@/components/student/student-dashboard-leaderboard-card";
 import type { StudentAssignmentCard } from "@/lib/assignments/student-assignment-card";
+import type { StudentDashboardOnboarding } from "@/lib/student/load-student-dashboard";
 import type { StudentDashboardLeaderboardPayload } from "@/lib/student/dashboard-leaderboard";
 import type { DashboardPerformanceStats } from "@/lib/student/dashboard-performance-stats";
 import type { SubjectTopicRadarDatum } from "@/lib/charts/subject-topic-radar-config";
@@ -168,6 +171,12 @@ export type StudentDashboardViewProps = {
 	leaderboard?: StudentDashboardLeaderboardPayload;
 	leaderboardContent?: React.ReactNode;
 	trackerNeedsHydration?: boolean;
+	/** First-run checklist signals. Rendered only for the student variant. */
+	onboarding?: StudentDashboardOnboarding;
+	/** Student first name for the first-run welcome dialog (student variant only). */
+	onboardingFirstName?: string | null;
+	/** Student grade label (e.g. "Grade 9") for the welcome dialog (student variant only). */
+	onboardingGradeLabel?: string | null;
 	/** Parent portal reuses this view with read-only messaging and links under `/parent`. */
 	variant?: "student" | "parent";
 };
@@ -182,6 +191,9 @@ export function StudentDashboardView({
 	leaderboard,
 	leaderboardContent,
 	trackerNeedsHydration = false,
+	onboarding,
+	onboardingFirstName,
+	onboardingGradeLabel,
 	variant = "student",
 }: StudentDashboardViewProps) {
 	const isParent = variant === "parent";
@@ -218,6 +230,17 @@ export function StudentDashboardView({
 					<p className={pageHeaderSubtextTextClass}>{headerGreeting}</p>
 				</motion.div>
 			</motion.div>
+
+			{!isParent && onboarding ? (
+				<>
+					<StudentOnboarding
+						onboarding={onboarding}
+						firstName={onboardingFirstName}
+						gradeLabel={onboardingGradeLabel}
+					/>
+					<OnboardingChecklist onboarding={onboarding} />
+				</>
+			) : null}
 
 			{/* `sm` aligns with inner subject cards: 640–767px is “mobile” shell but full-width main (< `md`). */}
 			{/* Row 1: section label (left) + empty cell (right) so Topic progress lines up with subject cards, not the label. */}

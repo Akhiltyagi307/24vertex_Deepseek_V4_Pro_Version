@@ -18,6 +18,17 @@ function gradeLabel(grade: number | null, section: string | null): string {
 	return `Grade ${grade}${sec}`;
 }
 
+/** Parents created within this many days see the first-run onboarding (mirrors the teacher window). */
+const PARENT_ONBOARDING_WINDOW_DAYS = 30;
+
+function isWithinParentOnboardingWindow(createdAtIso: string | null): boolean {
+	if (!createdAtIso) return false;
+	const created = Date.parse(createdAtIso);
+	if (Number.isNaN(created)) return false;
+	const windowMs = PARENT_ONBOARDING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+	return Date.now() - created <= windowMs;
+}
+
 export default async function ParentPortalLayout({ children }: { children: React.ReactNode }) {
 	const user = await getServerUser();
 	if (!user) {
@@ -71,6 +82,11 @@ export default async function ParentPortalLayout({ children }: { children: React
 	const childName = formatPersonDisplayName(childRow.full_name ?? "") || "Your child";
 	const parentName = formatPersonDisplayName(parentRow.full_name ?? "") || "Parent";
 
+	// First-run onboarding gate: parents created within the window. The welcome
+	// flag (client-side) is the secondary guard so the flow never re-shows.
+	const isNewParent = isWithinParentOnboardingWindow(parentRow.created_at);
+	const parentFirstName = formatPersonDisplayName(parentRow.full_name ?? "").split(/\s+/)[0] || null;
+
 	return (
 		<ParentShell
 			organizationName={org}
@@ -84,6 +100,8 @@ export default async function ParentPortalLayout({ children }: { children: React
 			entitlement={entitlement}
 			initialHasOpenAssignments={initialHasOpenAssignments}
 			initialUnreadCount={initialUnreadCount}
+			isNewParent={isNewParent}
+			parentFirstName={parentFirstName}
 		>
 			{children}
 		</ParentShell>

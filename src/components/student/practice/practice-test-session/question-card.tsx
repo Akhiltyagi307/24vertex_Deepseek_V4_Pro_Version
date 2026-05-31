@@ -304,7 +304,7 @@ export function QuestionCard({
 					</CardContent>
 				</div>
 			</div>
-			<CardFooter className="border-border bg-background flex w-full flex-wrap items-center justify-between gap-2 border-t-2 dark:bg-card">
+			<CardFooter className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/80 dark:bg-card/95 dark:supports-[backdrop-filter]:bg-card/80 sticky bottom-0 z-10 flex w-full flex-wrap items-center justify-between gap-2 border-t-2 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur medium:static medium:bg-background medium:pb-4 medium:backdrop-blur-none medium:dark:bg-card">
 				<div className="flex flex-wrap gap-2">
 					<Button
 						type="button"

@@ -10,6 +10,9 @@ export type StudentActivityStreakSnapshot = {
 	weeksToReward: number;
 	rewardGranted: boolean;
 	rewardGrantedAt: string | null;
+	/** Freezes banked (0 or 1); a freeze bridges a single missed week. */
+	freezesAvailable: number;
+	freezeLastUsedWeek: string | null;
 };
 
 type SnapshotRow = {
@@ -20,6 +23,8 @@ type SnapshotRow = {
 	weeks_to_reward: number | null;
 	reward_granted: boolean | null;
 	reward_granted_at: string | null;
+	freezes_available?: number | null;
+	freeze_last_used_week?: string | null;
 };
 
 export function mapActivityStreakRow(row: SnapshotRow | null | undefined): StudentActivityStreakSnapshot {
@@ -32,6 +37,8 @@ export function mapActivityStreakRow(row: SnapshotRow | null | undefined): Stude
 		weeksToReward: Math.max(0, Number(row?.weeks_to_reward ?? STREAK_REWARD_TARGET_WEEKS - streakWeeks)),
 		rewardGranted: Boolean(row?.reward_granted),
 		rewardGrantedAt: row?.reward_granted_at ?? null,
+		freezesAvailable: Math.max(0, Number(row?.freezes_available ?? 1)),
+		freezeLastUsedWeek: row?.freeze_last_used_week ?? null,
 	};
 }
 

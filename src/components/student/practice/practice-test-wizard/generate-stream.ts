@@ -1,4 +1,5 @@
 import type { GeneratePracticeResult } from "../../../../../app/student/practice/actions/types";
+import type { GenerateStreamStageEnvelope } from "@/lib/practice/generate-stream-envelope";
 
 /** NDJSON from `/api/student/practice/generate-stream` when `PRACTICE_STREAM` + `NEXT_PUBLIC_PRACTICE_STREAM` are enabled. */
 export type PracticeGenerateStreamProgress = {
@@ -36,6 +37,7 @@ export async function readPracticeGenerateNdjsonResponse(
 	res: Response,
 	options: {
 		onPartialProgress?: (progress: PracticeGenerateStreamProgress) => void;
+		onStage?: (stage: GenerateStreamStageEnvelope) => void;
 	} = {},
 ): Promise<GeneratePracticeResult> {
 	const reader = res.body?.getReader();
@@ -57,8 +59,13 @@ export async function readPracticeGenerateNdjsonResponse(
 			if (!trimmed) continue;
 			const msg = JSON.parse(trimmed) as
 				| { type: "partial"; partial: unknown }
+				| GenerateStreamStageEnvelope
 				| { type: "done"; result: GeneratePracticeResult }
 				| { type: "error"; message: string; correlationId?: string };
+			if (msg.type === "stage") {
+				options.onStage?.(msg);
+				continue;
+			}
 			if (msg.type === "partial") {
 				const draftedQuestions = inferDraftedQuestionsFromPartial(msg.partial);
 				if (draftedQuestions !== null) {
@@ -81,11 +88,24 @@ export async function readPracticeGenerateNdjsonResponse(
 			result?: GeneratePracticeResult;
 			message?: string;
 			correlationId?: string;
+			bucket?: GenerateStreamStageEnvelope["bucket"];
+			status?: GenerateStreamStageEnvelope["status"];
+			index?: number;
+			total?: number;
 		};
-		if (msg.type === "error") {
+		if (msg.type === "stage") {
+			if (msg.bucket && msg.status && typeof msg.index === "number" && typeof msg.total === "number") {
+				options.onStage?.({
+					type: "stage",
+					bucket: msg.bucket,
+					status: msg.status,
+					index: msg.index,
+					total: msg.total,
+				});
+			}
+		} else if (msg.type === "error") {
 			throw new PracticeStreamError(msg.message ?? "Generation failed.", msg.correlationId);
-		}
-		if (msg.type === "done" && msg.result) {
+		} else if (msg.type === "done" && msg.result) {
 			final = msg.result;
 		}
 	}

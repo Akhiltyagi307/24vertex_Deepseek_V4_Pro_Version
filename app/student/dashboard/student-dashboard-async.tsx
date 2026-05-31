@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { StudentDashboardView } from "@/components/student/student-dashboard-view";
+import { firstNameFromFullName } from "@/lib/student/dashboard-greeting";
 import type {
 	LoadStudentDashboardOptions,
 	StudentDashboardProfileRow,
@@ -25,10 +26,23 @@ export async function StudentDashboardAsync({
 		viewerRole: viewVariant,
 	});
 
+	// First-run welcome copy (student variant only). Grade is shown without the
+	// section suffix so the line reads naturally ("You're all set for Grade 9.").
+	const isStudent = viewVariant === "student";
+	const resolvedFirstName = firstNameFromFullName(profileRow.full_name);
+	// `firstNameFromFullName` returns the "there" sentinel when no name is set;
+	// treat that as absent so the welcome dialog uses its neutral greeting.
+	const onboardingFirstName =
+		isStudent && resolvedFirstName !== "there" ? resolvedFirstName : null;
+	const onboardingGradeLabel =
+		isStudent && profileRow.grade != null ? `Grade ${profileRow.grade}` : null;
+
 	return (
 		<StudentDashboardView
 			{...core}
 			variant={viewVariant}
+			onboardingFirstName={onboardingFirstName}
+			onboardingGradeLabel={onboardingGradeLabel}
 			leaderboardContent={
 				<Suspense fallback={<StudentDashboardLeaderboardSkeleton />}>
 					<StudentDashboardLeaderboardAsync

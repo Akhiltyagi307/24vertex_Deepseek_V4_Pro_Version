@@ -76,6 +76,7 @@ export function PracticeGradingProgressView({
 	} | null>(null);
 	const [reportErrorHint, setReportErrorHint] = React.useState("");
 	const [pollIntervalMs, setPollIntervalMs] = React.useState(GRADING_POLL_FAST_MS);
+	const [gradingProgress, setGradingProgress] = React.useState<{ graded: number; total: number } | null>(null);
 	const lastRealtimeAtRef = React.useRef(0);
 
 	React.useEffect(() => {
@@ -125,7 +126,7 @@ export function PracticeGradingProgressView({
 				supabase.from("tests").select("status").eq("id", testId).maybeSingle(),
 				supabase
 					.from("practice_jobs")
-					.select("status, error")
+					.select("status, error, payload")
 					.eq("test_id", testId)
 					.eq("job_type", "grade")
 					.order("created_at", { ascending: false })
@@ -142,6 +143,13 @@ export function PracticeGradingProgressView({
 				});
 			} else {
 				setJobInfo(null);
+			}
+			const rawPayload = (jobRes.data as { payload?: unknown } | null)?.payload;
+			const gp = (rawPayload as { grading?: { graded?: unknown; total?: unknown } } | null | undefined)?.grading;
+			if (gp && typeof gp.graded === "number" && typeof gp.total === "number" && gp.total > 0) {
+				const graded = Math.min(gp.graded, gp.total);
+				const total = gp.total;
+				setGradingProgress((prev) => ({ graded: Math.max(prev?.graded ?? 0, graded), total }));
 			}
 			const ge = reportRes.data?.grading_error;
 			setReportErrorHint(sanitizeGradingErrorForUi(typeof ge === "string" ? ge : null));
@@ -260,7 +268,11 @@ export function PracticeGradingProgressView({
 								</p>
 							) : null}
 							<p className="text-muted-foreground text-sm tabular-nums">
-								{totalQuestions != null ? `${totalQuestions} questions · ` : ""}
+								{gradingProgress != null
+									? `Graded ${gradingProgress.graded} of ${gradingProgress.total} · `
+									: totalQuestions != null
+										? `${totalQuestions} questions · `
+										: ""}
 								Elapsed {formatElapsed(elapsedSeconds)}
 							</p>
 							{showStuckNudge ? (

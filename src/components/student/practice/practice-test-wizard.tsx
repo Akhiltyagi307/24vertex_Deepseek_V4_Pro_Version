@@ -29,6 +29,7 @@ import {
 	practiceDurationSecondsInputSchema,
 	type PracticeCanonicalTopic,
 } from "@/lib/practice";
+import { BUCKET_TOTAL, GENERATION_BUCKETS } from "@/lib/practice/generation-progress-buckets";
 import {
 	clearPracticeWizardDraft,
 	readPracticeWizardDraft,
@@ -60,7 +61,6 @@ import {
 	DIFFICULTY_OPTIONS,
 	FOCUS_AREA_OPTIONS,
 	type FocusArea,
-	GENERATING_STATUS_MESSAGES,
 	GENERATING_STATUS_ROTATE_MS,
 	practiceStep0Schema,
 	practiceStep1Schema,
@@ -131,8 +131,8 @@ export function PracticeTestWizard({
 		canonicalTopics: PracticeCanonicalTopic[];
 	} | null>(null);
 	const [generating, setGenerating] = React.useState(false);
-	const [generatingStatusIndex, setGeneratingStatusIndex] = React.useState(0);
-	const [streamProgressMessage, setStreamProgressMessage] = React.useState<string | null>(null);
+	const [generationDoneThrough, setGenerationDoneThrough] = React.useState(0);
+	const [generationDraftedCount, setGenerationDraftedCount] = React.useState<number | null>(null);
 	const generateAbortRef = React.useRef<AbortController | null>(null);
 	/** Prevents overlapping `runGenerate` calls (e.g. rapid double activation before `generating` re-renders). */
 	const generateInFlightRef = React.useRef(false);
@@ -387,12 +387,16 @@ export function PracticeTestWizard({
 
 	React.useEffect(() => {
 		if (!generating) {
-			setGeneratingStatusIndex(0);
-			setStreamProgressMessage(null);
+			setGenerationDoneThrough(0);
+			setGenerationDraftedCount(null);
 			return;
 		}
+		// When streaming is on, real `stage` events drive the checklist. Otherwise
+		// (server-action fallback) advance it gently so it animates instead of
+		// sitting on a bare spinner, but never auto-complete the last step.
+		if (process.env.NEXT_PUBLIC_PRACTICE_STREAM === "true") return;
 		const id = window.setInterval(() => {
-			setGeneratingStatusIndex((i) => (i + 1) % GENERATING_STATUS_MESSAGES.length);
+			setGenerationDoneThrough((d) => (d < BUCKET_TOTAL - 1 ? d + 1 : d));
 		}, GENERATING_STATUS_ROTATE_MS);
 		return () => window.clearInterval(id);
 	}, [generating]);
@@ -530,7 +534,8 @@ export function PracticeTestWizard({
 		const abort = new AbortController();
 		generateAbortRef.current = abort;
 		setGenerating(true);
-		setStreamProgressMessage("Generating questions...");
+		setGenerationDoneThrough(0);
+		setGenerationDraftedCount(null);
 		try {
 			const payload = {
 				subjectId,
@@ -592,7 +597,13 @@ export function PracticeTestWizard({
 					return readPracticeGenerateNdjsonResponse(res, {
 						onPartialProgress: ({ draftedQuestions }) => {
 							if (draftedQuestions <= 0) return;
-							setStreamProgressMessage(`Drafting question ${draftedQuestions}...`);
+							setGenerationDraftedCount((c) => Math.max(c ?? 0, draftedQuestions));
+						},
+						onStage: (stage) => {
+							if (stage.status !== "done") return;
+							setGenerationDoneThrough((d) => Math.max(d, stage.index));
+							const nextLabel = GENERATION_BUCKETS[stage.index]?.label;
+							if (nextLabel) setLiveAnnouncement(nextLabel);
 						},
 					});
 				}
@@ -654,7 +665,7 @@ export function PracticeTestWizard({
 			}
 		} finally {
 			setGenerating(false);
-			setStreamProgressMessage(null);
+			setGenerationDraftedCount(null);
 			generateAbortRef.current = null;
 			generateInFlightRef.current = false;
 		}
@@ -662,7 +673,13 @@ export function PracticeTestWizard({
 
 	const cancelGenerate = React.useCallback(() => {
 		generateAbortRef.current?.abort();
+		toast.info("Generation cancelled.");
 	}, []);
+
+	const generationDraftedTotal = React.useMemo(() => {
+		const parsed = practiceDurationSecondsInputSchema.safeParse(durationSeconds);
+		return parsed.success ? getPracticeQuestionPlan(parsed.data).total : null;
+	}, [durationSeconds]);
 
 	const runFinalize = async (): Promise<boolean> => {
 		setActionError(null);
@@ -958,8 +975,9 @@ export function PracticeTestWizard({
 
 					<GenerationOverlay
 						generating={generating}
-						generatingStatusIndex={generatingStatusIndex}
-						streamProgressMessage={streamProgressMessage}
+						doneThrough={generationDoneThrough}
+						draftedCount={generationDraftedCount}
+						draftedTotal={generationDraftedTotal}
 						generatedPreview={generatedPreview}
 						pending={pending}
 						onCancelGenerate={cancelGenerate}

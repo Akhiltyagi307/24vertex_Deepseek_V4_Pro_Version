@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/auth/routing";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { PendingStatus } from "./pending-status";
+
 export const metadata: Metadata = {
 	title: "Awaiting verification",
 	robots: { index: false, follow: false },
@@ -34,6 +36,7 @@ export default async function TeacherPendingPage() {
 							Your profile is in review. An administrator will approve educator access after confirming the
 							account details.
 						</p>
+						<PendingStatus />
 						<p>
 							We&apos;ll email you at your login address when your access is active. Until then, you can sign out and
 							return via{" "}

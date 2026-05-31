@@ -30,21 +30,44 @@ type NavItem = {
 	title: string;
 	href: string;
 	icon: ComponentType<{ className?: string }>;
+	/** Coach-mark target id; matched by the parent onboarding tour. */
+	onboardingId?: string;
 };
 
 const overviewItems: NavItem[] = [
-	{ title: "Overview", href: "/parent/dashboard", icon: LayoutDashboardIcon },
+	{
+		title: "Overview",
+		href: "/parent/dashboard",
+		icon: LayoutDashboardIcon,
+		onboardingId: "nav-parent-overview",
+	},
 	{
 		title: "Learning chats",
 		href: "/parent/doubt-chat",
 		icon: MessageCircleIcon,
+		onboardingId: "nav-learning-chats",
 	},
 ];
 
 const progressItems: NavItem[] = [
-	{ title: "Assignments", href: "/parent/assignments", icon: ClipboardListIcon },
-	{ title: "Subject progress", href: "/parent/performance", icon: TrendingUpIcon },
-	{ title: "Test reports", href: "/parent/reports", icon: FileBarChartIcon },
+	{
+		title: "Assignments",
+		href: "/parent/assignments",
+		icon: ClipboardListIcon,
+		onboardingId: "nav-assignments",
+	},
+	{
+		title: "Subject progress",
+		href: "/parent/performance",
+		icon: TrendingUpIcon,
+		onboardingId: "nav-subject-progress",
+	},
+	{
+		title: "Test reports",
+		href: "/parent/reports",
+		icon: FileBarChartIcon,
+		onboardingId: "nav-test-reports",
+	},
 	{ title: "QnA logs", href: "/parent/qna-logs", icon: BookOpenIcon },
 ];
 
@@ -81,7 +104,7 @@ function SidebarAssignmentsRow({
 		hasOpen ? `${item.title}, child has open assignments` : item.title;
 
 	return (
-		<SidebarMenuItem key={item.href}>
+		<SidebarMenuItem key={item.href} data-onboarding-id={item.onboardingId}>
 			<SidebarMenuButton
 				isActive={isActive}
 				tooltip={item.title}
@@ -123,7 +146,7 @@ function NavMenuItems({
 					);
 				}
 				return (
-					<SidebarMenuItem key={item.href}>
+					<SidebarMenuItem key={item.href} data-onboarding-id={item.onboardingId}>
 						<SidebarMenuButton
 							isActive={isActive}
 							tooltip={item.title}

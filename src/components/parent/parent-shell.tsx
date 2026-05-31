@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { ParentOnboarding } from "@/components/onboarding/parent-onboarding";
 import { ParentAppSidebar } from "@/components/parent/parent-app-sidebar";
 import { StudentTopBar } from "@/components/student/student-top-bar";
 import type { EntitlementSnapshot } from "@/lib/billing/entitlements";
@@ -22,6 +23,10 @@ export type ParentShellProps = {
 	entitlement: EntitlementSnapshot | null;
 	initialHasOpenAssignments?: boolean;
 	initialUnreadCount?: number;
+	/** True for recently-created parents — gates the first-run onboarding flow. */
+	isNewParent?: boolean;
+	/** Parent first name for the onboarding greeting. */
+	parentFirstName?: string | null;
 	children: React.ReactNode;
 };
 
@@ -37,6 +42,8 @@ export function ParentShell({
 	entitlement,
 	initialHasOpenAssignments = false,
 	initialUnreadCount = 0,
+	isNewParent = false,
+	parentFirstName,
 	children,
 }: ParentShellProps) {
 	return (
@@ -66,6 +73,7 @@ export function ParentShell({
 				/>
 			}
 		>
+			<ParentOnboarding isNewParent={isNewParent} firstName={parentFirstName} />
 			{children}
 		</DashboardShell>
 	);

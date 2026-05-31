@@ -49,10 +49,71 @@ function formatDate(iso: string | null): string {
 	return formatDateTimeMediumShortInAppTimeZone(iso);
 }
 
+function QnaLogCardField({ label, children }: { label: string; children: React.ReactNode }) {
+	return (
+		<div className="flex items-start justify-between gap-3">
+			<dt className="text-muted-foreground shrink-0 text-xs font-medium">{label}</dt>
+			<dd className="min-w-0 text-right text-sm">{children}</dd>
+		</div>
+	);
+}
+
 export function QnaLogsTable({ rows, highlightAnswerId, onOpenRow }: Props) {
 	return (
-		<div className="overflow-x-auto border-border border-t">
-			<table className="w-full min-w-[1020px] border-collapse text-left text-sm">
+		<>
+			<ul className="flex flex-col gap-3 border-border border-t p-3 medium:hidden">
+				{rows.map((row, rowIndex) => (
+					<li key={row.answerId}>
+						<div
+							role="button"
+							tabIndex={0}
+							aria-label={`Open question ${row.questionNumber} details`}
+							onClick={() => onOpenRow(row, rowIndex)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter" || event.key === " ") {
+									event.preventDefault();
+									onOpenRow(row, rowIndex);
+								}
+							}}
+							className={cn(
+								"flex cursor-pointer flex-col gap-2.5 rounded-lg border border-border bg-background p-4 transition-colors hover:bg-muted/50 dark:bg-transparent dark:hover:bg-muted/20",
+								highlightAnswerId === row.answerId &&
+									"bg-primary/[0.07] ring-2 ring-primary/30 ring-inset dark:bg-primary/[0.12]",
+							)}
+						>
+							<p className="line-clamp-2 font-medium text-foreground">{row.questionPreview || "—"}</p>
+							<dl className="flex flex-col gap-2 border-border border-t pt-2.5">
+								<QnaLogCardField label="Date">
+									<span className="tabular-nums text-muted-foreground">{formatDate(row.dateIso)}</span>
+								</QnaLogCardField>
+								<QnaLogCardField label="Subject">{row.subjectName}</QnaLogCardField>
+								<QnaLogCardField label="Source">
+									<Badge variant="secondary" className="font-normal">
+										{sourceLabel(row.source)}
+									</Badge>
+								</QnaLogCardField>
+								<QnaLogCardField label="Performance">
+									<Badge
+										variant="outline"
+										className={cn("font-normal", performanceBadgeClassName(row.performance))}
+									>
+										{performanceLabel(row.performance)}
+									</Badge>
+								</QnaLogCardField>
+								<QnaLogCardField label="Topic">
+									<span className="text-muted-foreground">{row.topicName}</span>
+								</QnaLogCardField>
+								<QnaLogCardField label="Chapter">
+									<span className="text-muted-foreground">{row.chapterName ?? "—"}</span>
+								</QnaLogCardField>
+								<QnaLogCardField label="Type">{questionTypeLabel(row.questionType)}</QnaLogCardField>
+							</dl>
+						</div>
+					</li>
+				))}
+			</ul>
+			<div className="hidden overflow-x-auto border-border border-t medium:block">
+				<table className="w-full min-w-[1020px] border-collapse text-left text-sm">
 				<thead>
 					<tr className="border-border border-b bg-muted/85 dark:bg-muted/70">
 						<th scope="col" className="px-4 py-3 font-medium">
@@ -121,7 +182,8 @@ export function QnaLogsTable({ rows, highlightAnswerId, onOpenRow }: Props) {
 						</tr>
 					))}
 				</tbody>
-			</table>
-		</div>
+				</table>
+			</div>
+		</>
 	);
 }

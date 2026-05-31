@@ -227,6 +227,7 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 	const weeksToReward = snapshot?.weeksToReward ?? STREAK_REWARD_TARGET_WEEKS;
 	const rewardGranted = snapshot?.rewardGranted ?? false;
 	const longestStreakWeeks = snapshot?.longestStreakWeeks ?? 0;
+	const freezesAvailable = snapshot?.freezesAvailable ?? 1;
 	const isAtRisk = streakWeeks > 0 && !isActiveThisWeek && !rewardGranted;
 	const isInitialLoad = loading && !snapshot;
 	const isRefreshing = loading && Boolean(snapshot);
@@ -263,7 +264,9 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 		: isActiveThisWeek ?
 			"You are active this week. Submit again anytime to stay ahead."
 		: isAtRisk ?
-			"Submit one test before this week ends or your streak resets to zero."
+			(freezesAvailable > 0
+				? "Miss this week and your streak freeze will cover it — a quick set keeps it going."
+				: "Submit one test before this week ends or your streak resets to zero.")
 		: streakWeeks > 0 ?
 			"Submit a practice test or assignment to continue."
 		:	"Submit a practice test or assignment to start.";
@@ -272,6 +275,9 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 		formatLastActiveWeekLabel(snapshot?.lastActiveWeekStart ?? null),
 		!rewardGranted && !isActiveThisWeek ? formatStreakWeekDeadline() : null,
 		longestStreakWeeks > streakWeeks ? formatLongestStreakLabel(longestStreakWeeks) : null,
+		rewardGranted ? null
+		: freezesAvailable > 0 ? "Streak freeze ready — it covers one missed week."
+		: "Streak freeze used — stay active to earn it back.",
 		STREAK_RULES_LINE,
 	].filter(Boolean) as string[];
 

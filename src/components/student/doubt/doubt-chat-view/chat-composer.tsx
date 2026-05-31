@@ -12,7 +12,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { useOnboardingFlag } from "@/components/onboarding/use-onboarding-flag";
 import { TopicChatComposer } from "@/components/ui/multimodal-ai-chat-input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AnimatedMeter } from "@/components/student/subscription/animated-meter";
@@ -89,6 +92,17 @@ export function ChatComposer({
 		: 0;
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const [uploadPending, setUploadPending] = useState(false);
+
+	// One-time first-use coach-mark explaining the three tutor modes. Open state is
+	// derived from the localStorage flag (SSR-safe `false`, reconciles on the
+	// client) plus a per-session dismissal — no setState-in-effect needed.
+	const doubtModesTip = useOnboardingFlag("doubt-modes-tip");
+	const [tipDismissed, setTipDismissed] = useState(false);
+	const showDoubtModesTip = !doubtModesTip.done && !tipDismissed;
+	function dismissDoubtModesTip() {
+		setTipDismissed(true);
+		doubtModesTip.markDone();
+	}
 
 	async function handleFiles(filesList: FileList | null) {
 		if (!filesList) return;
@@ -245,35 +259,85 @@ export function ChatComposer({
 										: "Attach image or PDF"}
 								</TooltipContent>
 							</Tooltip>
-							<span className="text-muted-foreground hidden shrink-0 text-[12px] font-medium medium:inline">
-								Mode
-							</span>
-							<Select
-								value={tutorMode}
-								onValueChange={(v) => onTutorModeChange(v as DoubtTutorMode)}
-								disabled={busy}
+							{/*
+							 * First-use coach-mark. Anchored to a dedicated invisible anchor
+							 * span beside the selector so it never intercepts the Select's own
+							 * open/close clicks. Auto-opens once (flag-derived), then stays
+							 * dismissed.
+							 */}
+							<Popover
+								open={showDoubtModesTip}
+								onOpenChange={(next) => {
+									// Ignore "open" toggles from the anchor; any close (Esc,
+									// outside click, "Got it") permanently dismisses the tip.
+									if (!next) dismissDoubtModesTip();
+								}}
 							>
-								<SelectTrigger
-									id="doubt-tutor-mode"
-									aria-label="Tutor mode"
-									className="border-input bg-background h-10 medium:h-9 min-w-0 max-w-[10.5rem] shrink medium:min-w-[9.5rem] medium:max-w-[14rem]"
-								>
-									<SelectValue placeholder="Explain">
-										{(v) =>
-											v === "solve_with_me"
-												? "Solve with me"
-												: v === "quiz_me"
-													? "Quiz me"
-													: "Explain"
+								<span className="relative flex min-w-0 items-center gap-2">
+									<span className="text-muted-foreground hidden shrink-0 text-[12px] font-medium medium:inline">
+										Mode
+									</span>
+									<Select
+										value={tutorMode}
+										onValueChange={(v) => onTutorModeChange(v as DoubtTutorMode)}
+										disabled={busy}
+									>
+										<SelectTrigger
+											id="doubt-tutor-mode"
+											aria-label="Tutor mode"
+											className="border-input bg-background h-10 medium:h-9 min-w-0 max-w-[10.5rem] shrink medium:min-w-[9.5rem] medium:max-w-[14rem]"
+										>
+											<SelectValue placeholder="Explain">
+												{(v) =>
+													v === "solve_with_me"
+														? "Solve with me"
+														: v === "quiz_me"
+															? "Quiz me"
+															: "Explain"
+												}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="explain">Explain</SelectItem>
+											<SelectItem value="solve_with_me">Solve with me</SelectItem>
+											<SelectItem value="quiz_me">Quiz me</SelectItem>
+										</SelectContent>
+									</Select>
+									<PopoverTrigger
+										aria-hidden
+										tabIndex={-1}
+										render={
+											<span className="pointer-events-none absolute inset-x-0 bottom-0 h-0 w-full" />
 										}
-									</SelectValue>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="explain">Explain</SelectItem>
-									<SelectItem value="solve_with_me">Solve with me</SelectItem>
-									<SelectItem value="quiz_me">Quiz me</SelectItem>
-								</SelectContent>
-							</Select>
+									/>
+								</span>
+								<PopoverContent side="top" align="end" className="w-[min(100vw-2rem,20rem)]">
+									<div className="flex flex-col gap-2.5">
+										<p className="font-heading text-sm font-semibold leading-snug text-foreground">
+											Pick how the tutor helps
+										</p>
+										<ul className="flex flex-col gap-1.5 text-sm leading-snug text-muted-foreground">
+											<li>
+												<strong className="font-medium text-foreground">Explain</strong> — a clear,
+												step-by-step walkthrough of the concept.
+											</li>
+											<li>
+												<strong className="font-medium text-foreground">Solve with me</strong> —
+												work the problem together, one hint at a time.
+											</li>
+											<li>
+												<strong className="font-medium text-foreground">Quiz me</strong> — the
+												tutor asks you questions to check your understanding.
+											</li>
+										</ul>
+										<div className="flex justify-end">
+											<Button size="sm" onClick={dismissDoubtModesTip}>
+												Got it
+											</Button>
+										</div>
+									</div>
+								</PopoverContent>
+							</Popover>
 						</div>
 					}
 				/>

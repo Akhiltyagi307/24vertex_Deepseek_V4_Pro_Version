@@ -118,7 +118,58 @@ export function PaymentHistorySection({ payments }: { payments: PaymentHistoryRo
 						<CardTitle className="text-base">Recent payments</CardTitle>
 					</CardHeader>
 					<CardContent className="p-0">
-						<div className="overflow-x-auto">
+						<ul className="flex flex-col gap-3 p-3 medium:hidden">
+							{payments.map((payment) => {
+								const meta = statusMeta(payment.status);
+								return (
+									<li
+										key={payment.id}
+										className="flex flex-col gap-2.5 rounded-lg border border-border/80 p-4"
+									>
+										<div className="flex items-center justify-between gap-3">
+											<span className="font-medium tabular-nums">
+												{payment.currency === "INR"
+													? formatRupees(payment.amount_paise)
+													: `${payment.amount_paise / 100} ${payment.currency}`}
+											</span>
+											<Badge variant={meta.variant}>{meta.label}</Badge>
+										</div>
+										<dl className="flex flex-col gap-2 border-t border-border/60 pt-2.5 text-sm">
+											<div className="flex items-start justify-between gap-3">
+												<dt className="shrink-0 text-xs font-medium text-muted-foreground">Date</dt>
+												<dd className="text-right tabular-nums">
+													{formatDateShortDMYInAppTimeZone(payment.created_at)}
+												</dd>
+											</div>
+											<div className="flex items-start justify-between gap-3">
+												<dt className="shrink-0 text-xs font-medium text-muted-foreground">Method</dt>
+												<dd className="text-right tabular-nums text-muted-foreground">
+													{formatMethod(payment.method)}
+												</dd>
+											</div>
+											<div className="flex items-start justify-between gap-3">
+												<dt className="shrink-0 text-xs font-medium text-muted-foreground">Receipt</dt>
+												<dd className="text-right">
+													{payment.invoice_short_url ? (
+														<a
+															href={payment.invoice_short_url}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="text-primary underline underline-offset-4"
+														>
+															View receipt
+														</a>
+													) : (
+														<span className="text-muted-foreground">Not yet</span>
+													)}
+												</dd>
+											</div>
+										</dl>
+									</li>
+								);
+							})}
+						</ul>
+						<div className="hidden overflow-x-auto medium:block">
 							<table className="w-full min-w-[38rem] text-sm">
 								<thead className="bg-muted/50 text-left">
 									<tr>

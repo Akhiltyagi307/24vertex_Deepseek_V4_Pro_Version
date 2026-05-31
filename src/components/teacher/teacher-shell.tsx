@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { TeacherOnboarding } from "@/components/onboarding/teacher-onboarding";
 import { TeacherAppSidebar } from "@/components/teacher/teacher-app-sidebar";
 import { TeacherTopBar } from "@/components/teacher/teacher-top-bar";
 
@@ -18,6 +19,10 @@ export type TeacherShellProps = {
 	contextLabel: string;
 	email: string;
 	avatarUrl: string | null;
+	/** Gates the first-run onboarding flow (verified + recently created); see teacher layout. Defaults off (e.g. marketing mock). */
+	isNewTeacher?: boolean;
+	/** First name for the onboarding greeting; falls back to a neutral salutation when absent. */
+	onboardingFirstName?: string | null;
 	children: React.ReactNode;
 };
 
@@ -28,6 +33,8 @@ export function TeacherShell({
 	contextLabel,
 	email,
 	avatarUrl,
+	isNewTeacher = false,
+	onboardingFirstName = null,
 	children,
 }: TeacherShellProps) {
 	return (
@@ -50,6 +57,7 @@ export function TeacherShell({
 			}
 		>
 			{children}
+			<TeacherOnboarding isNewTeacher={isNewTeacher} firstName={onboardingFirstName} />
 		</DashboardShell>
 	);
 }

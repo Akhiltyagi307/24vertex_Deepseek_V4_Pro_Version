@@ -187,7 +187,6 @@ async function runGradingChunk(
 	// tokens per chunk (~1.2k per question grading payload), well within budget.
 	const maxOutputTokens = Math.min(14_000, Math.max(4_500, nQuestions * 1_500));
 	const resolved = resolveChatModel("practice.grade.chunk");
-	const modelId = resolved.modelId;
 	return withPracticeAiAttempts("gradePracticeTest.chunk", async () => {
 		const t0 = Date.now();
 		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
@@ -251,7 +250,6 @@ async function runSummaryObject(
 	return withPracticeAiAttempts("gradePracticeTest.summary", async () => {
 		const t0 = Date.now();
 		const resolved = resolveChatModel("practice.grade.summary");
-		const modelId = resolved.modelId;
 		const { object, usage, telemetry } = await generateStructuredWithProviderFallback({
 			resolved,
 			schema: practiceGradingSummarySchema,
@@ -448,6 +446,27 @@ async function gradePracticeTestWithAiInner(
 	trace.chunks.count = chunks.length;
 	const merged: GradedQuestionItem[] = [];
 
+	// In-flight "Graded N of M" progress for the student's grading screen. Written
+	// best-effort to practice_jobs.payload (grade jobs never read their own payload
+	// for input, so overwriting it is safe) and polled by the grading view.
+	const totalToGrade = gradingInputs.length;
+	let gradedSoFar = 0;
+	const writeGradingProgress = async () => {
+		const jobId = ctx.jobId;
+		if (!jobId) return;
+		try {
+			await supabase
+				.from("practice_jobs")
+				.update({
+					payload: { grading: { graded: gradedSoFar, total: totalToGrade } },
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", jobId);
+		} catch {
+			// best-effort progress; never fail grading on a progress write
+		}
+	};
+
 	type ChunkAttempt =
 		| { ok: true; index: number; graded: GradedQuestionItem[]; ms: number }
 		| { ok: false; index: number; error: unknown };
@@ -474,6 +493,8 @@ async function gradePracticeTestWithAiInner(
 				correlationId: ctx.correlationId,
 				chunkIndex: ci,
 			});
+			gradedSoFar = Math.min(totalToGrade, gradedSoFar + part.length);
+			await writeGradingProgress();
 			return { ok: true, index: ci, graded: gradedNormalized, ms: Date.now() - c0 };
 		} catch (error) {
 			return { ok: false, index: ci, error };
@@ -487,6 +508,7 @@ async function gradePracticeTestWithAiInner(
 		merged.push(...attempt.graded);
 	};
 
+	await writeGradingProgress();
 	const firstResults = await pLimit(
 		getGradingConcurrency(),
 		chunks.map((part, ci) => () => runChunkAttempt(part, ci)),

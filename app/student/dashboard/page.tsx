@@ -19,6 +19,7 @@ export default async function StudentDashboardPage() {
 		role: row.role,
 		full_name: row.full_name,
 		organization_id: row.organization_id ?? null,
+		created_at: row.created_at ?? null,
 	};
 
 	return (

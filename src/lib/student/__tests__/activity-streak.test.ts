@@ -22,6 +22,8 @@ describe("mapActivityStreakRow", () => {
 			weeksToReward: 49,
 			rewardGranted: false,
 			rewardGrantedAt: null,
+			freezesAvailable: 1,
+			freezeLastUsedWeek: null,
 		});
 	});
 
