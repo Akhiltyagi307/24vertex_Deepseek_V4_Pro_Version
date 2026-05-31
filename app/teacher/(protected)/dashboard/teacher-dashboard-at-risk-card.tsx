@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, Sparkles } from "lucide-react";
 
 import { cardSurfaceFrameClassName } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TeacherAtRiskInterventionDialog } from "./teacher-at-risk-intervention-dialog";
 import type { TeacherAtRiskStudentRow } from "@/lib/teachers/teacher-at-risk-types";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,10 @@ export function TeacherDashboardAtRiskCard({
 	error,
 	pending,
 }: Props) {
+	const [active, setActive] = useState<
+		{ studentId: string; studentName: string; riskSummary: string } | null
+	>(null);
+
 	return (
 		<div
 			className={cn(
@@ -94,19 +100,42 @@ export function TeacherDashboardAtRiskCard({
 						role="list"
 					>
 						{rows.map((r) => (
-							<li key={r.studentId} className="hover:bg-muted/30">
+							<li key={r.studentId} className="flex items-center gap-1 hover:bg-muted/30">
 								<Link
 									href={teacherStudentPerformanceHref(r.studentId, subjectId)}
-									className="flex w-full min-w-0 flex-col gap-0.5 px-3 py-2.5 text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2.5 text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 								>
 									<span className="font-medium text-foreground">{r.fullName}</span>
 									<span className="text-muted-foreground text-xs leading-snug">{r.summary}</span>
 								</Link>
+								<button
+									type="button"
+									onClick={() =>
+										setActive({ studentId: r.studentId, studentName: r.fullName, riskSummary: r.summary })
+									}
+									className="mr-2 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border/70 px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									aria-label={`Plan an intervention for ${r.fullName}`}
+								>
+									<Sparkles className="size-3.5 text-primary" aria-hidden />
+									Plan
+								</button>
 							</li>
 						))}
 					</ul>
 				)}
 			</div>
+			{active ? (
+				<TeacherAtRiskInterventionDialog
+					open
+					onOpenChange={(next) => {
+						if (!next) setActive(null);
+					}}
+					studentId={active.studentId}
+					studentName={active.studentName}
+					subjectId={subjectId}
+					riskSummary={active.riskSummary}
+				/>
+			) : null}
 		</div>
 	);
 }

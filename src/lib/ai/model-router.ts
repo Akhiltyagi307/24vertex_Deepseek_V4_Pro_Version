@@ -37,7 +37,9 @@ export type AiFeatureKey =
 	| "practice.generation.validation"
 	| "practice.grade.chunk"
 	| "practice.grade.summary"
-	| "doubt.chat";
+	| "doubt.chat"
+	| "teacher.dashboard_insight"
+	| "teacher.at_risk_intervention";
 
 export type AiProvider = "openai" | "deepseek";
 
@@ -92,6 +94,8 @@ function openaiModelIdForFeature(feature: AiFeatureKey): string {
 			return getOpenAIPracticeChatModel();
 		case "practice.grade.chunk":
 		case "practice.grade.summary":
+		case "teacher.dashboard_insight":
+		case "teacher.at_risk_intervention":
 			return getOpenAIChatModel();
 		default: {
 			const _exhaustive: never = feature;
@@ -114,6 +118,10 @@ function deepseekModelIdForFeature(feature: AiFeatureKey): string {
 		case "practice.generation.validation":
 			return getDeepSeekValidationModel();
 		case "practice.grade.summary":
+		// Teacher-portal narration: short, structured prose over already-computed
+		// analytics. The lightweight summary model is the right cost/quality fit.
+		case "teacher.dashboard_insight":
+		case "teacher.at_risk_intervention":
 			return getDeepSeekGradeSummaryModel();
 		// Quality-critical content paths stay on the practice/grading model
 		// (Pro by default).

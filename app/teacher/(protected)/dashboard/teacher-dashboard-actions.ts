@@ -10,6 +10,14 @@ import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
 import { consumeTeacherPortalDataActionRateLimit } from "@/lib/teachers/teacher-portal-action-rate-limit";
 import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
+import { classifyTeacherActionError } from "@/lib/teachers/classify-teacher-action-error";
+import {
+	getOrGenerateClassInsight,
+	lookupClassInsightOnly,
+	toClassInsightScope,
+	type ClassInsightLookupOutcome,
+	type ClassInsightOutcome,
+} from "@/lib/teachers/teacher-class-insight-service";
 import type { TeacherClassPerformanceSummary } from "@/lib/teachers/teacher-class-performance-summary-types";
 import type { TeacherAtRiskStudentRow } from "@/lib/teachers/teacher-at-risk-types";
 
@@ -85,5 +93,123 @@ export async function fetchTeacherClassPerformanceSummary(
 			return result;
 		}
 		return { summary: result.summary };
+	});
+}
+
+export type TeacherClassInsightActionResult = ClassInsightOutcome | { error: string };
+
+const insightInputSchema = filtersSchema
+	.extend({ scopeLabel: z.string().max(160).optional(), force: z.boolean().optional() })
+	.strict();
+
+/**
+ * On-demand AI narration of the current dashboard scope. Recomputes the summary
+ * server-side from validated filters (never trusts a client-supplied summary);
+ * `scopeLabel` is cosmetic prompt context only. Billed per call — the UI gates
+ * this behind an explicit button so page loads never spend a token.
+ */
+export async function generateTeacherClassInsightAction(
+	raw: unknown,
+): Promise<TeacherClassInsightActionResult> {
+	return withTeacherActionTelemetry("generateTeacherClassInsightAction", async (breadcrumb) => {
+		const parsed = insightInputSchema.safeParse(raw);
+		if (!parsed.success) {
+			breadcrumb("validation_failed");
+			return { error: parsed.error.flatten().formErrors[0] ?? "Invalid filters." };
+		}
+
+		const session = await getVerifiedTeacherSession();
+		if (!session.ok) {
+			breadcrumb("auth_failed", { code: session.code });
+			return { error: session.message };
+		}
+		const rate = await consumeTeacherPortalDataActionRateLimit(session.user.id);
+		if (!rate.ok) {
+			breadcrumb("rate_limited");
+			return { error: rate.message };
+		}
+
+		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
+		const bundle = await loadTeacherDashboardBundleForTeacher({
+			teacherId: session.user.id,
+			activeOrganizationId: activeOrg?.id ?? null,
+			filters: {
+				grade: parsed.data.grade,
+				section: parsed.data.section,
+				subjectId: parsed.data.subjectId,
+			},
+		});
+
+		try {
+			const outcome = await getOrGenerateClassInsight({
+				teacherUserId: session.user.id,
+				organizationId: activeOrg?.id ?? null,
+				scope: toClassInsightScope(parsed.data),
+				scopeLabel: parsed.data.scopeLabel?.trim() || "Selected scope",
+				summary: bundle.summary,
+				forceFresh: parsed.data.force,
+			});
+			breadcrumb(outcome.status === "ok" ? `insight_${outcome.source}` : "insufficient_data");
+			return outcome;
+		} catch (err) {
+			breadcrumb("insight_failed");
+			return {
+				error: classifyTeacherActionError(err, {
+					action: "generateTeacherClassInsightAction",
+					userId: session.user.id,
+				}).userMessage,
+			};
+		}
+	});
+}
+
+export type TeacherClassInsightLookupActionResult = ClassInsightLookupOutcome | { error: string };
+
+/**
+ * Read-only cache probe for the current scope — never calls the model. The card
+ * runs this on dashboard load / filter change so a cached insight shows for free
+ * (a miss just leaves the "Generate" button). Recomputes the summary server-side
+ * to compute the fingerprint; the SSR path passes its already-loaded summary
+ * instead of going through this action.
+ */
+export async function fetchCachedClassInsightAction(
+	raw: unknown,
+): Promise<TeacherClassInsightLookupActionResult> {
+	return withTeacherActionTelemetry("fetchCachedClassInsightAction", async (breadcrumb) => {
+		const parsed = insightInputSchema.safeParse(raw);
+		if (!parsed.success) {
+			breadcrumb("validation_failed");
+			return { error: parsed.error.flatten().formErrors[0] ?? "Invalid filters." };
+		}
+
+		const session = await getVerifiedTeacherSession();
+		if (!session.ok) {
+			breadcrumb("auth_failed", { code: session.code });
+			return { error: session.message };
+		}
+		const rate = await consumeTeacherPortalDataActionRateLimit(session.user.id);
+		if (!rate.ok) {
+			breadcrumb("rate_limited");
+			return { error: rate.message };
+		}
+
+		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
+		const bundle = await loadTeacherDashboardBundleForTeacher({
+			teacherId: session.user.id,
+			activeOrganizationId: activeOrg?.id ?? null,
+			filters: {
+				grade: parsed.data.grade,
+				section: parsed.data.section,
+				subjectId: parsed.data.subjectId,
+			},
+		});
+
+		const outcome = await lookupClassInsightOnly({
+			teacherUserId: session.user.id,
+			scope: toClassInsightScope(parsed.data),
+			summary: bundle.summary,
+		});
+		breadcrumb(`insight_lookup_${outcome.status}`);
+		return outcome;
 	});
 }
