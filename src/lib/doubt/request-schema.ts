@@ -29,7 +29,13 @@ import { z } from "zod";
 export const doubtChatBodySchema = z.object({
 	/** @ai-sdk/react chat id (optional) */
 	id: z.string().optional(),
-	messages: z.array(z.unknown()).min(1, "At least one message is required."),
+	messages: z
+		.array(z.unknown())
+		.min(1, "At least one message is required.")
+		// Bound the array so a malicious client can't POST an unbounded list.
+		// The transport sends the full visible thread, so this cap is generous —
+		// the route reloads history from the DB and only reads the last message.
+		.max(1000, "Conversation too long."),
 	subjectId: z.string().uuid("Invalid subject."),
 	/** Omit or null for chapter-scoped chats; must match the open conversation row. */
 	topicId: z
