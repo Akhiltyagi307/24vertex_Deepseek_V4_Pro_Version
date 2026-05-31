@@ -18,42 +18,6 @@ const organizationStudentBaseConditions = (organizationId: string) =>
 		isNull(profiles.deletedAt),
 	);
 
-export async function listOrganizationStudentsForTeachingRoster(params: {
-	organizationId: string;
-	grade: number;
-	subjectId: string;
-}): Promise<OrganizationRosterStudentRow[]> {
-	const rows = await db
-		.select({
-			id: profiles.id,
-			fullName: profiles.fullName,
-			grade: profiles.grade,
-			section: profiles.section,
-			studentLinkCode: profiles.studentLinkCode,
-		})
-		.from(profiles)
-		.where(
-			and(
-				organizationStudentBaseConditions(params.organizationId),
-				eq(profiles.grade, params.grade),
-				sql`EXISTS (
-					SELECT 1
-					FROM public.get_student_subjects(${profiles.grade}, ${profiles.stream}, ${profiles.electiveSubjectId}) gs
-					WHERE gs.id = ${params.subjectId}::uuid
-				)`,
-			),
-		)
-		.orderBy(asc(profiles.section), asc(profiles.fullName));
-
-	return rows.map((r) => ({
-		id: r.id,
-		fullName: r.fullName,
-		grade: r.grade,
-		section: r.section,
-		studentLinkCode: r.studentLinkCode,
-	}));
-}
-
 /** Distinct grades / sections present among students in an organization (for roster filters). */
 export async function getOrganizationRosterFilterOptions(
 	organizationId: string,

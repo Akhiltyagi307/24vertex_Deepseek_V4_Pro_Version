@@ -21,6 +21,7 @@ import {
 export function TeacherAppSidebar({
 	user,
 	contextLabel,
+	hasOrganization,
 }: {
 	user: {
 		name: string;
@@ -29,6 +30,8 @@ export function TeacherAppSidebar({
 	};
 	/** Shown under 24Vertex (e.g. organization type or “Teacher”). */
 	contextLabel: string;
+	/** When true, the code-based "Link Student" nav item is hidden (org teachers use the roster). */
+	hasOrganization: boolean;
 }) {
 	const { state, isMobile } = useSidebar();
 	const collapsedDesktop = state === "collapsed" && !isMobile;
@@ -59,7 +62,7 @@ export function TeacherAppSidebar({
 			</SidebarHeader>
 			<SidebarSeparator />
 			<SidebarContent>
-				<TeacherNavMain />
+				<TeacherNavMain hasOrganization={hasOrganization} />
 			</SidebarContent>
 			<SidebarFooter className="gap-2">
 				<SidebarSeparator />

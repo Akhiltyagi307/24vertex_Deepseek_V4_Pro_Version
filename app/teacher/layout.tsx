@@ -38,6 +38,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 			<AdminImpersonationBanner />
 			<TeacherShell
 				organizationName={organizationName}
+				hasOrganization={teacherOrg != null}
 				userDisplayName={displayName}
 				contextLabel={contextLabel}
 				email={user.email ?? ""}
