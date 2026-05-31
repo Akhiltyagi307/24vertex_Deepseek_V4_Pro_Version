@@ -27,6 +27,7 @@ export * from "./service-health-pings";
 export * from "./parental-consents";
 export * from "./profiles";
 export * from "./teacher-approval-history";
+export * from "./teacher-insights";
 export * from "./teaching";
 export * from "./topic-context-chunks";
 export * from "./user-feedback-reports";

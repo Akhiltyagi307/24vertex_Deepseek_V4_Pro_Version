@@ -6,10 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchTeacherDashboardBundle } from "./teacher-dashboard-actions";
 import { TeacherDashboardAtRiskCard } from "./teacher-dashboard-at-risk-card";
 import { TeacherDashboardClassPerformanceCard } from "./teacher-dashboard-class-performance-card";
+import { TeacherDashboardInsightCard } from "./teacher-dashboard-insight-card";
 import { TeacherDashboardPerformanceBandStrip } from "./teacher-dashboard-performance-band-strip";
 import { ReportsPillSelect } from "@/components/student/reports-pill-select";
 import type { TeacherDashboardBundle } from "./teacher-dashboard-data";
 import type { TeacherClassPerformanceSummary } from "@/lib/teachers/teacher-class-performance-summary-types";
+import type { ClassInsightLookupOutcome } from "@/lib/teachers/teacher-class-insight-service";
 import type { TeacherAtRiskStudentRow } from "@/lib/teachers/teacher-at-risk-types";
 import {
 	buildSubjectCatalogPillSelectModel,
@@ -22,6 +24,7 @@ type Props = {
 	subjectsCatalog: SubjectCatalogRow[];
 	filterOptions: { grades: number[]; sections: string[] };
 	initialDashboardBundle: TeacherDashboardBundle;
+	initialInsightLookup: ClassInsightLookupOutcome;
 	atRiskThresholdPercent: number;
 	atRiskLastGradedCount: number;
 };
@@ -32,6 +35,7 @@ export function TeacherDashboardPanel({
 	subjectsCatalog,
 	filterOptions,
 	initialDashboardBundle,
+	initialInsightLookup,
 	atRiskThresholdPercent,
 	atRiskLastGradedCount,
 }: Props) {
@@ -213,6 +217,15 @@ export function TeacherDashboardPanel({
 				error={dashboardError}
 				subjectId={subjectId}
 				scopeLabel={scopeLabel}
+			/>
+
+			<TeacherDashboardInsightCard
+				key={scopeKey}
+				grade={grade}
+				section={section}
+				subjectId={subjectId}
+				scopeLabel={scopeLabel}
+				initialLookup={scopeKey === initialScopeKey ? initialInsightLookup : null}
 			/>
 
 			<div className="grid grid-cols-1 gap-6 medium:grid-cols-3">

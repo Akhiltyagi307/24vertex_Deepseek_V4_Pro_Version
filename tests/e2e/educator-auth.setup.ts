@@ -45,19 +45,14 @@ setup("authenticate teacher", async ({ page }) => {
 	await page.getByLabel(/email/i).first().fill(email);
 	await page.getByLabel(/password/i).first().fill(password);
 
-	const [authRes] = await Promise.all([
-		page.waitForResponse(
-			(r) => /\/auth\/v1\/token/.test(r.url()) && r.request().method() === "POST",
-			{ timeout: 15_000 },
-		),
-		page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click(),
-	]);
-	expect(authRes.status(), "Supabase Auth must accept these credentials").toBe(200);
-
-	// Verified teachers land on /teacher/dashboard; unverified land on /teacher/pending.
-	// We require a verified account for the rest of the suite — fail loudly if the
-	// teacher is still pending so the operator knows to approve them.
-	await page.waitForURL((url) => /\/teacher\//.test(url.pathname), { timeout: 15_000 });
+	// `signInWithPassword` + role routing run inside the server action, so the
+	// Supabase Auth call is no longer observable from the browser (see
+	// auth.setup.ts). Wait for the navigation to the teacher portal as proof
+	// the credentials were accepted: a wrong password keeps us on /login (this
+	// times out), while a verified teacher lands on /teacher/* and an unverified
+	// one on /teacher/pending (asserted below).
+	await page.getByRole("button", { name: /sign\s*in|log\s*in/i }).first().click();
+	await page.waitForURL((url) => /\/teacher\//.test(url.pathname), { timeout: 30_000 });
 	expect(
 		page.url(),
 		"Teacher test account must be admin-verified (is_verified=true) before the suite can sign in.",

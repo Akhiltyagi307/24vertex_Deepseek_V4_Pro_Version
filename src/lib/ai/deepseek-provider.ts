@@ -66,7 +66,9 @@ export type DeepSeekThinkingFeature =
 	| "practice.generation.validation"
 	| "practice.grade.chunk"
 	| "practice.grade.summary"
-	| "doubt.chat";
+	| "doubt.chat"
+	| "teacher.dashboard_insight"
+	| "teacher.at_risk_intervention";
 
 /**
  * Returns the thinking mode for a given feature key. Only the three structural

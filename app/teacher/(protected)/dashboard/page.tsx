@@ -14,6 +14,7 @@ import {
 	AT_RISK_SCORE_THRESHOLD_PERCENT,
 } from "@/lib/teachers/teacher-at-risk-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
+import { lookupClassInsightOnly } from "@/lib/teachers/teacher-class-insight-service";
 
 export const metadata: Metadata = {
 	title: "Teacher dashboard",
@@ -45,6 +46,12 @@ export default async function TeacherDashboardPage() {
 		}),
 	]);
 
+	const initialInsightLookup = await lookupClassInsightOnly({
+		teacherUserId: teacherId,
+		scope: { grade: null, section: null, subjectId: null },
+		summary: initialDashboardBundle.summary,
+	});
+
 	return (
 		<TeacherDashboardPanel
 			activeOrganization={activeOrganization ? { name: activeOrganization.name } : null}
@@ -52,6 +59,7 @@ export default async function TeacherDashboardPage() {
 			subjectsCatalog={subjectsCatalog}
 			filterOptions={filterOptions}
 			initialDashboardBundle={initialDashboardBundle}
+			initialInsightLookup={initialInsightLookup}
 			atRiskThresholdPercent={AT_RISK_SCORE_THRESHOLD_PERCENT}
 			atRiskLastGradedCount={AT_RISK_LAST_GRADED_COUNT}
 		/>
