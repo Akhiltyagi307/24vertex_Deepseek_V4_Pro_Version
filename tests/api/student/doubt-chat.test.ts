@@ -95,7 +95,7 @@ vi.mock("@/lib/doubt/safety", () => ({
 	screenDoubtInput: async (text: string) =>
 		safetyInputMock.current
 			? safetyInputMock.current(text)
-			: { block: false, blockMessage: null, redactedText: text, categories: [], distress: false, pii: false },
+			: { block: false, blockMessage: null, redactedText: text, categories: [], distress: false, sensitive: false, pii: false },
 	screenDoubtOutput: async () => ({ safe: true, categories: [] }),
 	flagDoubtSafety: async () => undefined,
 	flagDoubtAttachmentInjection: async () => undefined,
@@ -631,6 +631,23 @@ describe("POST /api/student/doubt-chat", () => {
 				{ kind: "distress", severity: "critical", source: "heuristic_distress", reason: "severe-distress pattern" },
 			],
 			distress: true,
+			sensitive: false,
+			pii: false,
+		});
+		const res = await POST(makeRequest(VALID_BODY));
+		expect(res.status).toBe(200);
+	});
+
+	it("does not block a sensitive-but-curricular topic — the tutor still answers (200)", async () => {
+		safetyInputMock.current = (text: string) => ({
+			block: false,
+			blockMessage: null,
+			redactedText: text,
+			categories: [
+				{ kind: "sensitive", severity: "medium", source: "heuristic_sensitive", reason: "sensitive topic" },
+			],
+			distress: false,
+			sensitive: true,
 			pii: false,
 		});
 		const res = await POST(makeRequest(VALID_BODY));

@@ -5,16 +5,20 @@ import {
 	DOUBT_SAFETY_FLOOR,
 	detectInjection,
 	detectPii,
+	detectSensitiveTopic,
 	detectSevereDistress,
 	ensureDoubtSafetyFloor,
 	hasPii,
 	highestSeverity,
+	MODERATION_SOURCE_MAX,
+	moderationFlagFieldsFor,
 	promptHasSafetyAnchor,
 	redactPii,
 	screenInput,
 	screenOutput,
 	UNTRUSTED_ATTACHMENT_PREFACE,
 	type CompiledBlacklistRule,
+	type SafetyCategory,
 } from "@/lib/doubt/safety-detectors";
 
 describe("screenInput — block tier", () => {
@@ -50,7 +54,70 @@ describe("screenInput — block tier", () => {
 		expect(r.block).toBe(false);
 		expect(r.categories).toHaveLength(0);
 		expect(r.distress).toBe(false);
+		expect(r.sensitive).toBe(false);
 		expect(r.pii).toBe(false);
+	});
+
+	it("does NOT block ordinary words that contain a slur substring", () => {
+		// "chink" / "spic" were removed from the slur list — they are real English
+		// ("a chink of light", "spic and span") and were blocking legitimate turns.
+		expect(screenInput("a thin chink of light passed through the slit").block).toBe(false);
+		expect(screenInput("the lab was left spic and span").block).toBe(false);
+	});
+});
+
+describe("sensitive-but-curricular topics (review-only, never block)", () => {
+	it("detects sexual-violence terms that appear in the syllabus", () => {
+		expect(detectSensitiveTopic("what is the legal definition of rape under the IPC")).toBe(true);
+		expect(detectSensitiveTopic("explain laws against sexual assault")).toBe(true);
+		expect(detectSensitiveTopic("photosynthesis converts light to energy")).toBe(false);
+	});
+
+	it("flags but does NOT block a curricular question about a sensitive topic", () => {
+		const r = screenInput("For legal studies, what is the punishment for rape under IPC 376?");
+		expect(r.block).toBe(false); // the tutor still answers
+		expect(r.sensitive).toBe(true); // but a review flag is raised
+		const sensitive = r.categories.find((c) => c.kind === "sensitive");
+		expect(sensitive?.severity).toBe("medium");
+		expect(sensitive?.source).toBe("heuristic_sensitive");
+	});
+});
+
+describe("moderationFlagFieldsFor — varchar(30) source overflow guard", () => {
+	const cat = (kind: SafetyCategory["kind"], severity: SafetyCategory["severity"], source: string): SafetyCategory => ({
+		kind,
+		severity,
+		source,
+		reason: `${kind} matched`,
+	});
+
+	it("keeps a single category's source verbatim", () => {
+		const f = moderationFlagFieldsFor([cat("distress", "critical", "heuristic_distress")]);
+		expect(f.source).toBe("heuristic_distress");
+		expect(f.severity).toBe("critical");
+	});
+
+	it("never exceeds the column limit for a multi-category turn (the old join overflowed)", () => {
+		const cats = [
+			cat("slur", "high", "heuristic_output_slur"),
+			cat("profanity", "high", "heuristic_output_profanity"),
+		];
+		// The old behaviour joined these → 48 chars → Postgres 22001 → flag dropped.
+		expect([...cats.map((c) => c.source)].join(",").length).toBeGreaterThan(MODERATION_SOURCE_MAX);
+		const f = moderationFlagFieldsFor(cats);
+		expect(f.source.length).toBeLessThanOrEqual(MODERATION_SOURCE_MAX);
+		// Full breakdown is preserved in the unbounded `reason` column.
+		expect(f.reason).toContain("heuristic_output_slur");
+		expect(f.reason).toContain("heuristic_output_profanity");
+	});
+
+	it("uses the highest-severity category as the representative source", () => {
+		const f = moderationFlagFieldsFor([
+			cat("pii", "low", "heuristic_pii"),
+			cat("slur", "high", "heuristic_slur"),
+		]);
+		expect(f.source).toBe("heuristic_slur");
+		expect(f.severity).toBe("high");
 	});
 });
 

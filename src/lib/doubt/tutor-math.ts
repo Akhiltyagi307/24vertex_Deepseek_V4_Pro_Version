@@ -32,21 +32,44 @@ const PLACEHOLDER_RE = new RegExp(`${SENTINEL}(\\d+)${SENTINEL}`, "g");
 function convertBracketDelimiters(text: string): string {
 	return text
 		.replace(/\\\[([\s\S]+?)\\\]/g, (_m, inner: string) => `$$${inner.trim()}$$`)
-		.replace(/\\\(([\s\S]+?)\\\)/g, (_m, inner: string) => `$${inner}$`);
+		.replace(/\\\(([\s\S]+?)\\\)/g, (_m, inner: string) => `$${inner.trim()}$`);
 }
 
 /**
- * Canonicalize every `$$...$$` into block form — `$$` on its own line, blank
- * lines around it.
+ * Promote `$$...$$` to fenced display form — `$$` on its own line with blank
+ * lines around it — so `remark-math` renders it as DISPLAY (a single-line
+ * `$$x = y$$`, which both the model and the `\[...\]` conversion emit, otherwise
+ * parses as inline and renders small mid-paragraph).
  *
- * `remark-math` only renders `$$` as DISPLAY math when the fence stands on its
- * own line (flow context). A single-line `$$x = y$$` — which both the model and
- * the `\[...\]` conversion above emit — is otherwise parsed as inline, so a
- * derivation or integral renders small and mid-paragraph instead of centered.
- * Double-dollar always means display intent, so rewriting all of them is safe.
+ * Two structural cautions so the promotion doesn't shatter surrounding Markdown:
+ *  - We preserve the indentation of the line the `$$` starts on, so an equation
+ *    written on its own line *inside a list item / blockquote* stays inside it
+ *    instead of being dedented to column 0 (which terminates the list).
+ *  - A `$$` sitting *mid-line* inside a list/blockquote can't be promoted with
+ *    blank lines without ejecting it from the container, so there we leave it
+ *    inline (slightly smaller, but the steps/list stay intact). At the top level
+ *    a mid-line `$$` is still promoted (a centered equation splitting the para).
  */
 function toDisplayBlocks(text: string): string {
-	return text.replace(/\$\$([\s\S]+?)\$\$/g, (_m, inner: string) => `\n\n$$\n${inner.trim()}\n$$\n\n`);
+	return text.replace(/\$\$([\s\S]+?)\$\$/g, (_m, inner: string, offset: number, full: string) => {
+		const lineStart = full.lastIndexOf("\n", offset - 1) + 1;
+		const linePrefix = full.slice(lineStart, offset);
+		const indent = /^[ \t]*/.exec(linePrefix)?.[0] ?? "";
+		const body = inner.trim();
+		const fenced = indent
+			? `${indent}$$\n${body
+					.split("\n")
+					.map((l) => `${indent}${l}`)
+					.join("\n")}\n${indent}$$`
+			: `$$\n${body}\n$$`;
+		// `$$` begins its own line (only whitespace before it): promote, keeping
+		// the indent so it stays within any enclosing list item / blockquote.
+		if (linePrefix.trim().length === 0) return `\n\n${fenced}\n\n`;
+		// Mid-line. Inside a list/blockquote (indented, or a marker line) keep it
+		// inline so the container survives; at the top level promote as usual.
+		const inContainer = indent.length > 0 || /^[ \t]*([-*+]\s|\d+[.)]\s|>)/.test(linePrefix);
+		return inContainer ? `$$${body}$$` : `\n\n$$\n${body}\n$$\n\n`;
+	});
 }
 
 /**
@@ -81,8 +104,11 @@ export function normalizeTutorMarkdownMath(md: string): string {
 	//    single-`$` regions) can't reach inside a `$$...$$` block.
 	out = protect(out, /\$\$[\s\S]*?\$\$/g, store);
 
-	// 4. Normalize Unicode math in the remaining prose / inline `$...$`.
-	out = normalizeKatexMath(out);
+	// 4. Normalize Unicode math in the remaining prose / inline `$...$`. Disable
+	//    the bare-whitespace span merge: in free-form tutor prose two adjacent
+	//    `$...$` spans are usually distinct quantities ($F_1$ $F_2$), not a split
+	//    equation to rejoin (which is what the practice autofix wants).
+	out = normalizeKatexMath(out, { mergeSpaceSeparatedSpans: false });
 
 	// 5. Restore protected segments (single pass; indices are unique and the
 	//    stored segments contain no placeholders of their own).
