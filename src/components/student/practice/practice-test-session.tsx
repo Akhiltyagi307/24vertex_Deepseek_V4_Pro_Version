@@ -327,6 +327,13 @@ export function PracticeTestSession({
 
 	const queueSave = React.useCallback(
 		(questionId: string, payload: SessionStudentAnswer, markReview: boolean) => {
+			// Reflect the queued write immediately so the app bar shows "Saving"
+			// during the 750ms debounce, instead of only once the flush fires.
+			if (savedHideTimer.current) {
+				clearTimeout(savedHideTimer.current);
+				savedHideTimer.current = undefined;
+			}
+			setSaveUi("saving");
 			scheduleFlush(saveTimers, questionId, () => {
 				void flushSave(questionId, payload, markReview);
 			}, 750);

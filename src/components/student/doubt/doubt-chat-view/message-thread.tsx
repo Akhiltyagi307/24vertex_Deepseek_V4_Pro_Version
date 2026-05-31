@@ -2,7 +2,6 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ArrowDown, FileText, Image as ImageIcon, PanelLeft, Sparkles } from "lucide-react";
@@ -49,8 +48,8 @@ export function MessageThread({
 	initialTutorMode,
 	initialEntitlement,
 	onOpenChats,
+	onConversationActivity,
 }: DoubtChatThreadProps) {
-	const router = useRouter();
 	const [input, setInput] = useState("");
 	const [tutorMode, setTutorMode] = useState<DoubtTutorMode>(initialTutorMode ?? "explain");
 	// "Mode-just-changed" UI signal — set when the user toggles the composer
@@ -168,7 +167,11 @@ export function MessageThread({
 					if (entRes.ok) {
 						setEntitlement(entRes.entitlement);
 					}
-					router.refresh();
+					// Bump this conversation to the top of the sidebar without a
+					// full server round-trip (the old `router.refresh()` re-ran the
+					// entire doubt page bundle — subjects, conversations, AND the
+					// expensive performance aggregates — on every turn).
+					onConversationActivity?.(conversationId);
 				} catch (err) {
 					captureDoubtChatError("onFinish", err, { conversationId });
 				}

@@ -125,6 +125,20 @@ export function DoubtChatView(props: {
 		[c, router],
 	);
 
+	// Move a conversation to the top of the sidebar after it sees activity
+	// (an assistant turn finishing). Mirrors the server's `updated_at DESC`
+	// ordering without re-running the page's server data load on every turn.
+	const onConversationActivity = useCallback((conversationId: string) => {
+		setConversations((prev) => {
+			const idx = prev.findIndex((r) => r.id === conversationId);
+			if (idx < 0) return prev;
+			const bumped = { ...prev[idx]!, updatedAt: new Date().toISOString() };
+			return idx === 0
+				? [bumped, ...prev.slice(1)]
+				: [bumped, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+		});
+	}, []);
+
 	const showThread =
 		Boolean(c) && props.initialFromUrl != null && props.initialFromUrl.conversation.id === c;
 	const showPicker = !c;
@@ -365,6 +379,7 @@ export function DoubtChatView(props: {
 									initialTutorMode={props.initialFromUrl.initialTutorMode}
 									initialEntitlement={props.entitlement}
 									onOpenChats={openChats}
+									onConversationActivity={onConversationActivity}
 								/>
 							</motion.div>
 						) : null}

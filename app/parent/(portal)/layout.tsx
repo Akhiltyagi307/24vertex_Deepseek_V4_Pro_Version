@@ -34,18 +34,24 @@ export default async function ParentPortalLayout({ children }: { children: React
 		redirect("/parent/select-student");
 	}
 
-	const linked = await assertParentActiveLink(user.id, activeId);
+	// Link assertion and child-profile read both key off `activeId` and don't
+	// depend on each other — run them concurrently to save a DB round-trip on
+	// every parent page load. We still check `linked` before trusting the row.
+	const supabase = await createClient();
+	const [linked, childResult] = await Promise.all([
+		assertParentActiveLink(user.id, activeId),
+		supabase
+			.from("profiles")
+			.select("id, full_name, school_name, grade, section, student_link_code, role")
+			.eq("id", activeId)
+			.maybeSingle(),
+	]);
+
 	if (!linked) {
 		redirect("/parent/select-student");
 	}
 
-	const supabase = await createClient();
-	const { data: childRow } = await supabase
-		.from("profiles")
-		.select("id, full_name, school_name, grade, section, student_link_code, role")
-		.eq("id", activeId)
-		.maybeSingle();
-
+	const childRow = childResult.data;
 	if (!childRow || childRow.role !== "student") {
 		redirect("/parent/select-student");
 	}
