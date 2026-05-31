@@ -50,6 +50,9 @@ jobs:
           DATABASE_URL: "postgres://placeholder@localhost:5432/placeholder"
           OPENAI_API_KEY: "placeholder"
           NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          # instrumentation.ts (C-1) refuses to boot in production unless this is
+          # explicitly "true"/"false". CI audits placeholder infra, so disable.
+          SAAS_ENFORCEMENT: "false"
         run: pnpm build
 
       # Background processes started in one step do NOT reliably survive into
@@ -64,6 +67,9 @@ jobs:
           DATABASE_URL: "postgres://placeholder@localhost:5432/placeholder"
           OPENAI_API_KEY: "placeholder"
           NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          # instrumentation.ts (C-1) refuses to boot in production unless this is
+          # explicitly "true"/"false". CI audits placeholder infra, so disable.
+          SAAS_ENFORCEMENT: "false"
         run: |
           set -e
           nohup pnpm start > server.log 2>&1 &
