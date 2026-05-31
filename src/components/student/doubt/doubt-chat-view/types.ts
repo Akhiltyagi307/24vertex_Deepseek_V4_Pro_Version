@@ -38,6 +38,12 @@ export type DoubtChatThreadProps = {
 	initialEntitlement: EntitlementSummary;
 	/** Mobile: opens past-chats sheet from thread header */
 	onOpenChats?: () => void;
+	/**
+	 * Called after an assistant turn finishes so the parent can bump this
+	 * conversation to the top of the sidebar client-side, instead of a full
+	 * `router.refresh()` that re-runs the whole doubt page bundle each turn.
+	 */
+	onConversationActivity?: (conversationId: string) => void;
 };
 
 /**
