@@ -4,9 +4,9 @@ import {
 	panelRaisedInputClass,
 	settingsCardCtaButtonClass,
 	settingsCardCtaRowClass,
-} from "../_settings-form-styles";
+} from "@/app/student/settings/_settings-form-styles";
+import type { ParentProfileSettingsRow } from "../parent-account-settings-form";
 import { Button } from "@/components/ui/button";
-import type { StudentProfileSettingsRow } from "../student-profile-settings-form";
 import {
 	Card,
 	CardContent,
@@ -25,12 +25,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { StudentAvatarUpload } from "@/components/student/student-avatar-upload";
 
-export function ProfileEditorPanel({
+export function ParentProfileEditorPanel({
 	userId,
 	profile,
 }: {
 	userId: string;
-	profile: StudentProfileSettingsRow;
+	profile: ParentProfileSettingsRow;
 }) {
 	return (
 		<div>
@@ -38,7 +38,7 @@ export function ProfileEditorPanel({
 				<CardHeader className="px-0 pt-0">
 					<CardTitle className="text-lg">Profile</CardTitle>
 					<CardDescription className="text-base">
-						Name, photo, and phone: what classmates and reports see as you.
+						Name, photo, and phone for your parent account.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="px-0">
@@ -46,12 +46,12 @@ export function ProfileEditorPanel({
 						<FieldLegend className="sr-only">Editable profile</FieldLegend>
 						<FieldGroup className="gap-6">
 							<Field>
-								<FieldLabel className="text-base" htmlFor="fullName">
+								<FieldLabel className="text-base" htmlFor="parentFullName">
 									Display name
 								</FieldLabel>
 								<FieldContent>
 									<Input
-										id="fullName"
+										id="parentFullName"
 										name="fullName"
 										required
 										className={panelRaisedInputClass}
@@ -66,12 +66,12 @@ export function ProfileEditorPanel({
 								initialAvatarUrl={profile.avatar_url}
 							/>
 							<Field>
-								<FieldLabel className="text-base" htmlFor="phone">
+								<FieldLabel className="text-base" htmlFor="parentPhone">
 									Phone
 								</FieldLabel>
 								<FieldContent>
 									<Input
-										id="phone"
+										id="parentPhone"
 										name="phone"
 										type="tel"
 										className={panelRaisedInputClass}

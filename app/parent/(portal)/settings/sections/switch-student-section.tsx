@@ -7,6 +7,10 @@ import { Users } from "lucide-react";
 import { selectParentStudentAction } from "../../../select-student/actions";
 import { unlinkParentFromStudent, type UnlinkChildState } from "../unlink-actions";
 import {
+	settingsCardCtaButtonClass,
+	settingsCardCtaRowClass,
+} from "@/app/student/settings/_settings-form-styles";
+import {
 	AlertDialog,
 	AlertDialogCancel,
 	AlertDialogContent,
@@ -116,14 +120,16 @@ export function SwitchStudentSection({
 					<p className="mt-3 text-muted-foreground text-sm">No linked students yet.</p>
 				)}
 			</div>
-			<Button
-				variant="outline"
-				className="w-full medium:w-auto"
-				render={<Link href={onSwitchHref} />}
-			>
-				<Users data-icon="inline-start" />
-				Open student picker
-			</Button>
+			<div className={settingsCardCtaRowClass}>
+				<Button
+					variant="outline"
+					className={settingsCardCtaButtonClass}
+					render={<Link href={onSwitchHref} />}
+				>
+					<Users data-icon="inline-start" />
+					Open student picker
+				</Button>
+			</div>
 		</div>
 	);
 }

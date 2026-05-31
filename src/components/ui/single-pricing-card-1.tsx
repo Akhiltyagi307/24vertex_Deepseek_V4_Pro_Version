@@ -10,6 +10,12 @@ import {
   landingMarketingBadgeClassName,
   landingMarketingSectionEyebrowBadgeClassName,
 } from '@/lib/marketing/landing-marketing-badge'
+import {
+  PLAN_CATALOG,
+  annualEffectiveMonthlyRupees,
+  annualSavingsVsMonthlyRupees,
+  rupeesFromPaise,
+} from '@/lib/billing/plans'
 import { LANDING_PARENT_PRIMARY_CTA_HREF, LANDING_PRICING_MONTHLY_CTA_LABEL, LANDING_PRICING_YEARLY_CTA_LABEL } from '@/lib/marketing/landing-copy'
 import {
   MARKETING_SECTION_INTRO_MAX_CLASSNAME,
@@ -22,6 +28,11 @@ import {
 } from '@/lib/marketing/pricing-card-surface'
 
 export function Pricing() {
+  const monthlyRupees = rupeesFromPaise(PLAN_CATALOG.pro_monthly.pricePaise)
+  const annualRupees = rupeesFromPaise(PLAN_CATALOG.pro_annual.pricePaise)
+  const effectiveMonthlyRupees = annualEffectiveMonthlyRupees()
+  const annualSavingsRupees = annualSavingsVsMonthlyRupees()
+
   return (
     <section className="relative overflow-hidden bg-background py-16 medium:py-20 xl:py-24">
       <div id="pricing" className="mx-auto w-full max-w-7xl space-y-8 px-4 medium:px-6 xl:px-8 medium:space-y-10">
@@ -92,7 +103,7 @@ export function Pricing() {
                   <div className="text-muted-foreground flex items-end gap-1 text-lg medium:text-xl">
                     <span>&#8377;</span>
                     <span className="text-foreground -mb-0.5 text-3xl font-extrabold tracking-tight medium:text-5xl">
-                      1,000
+                      {monthlyRupees.toLocaleString('en-IN')}
                     </span>
                     <span>/month</span>
                   </div>
@@ -130,14 +141,15 @@ export function Pricing() {
                       streak, term break to term break.
                     </p>
                     <p className="text-primary text-sm font-medium medium:text-base">
-                      Effective ₹833/month. Save ₹2,000 compared to paying monthly.
+                      Effective ₹{effectiveMonthlyRupees.toLocaleString('en-IN')}/month. Save ₹
+                      {annualSavingsRupees.toLocaleString('en-IN')} compared to paying monthly.
                     </p>
                   </div>
                   <div className="mt-auto space-y-4 pt-8 medium:space-y-5 medium:pt-12">
                     <div className="text-muted-foreground flex items-end gap-1 text-xl medium:text-2xl">
                       <span>&#8377;</span>
                       <span className="text-foreground -mb-0.5 text-5xl font-extrabold tracking-tight medium:text-7xl">
-                        10,000
+                        {annualRupees.toLocaleString('en-IN')}
                       </span>
                       <span>/year</span>
                     </div>
@@ -157,6 +169,7 @@ export function Pricing() {
 
             <div
               className={cn(
+                'relative z-10',
                 pricingTierCardSurfaceClassName,
                 'border-border/55 mx-auto rounded-2xl px-5 py-4 text-center medium:px-7 medium:py-5',
                 MARKETING_SECTION_INTRO_MAX_CLASSNAME,

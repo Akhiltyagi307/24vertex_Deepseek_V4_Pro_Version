@@ -9,7 +9,7 @@ import type {
 	NotificationPreferencesInput,
 	NotificationPreferencesState,
 } from "./notification-preferences-types";
-import { settingsCtaButtonClass, settingsCtaButtonWidthClass } from "./_settings-form-styles";
+import { settingsCardCtaButtonClass, settingsCardCtaRowClass } from "./_settings-form-styles";
 import AnimatedToggle from "@/components/smoothui/animated-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,16 +145,13 @@ export function NotificationPreferencesForm({
 				</div>
 			</div>
 
-			<div
-				className={cn(
-					"flex items-center justify-between gap-4",
-					isSettingsTab && "flex-col items-stretch medium:flex-row medium:items-center",
-				)}
-			>
+			<div className={isSettingsTab ? settingsCardCtaRowClass : "flex items-center justify-between gap-4"}>
 				<p
 					className={cn(
 						"text-muted-foreground",
-						isSettingsTab ? "min-h-[1.25rem] text-sm leading-relaxed" : "text-xs",
+						isSettingsTab ?
+							"min-h-[1.25rem] w-full self-start text-sm leading-relaxed medium:mr-auto medium:w-auto"
+						:	"text-xs",
 					)}
 					aria-live="polite"
 				>
@@ -168,11 +165,7 @@ export function NotificationPreferencesForm({
 				</p>
 				<Button
 					type={isSettingsTab ? "button" : "submit"}
-					className={
-						isSettingsTab ?
-							cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")
-						:	undefined
-					}
+					className={isSettingsTab ? settingsCardCtaButtonClass : undefined}
 					disabled={pending}
 					onClick={isSettingsTab ? () => save() : undefined}
 				>
@@ -189,9 +182,7 @@ export function NotificationPreferencesForm({
 					<CardHeader className="px-0 pt-0">
 						<CardTitle className="text-lg">Notification preferences</CardTitle>
 						<CardDescription className="text-base leading-relaxed">
-							Choose where you want to be notified and which types you care about. Use{" "}
-							<strong className="font-medium text-foreground">Save preferences</strong> on this tab, not
-							“Save changes” at the bottom.
+							Choose where you want to be notified and which types you care about.
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="px-0">

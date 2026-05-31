@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 
+import {
+	settingsCardCtaButtonClass,
+	settingsCardCtaRowClass,
+} from "@/app/student/settings/_settings-form-styles";
 import { Button } from "@/components/ui/button";
 
 const settingsNestedWellClass =
@@ -22,13 +26,15 @@ export function LinkStudentSection() {
 					You&apos;ll confirm the link on the next screen. The student must generate the code
 					from their 24Vertex profile.
 				</p>
-				<Button
-					className="mt-4 h-11 text-base"
-					size="lg"
-					render={<Link href="/parent/link-child" />}
-				>
-					Link another student account
-				</Button>
+				<div className={settingsCardCtaRowClass}>
+					<Button
+						className={settingsCardCtaButtonClass}
+						size="lg"
+						render={<Link href="/parent/link-child" />}
+					>
+						Link another student account
+					</Button>
+				</div>
 			</div>
 		</div>
 	);

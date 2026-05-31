@@ -8,6 +8,7 @@ import { HomeMarketingShell } from "@/components/marketing/home-marketing-shell"
 import { LandingMarketingBody } from "@/components/marketing/landing-marketing-body";
 import { MarketingSiteHeader } from "@/components/marketing/marketing-site-header";
 import { MarketingSiteFooter } from "@/components/marketing/marketing-site-footer";
+import { rupeesFromPaise, PLAN_CATALOG } from "@/lib/billing/plans";
 import { getAppUrl, getPublicSupportEmail } from "@/lib/env";
 
 export const metadata: Metadata = {
@@ -33,6 +34,8 @@ const PARENT_FIRST_DESCRIPTION =
 export default async function HomePage() {
 	const landingBaseUrl = resolveLandingBaseUrl();
 	const supportEmail = getPublicSupportEmail();
+	const monthlyPriceInr = String(rupeesFromPaise(PLAN_CATALOG.pro_monthly.pricePaise));
+	const yearlyPriceInr = String(rupeesFromPaise(PLAN_CATALOG.pro_annual.pricePaise));
 	// Root must be a single object with `@context` — Safari throws when the
 	// document is a top-level array (`r["@context"]` is undefined on Array).
 	const landingJsonLd = {
@@ -73,11 +76,11 @@ export default async function HomePage() {
 					{
 						"@type": "Offer",
 						name: "Monthly",
-						price: "1000",
+						price: monthlyPriceInr,
 						priceCurrency: "INR",
 						priceSpecification: {
 							"@type": "UnitPriceSpecification",
-							price: "1000",
+							price: monthlyPriceInr,
 							priceCurrency: "INR",
 							referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" },
 						},
@@ -87,11 +90,11 @@ export default async function HomePage() {
 					{
 						"@type": "Offer",
 						name: "Yearly",
-						price: "10000",
+						price: yearlyPriceInr,
 						priceCurrency: "INR",
 						priceSpecification: {
 							"@type": "UnitPriceSpecification",
-							price: "10000",
+							price: yearlyPriceInr,
 							priceCurrency: "INR",
 							referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "ANN" },
 						},

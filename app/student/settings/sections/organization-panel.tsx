@@ -6,8 +6,8 @@ import { settingsNestedWellClass } from "./_account-fields";
 import type { UpdateStudentOrganizationState } from "../actions";
 import {
 	panelRaisedInputClass,
-	settingsCtaButtonClass,
-	settingsCtaButtonWidthClass,
+	settingsCardCtaButtonClass,
+	settingsCardCtaRowClass,
 } from "../_settings-form-styles";
 import type { StudentProfileSettingsRow } from "../student-profile-settings-form";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ export function OrganizationPanel({
 					{currentOrganization ? currentOrganization.name : "Not connected"}
 				</div>
 			</div>
-			<div className="mt-4 grid gap-3 medium:grid-cols-[1fr_auto_auto] medium:items-end">
+			<div className="mt-4 space-y-4">
 				<div className="space-y-2">
 					<label htmlFor="organizationId" className="text-sm font-medium text-foreground/80">
 						Choose organization
@@ -72,22 +72,24 @@ export function OrganizationPanel({
 						))}
 					</select>
 				</div>
-				<Button
-					type="submit"
-					formAction={organizationFormAction}
-					variant="default"
-					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
-				>
-					Save organization
-				</Button>
-				<Button
-					type="submit"
-					formAction={unlinkOrganization}
-					variant="outline"
-					className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
-				>
-					Unlink
-				</Button>
+				<div className={cn(settingsCardCtaRowClass, "mt-0")}>
+					<Button
+						type="submit"
+						formAction={organizationFormAction}
+						variant="default"
+						className={settingsCardCtaButtonClass}
+					>
+						Save organization
+					</Button>
+					<Button
+						type="submit"
+						formAction={unlinkOrganization}
+						variant="outline"
+						className={settingsCardCtaButtonClass}
+					>
+						Unlink
+					</Button>
+				</div>
 			</div>
 			{organizationState?.error ? (
 				<p className="mt-3 text-destructive text-sm leading-relaxed" role="alert">

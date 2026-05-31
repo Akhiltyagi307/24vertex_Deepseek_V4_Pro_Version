@@ -123,7 +123,7 @@ Plans must exist at Razorpay before subscriptions can use them. Two paths:
 pnpm tsx scripts/seed-razorpay-plans.ts
 ```
 
-Creates `pro_monthly` (₹1,000/month) and `pro_annual` (₹10,000/year) at Razorpay using the Plans API. Prints the resulting `plan_id` for each.
+Creates `pro_monthly` (₹600/month) and `pro_annual` (₹6,000/year) at Razorpay using the Plans API. Prints the resulting `plan_id` for each.
 
 ### Option B — manually in dashboard
 
@@ -133,7 +133,7 @@ Creates `pro_monthly` (₹1,000/month) and `pro_annual` (₹10,000/year) at Razo
 |---|---|---|
 | Period | `monthly` | `yearly` |
 | Interval | `1` | `1` |
-| Item amount | `100000` paise | `1000000` paise |
+| Item amount | `60000` paise | `600000` paise |
 | Currency | INR | INR |
 | Item name | "Pro Monthly" | "Pro Annual" |
 

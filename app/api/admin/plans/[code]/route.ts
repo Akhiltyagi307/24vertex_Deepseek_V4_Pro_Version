@@ -25,6 +25,7 @@ const patchBodySchema = z.object({
 	pool_multiplier: z.number().int().min(1).optional(),
 	is_active: z.boolean().optional(),
 	sort_order: z.number().int().optional(),
+	razorpay_plan_id: z.string().trim().min(1).max(80).nullable().optional(),
 }).strict();
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ code: string }> }) {
@@ -94,6 +95,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ code:
 				...(patch.pool_multiplier != null ? { poolMultiplier: patch.pool_multiplier } : {}),
 				...(patch.is_active != null ? { isActive: patch.is_active } : {}),
 				...(patch.sort_order != null ? { sortOrder: patch.sort_order } : {}),
+				...(patch.razorpay_plan_id !== undefined ? { razorpayPlanId: patch.razorpay_plan_id } : {}),
 				updatedAt: now,
 			})
 			.where(eq(plans.code, parsedCode.data));

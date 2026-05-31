@@ -6,6 +6,7 @@ import { MarketingSection } from "@/components/marketing/blocks/marketing-sectio
 import { LandingPrimaryCtaButton } from "@/components/marketing/landing-primary-cta-button";
 import { MarketingSubpageShell } from "@/components/marketing/marketing-subpage-shell";
 import { Pricing } from "@/components/ui/single-pricing-card-1";
+import { PLAN_CATALOG, rupeesFromPaise } from "@/lib/billing/plans";
 import { getAppUrl } from "@/lib/env";
 import { LANDING_PARENT_PRIMARY_CTA_HREF } from "@/lib/marketing/landing-copy";
 import { HELP_FAQ_CATEGORIES } from "@/lib/marketing/pages/help-faq";
@@ -33,6 +34,8 @@ function resolveBaseUrl(): string {
 
 export default function PricingPage() {
 	const base = resolveBaseUrl();
+	const monthlyPriceInr = String(rupeesFromPaise(PLAN_CATALOG.pro_monthly.pricePaise));
+	const yearlyPriceInr = String(rupeesFromPaise(PLAN_CATALOG.pro_annual.pricePaise));
 	const jsonLd = {
 		"@context": "https://schema.org",
 		"@type": "Product",
@@ -43,14 +46,14 @@ export default function PricingPage() {
 			{
 				"@type": "Offer",
 				name: "Monthly",
-				price: "1000",
+				price: monthlyPriceInr,
 				priceCurrency: "INR",
 				url: `${base}${LANDING_PARENT_PRIMARY_CTA_HREF}`,
 			},
 			{
 				"@type": "Offer",
 				name: "Yearly",
-				price: "10000",
+				price: yearlyPriceInr,
 				priceCurrency: "INR",
 				url: `${base}${LANDING_PARENT_PRIMARY_CTA_HREF}`,
 			},

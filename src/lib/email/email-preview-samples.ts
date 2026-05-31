@@ -474,7 +474,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 			subject: "Payment received · 24Vertex",
 			source: "app",
 			html: renderEmailShell({
-				preheader: "₹499 paid for Pro Monthly.",
+				preheader: "₹600 paid for Pro Monthly.",
 				greeting: `Hi ${sn},`,
 				title: "Payment received · 24Vertex",
 				paragraphs: [
@@ -482,7 +482,7 @@ export function buildEmailPreviewSamples(): EmailPreviewSample[] {
 					"Your hosted Razorpay invoice is available below.",
 				],
 				stats: [
-					{ label: "Amount", value: "₹499" },
+					{ label: "Amount", value: "₹600" },
 					{ label: "Plan", value: "Pro Monthly" },
 					{ label: "Reference", value: "pay_demo123" },
 				],

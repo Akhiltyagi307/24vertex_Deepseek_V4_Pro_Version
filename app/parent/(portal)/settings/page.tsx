@@ -5,17 +5,19 @@ import { PageStaggerRoot } from "@/components/motion/page-stagger-root";
 import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
+import { getNotificationPrefs } from "@/lib/notifications/prefs";
 import { loadLinkedChildrenForParent } from "@/lib/parent/linked-children";
 import { studentHubPageShellClassName } from "@/lib/student/student-hub-page-layout";
 import { cn } from "@/lib/utils";
 
-import { ParentAccountSettingsClient } from "./parent-account-settings-client";
+import { ParentAccountSettingsForm } from "./parent-account-settings-form";
+import { updateParentNotificationPreferences } from "./notification-preferences-actions";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
 	title: "Account · Parent",
-	description: "Switch between linked students, link a new student, or unlink an existing one.",
+	description: "Manage your parent profile, password, notifications, and linked students.",
 	robots: { index: false, follow: false },
 };
 
@@ -25,8 +27,21 @@ export default async function ParentSettingsPage() {
 	const row = await getCachedAppProfileRow();
 	if (!row || row.role !== "parent") redirect("/login");
 
-	const linkedStudentsRows = await loadLinkedChildrenForParent(user.id);
-	const displayName = formatPersonDisplayName(row.full_name ?? "") || "Parent";
+	const [linkedStudentsRows, prefs] = await Promise.all([
+		loadLinkedChildrenForParent(user.id),
+		getNotificationPrefs(user.id),
+	]);
+
+	const initialNotificationPrefs = {
+		enableInApp: prefs.enableInApp,
+		enableEmail: prefs.enableEmail,
+		types: {
+			test_result: prefs.types.test_result !== false,
+			usage_alert: prefs.types.usage_alert !== false,
+			announcement: prefs.types.announcement !== false,
+			reminder: prefs.types.reminder !== false,
+		},
+	};
 
 	return (
 		<div
@@ -42,8 +57,17 @@ export default async function ParentSettingsPage() {
 					{
 						key: "account",
 						content: (
-							<ParentAccountSettingsClient
-								signedInAs={displayName}
+							<ParentAccountSettingsForm
+								userId={user.id}
+								loginEmail={user.email ?? ""}
+								profile={{
+									id: row.id,
+									full_name: row.full_name,
+									avatar_url: row.avatar_url,
+									phone: row.phone,
+								}}
+								initialNotificationPrefs={initialNotificationPrefs}
+								saveNotificationPreferences={updateParentNotificationPreferences}
 								linkedStudents={linkedStudentsRows.map((c) => ({
 									id: c.id,
 									displayName: formatPersonDisplayName(c.full_name ?? "") || "Your student",

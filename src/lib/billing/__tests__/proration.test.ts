@@ -4,8 +4,8 @@ import { defaultWhenForChange, quotePlanChange } from "../proration";
 
 describe("quotePlanChange", () => {
 	it("upgrade monthly → annual mid-cycle returns positive delta", () => {
-		// Monthly = ₹1000 paise=100000, annual = ₹10000 paise=1000000.
-		// Mid-cycle (50% remaining) of a monthly cycle: delta = (1000000 - 100000) * 0.5 = 450000.
+		// Monthly = ₹600 paise=60000, annual = ₹6000 paise=600000.
+		// Mid-cycle (50% remaining) of a monthly cycle: delta = (600000 - 60000) * 0.5 = 270000.
 		const periodStart = new Date("2026-05-01T00:00:00Z");
 		const periodEnd = new Date("2026-06-01T00:00:00Z");
 		const now = new Date("2026-05-16T12:00:00Z"); // ~50% remaining
@@ -17,11 +17,11 @@ describe("quotePlanChange", () => {
 			now,
 		});
 		expect(q.isUpgrade).toBe(true);
-		expect(q.fromPricePaise).toBe(100000);
-		expect(q.toPricePaise).toBe(1000000);
-		// Loose: somewhere near 50% × 900000 = 450000, allow ±10% for calendar-month math.
-		expect(q.deltaPaise).toBeGreaterThan(400000);
-		expect(q.deltaPaise).toBeLessThan(500000);
+		expect(q.fromPricePaise).toBe(60000);
+		expect(q.toPricePaise).toBe(600000);
+		// Loose: somewhere near 50% × 540000 = 270000, allow ±10% for calendar-month math.
+		expect(q.deltaPaise).toBeGreaterThan(240000);
+		expect(q.deltaPaise).toBeLessThan(300000);
 	});
 
 	it("downgrade annual → monthly mid-cycle returns negative delta (credit)", () => {
@@ -78,8 +78,8 @@ describe("quotePlanChange", () => {
 			currentPeriodEnd: periodEnd,
 			now: periodStart,
 		});
-		// 100% remaining ⇒ delta = 900000
-		expect(q.deltaPaise).toBe(900000);
+		// 100% remaining ⇒ delta = 540000
+		expect(q.deltaPaise).toBe(540000);
 	});
 });
 

@@ -4,7 +4,7 @@ import { CheckIcon } from "lucide-react";
 import { useState } from "react";
 
 import { recordPasswordChangedAction } from "./account-security-actions";
-import { panelRaisedInputClass, settingsCtaButtonClass, settingsCtaButtonWidthClass } from "./_settings-form-styles";
+import { panelRaisedInputClass, settingsCardCtaButtonClass, settingsCardCtaRowClass } from "./_settings-form-styles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,6 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { studentChangePasswordSchema } from "@/lib/validations/auth";
 
@@ -100,8 +99,7 @@ export function PasswordChangeForm({ loginEmail, fieldIdPrefix = "student" }: Pr
 				<CardHeader className="px-0 pt-0">
 					<CardTitle className="text-lg">Change password</CardTitle>
 					<CardDescription className="text-base leading-relaxed">
-						Update the password for this email login. This uses the button on this tab, not
-						“Save changes” at the bottom.
+						Update the password for this email login.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="px-0">
@@ -168,18 +166,16 @@ export function PasswordChangeForm({ loginEmail, fieldIdPrefix = "student" }: Pr
 							</FieldContent>
 						</Field>
 					</FieldGroup>
-					<Button
-						type="button"
-						className={cn(
-							settingsCtaButtonClass,
-							settingsCtaButtonWidthClass,
-							"mt-6 shrink-0",
-						)}
-						disabled={pwPending}
-						onClick={() => void handleChangePassword()}
-					>
-						{pwPending ? "Updating…" : "Update password"}
-					</Button>
+					<div className={settingsCardCtaRowClass}>
+						<Button
+							type="button"
+							className={settingsCardCtaButtonClass}
+							disabled={pwPending}
+							onClick={() => void handleChangePassword()}
+						>
+							{pwPending ? "Updating…" : "Update password"}
+						</Button>
+					</div>
 				</CardContent>
 			</Card>
 		</div>

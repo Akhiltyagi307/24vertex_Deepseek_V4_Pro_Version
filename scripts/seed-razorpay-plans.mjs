@@ -40,7 +40,7 @@ const plans = [
 			interval: 1,
 			item: {
 				name: "24Vertex Pro Monthly",
-				amount: 100000, // paise
+				amount: 60000, // paise (₹600)
 				currency: "INR",
 				description: "30 practice tests/month + generous AI doubt-chat tokens",
 			},
@@ -54,7 +54,7 @@ const plans = [
 			interval: 1,
 			item: {
 				name: "24Vertex Pro Annual",
-				amount: 1000000, // paise (₹10,000)
+				amount: 600000, // paise (₹6,000)
 				currency: "INR",
 				description: "12-month pool — 360 practice tests + expanded AI doubt-chat",
 			},

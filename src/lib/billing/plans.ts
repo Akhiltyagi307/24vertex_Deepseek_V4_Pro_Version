@@ -43,7 +43,7 @@ export const PLAN_CATALOG: Record<PlanCode, PlanCatalogEntry> = {
 		code: "pro_monthly",
 		name: "Pro Monthly",
 		interval: "month",
-		pricePaise: 100_000, // ₹1,000.00
+		pricePaise: 60_000, // ₹600.00
 		testsPerPeriod: 30,
 		tokensGrade6to10: 200_000,
 		tokensGrade11to12: 400_000,
@@ -54,12 +54,12 @@ export const PLAN_CATALOG: Record<PlanCode, PlanCatalogEntry> = {
 		code: "pro_annual",
 		name: "Pro Annual",
 		interval: "year",
-		pricePaise: 1_000_000, // ₹10,000.00
+		pricePaise: 600_000, // ₹6,000.00 (2 months free vs monthly)
 		testsPerPeriod: 360,
 		tokensGrade6to10: 2_400_000,
 		tokensGrade11to12: 4_800_000,
 		poolMultiplier: 12,
-		annualSavingsPercent: 17,
+		annualSavingsPercent: 17, // ₹7,200/yr at monthly rate − ₹6,000 yearly
 	},
 };
 
@@ -69,10 +69,25 @@ export function isPlanCode(value: unknown): value is PlanCode {
 	return typeof value === "string" && (value === "free" || value === "pro_monthly" || value === "pro_annual");
 }
 
-/** Monthly/annual display formatter, ₹1,000. */
+/** Monthly/annual display formatter, e.g. ₹600. */
 export function formatRupees(paise: number): string {
 	const rupees = Math.round(paise / 100);
 	return `₹${rupees.toLocaleString("en-IN")}`;
+}
+
+/** Whole rupees for marketing copy (no ₹ prefix). */
+export function rupeesFromPaise(paise: number): number {
+	return Math.round(paise / 100);
+}
+
+/** Effective monthly cost when paying yearly (₹500 at ₹6,000/yr). */
+export function annualEffectiveMonthlyRupees(): number {
+	return Math.round(PLAN_CATALOG.pro_annual.pricePaise / 100 / 12);
+}
+
+/** Total rupees saved vs 12× monthly when choosing yearly. */
+export function annualSavingsVsMonthlyRupees(): number {
+	return rupeesFromPaise(PLAN_CATALOG.pro_monthly.pricePaise) * 12 - rupeesFromPaise(PLAN_CATALOG.pro_annual.pricePaise);
 }
 
 /** Tokens for a student's grade under a given plan. */

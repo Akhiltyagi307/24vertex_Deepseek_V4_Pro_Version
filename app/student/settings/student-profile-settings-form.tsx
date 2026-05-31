@@ -32,11 +32,7 @@ import { ParentPanel } from "./sections/parent-panel";
 import type { PendingParentLinkRow } from "@/lib/parent/pending-parent-links";
 import { ProfileEditorPanel } from "./sections/profile-editor-panel";
 import { SubjectsPanel } from "./sections/subjects-panel";
-import {
-	settingsCtaButtonClass,
-	settingsCtaButtonWidthClass,
-	tabAccentClass,
-} from "./_settings-form-styles";
+import { settingsCtaButtonClass, tabAccentClass } from "./_settings-form-styles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import SmoothTab from "@/components/kokonutui/smooth-tab";
@@ -173,8 +169,8 @@ export function StudentProfileSettingsForm({
 			<div className="flex shrink-0 flex-col gap-1.5">
 				<h1 className="font-semibold text-3xl tracking-tight text-balance text-foreground">Profile</h1>
 				<PageHeaderSubtext variant="wrap">
-					Update your name, photo, and appearance here. Tap{" "}
-					<span className="text-foreground/90">Save changes</span> when you&apos;re done.
+					Update your name, photo, and phone on the Profile tab. School fields save in their own pop-ups;
+					organization, password, and notification tabs each have their own save button.
 					<br />
 					<span className="text-foreground/90">Password</span>,{" "}
 					<span className="text-foreground/90">School &amp; account</span>,{" "}
@@ -286,27 +282,6 @@ export function StudentProfileSettingsForm({
 						},
 					]}
 				/>
-
-				<div
-					className={cn(
-						"sticky bottom-0 z-10 -mx-1 mt-2 flex flex-col gap-3 border-t border-border bg-background/95 px-1 py-4 backdrop-blur-md",
-						"supports-[backdrop-filter]:bg-background/80 medium:flex-row medium:items-center medium:justify-between",
-					)}
-				>
-					<p className="text-muted-foreground text-sm leading-relaxed">
-						<strong className="font-medium text-foreground">Save changes</strong> only saves the Profile tab
-						(name, photo, phone). On School &amp; account, each field saves in its own pop-up. Use{" "}
-						<strong className="font-medium text-foreground">Update password</strong> on the Password tab and{" "}
-						<strong className="font-medium text-foreground">Save preferences</strong> on the Notifications
-						tab.
-					</p>
-					<Button
-						type="submit"
-						className={cn(settingsCtaButtonClass, settingsCtaButtonWidthClass, "shrink-0")}
-					>
-						Save changes
-					</Button>
-				</div>
 			</form>
 		</div>
 	);

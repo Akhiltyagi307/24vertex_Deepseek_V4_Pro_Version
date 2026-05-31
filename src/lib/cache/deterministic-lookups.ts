@@ -12,6 +12,6 @@ type PlanCatalog = Record<PlanCode, PlanCatalogEntry>;
  */
 export const getCachedPlanCatalog = unstable_cache(
 	async (): Promise<PlanCatalog> => ({ ...PLAN_CATALOG }),
-	["deterministic-plan-catalog-v1"],
+	["deterministic-plan-catalog-v2"],
 	{ revalidate: 3600, tags: ["plan-catalog"] },
 );

@@ -242,6 +242,9 @@ export const teacherProfileUpdateSchema = z
 		}
 	});
 
+/** Parent self-service profile on `/parent/settings`. */
+export const parentProfileUpdateSchema = teacherProfileUpdateSchema;
+
 /** Org teachers choose roster filters on `/teacher/settings`. */
 export const teacherTeachingFocusSchema = z
 	.object({

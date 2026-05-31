@@ -112,9 +112,9 @@ describe("RazorpayPlanFetchedSchema", () => {
 			id: "plan_1",
 			period: "monthly",
 			interval: 1,
-			item: { name: "Pro Monthly", amount: 100000, currency: "INR" },
+			item: { name: "Pro Monthly", amount: 60000, currency: "INR" },
 		});
-		expect(out.item?.amount).toBe(100000);
+		expect(out.item?.amount).toBe(60000);
 	});
 
 	it("parses a plan without optional item", () => {

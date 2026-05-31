@@ -23,8 +23,15 @@ export const placementSelectClass = cn(
 	"w-full cursor-pointer appearance-none pr-10",
 );
 
-/** Primary & outline CTAs on Profile settings — same tap target + type scale as sticky “Save changes”. */
+/** Primary & outline CTAs on Profile settings — shared tap target + type scale. */
 export const settingsCtaButtonClass = "h-11 min-h-11 px-6 text-base font-medium";
 
 /** Full-width on narrow layouts; auto width from `medium` up. */
 export const settingsCtaButtonWidthClass = "w-full medium:w-auto";
+
+/** Bottom-right row for card save/update actions. */
+export const settingsCardCtaRowClass =
+	"mt-6 flex w-full flex-col items-end gap-3 medium:flex-row medium:flex-wrap medium:justify-end";
+
+/** Card footer CTA — compact width at all breakpoints. */
+export const settingsCardCtaButtonClass = cn(settingsCtaButtonClass, "w-auto shrink-0");
