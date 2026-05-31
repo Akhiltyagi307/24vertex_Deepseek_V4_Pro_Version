@@ -4,7 +4,10 @@ import { act } from "react-dom/test-utils";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { TutorMarkdown } from "@/components/student/doubt/tutor-markdown";
+import {
+	TutorMarkdown,
+	splitSolutionSteps,
+} from "@/components/student/doubt/tutor-markdown";
 
 // Tell React this is an act() environment so renders/effects flush synchronously.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -84,5 +87,72 @@ describe("TutorMarkdown rendering", () => {
 		expect(c.querySelector("code")).not.toBeNull();
 		expect(c.querySelector(".katex")).toBeNull();
 		expect(c.textContent ?? "").toContain("\\(x\\)");
+	});
+
+	it("renders a full walkthrough as a <details> disclosure, first step open", async () => {
+		const md = [
+			"Here is the full solution.",
+			"",
+			"### Step 1: Write the formula",
+			"",
+			"We use $v = u + at$.",
+			"",
+			"### Step 2: Substitute",
+			"",
+			"Plug in the values.",
+			"",
+			"### Step 3: Solve",
+			"",
+			"The answer is 20 m/s.",
+		].join("\n");
+		const c = await render(md);
+		const details = c.querySelectorAll("details");
+		expect(details.length).toBe(3);
+		// First step open, the rest collapsed.
+		expect(details[0]?.hasAttribute("open")).toBe(true);
+		expect(details[1]?.hasAttribute("open")).toBe(false);
+		expect(details[2]?.hasAttribute("open")).toBe(false);
+		// Summary carries the step heading text.
+		expect(c.querySelector("summary")?.textContent).toContain("Step 1: Write the formula");
+		// Math inside a step still typesets — content is not garbled.
+		expect(c.querySelector(".katex")).not.toBeNull();
+		// The preamble survives outside the disclosure.
+		expect(c.textContent ?? "").toContain("Here is the full solution.");
+	});
+
+	it("falls back to plain markdown with only one Step heading", async () => {
+		const c = await render("### Step 1: Just one\n\nNo disclosure here.");
+		expect(c.querySelector("details")).toBeNull();
+		// The lone heading renders as a normal heading (### → h5 via overrides).
+		expect(c.querySelector("h5")?.textContent).toContain("Step 1: Just one");
+	});
+
+	it("never splits on a '### Step' that lives inside a code fence", async () => {
+		const c = await render("```\n### Step 1: fake\n### Step 2: fake\n```");
+		expect(c.querySelector("details")).toBeNull();
+		expect(c.querySelector("code")).not.toBeNull();
+		expect(c.textContent ?? "").toContain("### Step 1: fake");
+	});
+});
+
+describe("splitSolutionSteps", () => {
+	it("returns no steps for ordinary prose (fallback to plain rendering)", () => {
+		const out = splitSolutionSteps("Just a short hint. Try the setup first.");
+		expect(out.steps).toHaveLength(0);
+		expect(out.preamble).toContain("short hint");
+	});
+
+	it("splits two-or-more Step headings and preserves bodies verbatim", () => {
+		const md = "intro\n\n### Step 1: A\n\nbody one\n\n### Step 2: B\n\nbody two";
+		const out = splitSolutionSteps(md);
+		expect(out.preamble).toBe("intro");
+		expect(out.steps).toHaveLength(2);
+		expect(out.steps[0]).toEqual({ heading: "Step 1: A", body: "body one" });
+		expect(out.steps[1]).toEqual({ heading: "Step 2: B", body: "body two" });
+	});
+
+	it("ignores Step headings inside a fenced code block", () => {
+		const md = "```\n### Step 1: x\n### Step 2: y\n```";
+		expect(splitSolutionSteps(md).steps).toHaveLength(0);
 	});
 });

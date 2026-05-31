@@ -57,6 +57,7 @@ import {
 	sortPerformanceRows,
 	type SubjectCardTrackerStats,
 } from "@/lib/student/performance-matrix";
+import { computeMasteryState, formatMasteryStateLabel } from "@/lib/student/mastery-states";
 import { formatTrackerStatusLabel } from "@/lib/student/tracker-status-labels";
 import { StudentPerformanceTrackerHydrate } from "@/components/student/student-performance-tracker-hydrate";
 import {
@@ -1085,13 +1086,24 @@ export function StudentPerformanceView({
 																		{row.topicNumber}
 																	</td>
 																	<td className="border-border border-e px-3 py-2 align-middle">
-																		<div className="flex justify-center">
+																		<div className="flex flex-col items-center gap-1">
 																			<Badge
 																				variant={statusBadgeVariant(row.status)}
 																				className={performanceStatusBadgeClass(row.status)}
 																			>
 																				{formatTrackerStatusLabel(row.status)}
 																			</Badge>
+																			{parentViewer ? (
+																				<span className="text-[11px] leading-none text-muted-foreground">
+																					{formatMasteryStateLabel(
+																						computeMasteryState({
+																							status: row.status,
+																							testsTaken: row.testsTaken,
+																							averageScore: row.averageScore,
+																						}),
+																					)}
+																				</span>
+																			) : null}
 																		</div>
 																	</td>
 																	<td className="border-border border-e px-3 py-2 align-middle">

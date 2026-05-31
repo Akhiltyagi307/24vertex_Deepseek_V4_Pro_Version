@@ -21,6 +21,7 @@ import {
 } from "@/lib/student/performance-matrix";
 import type { StudentProfileSubjectsRow } from "@/lib/student/student-performance-load";
 import { loadStudentPerformanceBundle } from "@/lib/student/student-performance-load";
+import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
@@ -29,7 +30,73 @@ export type StudentDashboardProfileRow = StudentProfileSubjectsRow & {
 	section: string | null;
 	full_name: string | null;
 	organization_id: string | null;
+	/**
+	 * Account creation timestamp — drives the first-run onboarding checklist window.
+	 * Optional so callers that never show the checklist (e.g. the parent portal) can omit it.
+	 */
+	created_at?: string | null;
 };
+
+/**
+ * First-run onboarding signals derived from existing data (migration-free).
+ * The view shows the checklist only while `isNewStudent && !allComplete`.
+ */
+export type StudentDashboardOnboarding = {
+	isNewStudent: boolean;
+	hasTakenTest: boolean;
+	hasAskedDoubt: boolean;
+	hasLinkedParent: boolean;
+};
+
+/** Students created within this many days see the onboarding checklist. */
+const ONBOARDING_NEW_STUDENT_WINDOW_DAYS = 7;
+
+function isWithinOnboardingWindow(createdAtIso: string | null): boolean {
+	if (!createdAtIso) return false;
+	const created = Date.parse(createdAtIso);
+	if (Number.isNaN(created)) return false;
+	const windowMs = ONBOARDING_NEW_STUDENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+	return Date.now() - created <= windowMs;
+}
+
+type OnboardingSignalCounts = {
+	hasAskedDoubt: boolean;
+	hasLinkedParent: boolean;
+};
+
+/**
+ * Two bounded existence checks (head + exact count) for the onboarding checklist.
+ * "Has taken a test" reuses `performanceStats.testsCompleted`, so no test query here.
+ * A failed read degrades to `false` (item shows as incomplete) rather than throwing.
+ */
+async function loadOnboardingSignals(
+	supabase: SupabaseServer,
+	userId: string,
+): Promise<OnboardingSignalCounts> {
+	const [doubtRes, parentRes] = await Promise.all([
+		supabase
+			.from("doubt_conversations")
+			.select("id", { count: "exact", head: true })
+			.eq("student_id", userId),
+		supabase
+			.from("parent_student_links")
+			.select("student_id", { count: "exact", head: true })
+			.eq("student_id", userId)
+			.eq("status", "active"),
+	]);
+
+	if (doubtRes.error) {
+		logSupabaseError("loadOnboardingSignals.doubt_conversations", doubtRes.error, { userId });
+	}
+	if (parentRes.error) {
+		logSupabaseError("loadOnboardingSignals.parent_student_links", parentRes.error, { userId });
+	}
+
+	return {
+		hasAskedDoubt: (doubtRes.count ?? 0) > 0,
+		hasLinkedParent: (parentRes.count ?? 0) > 0,
+	};
+}
 
 function statusPriority(status: "good" | "satisfactory" | "bad" | "not_tested"): number {
 	if (status === "bad") return 0;
@@ -86,6 +153,8 @@ export type StudentDashboardCorePayload = {
 	trackerNeedsHydration: boolean;
 	/** For deferred leaderboard load (Suspense). */
 	enrolledSubjects: { id: string; name: string }[];
+	/** First-run checklist signals (student variant only). */
+	onboarding: StudentDashboardOnboarding;
 };
 
 export type StudentDashboardViewPayload = StudentDashboardCorePayload & {
@@ -108,10 +177,18 @@ export async function loadStudentDashboardCorePayload(
 		role: profileRow.role,
 	};
 
-	const [bundle, completedTestInput, openAssignments] = await Promise.all([
+	// Onboarding signals only matter for the student-facing view and only while the
+	// account is new — skip the extra count reads for the parent portal and older accounts.
+	const onboardingEligible =
+		opts?.viewerRole !== "parent" && isWithinOnboardingWindow(profileRow.created_at ?? null);
+
+	const [bundle, completedTestInput, openAssignments, onboardingSignals] = await Promise.all([
 		loadStudentPerformanceBundle(supabase, userId, bundleInput),
 		loadDashboardCompletedTestInput(supabase, userId),
 		listOpenStudentAssignments(userId),
+		onboardingEligible
+			? loadOnboardingSignals(supabase, userId)
+			: Promise.resolve<OnboardingSignalCounts>({ hasAskedDoubt: false, hasLinkedParent: false }),
 	]);
 
 	const { enrolledSubjects, topicCountBySubjectId, rows, loadError, trackerNeedsHydration } = bundle;
@@ -195,6 +272,13 @@ export async function loadStudentDashboardCorePayload(
 			? pickParentDashboardGreeting(profileRow.full_name)
 			: pickStudentDashboardGreeting(profileRow.full_name);
 
+	const onboarding: StudentDashboardOnboarding = {
+		isNewStudent: onboardingEligible,
+		hasTakenTest: performanceStats.testsCompleted > 0,
+		hasAskedDoubt: onboardingSignals.hasAskedDoubt,
+		hasLinkedParent: onboardingSignals.hasLinkedParent,
+	};
+
 	return {
 		headerGreeting,
 		performanceStats,
@@ -204,6 +288,7 @@ export async function loadStudentDashboardCorePayload(
 		openAssignments,
 		trackerNeedsHydration,
 		enrolledSubjects: enrolledSubjects.map((s) => ({ id: s.id, name: s.name })),
+		onboarding,
 	};
 }
 

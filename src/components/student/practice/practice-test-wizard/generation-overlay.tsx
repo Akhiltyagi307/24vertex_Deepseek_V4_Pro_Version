@@ -5,14 +5,22 @@ import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GridLoader } from "@/components/ui/grid-loader";
+import { GENERATION_BUCKETS } from "@/lib/practice/generation-progress-buckets";
 import { cn } from "@/lib/utils";
 
-import { GENERATING_STATUS_MESSAGES, practiceSolidCtaClassName } from "./types";
+import { practiceSolidCtaClassName } from "./types";
+
+/** 1-based index of the "Writing questions" bucket — where the drafted count shows. */
+const WRITING_BUCKET_INDEX = 3;
 
 export type GenerationOverlayProps = {
 	generating: boolean;
-	generatingStatusIndex: number;
-	streamProgressMessage: string | null;
+	/** Highest completed checklist bucket (1-based); 0 = nothing done yet. */
+	doneThrough: number;
+	/** Questions drafted so far (during the writing step), or null if unknown. */
+	draftedCount: number | null;
+	/** Expected total questions from the duration plan, or null if unknown. */
+	draftedTotal: number | null;
 	generatedPreview: { testId: string; subjectName: string } | null;
 	pending: boolean;
 	onCancelGenerate: () => void;
@@ -22,8 +30,9 @@ export type GenerationOverlayProps = {
 
 export function GenerationOverlay({
 	generating,
-	generatingStatusIndex,
-	streamProgressMessage,
+	doneThrough,
+	draftedCount,
+	draftedTotal,
 	generatedPreview,
 	pending,
 	onCancelGenerate,
@@ -35,27 +44,61 @@ export function GenerationOverlay({
 		<div
 			className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-background/85 px-6 backdrop-blur-sm"
 			aria-busy={generating}
-			aria-live="polite"
 		>
 			{generating ? (
 				<>
-					<GridLoader size="lg" />
-					<p
-						key={generatingStatusIndex}
-						className="text-muted-foreground max-w-sm px-4 text-center text-base leading-relaxed motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300 motion-reduce:animate-none"
-					>
-						{streamProgressMessage ?? GENERATING_STATUS_MESSAGES[generatingStatusIndex]}
-					</p>
-					<p className="text-muted-foreground px-4 text-center text-sm">
-						This might take a minute or two.
-					</p>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={onCancelGenerate}
-						className="mt-2"
-					>
+					<GridLoader size="md" />
+					<ol className="w-full max-w-xs space-y-2.5" aria-label="Generating your test">
+						{GENERATION_BUCKETS.map((bucket, i) => {
+							const index = i + 1;
+							const status =
+								index <= doneThrough ? "done"
+								: index === doneThrough + 1 ? "active"
+								: "pending";
+							const showDrafted =
+								status === "active" && index === WRITING_BUCKET_INDEX && draftedCount !== null;
+							return (
+								<li key={bucket.id} className="flex items-start gap-2.5">
+									<span
+										className={cn(
+											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+											status === "done" ?
+												"border-emerald-600/40 bg-emerald-600/10 text-emerald-600 dark:text-emerald-400"
+											: status === "active" ?
+												"border-primary/50 bg-primary/10 text-primary"
+											:	"border-border bg-muted/40",
+										)}
+										aria-hidden
+									>
+										{status === "done" ?
+											<CheckIcon className="size-3" strokeWidth={2.5} />
+										: status === "active" ?
+											<span className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse" />
+										:	<span className="size-1.5 rounded-full bg-muted-foreground/40" />}
+									</span>
+									<span className="flex flex-col gap-0.5">
+										<span
+											className={cn(
+												"text-sm leading-snug",
+												status === "pending" ? "text-muted-foreground/60" : "text-foreground",
+											)}
+										>
+											{bucket.label}
+										</span>
+										{showDrafted ? (
+											<span className="text-muted-foreground text-xs tabular-nums">
+												{draftedTotal ?
+													`Drafted ${Math.min(draftedCount, draftedTotal)} of ${draftedTotal} questions`
+												:	`Drafted ${draftedCount} questions`}
+											</span>
+										) : null}
+									</span>
+								</li>
+							);
+						})}
+					</ol>
+					<p className="text-muted-foreground px-4 text-center text-sm">This usually takes a minute or two.</p>
+					<Button type="button" variant="outline" size="sm" onClick={onCancelGenerate} className="mt-1">
 						<XIcon className="mr-1.5 size-4" aria-hidden />
 						Cancel
 					</Button>

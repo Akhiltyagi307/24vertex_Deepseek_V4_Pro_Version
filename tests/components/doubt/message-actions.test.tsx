@@ -89,4 +89,30 @@ describe("MessageActions / TypingIndicator", () => {
 		);
 		expect(button).toBeUndefined();
 	});
+
+	it("renders the practice-topic deep link only when a topic is in scope", async () => {
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+
+		await act(async () => {
+			root!.render(<MessageActions text="hello" subjectId="subj-1" topicId="topic-9" />);
+		});
+
+		const link = container.querySelector('a[aria-label="Practice this topic"]');
+		expect(link).toBeTruthy();
+		expect(link?.getAttribute("href")).toBe("/student/practice?subjectId=subj-1&topicIds=topic-9");
+	});
+
+	it("omits the practice-topic deep link when no topic is in scope", async () => {
+		container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+
+		await act(async () => {
+			root!.render(<MessageActions text="hello" subjectId="subj-1" topicId={null} />);
+		});
+
+		expect(container.querySelector('a[aria-label="Practice this topic"]')).toBeNull();
+	});
 });

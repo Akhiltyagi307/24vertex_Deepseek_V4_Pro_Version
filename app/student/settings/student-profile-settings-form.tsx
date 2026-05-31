@@ -6,10 +6,11 @@ import {
 	CopyIcon,
 	GraduationCap,
 	KeyRound,
+	Share2,
 	User,
 	Users,
 } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
 	updateStudentOrganization,
@@ -40,6 +41,12 @@ import { PageHeaderSubtext } from "@/components/student/page-header-subtext";
 import { cn } from "@/lib/utils";
 import { formatDateLongStyleInAppTimeZone } from "@/lib/datetime/app-timezone";
 import type { SerializedOrganization } from "@/lib/organizations/schemas";
+
+// SSR-safe Web Share API detection (avoids setState-in-effect): the server
+// snapshot is always false; the client snapshot checks navigator.share.
+const subscribeNoop = () => () => {};
+const getCanShareSnapshot = () => typeof navigator !== "undefined" && typeof navigator.share === "function";
+const getCanShareServerSnapshot = () => false;
 
 export type ResolvedSubjectForSettings = {
 	id: string;
@@ -102,6 +109,9 @@ export function StudentProfileSettingsForm({
 	const feedbackRef = useRef<HTMLDivElement | null>(null);
 
 	const shareText = profile.student_link_code ?? profile.id;
+
+	// Feature-detect the Web Share API in an SSR-safe way without setState-in-effect.
+	const canShare = useSyncExternalStore(subscribeNoop, getCanShareSnapshot, getCanShareServerSnapshot);
 	const currentOrganization = organizations.find((org) => org.id === profile.organization_id) ?? null;
 
 	useEffect(() => {
@@ -117,6 +127,15 @@ export function StudentProfileSettingsForm({
 			window.setTimeout(() => setCopied(false), 2000);
 		} catch {
 			setCopied(false);
+		}
+	}
+
+	async function shareLinkCode() {
+		if (typeof navigator === "undefined" || typeof navigator.share !== "function") return;
+		try {
+			await navigator.share({ text: shareText });
+		} catch {
+			// User dismissed the share sheet or sharing failed — nothing to do.
 		}
 	}
 
@@ -144,6 +163,17 @@ export function StudentProfileSettingsForm({
 					{copied ? <CheckIcon /> : <CopyIcon />}
 					{copied ? "Copied" : "Copy"}
 				</Button>
+				{canShare ? (
+					<Button
+						type="button"
+						variant="outline"
+						onClick={shareLinkCode}
+						className={cn(settingsCtaButtonClass, "shrink-0 gap-2")}
+					>
+						<Share2 />
+						Share
+					</Button>
+				) : null}
 			</div>
 			<p className="mt-3 text-foreground/80 text-sm leading-relaxed dark:text-muted-foreground">
 				Give this code to a parent. They’ll use it in their app to connect to your account.

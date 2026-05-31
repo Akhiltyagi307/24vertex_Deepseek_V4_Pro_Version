@@ -1,10 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Loader2, RefreshCw, Sparkle } from "lucide-react";
+import Link from "next/link";
+import { Check, Copy, GraduationCap, Loader2, RefreshCw, Sparkle } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
+/**
+ * Builds the practice-wizard deep link for a doubt's scope. The wizard reads
+ * `subjectId` + `topicIds` from the URL and auto-selects those topics, so this
+ * closes the learning loop: "I understood the explanation → drill it now."
+ */
+function buildPracticeTopicHref(subjectId: string, topicId: string): string {
+	const params = new URLSearchParams();
+	params.set("subjectId", subjectId);
+	params.set("topicIds", topicId);
+	return `/student/practice?${params.toString()}`;
+}
 
 export function MessageActions({
 	text,
@@ -13,6 +26,8 @@ export function MessageActions({
 	onRegenerate,
 	canRequestSimilar,
 	onRequestSimilar,
+	subjectId,
+	topicId,
 }: {
 	text: string;
 	canRegenerate?: boolean;
@@ -26,8 +41,14 @@ export function MessageActions({
 	 */
 	canRequestSimilar?: boolean;
 	onRequestSimilar?: () => void;
+	/** Doubt scope — drives the "Practice this topic" deep link into the wizard. */
+	subjectId?: string;
+	/** Present only when a single topic is in scope; gates the practice CTA. */
+	topicId?: string | null;
 }) {
 	const [copied, setCopied] = useState(false);
+	const practiceHref =
+		subjectId && topicId ? buildPracticeTopicHref(subjectId, topicId) : null;
 
 	async function onCopy() {
 		try {
@@ -114,6 +135,26 @@ export function MessageActions({
 						<span>Similar one</span>
 					</TooltipTrigger>
 					<TooltipContent>Ask for a similar problem with different numbers</TooltipContent>
+				</Tooltip>
+			) : null}
+			{practiceHref ? (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Link
+								href={practiceHref}
+								aria-label="Practice this topic"
+								className={cn(
+									"text-muted-foreground hover:text-foreground hover:bg-muted/70 inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px]",
+									"focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+								)}
+							/>
+						}
+					>
+						<GraduationCap className="size-3.5" aria-hidden />
+						<span>Practice this topic</span>
+					</TooltipTrigger>
+					<TooltipContent>Generate a practice test on this topic</TooltipContent>
 				</Tooltip>
 			) : null}
 		</div>

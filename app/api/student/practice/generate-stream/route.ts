@@ -6,9 +6,11 @@ import {
 import {
 	envelopeForPartial,
 	envelopeForResult,
+	envelopeForStage,
 	envelopeForThrown,
 	httpStatusForGenerateFailure,
 } from "@/lib/practice/generate-stream-envelope";
+import { BUCKET_INDEX, BUCKET_TOTAL, bucketForStepKey } from "@/lib/practice/generation-progress-buckets";
 import { getApiRequestUser } from "@/lib/auth/api-request-user";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +96,9 @@ export async function POST(request: Request) {
 			};
 			let latestPendingPartial: unknown = null;
 			let lastPartialSentAt = 0;
+			// Highest checklist-bucket index marked done — keeps stage events
+			// monotonic across parallel question-generation batches.
+			let lastDoneIndex = 0;
 			const flushPendingPartial = () => {
 				if (latestPendingPartial === null) return;
 				send(envelopeForPartial(latestPendingPartial));
@@ -113,6 +118,20 @@ export async function POST(request: Request) {
 							if (now - lastPartialSentAt >= PARTIAL_EMIT_MIN_INTERVAL_MS) {
 								flushPendingPartial();
 							}
+						},
+						// Progress checklist: one `stage` line per completed pipeline step,
+						// collapsed to a student-facing bucket. Sent directly (not throttled
+						// like partials) so steps never drop; clamped monotonic so parallel
+						// batches/retries can't regress it. Recoverable mid-step errors are
+						// left to the final `error` envelope, not surfaced as a stage.
+						onStage: ({ stepKey, status }) => {
+							if (status !== "ok") return;
+							const bucket = bucketForStepKey(stepKey);
+							if (!bucket) return;
+							const index = BUCKET_INDEX[bucket];
+							if (index <= lastDoneIndex) return;
+							lastDoneIndex = index;
+							send(envelopeForStage({ bucket, status: "done", index, total: BUCKET_TOTAL }));
 						},
 						// When the client closes the connection, request.signal fires
 						// and the in-flight OpenAI HTTP call is cancelled — no more

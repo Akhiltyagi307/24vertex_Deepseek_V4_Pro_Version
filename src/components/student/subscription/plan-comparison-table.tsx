@@ -94,6 +94,12 @@ export function PlanComparisonTable({ currentPlanCode, grade, planCatalog = PLAN
 		},
 	];
 
+	const planColumns: Array<{ label: string; code: PlanCode }> = [
+		{ label: "Free trial", code: "free" },
+		{ label: "Pro Monthly", code: "pro_monthly" },
+		{ label: "Pro Annual", code: "pro_annual" },
+	];
+
 	const headerCell = (label: string, code: PlanCode) => (
 		<th
 			scope="col"
@@ -125,7 +131,38 @@ export function PlanComparisonTable({ currentPlanCode, grade, planCatalog = PLAN
 					&#x25BE;
 				</span>
 			</summary>
-			<div className="overflow-x-auto border-t">
+			<ul className="flex flex-col gap-3 border-t p-3 medium:hidden">
+				{planColumns.map((plan, planIdx) => {
+					const isCurrent = currentPlanCode === plan.code;
+					return (
+						<li
+							key={plan.code}
+							className={cn(
+								"rounded-lg border p-4",
+								isCurrent ? "border-primary/40 bg-primary/[0.03]" : "border-border/80",
+							)}
+						>
+							<div className="flex items-center gap-1.5 pb-2.5">
+								<span className={cn("text-sm font-medium", isCurrent ? "text-primary" : "text-foreground")}>
+									{plan.label}
+								</span>
+								{isCurrent ? (
+									<span aria-hidden className="inline-block size-1.5 rounded-full bg-primary" />
+								) : null}
+							</div>
+							<dl className="flex flex-col gap-2 border-t border-border/60 pt-2.5 text-sm">
+								{rows.map((row) => (
+									<div key={row.label} className="flex items-start justify-between gap-3">
+										<dt className="shrink-0 text-xs font-medium text-muted-foreground">{row.label}</dt>
+										<dd className="text-right text-foreground">{row.values[planIdx]}</dd>
+									</div>
+								))}
+							</dl>
+						</li>
+					);
+				})}
+			</ul>
+			<div className="hidden overflow-x-auto border-t medium:block">
 				<table className="w-full min-w-[36rem] border-separate border-spacing-0 text-sm">
 					<thead>
 						<tr className="bg-muted/40">

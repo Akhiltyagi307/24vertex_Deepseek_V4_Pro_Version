@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
+import { ChevronRight } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -42,6 +43,81 @@ function safeMarkdownUrl(url: string): string {
 
 // Exported for unit testing; not part of the public component surface.
 export const __test_safeMarkdownUrl = safeMarkdownUrl;
+
+/**
+ * A `### Step N` heading line — the convention the Solve-with-me prompt emits
+ * for *full* step-by-step walkthroughs (ladder rung 4 / time-pressure /
+ * verification). Anchored to the line start; the optional `: title` is captured
+ * for the disclosure summary. Tolerates `Step` casing and a trailing colon.
+ */
+const STEP_HEADING_RE = /^###\s+Step\s+(\d+)\s*[:.)-]?\s*(.*)$/i;
+
+export type SolutionStep = {
+	/** The `### Step N: …` summary line shown on the `<summary>` (heading stripped). */
+	heading: string;
+	/** Markdown body beneath the heading, up to the next step (or end). */
+	body: string;
+};
+
+export type StepSplit = {
+	/** Markdown before the first `### Step` heading (intro / setup), if any. */
+	preamble: string;
+	/** Two-or-more detected steps, in order. Empty when the pattern isn't present. */
+	steps: SolutionStep[];
+};
+
+/**
+ * Split tutor Markdown into a leading preamble + an ordered list of `### Step N`
+ * sections, but ONLY when at least two such headings exist as real top-level
+ * Markdown (not inside a fenced code block). Returns `steps: []` otherwise so
+ * the caller falls back to plain rendering.
+ *
+ * Fence-awareness matters: a literal "### Step" inside a ``` block must never be
+ * mistaken for a heading, or we'd shatter a code sample. We track fence state
+ * line-by-line and only treat heading lines found *outside* a fence as splits.
+ *
+ * Pure + deterministic; operates on the already-normalized Markdown string so
+ * each step body re-renders through the exact same pipeline (math/tables/lists
+ * are preserved verbatim — content is never dropped or rewritten).
+ */
+export function splitSolutionSteps(md: string): StepSplit {
+	const lines = md.split("\n");
+	const headingLineIdxs: number[] = [];
+	let fence: string | null = null;
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]!;
+		const fenceMatch = /^\s*(```+|~~~+)/.exec(line);
+		if (fenceMatch) {
+			const marker = fenceMatch[1]!.startsWith("`") ? "`" : "~";
+			if (fence === null) fence = marker;
+			else if (fence === marker) fence = null;
+			continue;
+		}
+		if (fence === null && STEP_HEADING_RE.test(line)) {
+			headingLineIdxs.push(i);
+		}
+	}
+
+	// Need at least two clearly-delimited steps to justify the disclosure UI.
+	if (headingLineIdxs.length < 2) {
+		return { preamble: md, steps: [] };
+	}
+
+	const preamble = lines.slice(0, headingLineIdxs[0]).join("\n").trim();
+	const steps: SolutionStep[] = [];
+	for (let s = 0; s < headingLineIdxs.length; s++) {
+		const start = headingLineIdxs[s]!;
+		const end = s + 1 < headingLineIdxs.length ? headingLineIdxs[s + 1]! : lines.length;
+		const headingLine = lines[start]!;
+		const match = STEP_HEADING_RE.exec(headingLine);
+		const num = match?.[1] ?? String(s + 1);
+		const title = (match?.[2] ?? "").trim();
+		const heading = title ? `Step ${num}: ${title}` : `Step ${num}`;
+		const body = lines.slice(start + 1, end).join("\n").trim();
+		steps.push({ heading, body });
+	}
+	return { preamble, steps };
+}
 
 /**
  * Renders tutor output as rich markdown. The content is model-generated (not
@@ -171,13 +247,13 @@ function TutorMarkdownImpl({
 		[],
 	);
 
-	return (
-		<div
-			className={cn(
-				"min-w-0 tabular-nums [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-				className,
-			)}
-		>
+	// Detect a full step-by-step walkthrough and, when present, render it as a
+	// native <details>/<summary> disclosure (first step open). Falls back to the
+	// plain body whenever the convention isn't matched — see `splitSolutionSteps`.
+	const stepSplit = useMemo(() => splitSolutionSteps(normalized), [normalized]);
+
+	const renderMarkdown = useCallback(
+		(source: string) => (
 			<ReactMarkdown
 				remarkPlugins={[remarkGfm, remarkMath]}
 				rehypePlugins={[[rehypeKatex, REHYPE_KATEX_OPTIONS]]}
@@ -185,10 +261,58 @@ function TutorMarkdownImpl({
 				skipHtml
 				urlTransform={safeMarkdownUrl}
 			>
-				{normalized}
+				{source}
 			</ReactMarkdown>
-		</div>
+		),
+		[components],
 	);
+
+	const wrapperClass = cn(
+		"min-w-0 tabular-nums [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+		className,
+	);
+
+	if (stepSplit.steps.length >= 2) {
+		return (
+			<div className={wrapperClass}>
+				{stepSplit.preamble ? renderMarkdown(stepSplit.preamble) : null}
+				<div className="border-border/60 divide-border/60 bg-muted/20 my-3 divide-y overflow-hidden rounded-lg border">
+					{stepSplit.steps.map((step, i) => (
+						<details
+							key={`${step.heading}-${i}`}
+							open={i === 0}
+							className="group/step"
+						>
+							<summary
+								className={cn(
+									"text-foreground flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-[13.5px] font-semibold tracking-tight select-none",
+									"hover:bg-muted/40 focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+									"[&::-webkit-details-marker]:hidden",
+								)}
+							>
+								<ChevronRight
+									className="text-muted-foreground size-4 shrink-0 transition-transform duration-150 group-open/step:rotate-90 motion-reduce:transition-none"
+									aria-hidden
+								/>
+								<span className="min-w-0">{step.heading}</span>
+							</summary>
+							<div className="px-3 pt-0 pb-3 pl-9">
+								{step.body ? (
+									renderMarkdown(step.body)
+								) : (
+									<p className="text-muted-foreground text-[13.5px] italic">
+										(no details)
+									</p>
+								)}
+							</div>
+						</details>
+					))}
+				</div>
+			</div>
+		);
+	}
+
+	return <div className={wrapperClass}>{renderMarkdown(normalized)}</div>;
 }
 
 export const TutorMarkdown = memo(TutorMarkdownImpl);

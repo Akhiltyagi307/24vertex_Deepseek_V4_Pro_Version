@@ -25,18 +25,20 @@ type NavItem = {
 	title: string;
 	href: string;
 	icon: ComponentType<{ className?: string }>;
+	/** Stable hook for the first-run coach-marks tour (see teacher-onboarding.tsx). */
+	onboardingId: string;
 	/** Code-based student linking is only for teachers outside an organization; org rosters live under Student performance. */
 	independentOnly?: boolean;
 };
 
 const primaryItems: NavItem[] = [
-	{ title: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboardIcon },
-	{ title: "Link Student", href: "/teacher/students", icon: UsersRoundIcon, independentOnly: true },
-	{ title: "Assignments", href: "/teacher/assignments", icon: ClipboardListIcon },
-	{ title: "Submissions", href: "/teacher/submissions", icon: ClipboardCheckIcon },
-	{ title: "Student performance", href: "/teacher/student-performance", icon: LineChartIcon },
-	{ title: "Topic performance", href: "/teacher/topic-performance", icon: ListTree },
-	{ title: "Settings", href: "/teacher/settings", icon: SettingsIcon },
+	{ title: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboardIcon, onboardingId: "nav-teacher-dashboard" },
+	{ title: "Link Student", href: "/teacher/students", icon: UsersRoundIcon, onboardingId: "nav-link-student", independentOnly: true },
+	{ title: "Assignments", href: "/teacher/assignments", icon: ClipboardListIcon, onboardingId: "nav-assignments" },
+	{ title: "Submissions", href: "/teacher/submissions", icon: ClipboardCheckIcon, onboardingId: "nav-submissions" },
+	{ title: "Student performance", href: "/teacher/student-performance", icon: LineChartIcon, onboardingId: "nav-student-performance" },
+	{ title: "Topic performance", href: "/teacher/topic-performance", icon: ListTree, onboardingId: "nav-topic-performance" },
+	{ title: "Settings", href: "/teacher/settings", icon: SettingsIcon, onboardingId: "nav-settings" },
 ];
 
 const groupLabelClass =
@@ -59,6 +61,7 @@ export function TeacherNavMain({ hasOrganization }: { hasOrganization: boolean }
 							<SidebarMenuButton
 								isActive={isActive}
 								tooltip={item.title}
+								data-onboarding-id={item.onboardingId}
 								render={<Link href={item.href} />}
 							>
 								<Icon />

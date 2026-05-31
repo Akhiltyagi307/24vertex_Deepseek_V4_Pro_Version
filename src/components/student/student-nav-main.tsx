@@ -35,18 +35,20 @@ type NavItem = {
 	title: string;
 	href: string;
 	icon: ComponentType<{ className?: string }>;
+	/** Anchor id for the first-run onboarding coach-marks (see student-onboarding.tsx). */
+	onboardingId?: string;
 };
 
 const primaryItems: NavItem[] = [
-	{ title: "Dashboard", href: "/student/dashboard", icon: LayoutDashboardIcon },
-	{ title: "Practice", href: "/student/practice", icon: SquarePenIcon },
-	{ title: "Ask a topic", href: "/student/doubt-chat", icon: MessageCircleIcon },
+	{ title: "Dashboard", href: "/student/dashboard", icon: LayoutDashboardIcon, onboardingId: "nav-dashboard" },
+	{ title: "Practice", href: "/student/practice", icon: SquarePenIcon, onboardingId: "nav-practice" },
+	{ title: "Ask a topic", href: "/student/doubt-chat", icon: MessageCircleIcon, onboardingId: "nav-doubt" },
 ];
 
 const progressItems: NavItem[] = [
-	{ title: "Assignments", href: "/student/assignments", icon: ClipboardListIcon },
-	{ title: "Performance", href: "/student/performance", icon: TrendingUpIcon },
-	{ title: "Reports", href: "/student/reports", icon: FileBarChartIcon },
+	{ title: "Assignments", href: "/student/assignments", icon: ClipboardListIcon, onboardingId: "nav-assignments" },
+	{ title: "Performance", href: "/student/performance", icon: TrendingUpIcon, onboardingId: "nav-performance" },
+	{ title: "Reports", href: "/student/reports", icon: FileBarChartIcon, onboardingId: "nav-reports" },
 	{ title: "QnA logs", href: "/student/qna-logs", icon: BookOpenIcon },
 ];
 
@@ -83,7 +85,7 @@ function SidebarAssignmentsRow({
 	const ariaLabel = hasOpen ? `${item.title}, open assignments` : item.title;
 
 	return (
-		<SidebarMenuItem key={item.href}>
+		<SidebarMenuItem key={item.href} data-onboarding-id={item.onboardingId}>
 			<SidebarMenuButton
 				isActive={isActive}
 				tooltip={item.title}
@@ -124,7 +126,7 @@ function SidebarNotificationsRow({
 				: `${item.title}, ${count} unread`;
 
 	return (
-		<SidebarMenuItem key={item.href}>
+		<SidebarMenuItem key={item.href} data-onboarding-id={item.onboardingId}>
 			<SidebarMenuButton
 				isActive={isActive}
 				tooltip={item.title}
@@ -179,7 +181,7 @@ function NavMenuItems({
 					);
 				}
 				return (
-					<SidebarMenuItem key={item.href}>
+					<SidebarMenuItem key={item.href} data-onboarding-id={item.onboardingId}>
 						<SidebarMenuButton
 							isActive={isActive}
 							tooltip={item.title}

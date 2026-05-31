@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import type { PerformanceRowSerialized } from "@/lib/student/performance-matrix";
+import { computeMasteryState, formatMasteryStateLabel } from "@/lib/student/mastery-states";
 import { formatTrackerStatusLabel } from "@/lib/student/tracker-status-labels";
 
 import {
@@ -74,6 +75,20 @@ export function PerformanceTopicSheet({
 									>
 										{formatTrackerStatusLabel(sheetRow.status)}
 									</Badge>
+									{!allowPractice ? (
+										<p className="mt-2 text-muted-foreground text-xs">
+											Mastery:{" "}
+											<span className="font-medium text-foreground">
+												{formatMasteryStateLabel(
+													computeMasteryState({
+														status: sheetRow.status,
+														testsTaken: sheetRow.testsTaken,
+														averageScore: sheetRow.averageScore,
+													}),
+												)}
+											</span>
+										</p>
+									) : null}
 								</div>
 								<div className="rounded-lg border border-border bg-muted/25 px-3 py-3">
 									<p className="text-muted-foreground text-xs">Tests taken</p>
@@ -91,6 +106,17 @@ export function PerformanceTopicSheet({
 									Trend: <span className="text-foreground">{trendLabel(sheetRow.trend)}</span>
 								</span>
 							</p>
+							{allowPractice && sheetRow.trend === "improving" ? (
+								<p
+									className={cn(
+										"inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs",
+										"bg-primary/10 text-primary",
+									)}
+								>
+									<TrendingUpIcon className="size-3.5 shrink-0" aria-hidden />
+									<span>You&apos;re improving here — keep going.</span>
+								</p>
+							) : null}
 							<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
 								<dt className="text-muted-foreground">Average score</dt>
 								<dd className="font-mono tabular-nums">{formatScore(sheetRow.averageScore)}</dd>

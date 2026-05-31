@@ -450,6 +450,8 @@ export function MessageThread({
 										{text ? (
 											<MessageActions
 												text={text}
+												subjectId={subjectId}
+												topicId={topicId}
 												canRegenerate={canRegenerate}
 												regenPending={regenPending && isLastAssistant}
 												onRegenerate={canRegenerate ? () => void onRegenerate() : undefined}

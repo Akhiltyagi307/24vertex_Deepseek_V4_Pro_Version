@@ -249,13 +249,16 @@ export function SessionAppBar({
 				</div>
 			) : null}
 			{adminMessage ? (
-				<div className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-					<span className="text-foreground/90">
-						<strong>Admin:</strong> {adminMessage}
+				<div
+					className="flex items-center justify-between gap-2 rounded-lg border-2 border-indigo-500/45 bg-indigo-500/10 px-4 py-3 text-sm"
+					role="alert"
+				>
+					<span className="text-indigo-950 dark:text-indigo-100">
+						<strong>Message from your admin:</strong> {adminMessage}
 					</span>
 					<button
 						type="button"
-						className="text-foreground/70 shrink-0 text-xs underline"
+						className="text-indigo-900/70 dark:text-indigo-100/80 shrink-0 text-xs underline"
 						onClick={onDismissAdminMessage}
 					>
 						Dismiss

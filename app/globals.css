@@ -280,6 +280,14 @@
   }
 }
 
+/* Skeleton shimmer: honor reduced-motion globally. Catches both the <Skeleton>
+   component and inline `animate-pulse` usages (e.g. streak tray, table skeletons). */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+}
+
 /* Practice wizard topic matrix: circular check controls (SVG data URLs; keep out of Tailwind arbitrary values). */
 .practice-matrix-check-circle[type="checkbox"]:checked {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");

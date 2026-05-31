@@ -163,6 +163,8 @@ export type RunGenerationPipelineOptions = {
 	recordGenerateClicked?: boolean;
 	/** Fires for each partial object when `useStreamObject` is true. */
 	onPartialObject?: (partial: unknown) => void;
+	/** Fires once per generation step; downstream maps the raw stepKey to a student-facing bucket. */
+	onStage?: (event: { stepKey: string; status: PracticeGenerationStepStatus }) => void;
 	/** Cancel the OpenAI HTTP call (and downstream model retries) when fired. */
 	abortSignal?: AbortSignal;
 	/** Override persistence for trusted server-side flows such as educator-assigned tests. */
@@ -842,6 +844,9 @@ async function runPracticeGenerationAfterResolveCore(
 		error?: string | null;
 		metadata?: Record<string, unknown>;
 	}) => {
+		// Surface progress to the client BEFORE the telemetry guard, so the
+		// generation checklist keeps advancing even if telemetry is unavailable.
+		opts.onStage?.({ stepKey: params.stepKey, status: params.status });
 		if (!generationRunId) return;
 		await appendGenerationStep({
 			runId: generationRunId,
