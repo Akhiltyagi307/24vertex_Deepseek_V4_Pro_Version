@@ -373,7 +373,7 @@ const KATEX_FUNCTION_NAMES_BY_LEN: Record<number, Set<string>> = (() => {
  *      first char of the inner forms a known KaTeX function name. Replace
  *      with `$\<func>...$`.
  */
-function widenMathSpans(s: string): string {
+function widenMathSpans(s: string, mergeSpaceSeparatedSpans = true): string {
 	// (1) Dash normalization. Done first so the dashes become valid glue.
 	let out = s.replace(/[–—]/g, "-");
 
@@ -432,7 +432,13 @@ function widenMathSpans(s: string): string {
 	do {
 		prev = out;
 		out = out.replace(mergeBothWrapped, (_m, a, g, b) => `$${a}${g}${b}$`);
-		out = out.replace(mergeSpaceSeparated, (_m, a, b) => `$${a} ${b}$`);
+		// Bare-whitespace merge ($a$ $b$ → $a b$) is right for practice autofix
+		// (rejoining a split equation) but wrong for free-form tutor prose, where
+		// two adjacent spans are usually distinct quantities ($F_1$ $F_2$). Callers
+		// that render LLM prose opt out via mergeSpaceSeparatedSpans=false.
+		if (mergeSpaceSeparatedSpans) {
+			out = out.replace(mergeSpaceSeparated, (_m, a, b) => `$${a} ${b}$`);
+		}
 		out = out.replace(mergeRightPlain, (_m, a, g, b) => `$${a}${g}${b}$`);
 		out = out.replace(mergeLeftPlain, (_m, lead, a, g, b) => `${lead}$${a}${g}${b}$`);
 		iterations += 1;
@@ -459,7 +465,10 @@ function widenMathSpans(s: string): string {
  * - Returns the original string unchanged if no Unicode-math triggers are
  *   present, so the function is safe to call on every text field.
  */
-export function normalizeKatexMath(input: string | null | undefined): string {
+export function normalizeKatexMath(
+	input: string | null | undefined,
+	opts: { mergeSpaceSeparatedSpans?: boolean } = {},
+): string {
 	if (input == null) return "";
 	const s = String(input);
 	// Three independent triggers, any one engages the pipeline:
@@ -480,7 +489,7 @@ export function normalizeKatexMath(input: string | null | undefined): string {
 		if (p.length >= 2 && p.startsWith("$") && p.endsWith("$")) continue;
 		parts[i] = transformPlainSegment(p);
 	}
-	return widenMathSpans(parts.join(""));
+	return widenMathSpans(parts.join(""), opts.mergeSpaceSeparatedSpans ?? true);
 }
 
 /** Exported for tests only. */

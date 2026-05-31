@@ -101,3 +101,47 @@ describe("normalizeTutorMarkdownMath — safety", () => {
 		expect(out).toContain("$\\ce{2H2 + O2 -> 2H2O}$");
 	});
 });
+
+describe("normalizeTutorMarkdownMath — display math inside lists stays in the list", () => {
+	it("preserves list indentation for an own-line $$ inside a numbered step", () => {
+		const md = ["1. Apply the formula:", "   $$E = mc^2$$", "2. Then substitute."].join("\n");
+		const out = normalizeTutorMarkdownMath(md);
+		// The promoted block keeps the 3-space indent of the list item, so the
+		// fence is NOT dedented to column 0 (which would terminate the list).
+		expect(out).toContain("   $$\n   E = mc^2\n   $$");
+		// The second step must remain a top-level "2." item, not be detached.
+		expect(out).toContain("2. Then substitute.");
+		// Old behaviour produced a column-0 "\n\n$$\n" that broke out of the list.
+		expect(out).not.toContain("\n\n$$\nE = mc^2");
+	});
+
+	it("keeps a mid-line $$ inside a list item inline rather than shattering the list", () => {
+		const md = "1. Apply $$F = ma$$ to the block\n2. Solve for a";
+		const out = normalizeTutorMarkdownMath(md);
+		// Mid-line inside a list → left inline so the list survives intact.
+		expect(out).toContain("1. Apply $$F = ma$$ to the block");
+		expect(out).toContain("2. Solve for a");
+	});
+
+	it("still promotes a top-level $$ to a display block", () => {
+		const out = normalizeTutorMarkdownMath("The result is $$x = 1$$ here.");
+		expect(out).toContain("$$\nx = 1\n$$");
+	});
+});
+
+describe("normalizeTutorMarkdownMath — adjacent inline spans are NOT merged", () => {
+	it("keeps two whitespace-separated inline spans distinct (tutor prose)", () => {
+		// In free-form tutoring these are usually two distinct quantities, not a
+		// split equation — the practice autofix merge must stay off here.
+		expect(normalizeTutorMarkdownMath("the forces $F_1$ $F_2$ act")).toContain("$F_1$ $F_2$");
+		expect(normalizeTutorMarkdownMath("roots are $x = 2$ $x = -3$ today")).toContain("$x = 2$ $x = -3$");
+	});
+});
+
+describe("normalizeTutorMarkdownMath — inline \\(...\\) is trimmed", () => {
+	it("strips flanking whitespace so the delimiter isn't padded", () => {
+		// `$ x $` (padded) can fail strict inline-math flanking rules; trim it.
+		expect(normalizeTutorMarkdownMath("speed \\( v = u + at \\) here")).toContain("$v = u + at$");
+		expect(normalizeTutorMarkdownMath("speed \\( v = u + at \\) here")).not.toContain("$ v = u + at $");
+	});
+});

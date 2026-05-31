@@ -50,6 +50,7 @@ export type PracticeEvent =
 	// category sources + severity; never the offending text.
 	| "doubt_chat_input_blocked"
 	| "doubt_chat_distress_flagged"
+	| "doubt_chat_sensitive_flagged"
 	| "doubt_chat_pii_detected"
 	| "doubt_chat_output_flagged"
 	| "doubt_chat_attachment_injection_flagged"

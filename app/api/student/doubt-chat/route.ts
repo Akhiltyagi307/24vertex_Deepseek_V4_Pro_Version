@@ -274,20 +274,42 @@ export async function POST(req: Request) {
 	// PII redaction-at-rest is enabled (off by default).
 	const inputScreen = await screenDoubtInput(lastUserText);
 	if (inputScreen.block) {
-		void flagDoubtSafety({ conversationId: existing.id as string, categories: inputScreen.categories });
-		void recordPracticeEvent(
-			supabase,
-			"doubt_chat_input_blocked",
-			{
-				sources: inputScreen.categories.map((c) => c.source),
-				subject_id: subjectId,
-				topic_id: topicId,
-			},
-			{ studentId: user.id },
-		);
+		// Persist the audit trail BEFORE responding. On a serverless runtime the
+		// function can freeze the instant we return the Response, so fire-and-forget
+		// writes here can be dropped — and the blocked-turn flag is precisely the
+		// record we must not lose. Both writes are internally fail-silent, so
+		// allSettled just guarantees they finish without ever throwing.
+		await Promise.allSettled([
+			flagDoubtSafety({ conversationId: existing.id as string, categories: inputScreen.categories }),
+			recordPracticeEvent(
+				supabase,
+				"doubt_chat_input_blocked",
+				{
+					sources: inputScreen.categories.map((c) => c.source),
+					subject_id: subjectId,
+					topic_id: topicId,
+				},
+				{ studentId: user.id },
+			),
+		]);
 		return new Response(
 			JSON.stringify({ error: inputScreen.blockMessage, code: "blocked_content" }),
 			{ status: 422, headers: { "content-type": "application/json" } },
+		);
+	}
+	if (inputScreen.sensitive) {
+		// Review-only: the tutor still answers, we just flag the sensitive
+		// curricular topic for visibility. Streaming keeps the function alive, so
+		// fire-and-forget is safe on this path.
+		void flagDoubtSafety({
+			conversationId: existing.id as string,
+			categories: inputScreen.categories.filter((c) => c.kind === "sensitive"),
+		});
+		void recordPracticeEvent(
+			supabase,
+			"doubt_chat_sensitive_flagged",
+			{ subject_id: subjectId, topic_id: topicId },
+			{ studentId: user.id },
 		);
 	}
 	if (inputScreen.distress) {

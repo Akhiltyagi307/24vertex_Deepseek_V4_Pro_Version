@@ -28,6 +28,7 @@ export type SafetyCategoryKind =
 	| "profanity"
 	| "blacklist"
 	| "distress"
+	| "sensitive"
 	| "pii"
 	| "injection";
 
@@ -53,14 +54,28 @@ export type CompiledBlacklistRule = { id: string; re: RegExp };
  * blacklist (DB), not hardcoded here.
  */
 const SLUR_PATTERN =
-	/\b(n[i1!]+g+[e3]+r|n[i1!]+g+a|f[a4]gg?[o0]t|r[e3]t[a4]rd|ch[i1]nk|sp[i1]c|k[i1]ke|tr[a4]nny|c[o0]on)\b/i;
+	/\b(n[i1!]+g+[e3]+r|n[i1!]+g+a|f[a4]gg?[o0]t|r[e3]t[a4]rd|k[i1]ke|tr[a4]nny|c[o0]on)\b/i;
 
 /**
  * Sexual content / harassment directed through the chat. The tutor is for minors;
  * an explicit-sex turn is blocked and flagged rather than answered.
+ *
+ * Deliberately excludes bare clinical/legal terms (e.g. "rape", "sexual
+ * assault") — those are part of the CBSE syllabus (legal studies, political
+ * science, social-issues chapters) and are handled by the review-only
+ * {@link SENSITIVE_TOPIC_PATTERN} so the tutor still answers them factually.
  */
 const SEXUAL_HARASSMENT_PATTERN =
-	/\b(send\s+nudes?|sex\s*chat|sexest|horny|blowjob|b[l1]ow\s*job|cum\s+on|jerk\s+off|masturbat|porn(o|hub)?|rape|make\s+out\s+with\s+me)\b/i;
+	/\b(send\s+nudes?|sex\s*chat|sexest|horny|blowjob|b[l1]ow\s*job|cum\s+on|jerk\s+off|masturbat|porn(o|hub)?|make\s+out\s+with\s+me)\b/i;
+
+/**
+ * Sensitive-but-curricular topics (sexual violence, etc.) that appear in the
+ * syllabus. REVIEW-ONLY: a match never blocks and the tutor still answers — we
+ * only raise a flag so the team has visibility into how the topic is being
+ * used. Distinct from {@link SEXUAL_HARASSMENT_PATTERN}, which targets
+ * harassment directed *through* the chat and does block.
+ */
+const SENSITIVE_TOPIC_PATTERN = /\b(rape|sexual\s+assault|molest(?:ation|ed|ing|s)?)\b/i;
 
 // ---------------------------------------------------------------------------
 // Flag tier — general profanity. Does NOT block (kids vent); raises a low flag.
@@ -155,6 +170,11 @@ export function detectInjection(text: string): boolean {
 	return INJECTION_PATTERNS.some((re) => re.test(text));
 }
 
+/** Sensitive-but-curricular topic detector (review-only; never blocks). */
+export function detectSensitiveTopic(text: string): boolean {
+	return SENSITIVE_TOPIC_PATTERN.test(text);
+}
+
 // ---------------------------------------------------------------------------
 // Composite screens.
 // ---------------------------------------------------------------------------
@@ -175,15 +195,27 @@ export type InputScreenResult = {
 	redactedText: string;
 	categories: SafetyCategory[];
 	distress: boolean;
+	/** True when a sensitive-but-curricular topic was mentioned (review-only). */
+	sensitive: boolean;
 	pii: boolean;
 };
 
 export const BLOCKED_CONTENT_MESSAGE =
 	"Let's keep this chat respectful so I can help you learn. Try rephrasing your question, and I'm happy to help.";
 
+/**
+ * Cap on how much text the (admin-authored) blacklist regexes scan per turn.
+ * Doubt turns are short; bounding the input length bounds the worst-case cost
+ * of a polynomial-backtracking pattern. (Catastrophic *exponential* patterns are
+ * refused at compile time in safety.ts — see `isSafeBlacklistPattern`.)
+ */
+const MAX_BLACKLIST_SCAN_CHARS = 10_000;
+
 function matchBlacklist(text: string, blacklist: CompiledBlacklistRule[]): CompiledBlacklistRule | null {
+	if (blacklist.length === 0) return null;
+	const scan = text.length > MAX_BLACKLIST_SCAN_CHARS ? text.slice(0, MAX_BLACKLIST_SCAN_CHARS) : text;
 	for (const rule of blacklist) {
-		if (rule.re.test(text)) return rule;
+		if (rule.re.test(scan)) return rule;
 	}
 	return null;
 }
@@ -247,6 +279,18 @@ export function screenInput(text: string, opts: InputScreenOptions = {}): InputS
 		});
 	}
 
+	// Review-only: a sensitive curricular topic (e.g. sexual violence). Never
+	// blocks — the tutor still answers — but raises a flag for visibility.
+	const sensitive = detectSensitiveTopic(text);
+	if (sensitive) {
+		categories.push({
+			kind: "sensitive",
+			severity: "medium",
+			source: "heuristic_sensitive",
+			reason: "input mentioned a sensitive curricular topic",
+		});
+	}
+
 	if (detectInjection(text)) {
 		categories.push({
 			kind: "injection",
@@ -275,6 +319,7 @@ export function screenInput(text: string, opts: InputScreenOptions = {}): InputS
 		redactedText,
 		categories,
 		distress,
+		sensitive,
 		pii,
 	};
 }
@@ -339,6 +384,33 @@ export function highestSeverity(categories: SafetyCategory[]): SafetySeverity {
 		max = Math.max(max, order.indexOf(c.severity));
 	}
 	return order[max] ?? "low";
+}
+
+/** Max characters the `moderation_flags.source` column accepts (varchar(30)). */
+export const MODERATION_SOURCE_MAX = 30;
+
+/**
+ * Build the fields for one `moderation_flags` row from one or more categories.
+ *
+ * `source` is a single representative label — the highest-severity category's
+ * source — capped at {@link MODERATION_SOURCE_MAX}. Comma-joining every source
+ * (the old behaviour) overflowed the column on multi-category turns, and because
+ * the insert is fail-silent the flag was then silently dropped for exactly the
+ * worst content. The full per-category breakdown lives in `reason`, an unbounded
+ * text column.
+ */
+export function moderationFlagFieldsFor(categories: SafetyCategory[]): {
+	source: string;
+	reason: string;
+	severity: SafetySeverity;
+} {
+	const severity = highestSeverity(categories);
+	const primary = categories.find((c) => c.severity === severity) ?? categories[0];
+	const reason =
+		categories.length > 1
+			? `sources=[${categories.map((c) => c.source).join(",")}]; ${categories.map((c) => c.reason).join("; ")}`
+			: (categories[0]?.reason ?? "");
+	return { source: (primary?.source ?? "heuristic").slice(0, MODERATION_SOURCE_MAX), reason, severity };
 }
 
 // ---------------------------------------------------------------------------

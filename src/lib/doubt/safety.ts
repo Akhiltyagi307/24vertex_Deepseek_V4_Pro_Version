@@ -11,7 +11,7 @@ import {
 	isDoubtSafetyModerationEnabled,
 } from "@/lib/env";
 import {
-	highestSeverity,
+	moderationFlagFieldsFor,
 	screenInput,
 	screenOutput,
 	type CompiledBlacklistRule,
@@ -56,6 +56,29 @@ export function __resetDoubtBlacklistCacheForTests(): void {
 	blacklistCache = null;
 }
 
+/** Hard cap on a stored blacklist pattern's length. */
+const MAX_BLACKLIST_PATTERN_LEN = 1_000;
+
+/**
+ * Classic catastrophic-backtracking (ReDoS) shape: a group that already contains
+ * a quantifier, itself quantified — e.g. `(a+)+`, `(a*)*`, `([a-z]+)*`, `(a+){2,}`.
+ * Heuristic, not exhaustive, but it catches the common footguns.
+ */
+const NESTED_QUANTIFIER_RE = /\([^()]*[+*][^()]*\)\s*[+*]|\([^()]*[+*][^()]*\)\s*\{\d/;
+
+/**
+ * Refuse to compile admin patterns that are absurdly long or look ReDoS-prone.
+ * Node's regex engine is synchronous with no timeout, so a single catastrophic
+ * pattern could pin the event loop for every concurrent turn — which would
+ * violate the "screen can never wedge the chat" guarantee. Skipped patterns are
+ * simply not applied (fail-open), matching the existing invalid-regex handling.
+ */
+function isSafeBlacklistPattern(pattern: string): boolean {
+	if (pattern.length > MAX_BLACKLIST_PATTERN_LEN) return false;
+	if (NESTED_QUANTIFIER_RE.test(pattern)) return false;
+	return true;
+}
+
 /**
  * Load and compile the admin regex blacklist scoped to doubt chat. Mirrors the
  * generation-side loader but reads the `doubt_chat` scope so doubt rules and
@@ -75,6 +98,7 @@ export async function loadDoubtContentBlacklist(): Promise<CompiledBlacklistRule
 		const compiled: CompiledBlacklistRule[] = [];
 		for (const row of rows) {
 			if (row.patternType !== "regex") continue;
+			if (!isSafeBlacklistPattern(row.pattern)) continue; // ReDoS / length guard
 			try {
 				compiled.push({ id: row.id, re: new RegExp(row.pattern, "i") });
 			} catch {
@@ -101,6 +125,7 @@ export async function screenDoubtInput(text: string): Promise<InputScreenResult>
 			redactedText: text,
 			categories: [],
 			distress: false,
+			sensitive: false,
 			pii: false,
 		};
 	}
@@ -117,6 +142,7 @@ export async function screenDoubtInput(text: string): Promise<InputScreenResult>
 			redactedText: text,
 			categories: [],
 			distress: false,
+			sensitive: false,
 			pii: false,
 		};
 	}
@@ -150,13 +176,17 @@ export async function flagDoubtSafety(input: {
 }): Promise<void> {
 	const { conversationId, categories } = input;
 	if (categories.length === 0) return;
+	// Capped source + full detail in `reason` — see moderationFlagFieldsFor. This
+	// prevents a multi-category turn from overflowing the varchar(30) source
+	// column and (because this insert is fail-silent) silently losing the flag.
+	const { source, reason, severity } = moderationFlagFieldsFor(categories);
 	try {
 		await insertHeuristicModerationFlag({
 			entityType: ENTITY_CONVERSATION,
 			entityId: conversationId,
-			source: categories.map((c) => c.source).join(","),
-			reason: categories.map((c) => c.reason).join("; "),
-			severity: highestSeverity(categories),
+			source,
+			reason,
+			severity,
 		});
 	} catch {
 		/* fail-silent — flagging must never break the chat */
