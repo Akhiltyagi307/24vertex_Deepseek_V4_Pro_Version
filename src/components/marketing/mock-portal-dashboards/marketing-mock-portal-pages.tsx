@@ -58,6 +58,7 @@ export function MarketingMockTeacherPortalPage() {
 	return (
 		<TeacherShell
 			organizationName={MOCK_SCHOOL}
+			hasOrganization
 			userDisplayName={MOCK_TEACHER.fullName}
 			contextLabel={MOCK_TEACHER.contextLabel}
 			email={MOCK_TEACHER.email}

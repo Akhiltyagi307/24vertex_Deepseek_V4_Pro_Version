@@ -25,11 +25,13 @@ type NavItem = {
 	title: string;
 	href: string;
 	icon: ComponentType<{ className?: string }>;
+	/** Code-based student linking is only for teachers outside an organization; org rosters live under Student performance. */
+	independentOnly?: boolean;
 };
 
 const primaryItems: NavItem[] = [
 	{ title: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboardIcon },
-	{ title: "Link Student", href: "/teacher/students", icon: UsersRoundIcon },
+	{ title: "Link Student", href: "/teacher/students", icon: UsersRoundIcon, independentOnly: true },
 	{ title: "Assignments", href: "/teacher/assignments", icon: ClipboardListIcon },
 	{ title: "Submissions", href: "/teacher/submissions", icon: ClipboardCheckIcon },
 	{ title: "Student performance", href: "/teacher/student-performance", icon: LineChartIcon },
@@ -40,14 +42,15 @@ const primaryItems: NavItem[] = [
 const groupLabelClass =
 	"font-mono text-2xs uppercase tracking-wider text-muted-foreground";
 
-export function TeacherNavMain() {
+export function TeacherNavMain({ hasOrganization }: { hasOrganization: boolean }) {
 	const pathname = usePathname();
+	const items = hasOrganization ? primaryItems.filter((item) => !item.independentOnly) : primaryItems;
 
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel className={groupLabelClass}>Teacher</SidebarGroupLabel>
 			<SidebarMenu>
-				{primaryItems.map((item) => {
+				{items.map((item) => {
 					const Icon = item.icon;
 					const isActive =
 						pathname === item.href || pathname.startsWith(`${item.href}/`);

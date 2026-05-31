@@ -11,6 +11,8 @@ const neverShellPath = () => false;
 export type TeacherShellProps = {
 	/** Set when the teacher has an active organization membership; hides workspace segment in the top bar when null. */
 	organizationName: string | null;
+	/** True when the teacher belongs to an active organization; hides the code-based "Link Student" nav item. */
+	hasOrganization: boolean;
 	userDisplayName: string;
 	/** Sidebar subtitle (organization role line). */
 	contextLabel: string;
@@ -21,6 +23,7 @@ export type TeacherShellProps = {
 
 export function TeacherShell({
 	organizationName,
+	hasOrganization,
 	userDisplayName,
 	contextLabel,
 	email,
@@ -42,6 +45,7 @@ export function TeacherShell({
 						avatar: avatarUrl,
 					}}
 					contextLabel={contextLabel}
+					hasOrganization={hasOrganization}
 				/>
 			}
 		>
