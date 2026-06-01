@@ -6,6 +6,7 @@ import {
 	type HeaderPortal,
 } from "@/components/layout/app-header-brand-trail";
 import { FeedbackReportTopBarButton } from "@/components/feedback/feedback-report-top-bar-button";
+import { TourReplayTopBarButton } from "@/components/onboarding/tour-replay-top-bar-button";
 import { ActivityStreakWidget } from "@/components/student/activity-streak-widget";
 import { StudentNotificationsBell } from "@/components/student/notifications/notifications-bell";
 import type { StudentActivityStreakSnapshot } from "@/lib/student/activity-streak";
@@ -75,6 +76,7 @@ export function StudentTopBar({
 						initialUnreadCount={initialUnreadCount}
 					/>
 				) : null}
+				<TourReplayTopBarButton scope={headerPortal === "parent" ? "parent" : "student"} />
 				<FeedbackReportTopBarButton
 					portal={headerPortal === "parent" ? "parent" : "student"}
 				/>

@@ -84,7 +84,9 @@ export default async function ParentPortalLayout({ children }: { children: React
 
 	// First-run onboarding gate: parents created within the window. The welcome
 	// flag (client-side) is the secondary guard so the flow never re-shows.
-	const isNewParent = isWithinParentOnboardingWindow(parentRow.created_at);
+	const isNewParent =
+		parentRow.onboarding_welcome_seen_at == null &&
+		isWithinParentOnboardingWindow(parentRow.created_at);
 	const parentFirstName = formatPersonDisplayName(parentRow.full_name ?? "").split(/\s+/)[0] || null;
 
 	return (

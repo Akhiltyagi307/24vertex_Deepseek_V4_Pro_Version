@@ -20,6 +20,7 @@ export default async function StudentDashboardPage() {
 		full_name: row.full_name,
 		organization_id: row.organization_id ?? null,
 		created_at: row.created_at ?? null,
+		onboarding_welcome_seen_at: row.onboarding_welcome_seen_at ?? null,
 	};
 
 	return (

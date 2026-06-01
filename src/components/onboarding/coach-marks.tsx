@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useReducedMotion } from "motion/react";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,16 @@ function findReachableStep(steps: CoachMarkStep[], from: number, dir: 1 | -1): n
 		if (locateTarget(steps[i].targetId)) return i;
 	}
 	return -1;
+}
+
+/**
+ * True when at least one step's target is currently in the DOM. Callers use this
+ * to decide whether starting the tour is worthwhile — on mobile the sidebar is a
+ * closed (unmounted) drawer, so every `data-onboarding-id` target is absent and a
+ * tour would render a contentless card. Must be called client-side (reads the DOM).
+ */
+export function hasReachableTourTarget(steps: CoachMarkStep[]): boolean {
+	return findReachableStep(steps, 0, 1) !== -1;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -112,6 +123,7 @@ export function CoachMarks({ steps, active, onClose, onFinish }: CoachMarksProps
 	}));
 	const cardRef = React.useRef<HTMLDivElement | null>(null);
 	const restoreFocusRef = React.useRef<HTMLElement | null>(null);
+	const overlayRef = React.useRef<HTMLDivElement | null>(null);
 
 	const stepCount = steps.length;
 	const currentStep = steps[stepIndex];
@@ -124,6 +136,24 @@ export function CoachMarks({ steps, active, onClose, onFinish }: CoachMarksProps
 			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		return () => {
 			restoreFocusRef.current?.focus?.();
+		};
+	}, [active]);
+
+	// While the tour is open, mark every other top-level element inert so assistive
+	// tech can't reach the visually-dimmed background. The overlay is portaled to
+	// <body> (below), so it's a sibling we skip. The Base UI welcome modal gets this
+	// from its primitive; the hand-rolled tour needs it explicit.
+	React.useEffect(() => {
+		if (!active) return;
+		const overlay = overlayRef.current;
+		const inerted: HTMLElement[] = [];
+		for (const child of Array.from(document.body.children)) {
+			if (child === overlay || !(child instanceof HTMLElement) || child.inert) continue;
+			child.inert = true;
+			inerted.push(child);
+		}
+		return () => {
+			for (const el of inerted) el.inert = false;
 		};
 	}, [active]);
 
@@ -273,31 +303,41 @@ export function CoachMarks({ steps, active, onClose, onFinish }: CoachMarksProps
 		? ""
 		: "transition-[top,left,width,height] duration-200 ease-out";
 
-	return (
+	return createPortal(
 		<div
+			ref={overlayRef}
 			className="fixed inset-0 z-[100]"
 			role="presentation"
 			onKeyDown={handleKeyDown}
 		>
-			{/* Dim the rest of the screen; clicking the backdrop skips the tour. */}
+			{/* Click-catcher that skips the tour. The dim scrim normally comes from the
+				spotlight element below (which cuts a hole around the target); only fall
+				back to a flat full-screen dim when there's no target rect to spotlight. */}
 			<button
 				type="button"
 				aria-label="Skip tour"
 				tabIndex={-1}
 				onClick={onClose}
 				className={cn(
-					"absolute inset-0 h-full w-full cursor-default bg-foreground/50 outline-none",
+					"absolute inset-0 h-full w-full cursor-default outline-none",
+					rect ? "" : "bg-[color-mix(in_oklab,oklch(0.13_0.01_285)_55%,transparent)]",
 					reduceMotion ? "" : "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200",
 				)}
 			/>
 
-			{/* Highlight ring tracking the target via getBoundingClientRect. */}
+			{/* Highlight ring + spotlight tracking the target via getBoundingClientRect.
+				The viewport-sized box-shadow scrims everything EXCEPT this element's rect,
+				so the highlighted target shows through at full brightness. The scrim is a
+				fixed dark (faint brand-violet tint) so it darkens the surroundings in BOTH
+				light and dark themes — a foreground-based dim would invert to a light wash
+				in dark mode. The rounded-xl shape gives a soft cut-out; the emerald ring frames it. */}
 			{rect ? (
 				<div
 					aria-hidden
 					className={cn(
 						"pointer-events-none absolute rounded-xl ring-2 ring-emerald-400 ring-offset-2 ring-offset-transparent",
-						"shadow-[0_0_0_9999px_rgba(0,0,0,0.001)]",
+						"shadow-[0_0_0_9999px_color-mix(in_oklab,oklch(0.13_0.01_285)_55%,transparent)]",
+						reduceMotion ? "" : "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200",
 						transitionClass,
 					)}
 					style={{
@@ -369,6 +409,7 @@ export function CoachMarks({ steps, active, onClose, onFinish }: CoachMarksProps
 					</div>
 				</div>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	);
 }

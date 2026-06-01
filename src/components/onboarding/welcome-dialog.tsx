@@ -6,7 +6,6 @@ import { ArrowRightIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
-	DialogClose,
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
@@ -69,28 +68,19 @@ export function WelcomeDialog({
 							<ArrowRightIcon aria-hidden />
 						</Button>
 					) : null}
-					<div className="flex flex-col gap-2 medium:flex-row medium:justify-between">
-						{onStartTour ? (
-							<Button
-								variant="outline"
-								className="w-full medium:w-auto"
-								onClick={() => {
-									onOpenChange(false);
-									onStartTour();
-								}}
-							>
-								<SparklesIcon aria-hidden />
-								Take a quick tour
-							</Button>
-						) : null}
-						<DialogClose
-							render={
-								<Button variant="ghost" className="w-full text-muted-foreground medium:w-auto" />
-							}
+					{onStartTour ? (
+						<Button
+							variant="outline"
+							className="w-full"
+							onClick={() => {
+								onOpenChange(false);
+								onStartTour();
+							}}
 						>
-							Maybe later
-						</DialogClose>
-					</div>
+							<SparklesIcon aria-hidden />
+							Take a quick tour
+						</Button>
+					) : null}
 				</div>
 			</DialogContent>
 		</Dialog>

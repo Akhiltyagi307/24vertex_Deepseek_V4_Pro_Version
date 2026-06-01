@@ -35,6 +35,8 @@ export type StudentDashboardProfileRow = StudentProfileSubjectsRow & {
 	 * Optional so callers that never show the checklist (e.g. the parent portal) can omit it.
 	 */
 	created_at?: string | null;
+	/** Durable cross-device "welcome dismissed" marker; gates the welcome modal (not the checklist). */
+	onboarding_welcome_seen_at?: string | null;
 };
 
 /**
@@ -43,6 +45,11 @@ export type StudentDashboardProfileRow = StudentProfileSubjectsRow & {
  */
 export type StudentDashboardOnboarding = {
 	isNewStudent: boolean;
+	/**
+	 * Durable cross-device "dismissed the welcome" flag. Gates only the welcome
+	 * modal — the checklist stays keyed off `isNewStudent` so it survives dismissal.
+	 */
+	welcomeSeen: boolean;
 	hasTakenTest: boolean;
 	hasAskedDoubt: boolean;
 	hasLinkedParent: boolean;
@@ -274,6 +281,7 @@ export async function loadStudentDashboardCorePayload(
 
 	const onboarding: StudentDashboardOnboarding = {
 		isNewStudent: onboardingEligible,
+		welcomeSeen: (profileRow.onboarding_welcome_seen_at ?? null) != null,
 		hasTakenTest: performanceStats.testsCompleted > 0,
 		hasAskedDoubt: onboardingSignals.hasAskedDoubt,
 		hasLinkedParent: onboardingSignals.hasLinkedParent,

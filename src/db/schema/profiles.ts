@@ -46,6 +46,8 @@ export const profiles = pgTable(
 		suspendedReason: text("suspended_reason"),
 		suspendedAt: timestamp("suspended_at", { withTimezone: true }),
 		deletedAt: timestamp("deleted_at", { withTimezone: true }),
+		// Cross-device "dismissed the first-run welcome" marker (NULL = not yet seen).
+		onboardingWelcomeSeenAt: timestamp("onboarding_welcome_seen_at", { withTimezone: true }),
 		createdAt: timestamp("created_at").defaultNow(),
 		updatedAt: timestamp("updated_at").defaultNow(),
 	},

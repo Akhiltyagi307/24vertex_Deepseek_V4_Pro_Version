@@ -23,6 +23,15 @@ function storageKeyFor(flag: string): string {
  */
 const flagListeners = new Map<string, Set<() => void>>();
 
+/**
+ * Session-durable fallback for keys marked done in this page session. localStorage
+ * can throw (private mode) or be cleared mid-session; this in-memory set keeps a
+ * dismissed flow dismissed for the life of the JS module (i.e. across client-side
+ * navigations), so onboarding doesn't re-appear on every navigation when storage
+ * is unavailable. A hard reload clears it, falling back to localStorage.
+ */
+const sessionDoneFlags = new Set<string>();
+
 function notifyFlagChange(key: string): void {
 	const listeners = flagListeners.get(key);
 	if (!listeners) return;
@@ -55,6 +64,8 @@ function subscribeFlag(key: string, onStoreChange: () => void): () => void {
 
 function getFlagSnapshot(key: string): boolean {
 	if (typeof window === "undefined") return false;
+	// In-session record wins so a dismissal holds even if localStorage is blocked.
+	if (sessionDoneFlags.has(key)) return true;
 	try {
 		return window.localStorage.getItem(key) === "1";
 	} catch {
@@ -74,11 +85,14 @@ function getFlagServerSnapshot(): boolean {
  */
 export function markOnboardingFlag(flag: string): void {
 	const key = storageKeyFor(flag);
+	// Always record in-session first, so a dismissal holds even if the localStorage
+	// write below fails (private mode) or storage is later cleared.
+	sessionDoneFlags.add(key);
 	if (typeof window !== "undefined") {
 		try {
 			window.localStorage.setItem(key, "1");
 		} catch {
-			// Ignore write failures (private mode); the in-memory notify still updates UI.
+			// Ignore write failures (private mode); the in-session flag still holds.
 		}
 	}
 	notifyFlagChange(key);
