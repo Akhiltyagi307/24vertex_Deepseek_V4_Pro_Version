@@ -44,6 +44,7 @@ import {
 import { formatTrackerStatusLabel, isTrackerStatus } from "@/lib/student/tracker-status-labels";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 import { buildTrackerPayloadItems } from "@/lib/practice/review-schedule-payload";
+import { recordPracticeEvent } from "@/lib/practice/analytics";
 import type { ReviewScheduleState } from "@/lib/practice/review-schedule";
 import { createPhaseTimer, logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -349,7 +350,7 @@ async function gradePracticeTestWithAiInner(
 	const { data: testRow, error: testErr } = await supabase
 		.from("tests")
 		.select(
-			"id, student_id, subject_id, difficulty, time_limit_seconds, test_date, created_at, total_questions",
+			"id, student_id, subject_id, test_type, difficulty, time_limit_seconds, test_date, created_at, total_questions",
 		)
 		.eq("id", testId)
 		.eq("student_id", userId)
@@ -723,14 +724,16 @@ async function gradePracticeTestWithAiInner(
 	// advance the SM-2-lite state inside the same tracker write (and replay job).
 	const reviewTopicIds = topicRollups.map((row) => row.topic_id);
 	const priorScheduleByTopic = new Map<string, ReviewScheduleState>();
+	const priorAvgByTopic = new Map<string, number | null>();
 	if (reviewTopicIds.length > 0) {
 		const { data: priorRows } = await supabase
 			.from("performance_tracker")
-			.select("topic_id, review_interval_days, review_ease, consecutive_good")
+			.select("topic_id, average_score, review_interval_days, review_ease, consecutive_good")
 			.eq("student_id", userId)
 			.in("topic_id", reviewTopicIds);
 		const rows = (priorRows ?? []) as Array<{
 			topic_id: string;
+			average_score: number | string | null;
 			review_interval_days: number | null;
 			review_ease: number | string | null;
 			consecutive_good: number | null;
@@ -741,6 +744,7 @@ async function gradePracticeTestWithAiInner(
 				ease: row.review_ease != null ? Number(row.review_ease) : null,
 				consecutiveGood: row.consecutive_good ?? 0,
 			});
+			priorAvgByTopic.set(row.topic_id, row.average_score != null ? Number(row.average_score) : null);
 		}
 	}
 	const trackerPayloadItems = buildTrackerPayloadItems({
@@ -748,6 +752,24 @@ async function gradePracticeTestWithAiInner(
 		priorByTopic: priorScheduleByTopic,
 		nowMs: new Date(nowIso).getTime(),
 	});
+	if (testRow.test_type === "review") {
+		for (const row of topicRollups) {
+			const before = priorAvgByTopic.get(row.topic_id) ?? null;
+			const after = Number(row.average_score);
+			await recordPracticeEvent(
+				supabase,
+				"review_test_completed",
+				{
+					test_id: testId,
+					topic_id: row.topic_id,
+					before_score: before,
+					after_score: after,
+					delta: before != null ? after - before : null,
+				},
+				{ studentId: userId },
+			);
+		}
+	}
 	if (topicRollups.length > 0) {
 		const { error: bulkTrackerErr } = await supabase.rpc("practice_update_trackers_bulk", {
 			p_student_id: userId,

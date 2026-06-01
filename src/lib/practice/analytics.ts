@@ -27,6 +27,7 @@ export type PracticeEvent =
 	| "practice_answer_saved"
 	| "practice_submit_clicked"
 	| "practice_graded"
+	| "review_test_completed"
 	| "practice_grading_failed"
 	| "practice_preview_regenerated"
 	| "practice_auto_submitted"
