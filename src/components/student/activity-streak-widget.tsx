@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
-import { CheckCircle2Icon, LoaderIcon, ZapIcon } from "lucide-react";
+import { CheckCircle2Icon, ChevronDownIcon, LoaderIcon, ZapIcon } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import {
@@ -23,28 +24,82 @@ import { cn } from "@/lib/utils";
 
 /** Shared with notifications bell tray */
 const trayPopoverClass =
-	"w-[min(calc(100vw-1.25rem),22rem)] overflow-hidden p-0 rounded-[14px] border border-border/60 bg-popover/95 shadow-2xl ring-1 ring-black/[0.06] backdrop-blur-xl dark:border-border dark:bg-popover/95 dark:ring-white/[0.08]";
+	"w-[min(calc(100vw-1.25rem),22rem)] overflow-hidden rounded-[14px] border border-border/60 bg-popover p-0 shadow-lg ring-1 ring-black/[0.06] dark:border-border dark:bg-popover dark:ring-white/[0.08]";
 
 const topBarControlChrome =
 	"border border-border/90 bg-sidebar-accent shadow-sm dark:border-border dark:bg-sidebar-accent";
 
-const streakUrgencyChrome =
-	"border-amber-500/45 bg-amber-500/[0.08] shadow-sm ring-1 ring-amber-500/25 dark:border-amber-500/40 dark:bg-amber-500/[0.12] dark:ring-amber-500/20";
+/** At-risk trigger: border + dot only */
+const streakUrgencyTriggerChrome = "border-amber-500/40 dark:border-amber-500/35";
 
-const streakUrgencyIcon = "text-amber-600 dark:text-amber-400";
-const streakUrgencyText = "text-amber-800 dark:text-amber-200";
+const streakUrgencyText = "text-amber-900 dark:text-amber-100";
 const streakUrgencyBadge =
-	"rounded-md bg-amber-500/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200";
+	"rounded-md bg-amber-500/12 px-1.5 py-0.5 text-2xs font-semibold text-amber-900 dark:text-amber-100";
 
 const MILESTONE_SEGMENT_WEEKS = 4;
 const MILESTONE_COUNT = STREAK_REWARD_TARGET_WEEKS / MILESTONE_SEGMENT_WEEKS;
 
-const STREAK_RULES_LINE =
-	"One practice or assignment submit per week counts. Skip a full week and your streak resets.";
+const STREAK_WEEKLY_RULE =
+	"Submit at least one practice test or assignment each calendar week (India time).";
+const STREAK_RESET_RULE =
+	"If you skip a full week without using a streak freeze, your streak count resets to zero.";
+const STREAK_FREEZE_AVAILABLE_RULE =
+	"You have one streak freeze. It covers a single missed week, then you need four active weeks to earn it back.";
+const STREAK_FREEZE_USED_RULE =
+	"Your streak freeze was used. Stay active for four weeks in a row to earn another one.";
 
 export type ActivityStreakWidgetProps = {
 	initialSnapshot?: StudentActivityStreakSnapshot | null;
 };
+
+type StreakVisualTone = "reward" | "active" | "at-risk" | "idle" | "new";
+
+function resolveStreakVisualTone({
+	rewardGranted,
+	isActiveThisWeek,
+	isAtRisk,
+	streakWeeks,
+}: {
+	rewardGranted: boolean;
+	isActiveThisWeek: boolean;
+	isAtRisk: boolean;
+	streakWeeks: number;
+}): StreakVisualTone {
+	if (rewardGranted) return "reward";
+	if (isAtRisk) return "at-risk";
+	if (isActiveThisWeek) return "active";
+	if (streakWeeks > 0) return "idle";
+	return "new";
+}
+
+function StreakZapIcon({
+	tone,
+	className,
+}: {
+	tone: StreakVisualTone;
+	className?: string;
+}) {
+	return (
+		<ZapIcon
+			className={cn(
+				"shrink-0 transition-colors duration-200 ease-out motion-reduce:transition-none",
+				tone === "reward" || tone === "active" ?
+					"fill-primary text-primary"
+				: tone === "at-risk" ?
+					"fill-amber-500 text-amber-600 dark:fill-amber-400 dark:text-amber-400"
+				: tone === "idle" ?
+					"fill-muted-foreground/25 text-muted-foreground/80"
+				:	"text-muted-foreground/55",
+				className,
+			)}
+			aria-hidden
+		/>
+	);
+}
+
+function shortenWeekDeadline(deadline: string): string {
+	return deadline.replace(/^Submit by end of /i, "Due by ");
+}
 
 function milestoneFillForWeek(streakWeeks: number, index: number): number {
 	const segmentStart = index * MILESTONE_SEGMENT_WEEKS;
@@ -79,38 +134,53 @@ function StreakStatusBadge({
 function StreakMilestoneTrack({
 	streakWeeks,
 	tone,
+	captionMode = "full",
+	compact = false,
 }: {
 	streakWeeks: number;
 	tone: "active" | "at-risk" | "idle" | "complete";
+	captionMode?: "full" | "hidden";
+	compact?: boolean;
 }) {
 	const fillClass =
 		tone === "complete" || tone === "active" ? "bg-primary"
 		: tone === "at-risk" ? "bg-amber-500 dark:bg-amber-400"
 		: "bg-muted-foreground/35";
 
+	const captionId = React.useId();
+	const caption = `${streakWeeks} of ${STREAK_REWARD_TARGET_WEEKS} weeks toward a free year of Pro. Each bar is ${MILESTONE_SEGMENT_WEEKS} weeks.`;
+	const barHeight = compact ? "h-2.5" : "h-1.5";
+
 	return (
-		<div
-			className="flex gap-0.5"
-			role="img"
-			aria-label={`${streakWeeks} of ${STREAK_REWARD_TARGET_WEEKS} weeks toward a free year of Pro`}
-		>
-			{Array.from({ length: MILESTONE_COUNT }, (_, index) => {
-				const fill = tone === "complete" ? 1 : milestoneFillForWeek(streakWeeks, index);
-				return (
-					<div
-						key={index}
-						className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-sm bg-muted/80"
-					>
+		<div className="space-y-1">
+			<div className="flex gap-0.5" role="img" aria-labelledby={captionId}>
+				{Array.from({ length: MILESTONE_COUNT }, (_, index) => {
+					const fill = tone === "complete" ? 1 : milestoneFillForWeek(streakWeeks, index);
+					return (
 						<div
-							className={cn(
-								"h-full rounded-sm transition-[width] duration-300 ease-out motion-reduce:transition-none",
-								fillClass,
-							)}
-							style={{ width: `${Math.round(fill * 100)}%` }}
-						/>
-					</div>
-				);
-			})}
+							key={index}
+							className={cn("min-w-0 flex-1 overflow-hidden rounded-sm bg-muted/80", barHeight)}
+						>
+							<div
+								className={cn(
+									"h-full rounded-sm transition-[width] duration-300 ease-out motion-reduce:transition-none",
+									fillClass,
+								)}
+								style={{ width: `${Math.round(fill * 100)}%` }}
+							/>
+						</div>
+					);
+				})}
+			</div>
+			{captionMode === "full" ? (
+				<p id={captionId} className="text-2xs text-muted-foreground">
+					{caption}
+				</p>
+			) : (
+				<p id={captionId} className="sr-only">
+					{caption}
+				</p>
+			)}
 		</div>
 	);
 }
@@ -118,7 +188,10 @@ function StreakMilestoneTrack({
 function StreakTrayHeader() {
 	return (
 		<div className="flex shrink-0 flex-col items-center border-b border-border/50 bg-muted/20 px-3 pb-2.5 pt-2">
-			<div className="mb-2 h-1 w-9 shrink-0 rounded-full bg-muted-foreground/25" aria-hidden />
+			<div
+				className="mb-2 h-1 w-9 shrink-0 rounded-full bg-muted-foreground/25 medium:hidden"
+				aria-hidden
+			/>
 			<h2 className="w-full px-1 text-[17px] font-semibold tracking-tight text-foreground">
 				Weekly streak
 			</h2>
@@ -128,15 +201,12 @@ function StreakTrayHeader() {
 
 function StreakTraySkeleton() {
 	return (
-		<div className="flex flex-col gap-3.5 p-4" aria-busy="true" aria-label="Loading streak">
-			<div className="flex gap-3">
-				<div className="size-9 shrink-0 animate-pulse rounded-lg bg-muted/70" />
-				<div className="flex flex-1 flex-col gap-2">
-					<div className="h-4 w-24 animate-pulse rounded bg-muted/70" />
-					<div className="h-3 w-full animate-pulse rounded bg-muted/60" />
-				</div>
+		<div className="flex flex-col gap-4 p-4" aria-busy="true" aria-label="Loading streak">
+			<div className="space-y-2">
+				<div className="h-4 w-24 animate-pulse rounded bg-muted/70" />
+				<div className="h-6 w-48 animate-pulse rounded bg-muted/70" />
+				<div className="h-4 w-full animate-pulse rounded bg-muted/60" />
 			</div>
-			<div className="h-8 w-36 animate-pulse rounded bg-muted/70" />
 			<div className="flex gap-0.5">
 				{Array.from({ length: MILESTONE_COUNT }, (_, i) => (
 					<div key={i} className="h-1.5 min-w-0 flex-1 animate-pulse rounded-sm bg-muted/70" />
@@ -146,34 +216,214 @@ function StreakTraySkeleton() {
 	);
 }
 
-function StreakIconTile({
-	tone,
-}: {
-	tone: "active" | "at-risk" | "idle" | "reward";
-}) {
+function StreakIconTile({ tone }: { tone: StreakVisualTone }) {
 	return (
 		<div
 			className={cn(
 				"flex size-9 shrink-0 items-center justify-center rounded-lg",
 				tone === "reward" || tone === "active" ?
-					"bg-primary/15 text-primary"
+					"bg-primary/15"
 				: tone === "at-risk" ?
-					"bg-amber-500/15 text-amber-600 dark:text-amber-400"
-				:	"bg-muted/60 text-muted-foreground",
+					"bg-amber-500/15"
+				:	"bg-muted/60",
 			)}
 		>
-			{tone === "reward" ? (
-				<CheckCircle2Icon className="size-4" aria-hidden />
-			) : (
-				<ZapIcon
+			{tone === "reward" ?
+				<CheckCircle2Icon className="size-4 text-primary" aria-hidden />
+			:	<StreakZapIcon tone={tone} className="size-4" />}
+		</div>
+	);
+}
+
+function StreakFreezeChip({ available }: { available: boolean }) {
+	if (!available) return null;
+	return (
+		<span className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-2xs font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+			<span aria-hidden>❄</span>
+			1 freeze
+		</span>
+	);
+}
+
+function StreakRulesDisclosure({
+	freezesAvailable,
+}: {
+	freezesAvailable: number;
+}) {
+	const [rulesOpen, setRulesOpen] = React.useState(false);
+	const freezeRule =
+		freezesAvailable > 0 ? STREAK_FREEZE_AVAILABLE_RULE : STREAK_FREEZE_USED_RULE;
+
+	return (
+		<Collapsible open={rulesOpen} onOpenChange={setRulesOpen}>
+			<CollapsibleTrigger
+				type="button"
+				className={cn(
+					"group flex w-full items-center gap-1.5 rounded-md py-1 text-left text-xs font-medium text-muted-foreground outline-none",
+					"hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50",
+				)}
+			>
+				<ChevronDownIcon
 					className={cn(
-						"size-4",
-						tone === "active" && "fill-primary",
-						tone === "at-risk" && "fill-amber-500/30",
+						"size-3.5 shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none",
+						rulesOpen ? "rotate-0" : "-rotate-90",
 					)}
 					aria-hidden
 				/>
+				How weekly streaks work
+			</CollapsibleTrigger>
+			<CollapsibleContent>
+				<ul className="mt-1.5 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+					<li>{STREAK_WEEKLY_RULE}</li>
+					<li>{freezeRule}</li>
+					<li>{STREAK_RESET_RULE}</li>
+				</ul>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}
+
+function StreakRefreshSpinner({ show }: { show: boolean }) {
+	if (!show) return null;
+	return (
+		<LoaderIcon
+			className="size-4 shrink-0 animate-spin text-muted-foreground"
+			aria-label="Updating streak"
+		/>
+	);
+}
+
+function StreakAtRiskTrayBody({
+	streakWeeks,
+	weekDeadline,
+	freezesAvailable,
+	displayWeeks,
+	isRefreshing,
+	weeksToReward,
+}: {
+	streakWeeks: number;
+	weekDeadline: string;
+	freezesAvailable: number;
+	displayWeeks: number;
+	isRefreshing: boolean;
+	weeksToReward: number;
+}) {
+	const deadlineShort = shortenWeekDeadline(weekDeadline);
+
+	return (
+		<div
+			className={cn(
+				"flex flex-col gap-4 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+				isRefreshing && "opacity-60",
 			)}
+			aria-busy={isRefreshing}
+		>
+			<div className="relative flex flex-col items-center gap-3 text-center">
+				<div className="absolute top-0 right-0">
+					<StreakRefreshSpinner show={isRefreshing} />
+				</div>
+				<div className="flex size-16 items-center justify-center rounded-2xl bg-amber-500/12 ring-1 ring-amber-500/20">
+					<StreakZapIcon tone="at-risk" className="size-8" />
+				</div>
+				<div className="flex flex-wrap items-center justify-center gap-2">
+					<StreakStatusBadge variant="at-risk" />
+					<StreakFreezeChip available={freezesAvailable > 0} />
+				</div>
+				<div className="tabular-nums">
+					<p className="text-5xl font-bold leading-none tracking-tight text-foreground">{streakWeeks}</p>
+					<p className="mt-1 text-sm font-medium text-muted-foreground">week streak</p>
+				</div>
+				<p className="text-sm font-medium text-foreground">{deadlineShort}</p>
+				<p className="text-2xs text-muted-foreground">
+					{weeksToReward} weeks to free Pro · {STREAK_REWARD_TARGET_WEEKS}-week goal
+				</p>
+			</div>
+
+			<StreakMilestoneTrack
+				streakWeeks={displayWeeks}
+				tone="at-risk"
+				captionMode="hidden"
+				compact
+			/>
+
+			<StreakRulesDisclosure freezesAvailable={freezesAvailable} />
+		</div>
+	);
+}
+
+function StreakProgressTrayBody({
+	rewardGranted,
+	isActiveThisWeek,
+	streakWeeks,
+	displayWeeks,
+	milestoneTone,
+	rewardLine,
+	contextMetaLines,
+	freezesAvailable,
+	isRefreshing,
+	statusCopy,
+	statusBadgeVariant,
+}: {
+	rewardGranted: boolean;
+	isActiveThisWeek: boolean;
+	streakWeeks: number;
+	displayWeeks: number;
+	milestoneTone: "active" | "idle" | "complete";
+	rewardLine: string;
+	contextMetaLines: string[];
+	freezesAvailable: number;
+	isRefreshing: boolean;
+	statusCopy: string;
+	statusBadgeVariant: "active" | "reward" | null;
+}) {
+	const iconTone = resolveStreakVisualTone({
+		rewardGranted,
+		isActiveThisWeek,
+		isAtRisk: false,
+		streakWeeks,
+	});
+
+	return (
+		<div
+			className={cn(
+				"flex flex-col gap-4 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+				isRefreshing && "opacity-60",
+			)}
+			aria-busy={isRefreshing}
+		>
+			<div className="flex items-start gap-3">
+				<StreakIconTile tone={iconTone} />
+				<div className="min-w-0 flex-1 space-y-1.5">
+					{statusBadgeVariant ? <StreakStatusBadge variant={statusBadgeVariant} /> : null}
+					<p className="text-sm leading-snug text-muted-foreground">{statusCopy}</p>
+				</div>
+				<StreakRefreshSpinner show={isRefreshing} />
+			</div>
+
+			<div className="space-y-2">
+				<div className="flex items-baseline gap-1.5 tabular-nums">
+					<span className="text-[1.75rem] font-semibold leading-none tracking-tight text-foreground">
+						{displayWeeks}
+					</span>
+					<span className="text-sm text-muted-foreground">of {STREAK_REWARD_TARGET_WEEKS} weeks</span>
+				</div>
+				<StreakMilestoneTrack streakWeeks={displayWeeks} tone={milestoneTone} captionMode="full" />
+				{!rewardGranted ? (
+					<p className="text-xs text-muted-foreground">{rewardLine}</p>
+				) : (
+					<p className="text-xs font-medium text-foreground/90">{rewardLine}</p>
+				)}
+			</div>
+
+			{contextMetaLines.length > 0 ? (
+				<ul className="space-y-0.5 text-xs leading-relaxed text-muted-foreground">
+					{contextMetaLines.map((line) => (
+						<li key={line}>{line}</li>
+					))}
+				</ul>
+			) : null}
+
+			{!rewardGranted ? <StreakRulesDisclosure freezesAvailable={freezesAvailable} /> : null}
 		</div>
 	);
 }
@@ -234,6 +484,7 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 
 	const weekLabel = streakWeeks === 1 ? "1 week" : `${streakWeeks} weeks`;
 	const triggerLabel = rewardGranted ? "Earned" : isAtRisk ? "Due" : "Streak";
+	const weekDeadline = formatStreakWeekDeadline();
 
 	const milestoneTone =
 		rewardGranted ? "complete"
@@ -256,38 +507,41 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 			snapshot?.rewardGrantedAt ?
 				`Free year of Pro, ${formatDateTimeMediumShortInAppTimeZone(snapshot.rewardGrantedAt)}`
 			:	"Free year of Pro on your account"
-		:	`${weeksToReward} ${weeksToReward === 1 ? "week" : "weeks"} until a free year of Pro`;
+		: weeksToReward <= MILESTONE_SEGMENT_WEEKS ?
+			`${weeksToReward} ${weeksToReward === 1 ? "week" : "weeks"} left for a free year of Pro`
+		:	`${weeksToReward} weeks until a free year of Pro`;
 
 	const statusCopy =
 		rewardGranted ?
 			`You completed ${STREAK_REWARD_TARGET_WEEKS} weeks in a row.`
 		: isActiveThisWeek ?
-			"You are active this week. Submit again anytime to stay ahead."
-		: isAtRisk ?
-			(freezesAvailable > 0
-				? "Miss this week and your streak freeze will cover it — a quick set keeps it going."
-				: "Submit one test before this week ends or your streak resets to zero.")
+			"You are set for this week. Another submit still counts toward your streak."
 		: streakWeeks > 0 ?
-			"Submit a practice test or assignment to continue."
-		:	"Submit a practice test or assignment to start.";
+			"Submit a practice test or assignment to extend your streak."
+		:	"Submit a practice test or assignment to start your streak.";
 
-	const metaLines = [
+	const contextMetaLines = [
 		formatLastActiveWeekLabel(snapshot?.lastActiveWeekStart ?? null),
-		!rewardGranted && !isActiveThisWeek ? formatStreakWeekDeadline() : null,
 		longestStreakWeeks > streakWeeks ? formatLongestStreakLabel(longestStreakWeeks) : null,
-		rewardGranted ? null
-		: freezesAvailable > 0 ? "Streak freeze ready — it covers one missed week."
-		: "Streak freeze used — stay active to earn it back.",
-		STREAK_RULES_LINE,
 	].filter(Boolean) as string[];
 
 	const statusBadgeVariant =
 		rewardGranted ? "reward"
-		: isAtRisk ? "at-risk"
 		: isActiveThisWeek ? "active"
 		: null;
 
 	const displayWeeks = rewardGranted ? STREAK_REWARD_TARGET_WEEKS : streakWeeks;
+	const visualTone = resolveStreakVisualTone({
+		rewardGranted,
+		isActiveThisWeek,
+		isAtRisk,
+		streakWeeks,
+	});
+
+	const primaryCtaLabel =
+		isAtRisk || streakWeeks === 0 ?
+			"Submit practice or assignment"
+		:	"Go to practice";
 
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
@@ -301,24 +555,14 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 					"medium:h-8 medium:min-h-8 medium:min-w-0 medium:gap-1 medium:px-2",
 					"hover:bg-foreground/10 focus-visible:ring-3 focus-visible:ring-ring/50 dark:hover:bg-foreground/15",
 					topBarControlChrome,
-					isAtRisk && streakUrgencyChrome,
+					isAtRisk && streakUrgencyTriggerChrome,
 					rewardGranted && "border-primary/35 ring-1 ring-primary/20",
 				)}
 			>
 				{rewardGranted ? (
 					<CheckCircle2Icon className="size-4 shrink-0 text-primary" aria-hidden />
 				) : (
-					<ZapIcon
-						className={cn(
-							"size-4 shrink-0",
-							isActiveThisWeek ?
-								"fill-primary text-primary"
-							: isAtRisk ?
-								cn("fill-amber-500/25", streakUrgencyIcon)
-							:	"text-muted-foreground/70",
-						)}
-						aria-hidden
-					/>
+					<StreakZapIcon tone={visualTone} className="size-4" />
 				)}
 				<span
 					className={cn(
@@ -344,7 +588,7 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 				</span>
 				{isAtRisk ? (
 					<span
-						className="absolute top-1 right-1 size-1.5 rounded-full bg-amber-500 ring-2 ring-sidebar dark:ring-sidebar"
+						className="absolute top-1 right-1 size-1.5 rounded-full bg-amber-600 ring-2 ring-sidebar dark:bg-amber-500 dark:ring-sidebar"
 						aria-hidden
 					/>
 				) : null}
@@ -355,7 +599,6 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 				sideOffset={10}
 				className={cn(
 					trayPopoverClass,
-					isAtRisk && "border-amber-500/30 ring-amber-500/10",
 					rewardGranted && "border-primary/30 ring-primary/10",
 				)}
 			>
@@ -368,68 +611,40 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 								We could not load your streak. Check your connection and try again.
 							</p>
 							<Button type="button" variant="outline" size="sm" onClick={() => void loadSnapshot()}>
-								Retry
+								Try again
 							</Button>
 						</div>
 					) : isInitialLoad ? (
 						<StreakTraySkeleton />
 					) : (
-						<div className="flex flex-col gap-3.5 p-4">
-							<div className="flex items-start gap-3">
-								<StreakIconTile
-									tone={
-										rewardGranted ? "reward"
-										: isActiveThisWeek ? "active"
-										: isAtRisk ? "at-risk"
-										: "idle"
-									}
+						<div className="flex flex-col gap-4 p-4">
+							{isAtRisk ?
+								<StreakAtRiskTrayBody
+									streakWeeks={streakWeeks}
+									weekDeadline={weekDeadline}
+									freezesAvailable={freezesAvailable}
+									displayWeeks={displayWeeks}
+									isRefreshing={isRefreshing}
+									weeksToReward={weeksToReward}
 								/>
-								<div className="min-w-0 flex-1 space-y-1.5">
-									{statusBadgeVariant ? (
-										<StreakStatusBadge variant={statusBadgeVariant} />
-									) : null}
-									<p
-										className={cn(
-											"text-[13px] leading-snug",
-											isAtRisk ? streakUrgencyText : "text-muted-foreground",
-										)}
-									>
-										{statusCopy}
-									</p>
-								</div>
-							</div>
+							:	<StreakProgressTrayBody
+									rewardGranted={rewardGranted}
+									isActiveThisWeek={isActiveThisWeek}
+									streakWeeks={streakWeeks}
+									displayWeeks={displayWeeks}
+									milestoneTone={
+										milestoneTone === "at-risk" ? "idle" : milestoneTone
+									}
+									rewardLine={rewardLine}
+									contextMetaLines={contextMetaLines}
+									freezesAvailable={freezesAvailable}
+									isRefreshing={isRefreshing}
+									statusCopy={statusCopy}
+									statusBadgeVariant={statusBadgeVariant}
+								/>
+							}
 
-							<div
-								className={cn(
-									"space-y-2 transition-opacity duration-200 ease-out motion-reduce:transition-none",
-									isRefreshing && "opacity-60",
-								)}
-								aria-busy={isRefreshing}
-							>
-								<div className="flex items-baseline gap-1.5 tabular-nums">
-									<span className="text-[1.75rem] font-semibold leading-none tracking-tight text-foreground">
-										{displayWeeks}
-									</span>
-									<span className="text-sm text-muted-foreground">
-										of {STREAK_REWARD_TARGET_WEEKS} weeks
-									</span>
-									{isRefreshing ? (
-										<LoaderIcon
-											className="ml-auto size-4 shrink-0 animate-spin text-muted-foreground"
-											aria-label="Updating streak"
-										/>
-									) : null}
-								</div>
-								<StreakMilestoneTrack streakWeeks={displayWeeks} tone={milestoneTone} />
-								<p className="text-xs font-medium text-foreground/90">{rewardLine}</p>
-								<ul className="space-y-1 text-2xs leading-relaxed text-muted-foreground">
-									{metaLines.map((line) => (
-										<li key={line}>{line}</li>
-									))}
-								</ul>
-							</div>
-
-							<div className="flex flex-col gap-2 border-t border-border/50 pt-3.5">
+							<div className="flex flex-col gap-2 border-t border-border/50 pt-4">
 								{rewardGranted ? (
 									<Button
 										render={
@@ -446,22 +661,18 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 										<Button
 											render={
 												<Link href="/student/practice" onClick={() => setOpen(false)}>
-													{isAtRisk ? "Submit a test now" : "Go to practice"}
+													{primaryCtaLabel}
 												</Link>
 											}
-											variant={isAtRisk ? "default" : "outline"}
+											variant="default"
 											size="sm"
-											className={cn(
-												"w-full",
-												isAtRisk &&
-													"bg-amber-600 text-white hover:bg-amber-600/90 dark:bg-amber-500 dark:hover:bg-amber-500/90",
-											)}
+											className="w-full"
 										/>
 										{isAtRisk ? (
 											<Button
 												render={
 													<Link href="/student/assignments" onClick={() => setOpen(false)}>
-														View assignments
+														Go to assignments
 													</Link>
 												}
 												variant="ghost"
