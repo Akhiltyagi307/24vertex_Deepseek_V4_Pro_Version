@@ -2,9 +2,16 @@
 
 import * as React from "react";
 
-import { CoachMarks, type CoachMarkStep } from "@/components/onboarding/coach-marks";
+import {
+	CoachMarks,
+	hasReachableTourTarget,
+	type CoachMarkStep,
+} from "@/components/onboarding/coach-marks";
 import { useOnboardingFlag } from "@/components/onboarding/use-onboarding-flag";
+import { subscribeTourReplay } from "@/components/onboarding/tour-replay";
 import { WelcomeDialog } from "@/components/onboarding/welcome-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { markWelcomeSeen } from "@/lib/onboarding/welcome-actions";
 import type { StudentDashboardOnboarding } from "@/lib/student/load-student-dashboard";
 
 export type StudentOnboardingProps = {
@@ -71,28 +78,50 @@ export function StudentOnboarding({ onboarding, firstName, gradeLabel }: Student
 	// first-step initializer instead of resetting state inside an effect.
 	const [tourRunId, setTourRunId] = React.useState(0);
 
-	// Only new students who have not seen the welcome get the first-run flow.
+	const isMobile = useIsMobile();
+
+	// `eligible` (window-based) also drives the checklist; the server-durable
+	// `welcomeSeen` gates only the welcome modal so a cross-device dismissal sticks.
 	const eligible = onboarding.isNewStudent;
-	const welcomeOpen = eligible && !welcome.done && !welcomeClosed;
+	// `!tourActive` keeps the welcome and the tour mutually exclusive.
+	const welcomeOpen =
+		eligible && !onboarding.welcomeSeen && !welcome.done && !welcomeClosed && !tourActive;
 
 	const closeWelcome = React.useCallback(() => {
 		setWelcomeClosed(true);
 		welcome.markDone();
+		// Persist the dismissal server-side so the welcome doesn't return on another
+		// device/browser. Best-effort; the UI has already closed off localStorage.
+		void markWelcomeSeen();
 	}, [welcome]);
 
 	const startTour = React.useCallback(() => {
 		setWelcomeClosed(true);
 		welcome.markDone();
+		// No anchorable nav targets (e.g. the mobile drawer sidebar is closed/unmounted):
+		// skip rather than render a contentless tour. Mark it done so it isn't re-offered.
+		if (!hasReachableTourTarget(STUDENT_TOUR_STEPS)) {
+			tour.markDone();
+			return;
+		}
 		setTourRunId((id) => id + 1);
 		setTourActive(true);
-	}, [welcome]);
+	}, [welcome, tour]);
 
 	const finishTour = React.useCallback(() => {
 		setTourActive(false);
 		tour.markDone();
 	}, [tour]);
 
-	if (!eligible) return null;
+	// Re-entry: a top-bar control can replay the tour at any time — even for users
+	// past the first-run window — so the orchestrator stays mounted regardless of
+	// `eligible` and listens for replay requests for this portal scope.
+	const replayTour = React.useCallback(() => {
+		if (!hasReachableTourTarget(STUDENT_TOUR_STEPS)) return;
+		setTourRunId((id) => id + 1);
+		setTourActive(true);
+	}, []);
+	React.useEffect(() => subscribeTourReplay("student", replayTour), [replayTour]);
 
 	const name = firstName?.trim();
 	const greetingTitle = name ? `Welcome to 24Vertex, ${name}!` : "Welcome to 24Vertex!";
@@ -114,7 +143,7 @@ export function StudentOnboarding({ onboarding, firstName, gradeLabel }: Student
 				title={greetingTitle}
 				lines={lines}
 				primaryCta={{ label: "Generate your first test", href: "/student/practice" }}
-				onStartTour={!tour.done ? startTour : undefined}
+				onStartTour={!tour.done && !isMobile ? startTour : undefined}
 			/>
 			<CoachMarks
 				key={tourRunId}

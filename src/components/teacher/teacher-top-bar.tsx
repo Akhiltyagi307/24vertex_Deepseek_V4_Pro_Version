@@ -5,6 +5,7 @@ import {
 	AppHeaderBrandTrail,
 	HeaderBreadcrumbSlash,
 } from "@/components/layout/app-header-brand-trail";
+import { TourReplayTopBarButton } from "@/components/onboarding/tour-replay-top-bar-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ export function TeacherTopBar({ organizationName, userDisplayName }: TeacherTopB
 				/>
 			</div>
 			<div className="flex items-center gap-2">
+				<TourReplayTopBarButton scope="teacher" />
 				<FeedbackReportTopBarButton portal="teacher" />
 				<ThemeToggle />
 			</div>

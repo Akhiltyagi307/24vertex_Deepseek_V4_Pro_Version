@@ -45,7 +45,10 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 	// First-run onboarding gate: verified teachers created within the window. The
 	// window is wider than students' (teachers may sit in "pending" awaiting admin
 	// approval before they ever reach the verified workspace).
-	const isNewTeacher = (row.is_verified ?? false) && isWithinTeacherOnboardingWindow(row.created_at);
+	const isNewTeacher =
+		(row.is_verified ?? false) &&
+		row.onboarding_welcome_seen_at == null &&
+		isWithinTeacherOnboardingWindow(row.created_at);
 	const onboardingFirstName = formatPersonDisplayName(row.full_name ?? "").split(/\s+/)[0] || null;
 
 	return (
