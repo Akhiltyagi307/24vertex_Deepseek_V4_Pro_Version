@@ -1,7 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
 	CheckCircle2Icon,
 	ChevronLeftIcon,
@@ -29,6 +32,7 @@ import {
 } from "@/lib/student/qna-logs/qna-log-verdict";
 import type { QnaLogDetail } from "@/lib/student/qna-logs/types";
 import { cn } from "@/lib/utils";
+import { createDoubtConversation } from "@/lib/doubt/doubt-actions";
 
 const LazyLatexText = dynamic(
 	() => import("@/components/student/practice/latex-text").then((module) => module.LatexText),
@@ -302,6 +306,30 @@ export function QnaLogDetailDialog({
 	onOpenChange,
 	onNavigate,
 }: Props) {
+	const router = useRouter();
+	const [asking, setAsking] = useState(false);
+
+	async function handleAskAboutThis() {
+		if (!detail || asking) return;
+		setAsking(true);
+		try {
+			const res = await createDoubtConversation({
+				subjectId: detail.subjectId,
+				topicId: detail.topicId,
+				mistakeContext: { questionId: detail.questionId },
+			});
+			if (res.ok) {
+				router.push(`/student/doubt-chat?c=${res.conversationId}`);
+			} else {
+				toast.error(res.message);
+				setAsking(false);
+			}
+		} catch {
+			toast.error("Could not start a chat. Try again.");
+			setAsking(false);
+		}
+	}
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="flex max-h-[min(90vh,56rem)] max-w-[min(96vw,72rem)] flex-col gap-0 overflow-hidden p-0 medium:max-w-4xl">
@@ -356,6 +384,17 @@ export function QnaLogDetailDialog({
 									</p>
 								) : null}
 							</section>
+
+							{detail.performance === "incorrect" || detail.performance === "partial" ? (
+								<section className="border-t border-border/60 pt-5">
+									<Button type="button" size="sm" disabled={asking} onClick={handleAskAboutThis}>
+										{asking ? "Opening…" : "Ask about this"}
+									</Button>
+									<p className="mt-1.5 text-xs text-muted-foreground">
+										Start a tutor chat grounded in this exact mistake.
+									</p>
+								</section>
+							) : null}
 
 							<AnswerKeySection detail={detail} />
 

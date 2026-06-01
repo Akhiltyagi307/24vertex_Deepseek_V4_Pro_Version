@@ -15,6 +15,7 @@ function makeDetail(overrides: Partial<QnaLogDetail>): QnaLogDetail {
 		answerId: "answer-id",
 		questionId: "question-id",
 		testId: "test-id",
+		topicId: "topic-id",
 		questionNumber: 1,
 		questionText: "What is matter?",
 		questionType: "multiple_choice",

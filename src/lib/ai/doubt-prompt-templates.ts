@@ -56,7 +56,10 @@ Description:
 {{topic_description}}
 
 What this topic teaches:
-{{learning_objectives}}`;
+{{learning_objectives}}
+
+## Student's specific mistake (focus your help here if present)
+{{mistake_block}}`;
 
 function extractTemplateFromDoc(filePath: string): string {
 	const raw = fs.readFileSync(filePath, "utf8");
@@ -211,6 +214,7 @@ export function interpolateDoubtPromptTemplate(
 			topic_number: chunksOnly ? "not provided" : String(t.topicNumber),
 			topic_description: desc,
 			learning_objectives: goalsLines,
+			mistake_block: t.mistakeBlock?.trim() || "(no specific mistake attached — help with the topic)",
 			chapter_topic_list: chunksOnly
 				? "(omitted intentionally — rely only on topic_context_chunks text)"
 				: `- ${t.topicName}`,
@@ -229,6 +233,7 @@ export function interpolateDoubtPromptTemplate(
 			topic_name: chunksOnly ? "selected chapter (metadata omitted)" : "Whole chapter (all syllabus topics listed below)",
 			topic_number: chunksOnly ? "not provided" : "—",
 			topic_description: descFromChunks || ch.topicDescription,
+			mistake_block: ch.mistakeBlock?.trim() || "(no specific mistake attached — help with the chapter)",
 			learning_objectives: chunksOnly
 				? "Use ONLY the topic_context_chunks content above as grounding. If a detail is missing there, state that clearly."
 				: ch.learningObjectivesBlock,

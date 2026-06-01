@@ -92,6 +92,7 @@ export type QnaLogDetail = {
 	answerId: string;
 	questionId: string;
 	testId: string;
+	topicId: string;
 	questionNumber: number;
 	questionText: string;
 	questionType: QnaLogQuestionType;

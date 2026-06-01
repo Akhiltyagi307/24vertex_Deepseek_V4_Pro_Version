@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buildDoubtHiddenBootstrapUserContent } from "@/lib/doubt/doubt-hidden-bootstrap";
 import { loadDoubtTopicRows, type DoubtChatEntitlement, type DoubtChatTopicRow } from "@/lib/doubt/loaders";
 import { parseChapterKey } from "@/lib/doubt/chapter-group";
+import { loadMistakeForQuestion } from "@/lib/doubt/mistake-context";
 import {
 	buildChapterMetadataPayload,
 	validateDoubtChapterScope,
@@ -25,6 +26,7 @@ const createSchema = z
 		subjectId: z.string().uuid(),
 		topicId: z.string().uuid().optional(),
 		chapterKey: z.string().regex(/^\d+:\d+$/, "Invalid chapter key.").optional(),
+		mistakeContext: z.object({ questionId: z.string().uuid() }).optional(),
 	})
 	.superRefine((val, ctx) => {
 		const hasTopic = val.topicId != null && val.topicId.length > 0;
@@ -81,13 +83,28 @@ export async function createDoubtConversation(input: unknown): Promise<CreateDou
 		return { ok: false, code: scope.code, message: scope.message };
 	}
 
+	let mistakeBlock: string | null = null;
+	if (parsed.data.mistakeContext) {
+		const mistake = await loadMistakeForQuestion(
+			supabase,
+			scope.userId,
+			parsed.data.mistakeContext.questionId,
+		);
+		if (mistake) {
+			mistakeBlock = mistake.block;
+			if (scope.kind === "topic") scope.topic.mistakeBlock = mistake.block;
+			else scope.chapter.mistakeBlock = mistake.block;
+		}
+	}
+
 	const title =
 		scope.kind === "topic"
 			? `${scope.topic.topicName} — ${scope.subjectName}`
 			: `Ch ${scope.chapter.chapterNumber}: ${scope.chapter.chapterName} — ${scope.subjectName}`;
 	const model = getOpenAIDoubtChatModel();
-	const metadata =
+	const baseMeta =
 		scope.kind === "chapter" ? (buildChapterMetadataPayload(scope) as unknown as Record<string, unknown>) : {};
+	const metadata: Record<string, unknown> = mistakeBlock ? { ...baseMeta, mistakeBlock } : baseMeta;
 
 	const { data: created, error } = await supabase
 		.from("doubt_conversations")

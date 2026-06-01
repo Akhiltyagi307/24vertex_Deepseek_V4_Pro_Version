@@ -17,6 +17,7 @@ type RawDetailRow = {
 	answer_id: string;
 	question_id: string;
 	test_id: string;
+	topic_id: string;
 	question_number: number;
 	question_text: string;
 	question_type: string;
@@ -135,6 +136,7 @@ export async function getQnaLogDetail(args: {
 			q.options,
 			q.answer_key,
 			q.metadata,
+			q.topic_id,
 			t.test_date,
 			t.created_at,
 			t.test_type,
@@ -180,6 +182,7 @@ export async function getQnaLogDetail(args: {
 		answerId: String(row.answer_id),
 		questionId: String(row.question_id),
 		testId: String(row.test_id),
+		topicId: String(row.topic_id),
 		questionNumber: Number(row.question_number ?? 0),
 		questionText: String(row.question_text ?? ""),
 		questionType,
