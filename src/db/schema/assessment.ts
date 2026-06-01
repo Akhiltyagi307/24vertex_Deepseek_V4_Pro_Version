@@ -36,6 +36,10 @@ export const performanceTracker = pgTable(
 		testsTaken: integer("tests_taken").default(0),
 		confidenceScore: decimal("confidence_score", { precision: 3, scale: 2 }).default("0"),
 		trend: varchar("trend", { length: 20 }).default("stable"),
+		nextReviewAt: timestamp("next_review_at"),
+		reviewIntervalDays: integer("review_interval_days"),
+		reviewEase: decimal("review_ease", { precision: 3, scale: 2 }),
+		consecutiveGood: integer("consecutive_good").notNull().default(0),
 		updatedAt: timestamp("updated_at").defaultNow(),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
@@ -44,6 +48,7 @@ export const performanceTracker = pgTable(
 		index("idx_perf_student_subject").on(t.studentId, t.subjectId),
 		index("idx_perf_status").on(t.status),
 		index("idx_perf_student").on(t.studentId),
+		index("idx_perf_next_review").on(t.nextReviewAt).where(sql`${t.nextReviewAt} is not null`),
 	],
 );
 
