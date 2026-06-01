@@ -109,6 +109,7 @@ testsprite_tests/
 # Exception: sentry/* alert configuration reference.
 # Exception: security/* CSP / WebAuthn / Trusted-Types decisions.
 # Exception: conventions.md repo-wide style + structure conventions.
+# Exception: superpowers/specs/* design specs (brainstorming -> spec -> plan flow).
 docs/*
 !docs/explain-mode-prompt.md
 !docs/solve-with-me-mode-prompt.md
@@ -130,6 +131,9 @@ docs/*
 !docs/security/
 !docs/security/*.md
 !docs/conventions.md
+!docs/superpowers/
+!docs/superpowers/specs/
+!docs/superpowers/specs/*.md
 
 # One-off local notes at repo root (keep out of git)
 EduAI_PRD_v3_2_TestSprite_Backend.md
