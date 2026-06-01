@@ -62,8 +62,8 @@ export function rankAdvisoryActions(rows: AdvisoryRow[], nowMs: number): Advisor
 export async function loadAdvisoryActions(
 	supabase: SupabaseClient,
 	studentId: string,
-	nowMs: number,
 ): Promise<AdvisoryAction[]> {
+	const nowMs = Date.now();
 	const { data } = await supabase
 		.from("performance_tracker")
 		.select("topic_id, average_score, next_review_at, topics(name)")

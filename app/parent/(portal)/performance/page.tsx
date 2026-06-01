@@ -6,10 +6,12 @@ import { Suspense } from "react";
 import { StudentPerformanceAsync } from "../../../student/performance/student-performance-async";
 import { StudentPerformanceSkeleton } from "../../../student/performance/student-performance-skeleton";
 import { ParentPerformanceChartA11yWrapper } from "@/components/parent/performance-chart-a11y-wrapper";
+import { ParentReviewAdvisoryPanel } from "@/components/parent/review-advisory-panel";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
 import { getParentActiveStudentIdFromCookie } from "@/lib/parent/active-student-cookie";
 import { assertParentActiveLink } from "@/lib/parent/linked-children";
+import { loadAdvisoryActions } from "@/lib/student/review-advisory";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -65,8 +67,16 @@ export default async function ParentPerformancePage({ searchParams }: PageProps)
 
 	const childName = formatPersonDisplayName(row.full_name ?? "") || "your child";
 
+	// Parent already authorized for activeId above (assertParentActiveLink). The
+	// parent's RLS client can read the linked child's tracker — the same access the
+	// performance matrix below relies on.
+	const advisoryActions = await loadAdvisoryActions(await createClient(), activeId);
+
 	return (
 		<ParentPerformanceChartA11yWrapper childName={childName}>
+			<div className="mb-5">
+				<ParentReviewAdvisoryPanel actions={advisoryActions} childName={childName} />
+			</div>
 			<Suspense fallback={<StudentPerformanceSkeleton />}>
 				<StudentPerformanceAsync
 					userId={activeId}
