@@ -1,6 +1,7 @@
 import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/notifications/report-ready";
 import { notifyAssignmentGraded } from "@/lib/notifications/assignment-events";
 import { materializeAssignedPracticeTest } from "@/lib/admin/assignment-generation";
+import { materializeReviewPracticeTest } from "@/lib/practice/review-generation";
 import {
 	gradePracticeTestWithAi,
 	recordGradingFailure,
@@ -38,6 +39,8 @@ function perJobTimeoutMs(jobType: ClaimedJob["job_type"]): number {
 			return 90_000;
 		case "assign_generate_test":
 			return 180_000;
+		case "review_generate":
+			return 180_000;
 		default:
 			return 90_000;
 	}
@@ -69,7 +72,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, jobType: string): Promi
 
 type ClaimedJob = {
 	id: string;
-	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update" | "assign_generate_test";
+	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update" | "assign_generate_test" | "review_generate";
 	test_id: string | null;
 	student_id: string;
 	assignment_submission_id?: string | null;
@@ -511,6 +514,21 @@ async function handleEmailJob(
 	return { ok: false, message: result.reason };
 }
 
+async function handleReviewGenerateJob(
+	job: ClaimedJob,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const studentId = job.student_id;
+	const payload = job.payload;
+	const subjectId = typeof payload.subject_id === "string" ? payload.subject_id : null;
+	const topicId = typeof payload.topic_id === "string" ? payload.topic_id : null;
+	const trackerId = typeof payload.tracker_id === "string" ? payload.tracker_id : null;
+	if (!studentId || !subjectId || !topicId || !trackerId) {
+		return { ok: false, message: "review_generate payload missing student/subject/topic/tracker" };
+	}
+	const result = await materializeReviewPracticeTest({ studentId, subjectId, topicId, trackerId });
+	return result.ok ? { ok: true } : { ok: false, message: result.message };
+}
+
 async function handleAssignGenerateTestJob(
 	job: ClaimedJob,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -558,7 +576,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 
 	const { data: jobs, error } = await admin.rpc("practice_claim_jobs", {
 		p_worker_id: workerId,
-		p_job_types: ["grade", "pdf", "email", "tracker_update", "assign_generate_test"],
+		p_job_types: ["grade", "pdf", "email", "tracker_update", "assign_generate_test", "review_generate"],
 		p_limit: limit,
 	});
 
@@ -578,6 +596,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 				: job.job_type === "email" ? handleEmailJob(job)
 				: job.job_type === "tracker_update" ? handleTrackerUpdateJob(job)
 				: job.job_type === "assign_generate_test" ? handleAssignGenerateTestJob(job)
+				: job.job_type === "review_generate" ? handleReviewGenerateJob(job)
 				: Promise.resolve({ ok: false as const, message: `Unsupported job_type ${job.job_type}` });
 
 			// Per-job timeout: a stuck AI call cannot block the whole worker
