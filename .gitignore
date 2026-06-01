@@ -134,6 +134,8 @@ docs/*
 !docs/superpowers/
 !docs/superpowers/specs/
 !docs/superpowers/specs/*.md
+!docs/superpowers/plans/
+!docs/superpowers/plans/*.md
 
 # One-off local notes at repo root (keep out of git)
 EduAI_PRD_v3_2_TestSprite_Backend.md
