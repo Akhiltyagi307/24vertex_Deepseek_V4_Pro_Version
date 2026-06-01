@@ -1,6 +1,7 @@
 import { getEntitlements } from "@/lib/billing/entitlements";
 import { assertCronRequestAuthorized } from "@/lib/internal/cron-auth";
 import { decideReviewEnqueue } from "@/lib/practice/review-selection";
+import { studentInReviewCohort } from "@/lib/practice/review-cohort";
 import { logServerError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -26,6 +27,16 @@ async function handle(request: Request): Promise<Response> {
 		return Response.json({ ok: true, enqueued: 0, skipped: "disabled" });
 	}
 
+	// Staged-rollout cohort gate (under the kill-switch). Defaults to nobody, so the
+	// loop stays dormant until a pilot org or a rollout % is deliberately set.
+	const { data: rolloutPctRaw } = await admin.rpc("review_scheduler_rollout_pct");
+	const { data: cohortOrgIdsRaw } = await admin.rpc("review_scheduler_cohort_org_ids");
+	const rolloutPct = typeof rolloutPctRaw === "number" ? rolloutPctRaw : 0;
+	const cohortOrgIds = Array.isArray(cohortOrgIdsRaw) ? (cohortOrgIdsRaw as string[]) : [];
+	if (rolloutPct <= 0 && cohortOrgIds.length === 0) {
+		return Response.json({ ok: true, enqueued: 0, skipped: "empty_cohort" });
+	}
+
 	// Due topics. Graduated topics have next_review_at = NULL, so this is exactly
 	// the still-being-remediated set; the partial index keeps it cheap.
 	const nowIso = new Date().toISOString();
@@ -42,6 +53,19 @@ async function handle(request: Request): Promise<Response> {
 	}
 	const due = (dueRows ?? []) as DueTrackerRow[];
 
+	// Cohort membership needs each due student's org (for the org allowlist).
+	const dueStudentIds = [...new Set(due.map((r) => r.student_id))];
+	const orgByStudent = new Map<string, string | null>();
+	if (dueStudentIds.length > 0) {
+		const { data: profileRows } = await admin
+			.from("profiles")
+			.select("id, organization_id")
+			.in("id", dueStudentIds);
+		for (const p of (profileRows ?? []) as Array<{ id: string; organization_id: string | null }>) {
+			orgByStudent.set(p.id, p.organization_id ?? null);
+		}
+	}
+
 	// One review per student per run → with the unique active-job index this
 	// enforces ≤1 review/day per student.
 	const seenStudents = new Set<string>();
@@ -53,6 +77,16 @@ async function handle(request: Request): Promise<Response> {
 	for (const row of due) {
 		if (seenStudents.has(row.student_id)) continue;
 		seenStudents.add(row.student_id);
+		if (
+			!studentInReviewCohort({
+				studentId: row.student_id,
+				orgId: orgByStudent.get(row.student_id) ?? null,
+				rolloutPct,
+				cohortOrgIds,
+			})
+		) {
+			continue;
+		}
 		try {
 			const ent = await getEntitlements(admin, row.student_id);
 			if (!ent) continue;
