@@ -43,6 +43,8 @@ import {
 } from "@/lib/student/practice-grading-pdf-student-details";
 import { formatTrackerStatusLabel, isTrackerStatus } from "@/lib/student/tracker-status-labels";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
+import { buildTrackerPayloadItems } from "@/lib/practice/review-schedule-payload";
+import type { ReviewScheduleState } from "@/lib/practice/review-schedule";
 import { createPhaseTimer, logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { withPracticeSpan } from "@/lib/practice/sentry-tags";
@@ -717,11 +719,35 @@ async function gradePracticeTestWithAiInner(
 	// Update performance trackers BEFORE downstream notifications fan out so the
 	// student (and linked parents) open a report whose tracker rows already match
 	// the new scores.
-	const trackerPayloadItems = topicRollups.map((row) => ({
-		topic_id: row.topic_id,
-		average_score: row.average_score,
-		n_incorrect: row.n_incorrect,
-	}));
+	// Closed-learning-loop: load each topic's prior review schedule so we can
+	// advance the SM-2-lite state inside the same tracker write (and replay job).
+	const reviewTopicIds = topicRollups.map((row) => row.topic_id);
+	const priorScheduleByTopic = new Map<string, ReviewScheduleState>();
+	if (reviewTopicIds.length > 0) {
+		const { data: priorRows } = await supabase
+			.from("performance_tracker")
+			.select("topic_id, review_interval_days, review_ease, consecutive_good")
+			.eq("student_id", userId)
+			.in("topic_id", reviewTopicIds);
+		const rows = (priorRows ?? []) as Array<{
+			topic_id: string;
+			review_interval_days: number | null;
+			review_ease: number | string | null;
+			consecutive_good: number | null;
+		}>;
+		for (const row of rows) {
+			priorScheduleByTopic.set(row.topic_id, {
+				intervalDays: row.review_interval_days ?? null,
+				ease: row.review_ease != null ? Number(row.review_ease) : null,
+				consecutiveGood: row.consecutive_good ?? 0,
+			});
+		}
+	}
+	const trackerPayloadItems = buildTrackerPayloadItems({
+		rollups: topicRollups,
+		priorByTopic: priorScheduleByTopic,
+		nowMs: new Date(nowIso).getTime(),
+	});
 	if (topicRollups.length > 0) {
 		const { error: bulkTrackerErr } = await supabase.rpc("practice_update_trackers_bulk", {
 			p_student_id: userId,
