@@ -25,6 +25,8 @@ export type DoubtTopicPayload = {
 	learningObjectives: string[] | null;
 	/** Optional runtime grounding packed from `topic_context_chunks` by the route. */
 	contextChunksBlock?: string;
+	/** Optional student-mistake grounding (their wrong answer + reference + feedback). */
+	mistakeBlock?: string;
 };
 
 export type DoubtChapterPayload = {
@@ -39,6 +41,8 @@ export type DoubtChapterPayload = {
 	learningObjectivesBlock: string;
 	/** Optional runtime grounding packed from `topic_context_chunks` by the route. */
 	contextChunksBlock?: string;
+	/** Optional student-mistake grounding (their wrong answer + reference + feedback). */
+	mistakeBlock?: string;
 };
 
 export type DoubtTopicScopeSuccess = {

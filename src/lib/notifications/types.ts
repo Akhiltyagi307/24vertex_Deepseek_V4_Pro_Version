@@ -39,7 +39,8 @@ export type NotificationCategory =
 	| "teacher_student_link_confirmed"
 	| "assignment_published"
 	| "assignment_materialized"
-	| "assignment_graded";
+	| "assignment_graded"
+	| "review_ready";
 
 /** Shape passed to UI components when rendering a notification row. */
 export type NotificationListItem = {
@@ -121,6 +122,18 @@ export function deriveCta(
 		return {
 			label: row.category === "assignment_graded" ? "View assignment" : "Open assignments",
 			href: portal === "parent" ? "/parent/assignments" : "/student/assignments",
+			variant: "primary",
+		};
+	}
+	if (
+		portal === "student" &&
+		row.category === "review_ready" &&
+		row.referenceType === "test" &&
+		row.referenceId
+	) {
+		return {
+			label: "Start review",
+			href: `/student/practice/${encodeURIComponent(row.referenceId)}`,
 			variant: "primary",
 		};
 	}

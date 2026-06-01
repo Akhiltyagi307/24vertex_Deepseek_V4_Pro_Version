@@ -235,6 +235,16 @@ export async function POST(req: Request) {
 			);
 		}
 		groundedScope = attachTopicContextChunksToScope(scope, chunksRes.block);
+		const storedMistake =
+			existing.metadata && typeof (existing.metadata as Record<string, unknown>).mistakeBlock === "string"
+				? ((existing.metadata as Record<string, unknown>).mistakeBlock as string)
+				: null;
+		if (storedMistake) {
+			groundedScope =
+				groundedScope.kind === "topic"
+					? { ...groundedScope, topic: { ...groundedScope.topic, mistakeBlock: storedMistake } }
+					: { ...groundedScope, chapter: { ...groundedScope.chapter, mistakeBlock: storedMistake } };
+		}
 	} catch (e) {
 		logSupabaseError(
 			"doubt_chat.context_chunks",

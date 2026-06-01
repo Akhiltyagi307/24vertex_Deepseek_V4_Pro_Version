@@ -5,7 +5,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiCalls, practiceGenerationRuns, practiceGenerationSteps } from "@/db/schema";
 
-export type PracticeGenerationRequestMode = "server_action" | "stream" | "assignment_worker";
+export type PracticeGenerationRequestMode = "server_action" | "stream" | "assignment_worker" | "review_worker";
 export type PracticeGenerationRunStatus = "running" | "succeeded" | "failed" | "aborted";
 export type PracticeGenerationStepStatus = "started" | "ok" | "error" | "skipped";
 

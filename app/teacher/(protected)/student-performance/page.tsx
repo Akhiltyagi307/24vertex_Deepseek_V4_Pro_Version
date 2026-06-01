@@ -9,6 +9,8 @@ import {
 	listTeacherPerformanceDirectoryRows,
 } from "@/lib/teachers/teacher-performance-directory-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
+import { loadTeacherReviewSummary } from "@/lib/teachers/teacher-review-summary";
+import { TeacherReviewSummaryCard } from "@/components/teacher/review-summary-card";
 
 // Authenticated teacher student directories are roster-scoped and should not be statically cached.
 export const dynamic = "force-dynamic";
@@ -52,13 +54,21 @@ export default async function TeacherStudentPerformanceDirectoryPage({ searchPar
 		? `Review subject-level performance for students at ${activeOrg.name} that your teacher account can reach. Filter by grade, section, or subject (grades 11–12 respect stream and elective), then open a student to see detailed progress. The same subject view families see in the parent portal.`
 		: `Review subject-level performance for students linked to your account with a six-character code while you’re outside an organization. Filter by class placement or subject, then open a student to see detailed progress. The same subject view families see in the parent portal.`;
 
+	const reviewSummary = await loadTeacherReviewSummary({
+		teacherId: user.id,
+		activeOrganizationId: activeOrg?.id ?? null,
+	});
+
 	return (
-		<TeacherPerformanceDirectoryPanel
-			workspaceDescription={workspaceDescription}
-			subjectsCatalog={subjectsCatalog}
-			initialRows={initialRows}
-			filterOptions={filterOptions}
-			initialSubjectId={initialSubjectId}
-		/>
+		<div className="space-y-4">
+			<TeacherReviewSummaryCard summary={reviewSummary} />
+			<TeacherPerformanceDirectoryPanel
+				workspaceDescription={workspaceDescription}
+				subjectsCatalog={subjectsCatalog}
+				initialRows={initialRows}
+				filterOptions={filterOptions}
+				initialSubjectId={initialSubjectId}
+			/>
+		</div>
 	);
 }
