@@ -11,6 +11,16 @@ on:
 jobs:
   admin-phase1-checks:
     runs-on: ubuntu-latest
+    # `secrets` is NOT a valid context in step-level `if:` — referencing it
+    # there makes the whole workflow file invalid (startup_failure; jobs never
+    # run). Mirror the presence-gating secrets into job env so the
+    # `if: env.X != ''` guards below are valid (`env` IS allowed in `if:`).
+    # Absent secrets resolve to '' → the gated steps skip, as before.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +61,7 @@ jobs:
         run: pnpm vitest run
 
       - name: Drizzle ↔ Postgres schema parity (blocks on real drift)
-        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' && env.NEXT_PUBLIC_SUPABASE_URL != '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -77,7 +87,7 @@ jobs:
         run: node scripts/check-migration-drift.mjs
 
       - name: Next build + verify service role not in client static
-        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' && env.NEXT_PUBLIC_SUPABASE_URL != '' && env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
@@ -89,7 +99,7 @@ jobs:
           node scripts/ci-verify-no-service-role-in-next-static.mjs
 
       - name: Vitest (admin immutability — skips without Supabase env)
-        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' && env.NEXT_PUBLIC_SUPABASE_URL != '' }}
         env:
           ADMIN_INTEGRATION_TESTS: "true"
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -97,7 +107,7 @@ jobs:
         run: pnpm vitest run tests/admin/immutability.test.ts
 
       - name: Vitest (admin login — skips without DATABASE_URL)
-        if: ${{ secrets.DATABASE_URL != '' }}
+        if: ${{ env.DATABASE_URL != '' }}
         env:
           ADMIN_INTEGRATION_TESTS: "true"
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
