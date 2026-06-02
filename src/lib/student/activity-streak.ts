@@ -1,19 +1,28 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 export const STREAK_REWARD_TARGET_WEEKS = 52;
 
-export type StudentActivityStreakSnapshot = {
-	streakWeeks: number;
-	currentWeekActive: boolean;
-	lastActiveWeekStart: string | null;
-	longestStreakWeeks: number;
-	weeksToReward: number;
-	rewardGranted: boolean;
-	rewardGrantedAt: string | null;
+/**
+ * Runtime schema + inferred type for the streak snapshot. Single source of
+ * truth: the API route serialises this shape and the client widget validates
+ * the response against it, so a drifted payload fails loudly instead of
+ * silently rendering zeroes.
+ */
+export const studentActivityStreakSnapshotSchema = z.object({
+	streakWeeks: z.number(),
+	currentWeekActive: z.boolean(),
+	lastActiveWeekStart: z.string().nullable(),
+	longestStreakWeeks: z.number(),
+	weeksToReward: z.number(),
+	rewardGranted: z.boolean(),
+	rewardGrantedAt: z.string().nullable(),
 	/** Freezes banked (0 or 1); a freeze bridges a single missed week. */
-	freezesAvailable: number;
-	freezeLastUsedWeek: string | null;
-};
+	freezesAvailable: z.number(),
+	freezeLastUsedWeek: z.string().nullable(),
+});
+
+export type StudentActivityStreakSnapshot = z.infer<typeof studentActivityStreakSnapshotSchema>;
 
 type SnapshotRow = {
 	streak_weeks: number | null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,15 +26,27 @@ export function AdminQuotaGrantsPanel({ subscriptionId }: Props) {
 	const [expiresAt, setExpiresAt] = useState("");
 	const [note, setNote] = useState("");
 
+	// Out-of-order guard: only the most recent load may apply its rows, so a slow
+	// response (e.g. after a subscriptionId change or a post-mutation refresh)
+	// can't overwrite newer data.
+	const reqIdRef = useRef(0);
 	const load = useCallback(async () => {
+		const reqId = ++reqIdRef.current;
 		const res = await fetch(`/api/admin/subscriptions/${subscriptionId}/grants`, { credentials: "include" });
 		const j = (await res.json()) as { data?: GrantRow[] };
 		if (!res.ok) throw new Error("Failed to load grants");
+		if (reqId !== reqIdRef.current) return;
 		setRows(j.data ?? []);
 	}, [subscriptionId]);
 
 	useEffect(() => {
-		void load().catch(() => setRows([]));
+		let ignore = false;
+		void load().catch(() => {
+			if (!ignore) setRows([]);
+		});
+		return () => {
+			ignore = true;
+		};
 	}, [load]);
 
 	if (rows === null) {

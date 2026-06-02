@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BookmarkPlus } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { z } from "zod";
 
+import { fetchJson, isAbortError } from "@/lib/http/fetch-json";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -24,6 +26,16 @@ import {
 
 export type SavedViewRow = { id: string; name: string; state: Record<string, unknown> };
 
+const savedViewsResponseSchema = z.object({
+	data: z.array(
+		z.object({
+			id: z.string(),
+			name: z.string(),
+			state: z.record(z.string(), z.unknown()),
+		}),
+	),
+});
+
 type SavedViewsProps = {
 	listId: string;
 };
@@ -37,15 +49,33 @@ export function AdminSavedViews({ listId }: SavedViewsProps) {
 	const [name, setName] = useState("");
 	const [loading, setLoading] = useState(false);
 
+	const reqIdRef = useRef(0);
+	const acRef = useRef<AbortController | null>(null);
+
 	const load = useCallback(async () => {
-		const res = await fetch(`/api/admin/saved-views?list_id=${encodeURIComponent(listId)}`, { credentials: "include" });
-		if (!res.ok) return;
-		const j = (await res.json()) as { data: SavedViewRow[] };
-		setViews(j.data ?? []);
+		const reqId = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
+		try {
+			const j = await fetchJson(`/api/admin/saved-views?list_id=${encodeURIComponent(listId)}`, {
+				schema: savedViewsResponseSchema,
+				signal: ac.signal,
+				init: { credentials: "include" },
+			});
+			if (reqId !== reqIdRef.current) return;
+			setViews(j.data ?? []);
+		} catch (err) {
+			if (isAbortError(err)) return;
+			// Match the previous behaviour: a failed load silently leaves the list as-is.
+		}
 	}, [listId]);
 
 	useEffect(() => {
 		void load();
+		return () => {
+			acRef.current?.abort();
+		};
 	}, [load]);
 
 	const applyState = (state: Record<string, unknown>) => {

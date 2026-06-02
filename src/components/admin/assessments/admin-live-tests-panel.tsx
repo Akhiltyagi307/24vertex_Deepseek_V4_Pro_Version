@@ -6,6 +6,7 @@ import * as React from "react";
 import { AdminExportButton } from "@/components/admin/data-table/export-button";
 import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { Button } from "@/components/ui/button";
+import { isAbortError } from "@/lib/http/fetch-json";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
@@ -25,14 +26,27 @@ export function AdminLiveTestsPanel() {
 	const [rows, setRows] = React.useState<LiveRow[]>([]);
 	const [error, setError] = React.useState<string | null>(null);
 
+	// Out-of-order guard: this `load` is re-fired from a realtime subscription, a
+	// 30s heartbeat, the initial mount, and the manual "Refresh now" button, so a
+	// slow response must not overwrite a newer one. The AbortController is also
+	// torn down on unmount by the effect cleanup below.
+	const reqIdRef = React.useRef(0);
+	const acRef = React.useRef<AbortController | null>(null);
+
 	const load = React.useCallback(async () => {
+		const reqId = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		try {
-			const res = await fetch("/api/admin/tests/live", { credentials: "include" });
+			const res = await fetch("/api/admin/tests/live", { credentials: "include", signal: ac.signal });
 			const j = (await res.json()) as { data?: LiveRow[]; error?: string };
 			if (!res.ok) throw new Error(j.error ?? res.statusText);
+			if (reqId !== reqIdRef.current) return;
 			setRows(j.data ?? []);
 			setError(null);
 		} catch (e) {
+			if (reqId !== reqIdRef.current || isAbortError(e)) return;
 			setError(e instanceof Error ? e.message : String(e));
 		}
 	}, []);
@@ -63,6 +77,7 @@ export function AdminLiveTestsPanel() {
 		return () => {
 			cancelled = true;
 			window.clearInterval(heartbeat);
+			acRef.current?.abort();
 			void supabase.removeChannel(channel);
 		};
 	}, [load]);

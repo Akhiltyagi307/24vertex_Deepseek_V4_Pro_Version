@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Tiny pub/sub bridging a top-bar "Take the tour" control to the per-role
  * onboarding orchestrator that actually owns the tour. They live in different

@@ -1,7 +1,18 @@
 import { sql } from "drizzle-orm";
+import { z } from "zod";
+import * as Sentry from "@sentry/nextjs";
 
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
 import { db } from "@/db";
+import { safeParseOrError } from "@/lib/validations/parse";
+
+const healthPingSchema = z.object({
+	provider: z.string(),
+	status: z.string().nullable(),
+	latency_ms: z.union([z.number(), z.string()]).nullable(),
+	error: z.string().nullable(),
+	checked_at: z.union([z.string(), z.date()]).nullable(),
+});
 
 export const metadata = {
 	title: "Service health · 24Vertex Admin",
@@ -20,7 +31,13 @@ export default async function AdminServiceHealthPage() {
 		ORDER BY provider, checked_at DESC
 	`);
 
-	const list = rows as unknown as Record<string, unknown>[];
+	const parsed = safeParseOrError(z.array(healthPingSchema), Array.from(rows as Iterable<unknown>));
+	if (!parsed.ok) {
+		Sentry.captureException(new Error(`Service health row shape drift: ${parsed.issues.join("; ")}`), {
+			tags: { area: "admin_system", op: "service_health" },
+		});
+	}
+	const list = parsed.ok ? parsed.data : [];
 
 	return (
 		<div className="space-y-6">

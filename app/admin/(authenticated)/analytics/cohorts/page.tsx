@@ -1,9 +1,19 @@
 import { sql } from "drizzle-orm";
 import { Suspense } from "react";
+import { z } from "zod";
+import * as Sentry from "@sentry/nextjs";
 
 import { AdminServerRowsToolbar } from "@/components/admin/admin-server-rows-toolbar";
 import { db } from "@/db";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
+import { safeParseOrError } from "@/lib/validations/parse";
+
+const cohortRowSchema = z.object({
+	cohort_month: z
+		.union([z.string(), z.date()])
+		.transform((v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v)),
+	cohort_size: z.number(),
+});
 
 export const metadata = {
 	title: "Analytics cohorts · Admin",
@@ -22,7 +32,13 @@ export default async function AdminAnalyticsCohortsPage() {
 		order by 1 asc
 	`;
 	const rows = await db.execute(q);
-	const cohortRows = rows as unknown as { cohort_month: string; cohort_size: number }[];
+	const parsed = safeParseOrError(z.array(cohortRowSchema), Array.from(rows as Iterable<unknown>));
+	if (!parsed.ok) {
+		Sentry.captureException(new Error(`Analytics cohorts row shape drift: ${parsed.issues.join("; ")}`), {
+			tags: { area: "admin_analytics", op: "cohorts" },
+		});
+	}
+	const cohortRows = parsed.ok ? parsed.data : [];
 
 	return (
 		<div className="space-y-4">

@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
+import { fetchJson } from "@/lib/http/fetch-json";
 
 type BulkReinitJobState = {
 	status: "queued" | "running" | "done" | "failed";
@@ -86,14 +87,14 @@ export function AdminBulkReinitPanel({ grade: gradeProp, onGradeChange, onJobFin
 
 	React.useEffect(() => {
 		if (!jobId) return;
+		const controller = new AbortController();
 		const id = window.setInterval(() => {
 			void (async () => {
 				try {
-					const res = await fetch(`/api/admin/performance/jobs/bulk-reinit/${jobId}`, {
-						credentials: "include",
+					const j = await fetchJson<{ data?: unknown }>(`/api/admin/performance/jobs/bulk-reinit/${jobId}`, {
+						signal: controller.signal,
+						init: { credentials: "include" },
 					});
-					if (!res.ok) return;
-					const j = (await res.json()) as { data?: unknown };
 					const state = parsePollState(j.data ?? j);
 					if (!state) return;
 					setPoll(state);
@@ -103,11 +104,14 @@ export function AdminBulkReinitPanel({ grade: gradeProp, onGradeChange, onJobFin
 						router.refresh();
 					}
 				} catch {
-					// transient poll failure — next tick retries
+					// transient poll failure (or abort on cleanup) — next tick retries
 				}
 			})();
 		}, 2000);
-		return () => window.clearInterval(id);
+		return () => {
+			controller.abort();
+			window.clearInterval(id);
+		};
 	}, [jobId, onJobFinished, router]);
 
 	const active = jobIsActive(poll);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ConfirmDestructive } from "@/components/admin/confirm-destructive";
 import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
@@ -28,7 +28,12 @@ export function AdminContextChunksEditor({ topicId }: { topicId: string }) {
 	const [sourceRef, setSourceRef] = useState("");
 	const [busy, setBusy] = useState(false);
 
+	// Out-of-order guard: only the most recent load may apply its result, so a
+	// slow response (after a topicId change or a post-mutation refresh) can't
+	// overwrite newer state.
+	const reqIdRef = useRef(0);
 	const load = useCallback(async () => {
+		const reqId = ++reqIdRef.current;
 		setLoading(true);
 		setError(null);
 		try {
@@ -36,6 +41,7 @@ export function AdminContextChunksEditor({ topicId }: { topicId: string }) {
 				credentials: "include",
 			});
 			const j = (await res.json()) as { data?: ChunkRow[]; error?: string };
+			if (reqId !== reqIdRef.current) return;
 			if (!res.ok) {
 				setError(j.error ?? res.statusText);
 				setRows([]);
@@ -43,9 +49,10 @@ export function AdminContextChunksEditor({ topicId }: { topicId: string }) {
 			}
 			setRows(j.data ?? []);
 		} catch (e) {
+			if (reqId !== reqIdRef.current) return;
 			setError(e instanceof Error ? e.message : String(e));
 		} finally {
-			setLoading(false);
+			if (reqId === reqIdRef.current) setLoading(false);
 		}
 	}, [topicId]);
 
