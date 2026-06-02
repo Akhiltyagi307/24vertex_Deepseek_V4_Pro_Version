@@ -8,6 +8,9 @@ import { aiCalls } from "@/db/schema/ai-calls";
 import { adminTestMessages, performanceTracker, questionFlags, studentAnswers, testReports, tests } from "@/db/schema/assessment";
 import { assignmentSubmissions } from "@/db/schema/teaching";
 import { notifications, userPreferences } from "@/db/schema/comms-audit";
+import { practiceAnalyticsEvents, practiceGenerationRuns, practiceJobs } from "@/db/schema/practice-tables";
+import { studentActivityStreaks } from "@/db/schema/student-activity-streak";
+import { teacherStudentLinks } from "@/db/schema/organizations";
 import { complianceRequests } from "@/db/schema/compliance-requests";
 import { doubtConversations, doubtMessageAttachments, doubtMessages } from "@/db/schema/doubt";
 import { profiles, parentStudentLinks } from "@/db/schema/profiles";
@@ -100,6 +103,12 @@ export async function countErasureImpact(userId: string): Promise<ErasureCounts>
 		.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId))!);
 	counts.parent_student_links_deleted = Number(links ?? 0);
 
+	const [{ c: tsl }] = await db
+		.select({ c: sql<number>`count(*)::int` })
+		.from(teacherStudentLinks)
+		.where(or(eq(teacherStudentLinks.studentId, userId), eq(teacherStudentLinks.teacherId, userId))!);
+	counts.teacher_student_links_deleted = Number(tsl ?? 0);
+
 	const convos = await db.select({ id: doubtConversations.id }).from(doubtConversations).where(eq(doubtConversations.studentId, userId));
 	const convoIds = convos.map((c) => c.id);
 	if (convoIds.length) {
@@ -121,6 +130,28 @@ export async function countErasureImpact(userId: string): Promise<ErasureCounts>
 
 	const [{ c: ai }] = await db.select({ c: sql<number>`count(*)::int` }).from(aiCalls).where(eq(aiCalls.userId, userId));
 	counts.ai_calls_deleted = Number(ai ?? 0);
+
+	// M7: behavioral / engagement tables erased alongside the rest.
+	const [{ c: pae }] = await db
+		.select({ c: sql<number>`count(*)::int` })
+		.from(practiceAnalyticsEvents)
+		.where(eq(practiceAnalyticsEvents.studentId, userId));
+	counts.practice_analytics_events_deleted = Number(pae ?? 0);
+	const [{ c: pgr }] = await db
+		.select({ c: sql<number>`count(*)::int` })
+		.from(practiceGenerationRuns)
+		.where(eq(practiceGenerationRuns.studentId, userId));
+	counts.practice_generation_runs_deleted = Number(pgr ?? 0);
+	const [{ c: pj }] = await db
+		.select({ c: sql<number>`count(*)::int` })
+		.from(practiceJobs)
+		.where(eq(practiceJobs.studentId, userId));
+	counts.practice_jobs_deleted = Number(pj ?? 0);
+	const [{ c: sas }] = await db
+		.select({ c: sql<number>`count(*)::int` })
+		.from(studentActivityStreaks)
+		.where(eq(studentActivityStreaks.studentId, userId));
+	counts.student_activity_streaks_deleted = Number(sas ?? 0);
 
 	return counts;
 }
@@ -242,6 +273,12 @@ export async function performComplianceErasure(
 			await tx
 				.delete(parentStudentLinks)
 				.where(or(eq(parentStudentLinks.parentId, userId), eq(parentStudentLinks.studentId, userId))!);
+			// M7 gap fix: teacher↔student links must be erased too (parity with
+			// parent links) so the subject's links don't survive whether they were
+			// the student or the teacher party.
+			await tx
+				.delete(teacherStudentLinks)
+				.where(or(eq(teacherStudentLinks.studentId, userId), eq(teacherStudentLinks.teacherId, userId))!);
 			if (convoIds.length) {
 				await tx
 					.delete(doubtMessageAttachments)
@@ -250,6 +287,13 @@ export async function performComplianceErasure(
 				await tx.delete(doubtConversations).where(eq(doubtConversations.studentId, userId));
 			}
 			await tx.delete(aiCalls).where(eq(aiCalls.userId, userId));
+			// M7: behavioral / engagement data tied to the subject (no legal retention
+			// requirement, unlike tests/questions/payments). practice_generation_steps
+			// cascades via its run_id FK when the runs are deleted.
+			await tx.delete(practiceAnalyticsEvents).where(eq(practiceAnalyticsEvents.studentId, userId));
+			await tx.delete(practiceGenerationRuns).where(eq(practiceGenerationRuns.studentId, userId));
+			await tx.delete(practiceJobs).where(eq(practiceJobs.studentId, userId));
+			await tx.delete(studentActivityStreaks).where(eq(studentActivityStreaks.studentId, userId));
 
 			const now = new Date();
 			await tx

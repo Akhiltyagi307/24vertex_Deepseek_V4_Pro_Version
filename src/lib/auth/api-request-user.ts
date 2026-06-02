@@ -79,9 +79,14 @@ async function tryAuthorizationHeaderAuth(request: Request): Promise<RequestAuth
 }
 
 /**
- * Resolves authenticated API user from cookie session first, then from
- * `Authorization` (Bearer / Basic) only when `ALLOW_API_HEADER_AUTH=true` and
- * not a production deployment — for automated tests and local tooling only.
+ * Resolves the authenticated API user from the cookie session first, then from
+ * an `Authorization` (Bearer / Basic) header — but the header path is for local
+ * + CI test tooling ONLY (see the guards below).
+ *
+ * IMPORTANT: this returns IDENTITY ONLY — it performs NO role/authorization
+ * check. "Got a user" does not mean "allowed to do this." Callers MUST apply the
+ * appropriate role guard (requireVerifiedStudent / requireParent / requireAdminApi
+ * / ownership check) before acting. (Review findings M11 + H5.)
  */
 export async function getApiRequestUser(request: Request): Promise<RequestAuthContext | null> {
 	const cookieClient = await createServerSupabaseClient();
@@ -91,6 +96,12 @@ export async function getApiRequestUser(request: Request): Promise<RequestAuthCo
 	if (user) return { supabase: cookieClient, user };
 
 	if (isProductionDeployment()) return null;
+	// Defense-in-depth (M11): isProductionDeployment() is FALSE on Vercel preview
+	// deployments (VERCEL_ENV='preview'), which can be publicly reachable — so a
+	// preview with ALLOW_API_HEADER_AUTH set would expose a password-grant
+	// endpoint. Refuse header auth on ANY Vercel deployment; it then works only
+	// off Vercel (local/CI), independent of how ALLOW_API_HEADER_AUTH is set.
+	if (process.env.VERCEL === "1") return null;
 	if (process.env.ALLOW_API_HEADER_AUTH?.trim().toLowerCase() !== "true") return null;
 	return tryAuthorizationHeaderAuth(request);
 }

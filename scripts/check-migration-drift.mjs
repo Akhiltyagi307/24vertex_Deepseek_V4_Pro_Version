@@ -217,8 +217,10 @@ const CONCURRENT_LINT_MIN_VERSION = "20260623000000";
 // Additional hot OLTP tables flagged by the 2026-06 production-readiness
 // re-audit (P2-A: the CONCURRENTLY lint under-covered these). Given a HIGHER
 // version cutoff than the base set so indexes already shipped on these tables
-// (the latest local migration is 20260704040000) are grandfathered, while any
-// NEW non-CONCURRENTLY index on them is caught. Re-create the existing
+// (everything authored so far — latest local migration is 20260705000500,
+// which includes main's just-landed unique indexes on notifications /
+// subscriptions / practice_jobs) is grandfathered, while any NEW
+// non-CONCURRENTLY index on them is caught. Re-create the existing
 // non-concurrent ones via standalone CONCURRENTLY migrations when convenient.
 const HOT_TABLES_EXTENDED = [
 	"public.performance_tracker",
@@ -229,7 +231,7 @@ const HOT_TABLES_EXTENDED = [
 	"public.practice_jobs",
 	"public.coupon_redemptions",
 ];
-const HOT_TABLES_EXTENDED_MIN_VERSION = "20260705000000";
+const HOT_TABLES_EXTENDED_MIN_VERSION = "20260706000000";
 
 // Known pre-existing non-CONCURRENTLY indexes on hot tables, surfaced by the
 // 2026-06 re-audit. These are one-time backfill/dedup migrations whose index

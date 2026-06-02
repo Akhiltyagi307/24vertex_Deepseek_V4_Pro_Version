@@ -2,15 +2,22 @@ import { sql } from "drizzle-orm";
 import { check, index, integer, jsonb, pgTable, text, timestamp, uuid, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { tests } from "./assessment";
+import { authUsers } from "./auth-users";
 
 export const practiceJobs = pgTable(
 	"practice_jobs",
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
 		jobType: text("job_type").notNull(),
+		// NOTE: live DB has practice_jobs.test_id → tests ON DELETE NO ACTION (not
+		// cascade as modeled here). That mismatch means deleting a test orphans its
+		// jobs — flagged as a DB-FK fix (separate task), so the mirror keeps the
+		// intended cascade rather than endorsing the no-action DB state.
 		testId: uuid("test_id")
 			.references(() => tests.id, { onDelete: "cascade" }),
-		studentId: uuid("student_id").notNull(),
+		studentId: uuid("student_id")
+			.notNull()
+			.references(() => authUsers.id),
 		assignmentSubmissionId: uuid("assignment_submission_id"),
 		status: text("status").notNull().default("pending"),
 		attempts: integer("attempts").notNull().default(0),
@@ -59,7 +66,7 @@ export const practiceGenerationRuns = pgTable(
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
 		correlationId: uuid("correlation_id").notNull(),
-		studentId: uuid("student_id"),
+		studentId: uuid("student_id").references(() => authUsers.id, { onDelete: "set null" }),
 		subjectId: uuid("subject_id"),
 		testId: uuid("test_id")
 			.references(() => tests.id, { onDelete: "set null" }),

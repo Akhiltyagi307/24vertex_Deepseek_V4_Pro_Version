@@ -8,8 +8,8 @@ async function handle(request: Request): Promise<Response> {
 	const denied = assertCronRequestAuthorized(request);
 	if (denied) return denied;
 
-	const { processed, stoppedForPause } = await runOperatorJobDrain({ maxJobs: 5 });
-	return Response.json({ ok: true, processed, stopped_for_pause: stoppedForPause });
+	const { processed, stoppedForPause, reclaimed } = await runOperatorJobDrain({ maxJobs: 5 });
+	return Response.json({ ok: true, processed, stopped_for_pause: stoppedForPause, reclaimed });
 }
 
 export async function POST(request: Request): Promise<Response> {

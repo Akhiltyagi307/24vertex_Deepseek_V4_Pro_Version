@@ -45,7 +45,8 @@ async function handle(request: Request): Promise<Response> {
 			profileId: subscriptions.profileId,
 			status: subscriptions.status,
 			updatedAt: subscriptions.updatedAt,
-			razorpaySubscriptionId: subscriptions.razorpaySubscriptionId,
+			dunningStartedAt: subscriptions.dunningStartedAt,
+				razorpaySubscriptionId: subscriptions.razorpaySubscriptionId,
 		})
 		.from(subscriptions)
 		.where(inArray(subscriptions.status, ["grace", "past_due"]))
@@ -57,7 +58,19 @@ async function handle(request: Request): Promise<Response> {
 	const errors: Array<{ id: string; phase: string; error: string }> = [];
 
 	for (const sub of candidates) {
-		const ageMs = now - sub.updatedAt.getTime();
+		// H3c: anchor dunning age on the stable dunning_started_at, not updated_at
+		// (which any unrelated write resets). Legacy rows that entered dunning
+		// before the column existed fall back to updated_at and are frozen here so
+		// future writes can't reset their clock.
+		const anchor = sub.dunningStartedAt ?? sub.updatedAt;
+		if (!sub.dunningStartedAt) {
+			try {
+				await db.update(subscriptions).set({ dunningStartedAt: anchor }).where(eq(subscriptions.id, sub.id));
+			} catch (e) {
+				logServerError("billing.dunning.stamp_anchor", e, { subscription_id: sub.id });
+			}
+		}
+		const ageMs = now - anchor.getTime();
 
 		// Day 14: hard cancel.
 		if (ageMs >= 14 * DAY_MS && sub.razorpaySubscriptionId) {
@@ -77,7 +90,7 @@ async function handle(request: Request): Promise<Response> {
 		}
 
 		// Day 7 reminder.
-		if (ageMs >= 7 * DAY_MS && sub.updatedAt < day7Cutoff) {
+		if (ageMs >= 7 * DAY_MS && anchor < day7Cutoff) {
 			try {
 				const sent = await sendDunningEmailFor(admin, sub.profileId, sub.id, 7);
 				if (sent) day7Sent += 1;
@@ -88,7 +101,7 @@ async function handle(request: Request): Promise<Response> {
 		}
 
 		// Day 3 reminder.
-		if (ageMs >= 3 * DAY_MS && sub.updatedAt < day3Cutoff) {
+		if (ageMs >= 3 * DAY_MS && anchor < day3Cutoff) {
 			try {
 				const sent = await sendDunningEmailFor(admin, sub.profileId, sub.id, 3);
 				if (sent) day3Sent += 1;

@@ -161,6 +161,12 @@ export type RunGenerationPipelineOptions = {
 	useStreamObject: boolean;
 	requestMode?: PracticeGenerationRequestMode;
 	recordGenerateClicked?: boolean;
+	/**
+	 * Inject a known correlation id instead of generating one. The durable
+	 * student-generation worker passes the job's client_request_id so the progress
+	 * poller can find this run (and its steps) by key (review H2, increment 3).
+	 */
+	correlationId?: string;
 	/** Fires for each partial object when `useStreamObject` is true. */
 	onPartialObject?: (partial: unknown) => void;
 	/** Fires once per generation step; downstream maps the raw stepKey to a student-facing bucket. */
@@ -551,7 +557,7 @@ function batchTailTimeoutMs(): number {
 		: BATCH_TAIL_TIMEOUT_MS_DEFAULT;
 }
 
-async function runBatchWithTailGuard(args: {
+async function runModelWithTailGuard(args: {
 	systemPrompt: string;
 	userPrompt: string;
 	slotCount: number;
@@ -760,7 +766,7 @@ export async function runPracticeGenerationAfterResolve(
 	resolved: PracticeConfigResolveSuccess,
 	opts: RunGenerationPipelineOptions,
 ): Promise<GeneratePracticeResult> {
-	const correlationId = newPracticeCorrelationId();
+	const correlationId = opts.correlationId ?? newPracticeCorrelationId();
 	const pipelineT0 = Date.now();
 	// H-5: if the core throws before finalizing, mark the run `aborted` here so
 	// the row doesn't sit at `running` forever and skew funnel/success metrics.
@@ -1204,7 +1210,7 @@ ${JSON.stringify(blueprintSlots)}`;
 					// 102.8s while siblings finished in 22–43s on identical input.
 					// Wrap each batch in a 75s soft timeout + ONE retry. The retry
 					// uses fresh telemetry tags so the dashboard can count tail events.
-					const result = await runBatchWithTailGuard({
+					const result = await runModelWithTailGuard({
 						systemPrompt: batchSystemPrompt,
 						userPrompt: batchUserPrompt,
 						slotCount: batch.slots.length,
@@ -1355,19 +1361,23 @@ ${JSON.stringify(blueprintSlots)}`;
 			}
 		} else {
 			generationCallCount++;
-			const r = await runModelOnce(
-				generationSystemPrompt,
-				generationUserPrompt,
-				expectedCount,
-				generationOutputSchema,
+			// Tail-latency guard for the DEFAULT (single-call) path. Previously
+			// this branch called runModelOnce bare, so a hung provider call had no
+			// soft timeout — it ran until the 300s function ceiling killed the
+			// whole request with zero recovery. Route it through the same guard the
+			// parallel-batch path uses: abort a stalled attempt at the soft timeout
+			// and retry once within the remaining budget.
+			const r = await runModelWithTailGuard({
+				systemPrompt: generationSystemPrompt,
+				userPrompt: generationUserPrompt,
+				slotCount: expectedCount,
+				schema: generationOutputSchema,
 				opts,
-				resolved.userId,
-				{
-					generationRunId,
-					correlationId,
-					stepKey: "question_generation",
-				},
-			);
+				userId: resolved.userId,
+				baseStepKey: "question_generation",
+				generationRunId,
+				correlationId,
+			});
 			cumulativeModelMs += Date.now() - m0;
 			await writeGenerationStep({
 				stepKey: "question_generation",

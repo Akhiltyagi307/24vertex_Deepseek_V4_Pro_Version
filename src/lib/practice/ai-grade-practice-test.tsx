@@ -916,6 +916,14 @@ export type BuildPracticeGradingReportPdfResult =
 /**
  * Renders the full practice grading PDF (branded, per-question detail) to a buffer.
  * Used by the background upload job and by the student report PDF route when storage has no file yet.
+ *
+ * SECURITY (review M5): this runs under a service-role client (RLS bypassed) and
+ * resolves the test by `testId` ALONE — it will render ANY student's report
+ * regardless of who is calling. It deliberately does NOT enforce ownership,
+ * because its legitimate callers authorize differently (student = self or a
+ * linked parent; teacher = assignment owner; background worker = trusted). THE
+ * CALLER MUST verify the requester is allowed to access `testId` before calling
+ * this. Do not expose it on a route without an explicit ownership check.
  */
 export async function buildPracticeGradingReportPdfBuffer(
 	testId: string,

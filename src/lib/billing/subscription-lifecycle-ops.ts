@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isPlanCode, PAID_CHECKOUT_PLAN_CODES, type PlanCode } from "@/lib/billing/plans";
+import { parsePrePauseQuota } from "@/lib/billing/pre-pause-quota";
 import { defaultWhenForChange, quotePlanChange } from "@/lib/billing/proration";
 import { pauseSubscription, resumeSubscription, updateSubscriptionPlan } from "@/lib/billing/razorpay";
 import { canTransition, isSubscriptionStatus } from "@/lib/billing/subscription-state-machine";
@@ -228,14 +229,16 @@ export async function resumeSubscriptionForProfile(profileId: string): Promise<S
 		.eq("subscription_id", sub.id)
 		.order("period_start", { ascending: false })
 		.limit(1)
-		.maybeSingle<{ id: string; pre_pause_quota: { testsQuota: number; tokensQuota: number } | null }>();
+		.maybeSingle<{ id: string; pre_pause_quota: unknown }>();
 
-	if (openPeriod?.pre_pause_quota) {
+	// M8: validate the JSONB shape before restoring into integer quota columns.
+	const restoredQuota = parsePrePauseQuota(openPeriod?.pre_pause_quota);
+	if (openPeriod && restoredQuota) {
 		await admin
 			.from("usage_periods")
 			.update({
-				tests_quota: openPeriod.pre_pause_quota.testsQuota,
-				tokens_quota: openPeriod.pre_pause_quota.tokensQuota,
+				tests_quota: restoredQuota.testsQuota,
+				tokens_quota: restoredQuota.tokensQuota,
 				pre_pause_quota: null,
 			})
 			.eq("id", openPeriod.id);

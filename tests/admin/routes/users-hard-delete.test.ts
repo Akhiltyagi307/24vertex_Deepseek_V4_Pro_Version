@@ -16,7 +16,13 @@ const consumeAdminActionRateLimit = vi.fn(async () => ({
 	resetAt: new Date(Date.now() + 60_000),
 	degraded: false,
 }));
-const supabaseDeleteUser = vi.fn(async () => ({ error: null }));
+// Hard-delete is now "erase + disable" (review M7/FK): the auth row can't be
+// physically deleted (audit_logs/payments/tests FK to auth.users NO ACTION), so
+// the route runs the compliance erasure then bans the account via updateUserById.
+const performComplianceErasure = vi.fn<(id: string, opts: { dryRun: boolean }) => Promise<Record<string, number>>>(
+	async () => ({}),
+);
+const supabaseUpdateUserById = vi.fn(async () => ({ error: null }));
 
 vi.mock("@/lib/admin/api-auth", () => ({ requireAdminApi }));
 vi.mock("@/lib/admin/audit", () => ({ writeAdminAction, writeAdminActionStrict }));
@@ -33,9 +39,10 @@ vi.mock("@/lib/admin/rate-limit-action", () => ({
 	adminActionScope: ({ jti }: { jti?: string }) => `jti:${jti ?? "anon"}`,
 }));
 vi.mock("@/lib/admin/users-list", () => ({ adminGetUserById }));
+vi.mock("@/lib/compliance/erasure", () => ({ performComplianceErasure }));
 vi.mock("@/lib/supabase/admin", () => ({
 	createServiceRoleClient: () => ({
-		auth: { admin: { deleteUser: supabaseDeleteUser } },
+		auth: { admin: { updateUserById: supabaseUpdateUserById } },
 	}),
 }));
 
@@ -54,8 +61,10 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/hard-delete", () => {
 			resetAt: new Date(Date.now() + 60_000),
 			degraded: false,
 		});
-		supabaseDeleteUser.mockClear();
-		supabaseDeleteUser.mockResolvedValue({ error: null });
+		performComplianceErasure.mockClear();
+		performComplianceErasure.mockResolvedValue({});
+		supabaseUpdateUserById.mockClear();
+		supabaseUpdateUserById.mockResolvedValue({ error: null });
 		isAdminTotpRequired.mockResolvedValue(false);
 		verifyAdminTotpIfConfigured.mockReturnValue(true);
 	});
@@ -91,7 +100,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/hard-delete", () => {
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(400);
-		expect(supabaseDeleteUser).not.toHaveBeenCalled();
+		expect(performComplianceErasure).not.toHaveBeenCalled();
 	});
 
 	it("404 when target user not found", async () => {
@@ -116,7 +125,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/hard-delete", () => {
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(400);
-		expect(supabaseDeleteUser).not.toHaveBeenCalled();
+		expect(performComplianceErasure).not.toHaveBeenCalled();
 	});
 
 	it("requires TOTP when totpRequired=true (401 without it)", async () => {
@@ -131,7 +140,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/hard-delete", () => {
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(401);
-		expect(supabaseDeleteUser).not.toHaveBeenCalled();
+		expect(performComplianceErasure).not.toHaveBeenCalled();
 	});
 
 	it("429 when rate limit hit; writes a best-effort audit row", async () => {
@@ -151,10 +160,10 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/hard-delete", () => {
 		);
 		expect(res.status).toBe(429);
 		expect(res.headers.get("Retry-After")).toBeTruthy();
-		expect(supabaseDeleteUser).not.toHaveBeenCalled();
+		expect(performComplianceErasure).not.toHaveBeenCalled();
 	});
 
-	it("happy path: strict pre + post audit, supabase delete called", async () => {
+	it("happy path: erase + ban (no physical auth delete) + strict pre/post audit", async () => {
 		adminGetUserById.mockResolvedValue({ email: "u@example.com", full_name: "User" });
 		const { POST } = await import("@/app/api/admin/users/[id]/hard-delete/route");
 		const res = await POST(
@@ -164,12 +173,31 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/hard-delete", () => {
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(200);
-		expect(supabaseDeleteUser).toHaveBeenCalledWith(VALID_UUID);
+		// Erase, then ban the auth account — the auth row is NOT physically deleted.
+		expect(performComplianceErasure).toHaveBeenCalledWith(VALID_UUID, { dryRun: false });
+		expect(supabaseUpdateUserById).toHaveBeenCalledWith(
+			VALID_UUID,
+			expect.objectContaining({ ban_duration: expect.any(String) }),
+		);
 		// Two strict audits: pre (request) + post (done).
 		const strictActions = writeAdminActionStrict.mock.calls.map(
 			(c) => (c[0] as unknown as { action: string }).action,
 		);
 		expect(strictActions).toContain("user_hard_delete_request");
 		expect(strictActions).toContain("user_hard_delete_done");
+	});
+
+	it("500 + no ban when erasure fails (fail-closed)", async () => {
+		adminGetUserById.mockResolvedValue({ email: "u@example.com", full_name: "User" });
+		performComplianceErasure.mockRejectedValueOnce(new Error("db down"));
+		const { POST } = await import("@/app/api/admin/users/[id]/hard-delete/route");
+		const res = await POST(
+			adminRequest(`/api/admin/users/${VALID_UUID}/hard-delete`, {
+				body: { confirm_email: "u@example.com" },
+			}),
+			{ params: Promise.resolve({ id: VALID_UUID }) },
+		);
+		expect(res.status).toBe(500);
+		expect(supabaseUpdateUserById).not.toHaveBeenCalled();
 	});
 });

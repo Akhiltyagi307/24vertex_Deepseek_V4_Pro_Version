@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { subscriptions as subscriptionsTbl, usagePeriods as usagePeriodsTbl } from "@/db/schema/billing";
 import { fetchInvoice } from "@/lib/billing/razorpay";
 import { isPlanCode, PLAN_CATALOG, tokenQuotaForGrade, type PlanCode, type PlanCatalogEntry } from "@/lib/billing/plans";
+import { ensureForwardPeriod } from "@/lib/billing/ensure-forward-period";
+import { parsePrePauseQuota } from "@/lib/billing/pre-pause-quota";
 import { assertTransition } from "@/lib/billing/subscription-state-machine";
 import {
 	sendPaymentFailedEmail,
@@ -218,6 +220,9 @@ async function applySubscriptionStateChangeAtomic(input: {
 				currentPeriodStart: input.currentPeriodStart,
 				currentPeriodEnd: input.currentPeriodEnd,
 				updatedAt: new Date(),
+				// H3c: recovery to active clears the dunning clock so a future
+				// dunning episode re-anchors from its own entry.
+				...(input.status === "active" ? { dunningStartedAt: null } : {}),
 			})
 			.where(eq(subscriptionsTbl.id, input.subscriptionId));
 
@@ -260,8 +265,13 @@ async function handleSubscriptionMandateAuthenticated(ctx: WebhookHandlerContext
 async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<void> {
 	const { admin, subscriptionId, ours, profile, studentEmail, targetPlan, targetPlanCode, currentStart, currentEnd } = ctx;
 	const fallbackEnd = new Date(Date.now() + 31 * 86_400_000).toISOString();
-	const periodStartIso = currentStart ?? new Date().toISOString();
-	const periodEndIso = currentEnd ?? ours.current_period_end ?? fallbackEnd;
+	// M10: guarantee end > start so a payload missing current_end can't write a
+	// zero-length (immediately-expired) period for a student who just paid.
+	const { startIso: periodStartIso, endIso: periodEndIso } = ensureForwardPeriod(
+		currentStart ?? new Date().toISOString(),
+		currentEnd ?? ours.current_period_end ?? fallbackEnd,
+		targetPlan.interval,
+	);
 
 	await applySubscriptionStateChangeAtomic({
 		subscriptionId: ours.id,
@@ -300,27 +310,19 @@ async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<
 	});
 }
 
-/**
- * Derive a period end from the plan billing interval off `startIso`. Used when
- * a webhook payload omits `current_end`: collapsing start===end would make the
- * freshly-charged period read as already-expired and lock the paying student
- * out until reconciliation. Mirrors `rolloverPeriodIfNeeded`'s interval math.
- */
-function derivePeriodEndIso(startIso: string, plan: { interval: string }): string {
-	const d = new Date(startIso);
-	if (plan.interval === "year") d.setUTCFullYear(d.getUTCFullYear() + 1);
-	else d.setUTCMonth(d.getUTCMonth() + 1);
-	return d.toISOString();
-}
-
 async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<void> {
 	const { admin, ours, profile, studentEmail, targetPlan, targetPlanCode, currentStart, currentEnd, paymentEntity } =
 		ctx;
 	const amt = (paymentEntity?.amount as number | undefined) ?? targetPlan.pricePaise;
 	const paymentId = paymentEntity?.id as string | undefined;
 	const fallbackIso = new Date().toISOString();
-	const periodStartIso = currentStart ?? ours.current_period_end ?? fallbackIso;
-	const periodEndIso = currentEnd ?? derivePeriodEndIso(periodStartIso, targetPlan);
+	// M10: guarantee end > start so a payload missing current_end can't write a
+	// zero-length (immediately-expired) period.
+	const { startIso: periodStartIso, endIso: periodEndIso } = ensureForwardPeriod(
+		currentStart ?? ours.current_period_end ?? fallbackIso,
+		currentEnd ?? ours.current_period_end ?? fallbackIso,
+		targetPlan.interval,
+	);
 
 	await applySubscriptionStateChangeAtomic({
 		subscriptionId: ours.id,
@@ -384,8 +386,13 @@ async function handleSubscriptionUpdated(ctx: WebhookHandlerContext): Promise<vo
 	// then apply atomically with new period bounds from the webhook payload.
 	const { admin, ours, profile, targetPlan, targetPlanCode, currentStart, currentEnd } = ctx;
 	const fallbackIso = new Date().toISOString();
-	const periodStartIso = currentStart ?? ours.current_period_end ?? fallbackIso;
-	const periodEndIso = currentEnd ?? derivePeriodEndIso(periodStartIso, targetPlan);
+	// M10: guarantee end > start so a payload missing current_end can't write a
+	// zero-length (immediately-expired) period.
+	const { startIso: periodStartIso, endIso: periodEndIso } = ensureForwardPeriod(
+		currentStart ?? ours.current_period_end ?? fallbackIso,
+		currentEnd ?? ours.current_period_end ?? fallbackIso,
+		targetPlan.interval,
+	);
 
 	await applySubscriptionStateChangeAtomic({
 		subscriptionId: ours.id,
@@ -487,13 +494,16 @@ async function handleSubscriptionResumed(ctx: WebhookHandlerContext): Promise<vo
 		.eq("subscription_id", ours.id)
 		.order("period_start", { ascending: false })
 		.limit(1)
-		.maybeSingle<{ id: string; pre_pause_quota: { testsQuota: number; tokensQuota: number } | null }>();
-	if (openPeriod?.pre_pause_quota) {
+		.maybeSingle<{ id: string; pre_pause_quota: unknown }>();
+	// Validate the stashed shape (M8): a drifted / hand-edited JSONB row must not
+	// write `undefined` into the integer quota columns — skip the restore instead.
+	const restored = parsePrePauseQuota(openPeriod?.pre_pause_quota);
+	if (openPeriod && restored) {
 		await admin
 			.from("usage_periods")
 			.update({
-				tests_quota: openPeriod.pre_pause_quota.testsQuota,
-				tokens_quota: openPeriod.pre_pause_quota.tokensQuota,
+				tests_quota: restored.testsQuota,
+				tokens_quota: restored.tokensQuota,
 				pre_pause_quota: null,
 			})
 			.eq("id", openPeriod.id);
@@ -514,6 +524,13 @@ async function handleSubscriptionHaltedOrPending(ctx: WebhookHandlerContext): Pr
 			updated_at: new Date().toISOString(),
 		})
 		.eq("id", ours.id);
+	// H3c: stamp the dunning clock on first entry only — `.is(null)` ensures a
+	// re-fired halted/pending event can't reset it.
+	await admin
+		.from("subscriptions")
+		.update({ dunning_started_at: new Date().toISOString() })
+		.eq("id", ours.id)
+		.is("dunning_started_at", null);
 }
 
 async function handleInvoicePaid(ctx: WebhookHandlerContext): Promise<void> {
@@ -570,6 +587,12 @@ async function handlePaymentFailed(ctx: WebhookHandlerContext): Promise<void> {
 		.from("subscriptions")
 		.update({ status: "grace", updated_at: new Date().toISOString() })
 		.eq("id", ours.id);
+	// H3c: stamp the dunning clock on first entry only (see handleSubscriptionHaltedOrPending).
+	await admin
+		.from("subscriptions")
+		.update({ dunning_started_at: new Date().toISOString() })
+		.eq("id", ours.id)
+		.is("dunning_started_at", null);
 	await admin.from("practice_analytics_events").insert({
 		student_id: ours.profile_id,
 		event_name: "subscription_payment_failed",
