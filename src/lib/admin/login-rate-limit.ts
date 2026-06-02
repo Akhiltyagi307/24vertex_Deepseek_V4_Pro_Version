@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { adminLoginRate } from "@/db/schema/admin-login-rate";
+import { logServerError } from "@/lib/server/log-supabase-error";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -17,7 +18,12 @@ export async function isAdminLoginBlocked(ip: string): Promise<boolean> {
 		const deadline = row.windowStartedAt.getTime() + WINDOW_MS;
 		if (Date.now() > deadline) return false;
 		return row.failCount >= MAX_ATTEMPTS;
-	} catch {
+	} catch (err) {
+		// Rate-limit DB unreachable. Fail OPEN (don't block) so a DB blip can't
+		// lock EVERY admin out — admin login is already gated by the IP
+		// allowlist + TOTP + bcrypt cost-12 — but log LOUDLY (was silent) so ops
+		// knows brute-force protection is temporarily degraded.
+		logServerError("admin.login_rate.check_failed", err, { ip });
 		return false;
 	}
 }

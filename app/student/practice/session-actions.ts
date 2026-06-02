@@ -7,6 +7,7 @@ import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
 import { triggerPracticeWorkerInBackground } from "@/lib/admin/practice-worker-trigger";
 import { computeAssignedGradingRunAfter } from "@/lib/assignments/schemas";
+import { canStartDoubtChat, consumeTokens } from "@/lib/billing/entitlements";
 import { getOpenAIChatModel } from "@/lib/env";
 import { practiceGenerationOutputSchema, validateAndStripGeneration } from "@/lib/practice";
 import { consumeAdaptiveFollowupsRateLimit } from "@/lib/practice/practice-rate-limit";
@@ -388,6 +389,16 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 		return { ok: false, message: "Test is not in progress." };
 	}
 
+	// AI-token entitlement gate. Adaptive follow-ups run a paid LLM call, so a
+	// lapsed / out-of-tokens student must not be able to trigger generation just
+	// because they still hold a rate-limit slot. canStartDoubtChat is the shared
+	// "active subscription + AI tokens remaining" check (no-op when SaaS
+	// enforcement is off); actual usage is debited below after generation.
+	const aiGate = await canStartDoubtChat(supabase, user.id);
+	if (!aiGate.ok) {
+		return { ok: false, message: aiGate.message };
+	}
+
 	// Use the existing topics in this test to stay in scope. We additionally
 	// filter to `is_active=true` here: the original test was generated against
 	// active topics, but an admin may have soft-deleted one between test
@@ -451,6 +462,9 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 			prompt: userPrompt,
 			maxOutputTokens: Math.min(12_000, count * 900),
 			maxRetries: 2,
+			// Bound the call so a hung provider connection can't keep this server
+			// action (and its serverless invocation) alive indefinitely.
+			abortSignal: AbortSignal.timeout(60_000),
 			providerOptions: { openai: { strictJsonSchema: false } },
 		});
 		void recordAiCall({
@@ -462,6 +476,11 @@ export async function appendAdaptiveFollowups(input: unknown): Promise<AdaptiveF
 			latencyMs: Date.now() - t0,
 			status: "ok",
 		});
+
+		// Count this adaptive-generation call against the student's AI token
+		// budget (output-token quota model — the same meter doubt-chat draws
+		// down). No-op when SaaS enforcement is off.
+		await consumeTokens(supabase, user.id, usage?.outputTokens ?? 0);
 
 		const validation = validateAndStripGeneration(object, count, new Set(topicIds));
 		if (!validation.ok) {

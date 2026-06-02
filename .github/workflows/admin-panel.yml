@@ -50,16 +50,16 @@ jobs:
         # steps below when secrets are present.
         run: pnpm vitest run
 
-      - name: Drizzle ↔ Postgres schema parity (advisory until helper RPC ships in prod)
+      - name: Drizzle ↔ Postgres schema parity (blocks on real drift)
         if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        # Set continue-on-error until the `_drizzle_parity_columns` helper
-        # (migration 20260623002000) is deployed to all projects — the script
-        # WARNs and exits 0 in that case anyway, but this belt-and-suspenders
-        # keeps a transient miss from blocking unrelated PRs.
-        continue-on-error: true
+        # Now blocking (no continue-on-error). The script already exits 0 when
+        # the `_drizzle_parity_columns` helper (migration 20260623002000) or the
+        # Supabase secrets are absent, and exits 1 only on a real table/column
+        # drift — so this fails the build for actual drift without breaking
+        # unrelated PRs or environments where the helper isn't deployed yet.
         run: node scripts/check-drizzle-postgres-parity.mjs
 
       - name: Migration drift (local sql files vs remote ledger; two-project parity)

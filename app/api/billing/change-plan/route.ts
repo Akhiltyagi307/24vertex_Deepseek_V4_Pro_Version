@@ -128,6 +128,28 @@ export async function POST(req: Request) {
 		currentPeriodEnd: new Date(subRow.current_period_end),
 	});
 
+	// Concurrency guard: atomically claim the in-flight slot using
+	// pending_plan_code as a mutex BEFORE the Razorpay call. A racing
+	// double-submit finds pending_plan_code already set and is rejected, so we
+	// never fire two subscriptions.update calls for the same row. Cleared by the
+	// subscription.updated webhook on flip, or reset below on Razorpay failure.
+	const { data: claimed, error: claimErr } = await admin
+		.from("subscriptions")
+		.update({ pending_plan_code: parsed.data.newPlanCode, updated_at: new Date().toISOString() })
+		.eq("id", subRow.id)
+		.is("pending_plan_code", null)
+		.select("id");
+	if (claimErr) {
+		logSupabaseError("billing.change-plan.claim", claimErr, { subId: subRow.id });
+		return Response.json({ success: false, ok: false, message: "Could not start plan change." }, { status: 500 });
+	}
+	if (!claimed || claimed.length === 0) {
+		return Response.json(
+			{ success: false, ok: false, code: "in_progress", message: "A plan change is already in progress for this account." },
+			{ status: 409 },
+		);
+	}
+
 	// Insert pending plan-change row before the Razorpay call so a crash
 	// after the call leaves an audit trail.
 	const { data: planChangeRow, error: insertErr } = await admin
@@ -154,6 +176,11 @@ export async function POST(req: Request) {
 		});
 	} catch (e) {
 		logServerError("billing.change-plan.razorpay_update", e);
+		// Release the claim so the user can retry; the change never happened.
+		await admin
+			.from("subscriptions")
+			.update({ pending_plan_code: null, updated_at: new Date().toISOString() })
+			.eq("id", subRow.id);
 		await admin
 			.from("billing_plan_changes")
 			.update({ error_message: e instanceof Error ? e.message : String(e) })
@@ -164,13 +191,8 @@ export async function POST(req: Request) {
 		);
 	}
 
-	// Stash pending_plan_code so the subscription.updated webhook knows what
-	// plan_code to flip to when it fires.
-	await admin
-		.from("subscriptions")
-		.update({ pending_plan_code: parsed.data.newPlanCode, updated_at: new Date().toISOString() })
-		.eq("id", subRow.id);
-
+	// pending_plan_code was already claimed atomically before the Razorpay call
+	// (concurrency guard above); the subscription.updated webhook clears it on flip.
 	await admin
 		.from("billing_plan_changes")
 		.update({ completed_at: new Date().toISOString() })

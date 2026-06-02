@@ -1,6 +1,7 @@
 import "server-only";
 
 import { rlConsume, type RlConsumeResult } from "@/lib/ratelimit/consume";
+import { shouldDenyOnDegraded } from "@/lib/ratelimit/fail-policy";
 
 export const parentLinkAttemptKey = (parentUserId: string): string =>
 	`parent-link-attempt:${parentUserId}`;
@@ -26,6 +27,11 @@ export type ParentRateLimitOutcome =
 
 async function consume(key: string, limit: number, windowSec: number): Promise<ParentRateLimitOutcome> {
 	const result = await rlConsume({ key, limit, windowSec });
+	// Fail closed in prod when the limiter is degraded so a DB blip can't open
+	// the parent-link / notification endpoints to unbounded attempts.
+	if (shouldDenyOnDegraded(result)) {
+		return { ok: false, result, limit };
+	}
 	return result.allowed ? { ok: true } : { ok: false, result, limit };
 }
 

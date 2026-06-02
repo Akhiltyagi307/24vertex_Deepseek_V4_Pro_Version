@@ -1,6 +1,7 @@
 import "server-only";
 
 import { rlConsume } from "@/lib/ratelimit/consume";
+import { shouldDenyOnDegraded } from "@/lib/ratelimit/fail-policy";
 
 export const TEACHER_PORTAL_ACTION_LIMIT = 120;
 export const TEACHER_PORTAL_ACTION_WINDOW_SEC = 60;
@@ -17,6 +18,11 @@ export async function consumeTeacherPortalDataActionRateLimit(
 		limit: TEACHER_PORTAL_ACTION_LIMIT,
 		windowSec: TEACHER_PORTAL_ACTION_WINDOW_SEC,
 	});
+
+	// Fail closed in prod when the limiter is degraded (see fail-policy).
+	if (shouldDenyOnDegraded(result)) {
+		return { ok: false, message: "Service is busy right now. Try again in a moment." };
+	}
 
 	if (result.allowed) {
 		return { ok: true };

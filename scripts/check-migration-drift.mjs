@@ -214,10 +214,37 @@ const HOT_TABLES = [
 ];
 const CONCURRENT_LINT_MIN_VERSION = "20260623000000";
 
+// Additional hot OLTP tables flagged by the 2026-06 production-readiness
+// re-audit (P2-A: the CONCURRENTLY lint under-covered these). Given a HIGHER
+// version cutoff than the base set so indexes already shipped on these tables
+// (the latest local migration is 20260704040000) are grandfathered, while any
+// NEW non-CONCURRENTLY index on them is caught. Re-create the existing
+// non-concurrent ones via standalone CONCURRENTLY migrations when convenient.
+const HOT_TABLES_EXTENDED = [
+	"public.performance_tracker",
+	"public.ai_calls",
+	"public.notifications",
+	"public.payments",
+	"public.subscriptions",
+	"public.practice_jobs",
+	"public.coupon_redemptions",
+];
+const HOT_TABLES_EXTENDED_MIN_VERSION = "20260705000000";
+
+// Known pre-existing non-CONCURRENTLY indexes on hot tables, surfaced by the
+// 2026-06 re-audit. These are one-time backfill/dedup migrations whose index
+// already exists (re-issuing CONCURRENTLY is moot) — listed explicitly so the
+// lint stays green while still catching any NEW offender. Do not add to this
+// set casually: a genuinely-new hot-table index must use CONCURRENTLY.
+const CONCURRENT_LINT_GRANDFATHERED_FILES = new Set([
+	"20260629002000_email_log_dedup_backfill.sql",
+]);
+
 function lintConcurrentIndexes(local) {
 	const violations = [];
 	for (const m of local) {
 		if (m.version < CONCURRENT_LINT_MIN_VERSION) continue;
+		if (CONCURRENT_LINT_GRANDFATHERED_FILES.has(m.file)) continue;
 		let body;
 		try {
 			body = readFileSync(join(migrationsDir, m.file), "utf8");
@@ -237,6 +264,12 @@ function lintConcurrentIndexes(local) {
 				match[0],
 			);
 			if (HOT_TABLES.includes(table) && !concurrent) {
+				violations.push({ file: m.file, table });
+			} else if (
+				!concurrent &&
+				HOT_TABLES_EXTENDED.includes(table) &&
+				m.version >= HOT_TABLES_EXTENDED_MIN_VERSION
+			) {
 				violations.push({ file: m.file, table });
 			}
 		}

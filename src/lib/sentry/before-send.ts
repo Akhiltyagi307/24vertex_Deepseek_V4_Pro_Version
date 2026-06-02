@@ -245,6 +245,33 @@ export function scrubSentryEvent<T>(event: T): T {
 }
 
 /**
+ * PII scrubber for Sentry **Logs** (the `enableLogs` stream fed by
+ * `consoleLoggingIntegration`). The SDK applies `beforeSend` only to
+ * error/transaction events — NOT to log records — so without a `beforeSendLog`
+ * hook every `console.log`/`warn`/`error` reaches Sentry's Logs product with
+ * the careful event-scrubbing bypassed. This mirrors {@link scrubSentryEvent}:
+ * redact PII in the log message/body and deep-redact structured attributes
+ * (where console args land). Mutates in place and returns the input; the SDK
+ * contract also allows returning null to drop a log — we always keep, scrubbed.
+ *
+ * Loosely typed so the same helper accepts the SDK's `Log` shape across
+ * runtimes/minor versions without importing SDK types into this multi-runtime file.
+ */
+export function scrubSentryLog<T>(log: T): T {
+	const l = log as unknown as {
+		message?: unknown;
+		body?: unknown;
+		attributes?: Record<string, unknown>;
+	};
+	if (typeof l.message === "string") l.message = redactPii(l.message);
+	if (typeof l.body === "string") l.body = redactPii(l.body);
+	if (l.attributes && typeof l.attributes === "object") {
+		l.attributes = deepRedact(l.attributes, 0, new WeakSet()) as Record<string, unknown>;
+	}
+	return log;
+}
+
+/**
  * Sentry SDK noise we never want to ingest. Mostly internal Next dev-frames
  * and browser extension origins that produce uncontrollable error volume.
  */

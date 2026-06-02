@@ -229,10 +229,18 @@ function main() {
 	if (legacyOk) {
 		routeResults = runLegacyRouteBudgets(manifest);
 	} else {
-		console.log(
-			"⚠  .next/app-build-manifest.json not found (Next 16 / Turbopack). " +
-				"Per-route JS budgets skipped — visual-chunk scan runs below.",
-		);
+		const skipMsg =
+			".next/app-build-manifest.json not found (Next 16 / Turbopack). " +
+			"Per-route JS first-load budgets were NOT enforced — only the visual-chunk scan ran.";
+		console.log(`⚠  ${skipMsg}`);
+		if (process.env.CI) {
+			// Surface loudly in the CI checks summary so skipped per-route budgets
+			// don't silently read as "all budgets passed". We deliberately do NOT
+			// exit non-zero here: Turbopack never emits this legacy manifest, so a
+			// hard failure would break every CI build until a Turbopack-native
+			// per-route reader lands.
+			console.log(`::warning title=Bundle budget::${skipMsg}`);
+		}
 	}
 
 	const visualResults = runVisualChunkBudgets();

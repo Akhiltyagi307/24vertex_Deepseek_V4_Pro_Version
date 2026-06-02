@@ -251,6 +251,33 @@ export async function POST(req: Request) {
 		vertex24CouponId = q.couponId;
 	}
 
+	// Concurrency guard: atomically claim the right to create a Razorpay
+	// subscription for this profile using pending_plan_code as a mutex. A second
+	// concurrent (or retried) request finds pending_plan_code already set and is
+	// rejected, so we never create two Razorpay subscriptions — the second of
+	// which would orphan and keep charging the customer. Cleared by the
+	// activation webhook, or reset below if the Razorpay call fails.
+	const { data: createClaim, error: createClaimErr } = await admin
+		.from("subscriptions")
+		.update({ pending_plan_code: plan.code, updated_at: new Date().toISOString() })
+		.eq("profile_id", targetProfileId)
+		.is("pending_plan_code", null)
+		.select("id");
+	if (createClaimErr) {
+		logSupabaseError("billing.create-subscription.claim", createClaimErr, { profileId: targetProfileId });
+		return Response.json({ success: false, ok: false, message: "Could not start checkout. Try again." }, { status: 500 });
+	}
+	if (!createClaim || createClaim.length === 0) {
+		return Response.json(
+			{
+				success: false, ok: false,
+				code: "in_progress",
+				message: "A checkout is already in progress for this account. Refresh and try again in a moment.",
+			},
+			{ status: 409 },
+		);
+	}
+
 	let razorpaySubscription;
 	try {
 		razorpaySubscription = await createSubscription({
@@ -283,6 +310,12 @@ export async function POST(req: Request) {
 				start_mode: parsed.data.startMode,
 			},
 		});
+		// Release the claim so the user can retry; no Razorpay subscription exists.
+		await admin
+			.from("subscriptions")
+			.update({ pending_plan_code: null, updated_at: new Date().toISOString() })
+			.eq("profile_id", targetProfileId)
+			.is("razorpay_subscription_id", null);
 		return Response.json({ success: false, ok: false, message: "Could not start Razorpay checkout." }, { status: 502 });
 	}
 

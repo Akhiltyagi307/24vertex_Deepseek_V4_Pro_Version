@@ -50,6 +50,8 @@ export type PaymentReceiptParams = CommonParams & {
 	planName?: string;
 	invoiceShortUrl?: string | null;
 	paymentRef?: string | null;
+	/** Stable key so a replayed `subscription.charged` doesn't re-send the receipt. */
+	dedupKey?: string;
 };
 
 /** Sent after a successful charge (webhook). Includes hosted invoice link when available. */
@@ -94,10 +96,16 @@ export async function sendPaymentReceiptEmail(params: PaymentReceiptParams): Pro
 			payment_ref: params.paymentRef ?? "",
 			invoice_short_url: params.invoiceShortUrl ?? "",
 		},
+		dedupKey: params.dedupKey,
 	});
 }
 
-export type SubscriptionActiveParams = CommonParams & { planName: string; nextRenewalIso: string };
+export type SubscriptionActiveParams = CommonParams & {
+	planName: string;
+	nextRenewalIso: string;
+	/** Stable key so a replayed activation/charged event doesn't re-send this. */
+	dedupKey?: string;
+};
 export async function sendSubscriptionActiveEmail(params: SubscriptionActiveParams): Promise<{ error: string | null }> {
 	const subject = `Welcome to ${params.planName}!`;
 	const renewal = formatDateLongDMYInAppTimeZone(params.nextRenewalIso);
@@ -127,6 +135,7 @@ export async function sendSubscriptionActiveEmail(params: SubscriptionActivePara
 			plan_name: params.planName,
 			next_renewal: renewal,
 		},
+		dedupKey: params.dedupKey,
 	});
 }
 

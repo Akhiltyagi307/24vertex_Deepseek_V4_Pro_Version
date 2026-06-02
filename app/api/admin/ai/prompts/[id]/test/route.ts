@@ -6,15 +6,31 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";
+import { rlConsume } from "@/lib/ratelimit/consume";
 import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { aiPrompts } from "@/db/schema/ai-prompts";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
+
+/**
+ * Hard ceiling on a prompt-test generation regardless of the stored prompt's
+ * configured maxTokens — bounds latency/cost of the admin test path.
+ */
+const ADMIN_PROMPT_TEST_MAX_OUTPUT_TOKENS = 4096;
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	const gate = await requireAdminApi();
 	if (gate instanceof NextResponse) return gate;
+
+	// Per-admin rate limit: this endpoint runs an LLM call, so without a limit a
+	// single admin session could fan out parallel expensive generations. 20/min
+	// is generous for interactive prompt testing.
+	const rl = await rlConsume({ key: `admin:prompt-test:${gate.jti}`, limit: 20, windowSec: 60 });
+	if (!rl.allowed) {
+		return adminErrorResponse("Too many prompt tests. Wait a moment and retry.", { status: 429 });
+	}
 
 	const { id } = await ctx.params;
 	const [row] = await db.select().from(aiPrompts).where(eq(aiPrompts.id, id)).limit(1);
@@ -40,7 +56,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			model: getOpenAIProvider().chat(row.model),
 			system: row.template,
 			prompt: userMsg,
-			maxOutputTokens: row.maxTokens ?? 512,
+			maxOutputTokens: Math.min(row.maxTokens ?? 512, ADMIN_PROMPT_TEST_MAX_OUTPUT_TOKENS),
 			temperature: row.temperature ? Number(row.temperature) : undefined,
 		});
 		const usage = result.usage;

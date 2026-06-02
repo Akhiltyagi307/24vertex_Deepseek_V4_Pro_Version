@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildPublicMarketingCsp, resolveCspPolicyForPath } from "@/lib/security/csp";
+import { buildCsp, buildPublicMarketingCsp, resolveCspPolicyForPath } from "@/lib/security/csp";
+
+function scriptSrcOf(csp: string): string {
+	return csp.split(";").find((d) => d.trim().startsWith("script-src")) ?? "";
+}
 
 describe("buildPublicMarketingCsp", () => {
 	afterEach(() => {
@@ -16,6 +20,36 @@ describe("buildPublicMarketingCsp", () => {
 		const csp = buildPublicMarketingCsp();
 		expect(csp).toMatch(/'unsafe-inline'/);
 		expect(csp).not.toMatch(/'sha256-/);
+	});
+});
+
+describe("unsafe-inline drop (PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK)", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it("keeps 'unsafe-inline' in script-src by default in production (legacy fallback)", () => {
+		vi.stubEnv("VERCEL_ENV", "production");
+		vi.stubEnv("PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK", "");
+		expect(scriptSrcOf(buildCsp("test-nonce"))).toMatch(/'unsafe-inline'/);
+	});
+
+	it("drops 'unsafe-inline' from portal script-src when the prod flag is set (nonce + strict-dynamic remain)", () => {
+		vi.stubEnv("VERCEL_ENV", "production");
+		vi.stubEnv("PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK", "1");
+		const scriptSrc = scriptSrcOf(buildCsp("test-nonce"));
+		expect(scriptSrc).not.toMatch(/'unsafe-inline'/);
+		expect(scriptSrc).toMatch(/'strict-dynamic'/);
+		expect(scriptSrc).toMatch(/'nonce-test-nonce'/);
+	});
+
+	it("drops 'unsafe-inline' from static marketing script-src (relying on hashes) when the prod flag is set", () => {
+		vi.stubEnv("NODE_ENV", "production");
+		vi.stubEnv("VERCEL_ENV", "production");
+		vi.stubEnv("PRODUCTION_DROP_UNSAFE_INLINE_SCRIPT_FALLBACK", "1");
+		const scriptSrc = scriptSrcOf(buildPublicMarketingCsp());
+		expect(scriptSrc).not.toMatch(/'unsafe-inline'/);
+		expect(scriptSrc).toMatch(/'sha256-/);
 	});
 });
 

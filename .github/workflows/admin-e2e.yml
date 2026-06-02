@@ -1,7 +1,17 @@
-name: Admin E2E (optional)
+name: Admin E2E
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "src/**"
+      - "tests/e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
 
 jobs:
   playwright:

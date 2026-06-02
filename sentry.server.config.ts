@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 
-import { SENTRY_DENY_URLS, scrubSentryEvent } from "@/lib/sentry/before-send";
+import { SENTRY_DENY_URLS, scrubSentryEvent, scrubSentryLog } from "@/lib/sentry/before-send";
 
 const dsn = process.env.SENTRY_DSN ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
 
@@ -15,6 +15,11 @@ if (dsn) {
 		denyUrls: SENTRY_DENY_URLS,
 		beforeSend(event) {
 			return scrubSentryEvent(event);
+		},
+		// enableLogs ships console.* to Sentry's Logs product, which bypasses
+		// beforeSend (events only). Scrub the log stream too or PII leaks.
+		beforeSendLog(log) {
+			return scrubSentryLog(log);
 		},
 		beforeBreadcrumb(breadcrumb) {
 			// Breadcrumbs feed into events; same redactor at the breadcrumb layer
