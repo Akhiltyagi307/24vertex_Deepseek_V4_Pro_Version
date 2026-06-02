@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useReducedMotion } from "motion/react";
 import { useRef, useState } from "react";
 import { FileText, Image as ImageIcon, Loader2, Paperclip, X } from "lucide-react";
@@ -136,13 +137,29 @@ export function ChatComposer({
 	}
 
 	async function removeAttachment(att: AttachmentRow) {
-		try {
-			const supabase = createClient();
-			// Best-effort delete; the row's RLS allows the owner.
-			await supabase.from("doubt_message_attachments").delete().eq("id", att.id);
-			await supabase.storage.from("doubt-attachments").remove([att.storagePath]);
-		} catch {
-			// best-effort cleanup; the chip removal still proceeds.
+		const supabase = createClient();
+		// RLS scopes this to the owner (migration
+		// 20260530000200_doubt_message_attachments.sql, "Students manage own
+		// doubt attachments"). Supabase `.delete()` resolves `{ error }` instead
+		// of throwing, so the old empty `catch` silently orphaned the row + its
+		// storage object on any failure. Surface failures; only remove the blob
+		// once the row is actually gone.
+		const { error } = await supabase.from("doubt_message_attachments").delete().eq("id", att.id);
+		if (error) {
+			Sentry.captureException(error, {
+				tags: { area: "doubt_attachment", op: "delete" },
+				extra: { attachmentId: att.id },
+			});
+		} else {
+			const { error: storageError } = await supabase.storage
+				.from("doubt-attachments")
+				.remove([att.storagePath]);
+			if (storageError) {
+				Sentry.captureException(storageError, {
+					tags: { area: "doubt_attachment", op: "storage_remove" },
+					extra: { attachmentId: att.id, storagePath: att.storagePath },
+				});
+			}
 		}
 		onAttachmentRemoved(att.id);
 	}

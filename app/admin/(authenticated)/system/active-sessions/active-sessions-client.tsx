@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ConfirmDestructive } from "@/components/admin/confirm-destructive";
 import { Button } from "@/components/ui/button";
+import { isAbortError } from "@/lib/http/fetch-json";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 
 type SessionRow = {
@@ -22,12 +23,23 @@ export function AdminActiveSessionsClient() {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 
+	// Out-of-order guard: `load` is re-fired by the Refresh button and after each
+	// revoke, so a slow response must not clobber a newer one; the AbortController
+	// is also torn down on unmount.
+	const reqIdRef = useRef(0);
+	const acRef = useRef<AbortController | null>(null);
+
 	const load = useCallback(async () => {
+		const reqId = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		setError(null);
 		setLoading(true);
 		try {
-			const res = await fetch("/api/admin/sessions", { credentials: "include" });
+			const res = await fetch("/api/admin/sessions", { credentials: "include", signal: ac.signal });
 			const j = (await res.json()) as { data?: SessionRow[]; error?: string };
+			if (reqId !== reqIdRef.current) return;
 			if (!res.ok) {
 				setError(j.error ?? res.statusText);
 				setRows([]);
@@ -35,15 +47,19 @@ export function AdminActiveSessionsClient() {
 			}
 			setRows(j.data ?? []);
 		} catch (e) {
+			if (reqId !== reqIdRef.current || isAbortError(e)) return;
 			setError(e instanceof Error ? e.message : String(e));
 			setRows([]);
 		} finally {
-			setLoading(false);
+			if (reqId === reqIdRef.current) setLoading(false);
 		}
 	}, []);
 
 	useEffect(() => {
 		void load();
+		return () => {
+			acRef.current?.abort();
+		};
 	}, [load]);
 
 	async function revokeOne(id: string) {

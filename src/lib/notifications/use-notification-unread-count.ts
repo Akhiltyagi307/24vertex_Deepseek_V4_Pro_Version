@@ -2,9 +2,13 @@
 
 import * as React from "react";
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
 
+import { fetchJson, FetchJsonError, isAbortError } from "@/lib/http/fetch-json";
 import { subscribeToMyNotifications } from "@/lib/notifications/realtime-client";
 import type { NotificationsRealtimeScope } from "@/lib/notifications/realtime-client";
+
+const unreadCountSchema = z.object({ count: z.number().optional() });
 
 /** Background poll interval when Realtime is healthy (ms). */
 export const NOTIFICATION_UNREAD_POLL_MS = 180_000;
@@ -32,17 +36,28 @@ export function useNotificationUnreadCount({
 }: UseNotificationUnreadCountArgs) {
 	const [count, setCount] = React.useState(initialCount);
 
+	const reqIdRef = React.useRef(0);
+	const acRef = React.useRef<AbortController | null>(null);
+
 	const refresh = React.useCallback(async () => {
+		const id = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		try {
-			const res = await fetch(`${apiBasePath}/unread-count`, {
-				cache: "no-store",
+			const result = await fetchJson(`${apiBasePath}/unread-count`, {
+				schema: unreadCountSchema,
+				signal: ac.signal,
 			});
-			if (!res.ok) return;
-			const json = (await res.json()) as { count?: number };
-			if (typeof json.count === "number") {
-				setCount(Math.max(0, json.count));
+			if (id !== reqIdRef.current) return;
+			if (typeof result.count === "number") {
+				setCount(Math.max(0, result.count));
 			}
 		} catch (err) {
+			if (isAbortError(err)) return;
+			// Preserve prior behaviour: stay silent on HTTP/validation failures
+			// (`!res.ok` used to `return`); only report genuine network errors.
+			if (err instanceof FetchJsonError && err.status !== null) return;
 			Sentry.captureException(err, {
 				tags: { area: "notifications", op: "unread_count_refresh" },
 			});
@@ -52,6 +67,9 @@ export function useNotificationUnreadCount({
 	React.useEffect(() => {
 		if (skipMountRefresh) return;
 		void refresh();
+		return () => {
+			acRef.current?.abort();
+		};
 	}, [refresh, skipMountRefresh]);
 
 	React.useEffect(() => {

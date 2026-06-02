@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Building2Icon, CopyIcon, ImageIcon, Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 
+import { isAbortError } from "@/lib/http/fetch-json";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -81,23 +82,35 @@ export function AdminOrganizationsManager() {
 		[editingId, rows],
 	);
 
+	const reqIdRef = useRef(0);
+	const acRef = useRef<AbortController | null>(null);
+
 	async function load() {
+		const reqId = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		setLoading(true);
 		setError(null);
 		try {
-			const res = await fetch("/api/admin/organizations", { credentials: "include" });
+			const res = await fetch("/api/admin/organizations", { credentials: "include", signal: ac.signal });
 			if (!res.ok) throw new Error(await readError(res));
 			const json = (await res.json()) as { data: SerializedOrganizationAdmin[] };
+			if (reqId !== reqIdRef.current) return;
 			setRows(json.data ?? []);
 		} catch (e) {
+			if (reqId !== reqIdRef.current || isAbortError(e)) return;
 			setError(e instanceof Error ? e.message : "Failed to load organizations.");
 		} finally {
-			setLoading(false);
+			if (reqId === reqIdRef.current) setLoading(false);
 		}
 	}
 
 	useEffect(() => {
 		void load();
+		return () => {
+			acRef.current?.abort();
+		};
 	}, []);
 
 	function startEdit(row: SerializedOrganizationAdmin) {

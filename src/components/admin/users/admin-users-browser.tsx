@@ -1,9 +1,10 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { z } from "zod";
 
 import { AdminDataTable } from "@/components/admin/data-table/admin-data-table";
 import { AdminExportButton } from "@/components/admin/data-table/export-button";
@@ -11,6 +12,7 @@ import { AdminFilterBar } from "@/components/admin/data-table/filter-bar";
 import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { AdminUsersBulkToolbar } from "@/components/admin/users/admin-users-bulk-toolbar";
 import { StatusChip } from "@/components/admin/status-chip";
+import { fetchJson, isAbortError } from "@/lib/http/fetch-json";
 import type { AdminUserListRole, AdminUserListRow } from "@/lib/admin/users-list";
 
 type Props = {
@@ -18,6 +20,26 @@ type Props = {
 	role: AdminUserListRole;
 	title: string;
 };
+
+const adminUserListRowSchema: z.ZodType<AdminUserListRow> = z.object({
+	id: z.string(),
+	email: z.string().nullable(),
+	full_name: z.string(),
+	role: z.string(),
+	grade: z.number().nullable(),
+	section: z.string().nullable(),
+	stream: z.string().nullable(),
+	is_verified: z.boolean().nullable(),
+	is_suspended: z.boolean(),
+	deleted_at: z.string().nullable(),
+	last_active_at: z.string().nullable(),
+	created_at: z.string().nullable(),
+});
+
+const adminUsersResponseSchema = z.object({
+	data: z.array(adminUserListRowSchema),
+	total: z.number(),
+});
 
 export function AdminUsersBrowser({ listId, role, title }: Props) {
 	const router = useRouter();
@@ -34,7 +56,14 @@ export function AdminUsersBrowser({ listId, role, title }: Props) {
 	const [error, setError] = useState<string | null>(null);
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
+	const reqIdRef = useRef(0);
+	const acRef = useRef<AbortController | null>(null);
+
 	const fetchPage = useCallback(async () => {
+		const reqId = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		setRowSelection({});
 		setLoading(true);
 		setError(null);
@@ -54,24 +83,32 @@ export function AdminUsersBrowser({ listId, role, title }: Props) {
 		if (searchParams.get("include_suspended") === "1") p.set("include_suspended", "1");
 		if (sort) p.set("sort", sort);
 
-		const res = await fetch(`/api/admin/users?${p.toString()}`, { credentials: "include" });
-		if (!res.ok) {
+		try {
+			const j = await fetchJson(`/api/admin/users?${p.toString()}`, {
+				schema: adminUsersResponseSchema,
+				signal: ac.signal,
+				init: { credentials: "include" },
+			});
+			if (reqId !== reqIdRef.current) return;
+			setRows(j.data ?? []);
+			setTotal(Number(j.total ?? 0));
+			setLoading(false);
+		} catch (err) {
+			if (isAbortError(err) || reqId !== reqIdRef.current) return;
 			setError("Failed to load users");
 			setRows([]);
 			setTotal(0);
 			setLoading(false);
-			return;
 		}
-		const j = (await res.json()) as { data: AdminUserListRow[]; total: number };
-		setRows(j.data ?? []);
-		setTotal(Number(j.total ?? 0));
-		setLoading(false);
 	}, [page, pageSize, role, searchParams, sort]);
 
 	useEffect(() => {
 		startTransition(() => {
 			void fetchPage();
 		});
+		return () => {
+			acRef.current?.abort();
+		};
 	}, [fetchPage]);
 
 	const setPage = (next: PaginationState) => {

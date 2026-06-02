@@ -3,8 +3,9 @@
 import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +16,7 @@ import {
 	type CommandPaletteConfirmFetchAction,
 } from "@/lib/admin/command-palette-registry";
 import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
+import { fetchJson, isAbortError } from "@/lib/http/fetch-json";
 import { cn } from "@/lib/utils";
 
 const RECENT_KEY = "admin_cmdk_recent_v1";
@@ -22,13 +24,17 @@ const MAX_RECENT = 5;
 
 type RecentEntry = { type: string; id: string; label: string; href: string };
 
-type AdminSearchHit = {
-	type: string;
-	id: string;
-	label: string;
-	subtitle?: string;
-	href: string;
-};
+const adminSearchHitSchema = z.object({
+	type: z.string(),
+	id: z.string(),
+	label: z.string(),
+	subtitle: z.string().optional(),
+	href: z.string(),
+});
+
+type AdminSearchHit = z.infer<typeof adminSearchHitSchema>;
+
+const adminSearchResponseSchema = z.object({ data: z.array(adminSearchHitSchema).optional() });
 
 function readRecent(): RecentEntry[] {
 	if (typeof window === "undefined") return [];
@@ -84,6 +90,7 @@ export function AdminCommandPalette({
 		}
 	}, [open]);
 
+	const searchReqIdRef = useRef(0);
 	useEffect(() => {
 		if (!open) return;
 		const q = query.trim();
@@ -91,21 +98,33 @@ export function AdminCommandPalette({
 			setHits([]);
 			return;
 		}
+		const ac = new AbortController();
 		const t = window.setTimeout(() => {
 			void (async () => {
+				// Out-of-order guard: a slower response from a stale query must not
+				// overwrite the hits of a newer one.
+				const reqId = ++searchReqIdRef.current;
 				setLoading(true);
 				try {
-					const res = await fetch(`/api/admin/search?q=${encodeURIComponent(q)}`, { credentials: "include" });
-					const json = (await res.json()) as { data?: AdminSearchHit[] };
+					const json = await fetchJson(`/api/admin/search?q=${encodeURIComponent(q)}`, {
+						schema: adminSearchResponseSchema,
+						signal: ac.signal,
+						init: { credentials: "include" },
+					});
+					if (reqId !== searchReqIdRef.current) return;
 					setHits(Array.isArray(json.data) ? json.data : []);
-				} catch {
+				} catch (err) {
+					if (reqId !== searchReqIdRef.current || isAbortError(err)) return;
 					setHits([]);
 				} finally {
-					setLoading(false);
+					if (reqId === searchReqIdRef.current) setLoading(false);
 				}
 			})();
 		}, 220);
-		return () => window.clearTimeout(t);
+		return () => {
+			window.clearTimeout(t);
+			ac.abort();
+		};
 	}, [query, open]);
 
 	const navigate = useCallback(

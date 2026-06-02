@@ -101,12 +101,6 @@ function chargePlanCostBudget(jti: string, cost: number): boolean {
 	return true;
 }
 
-/** Test-only — clear per-process SQL console counters between cases. */
-export function __resetAdminSqlConsoleStateForTest(): void {
-	sqlInflight.clear();
-	sqlPlanCostByJti.clear();
-}
-
 export async function POST(request: NextRequest) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");

@@ -1,10 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetchJson, isAbortError } from "@/lib/http/fetch-json";
+
+const plansSchema = z.object({ data: z.array(z.object({ code: z.string() })).optional() });
 
 export function AdminCouponCreateForm() {
 	const router = useRouter();
@@ -21,19 +25,35 @@ export function AdminCouponCreateForm() {
 	const [discountPercent, setDiscountPercent] = useState("10");
 	const [confirmHighDiscount, setConfirmHighDiscount] = useState(false);
 
+	const plansReqIdRef = useRef(0);
 	useEffect(() => {
+		const reqId = ++plansReqIdRef.current;
+		const ac = new AbortController();
 		void (async () => {
-			const res = await fetch("/api/admin/plans", { credentials: "include" });
-			const j = (await res.json()) as { data?: { code: string }[] };
-			if (res.ok && j.data?.length) {
-				// W2.3: never offer 'free' as a coupon-grant target. The API and
-				// RPC also reject this; filtering at the UI layer just keeps the
-				// dropdown honest.
-				const paidCodes = j.data.map((p) => p.code).filter((c) => c !== "free");
-				setPlanCodes(paidCodes);
-				setGrantsPlanCode((c) => c || paidCodes[0] || "");
+			try {
+				const j = await fetchJson("/api/admin/plans", {
+					schema: plansSchema,
+					signal: ac.signal,
+					init: { credentials: "include" },
+				});
+				if (reqId !== plansReqIdRef.current) return;
+				if (j.data?.length) {
+					// W2.3: never offer 'free' as a coupon-grant target. The API and
+					// RPC also reject this; filtering at the UI layer just keeps the
+					// dropdown honest.
+					const paidCodes = j.data.map((p) => p.code).filter((c) => c !== "free");
+					setPlanCodes(paidCodes);
+					setGrantsPlanCode((c) => c || paidCodes[0] || "");
+				}
+			} catch (err) {
+				if (isAbortError(err)) return;
+				// Original behaviour: a failed plans load silently leaves the
+				// dropdown empty (no error surface).
 			}
 		})();
+		return () => {
+			ac.abort();
+		};
 	}, []);
 
 	const discountPctNum = Number(discountPercent || "0");

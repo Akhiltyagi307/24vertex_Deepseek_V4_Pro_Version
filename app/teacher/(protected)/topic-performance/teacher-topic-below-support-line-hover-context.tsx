@@ -43,9 +43,13 @@ export function TeacherTopicBelowSupportLineHoverProvider({
 		setOpenTopicId(null);
 	}, []);
 
-	useEffect(() => {
+	// Reset the open topic when `resetKey` changes — during render, not in an
+	// effect, to avoid the cascading re-render the set-state-in-effect rule flags.
+	const [prevResetKey, setPrevResetKey] = useState(resetKey);
+	if (prevResetKey !== resetKey) {
+		setPrevResetKey(resetKey);
 		setOpenTopicId(null);
-	}, [resetKey]);
+	}
 
 	useEffect(() => {
 		const root = scrollRootRef?.current;

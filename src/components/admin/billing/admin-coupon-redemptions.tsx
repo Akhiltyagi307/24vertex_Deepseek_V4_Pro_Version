@@ -1,29 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { z } from "zod";
 
-type Row = {
-	id: string;
-	profile_id: string;
-	subscription_id: string | null;
-	redeemed_at: string;
-	refunded_at: string | null;
-	full_name: string;
-	email: string | null;
-};
+import { useJsonResource } from "@/hooks/use-json-resource";
+
+const rowSchema = z.object({
+	id: z.string(),
+	profile_id: z.string(),
+	subscription_id: z.string().nullable(),
+	redeemed_at: z.string(),
+	refunded_at: z.string().nullable(),
+	full_name: z.string(),
+	email: z.string().nullable(),
+});
+
+type Row = z.infer<typeof rowSchema>;
+
+const redemptionsSchema = z
+	.object({ data: z.array(rowSchema).optional() })
+	.transform((j) => j.data ?? []);
 
 export function AdminCouponRedemptions({ code }: { code: string }) {
-	const [rows, setRows] = useState<Row[] | null>(null);
-
-	useEffect(() => {
-		const enc = encodeURIComponent(code);
-		void (async () => {
-			const res = await fetch(`/api/admin/coupons/${enc}/redemptions?page_size=50`, { credentials: "include" });
-			const j = (await res.json()) as { data?: Row[] };
-			if (res.ok) setRows(j.data ?? []);
-			else setRows([]);
-		})();
-	}, [code]);
+	const enc = encodeURIComponent(code);
+	const { data, error } = useJsonResource<Row[]>(`/api/admin/coupons/${enc}/redemptions?page_size=50`, {
+		schema: redemptionsSchema,
+	});
+	// Preserve the original behaviour: failures render the empty state (never an
+	// error message); only the pre-first-response state shows the loading copy.
+	const rows = error ? [] : data;
 
 	if (rows === null) return <p className="text-sm text-muted-foreground">Loading redemptions…</p>;
 	if (rows.length === 0) return <p className="text-sm text-muted-foreground">No redemptions yet.</p>;

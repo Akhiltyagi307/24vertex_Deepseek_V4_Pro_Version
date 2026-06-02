@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import * as Sentry from "@sentry/nextjs";
 import { CheckCircle2Icon, ChevronDownIcon, LoaderIcon, ZapIcon } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { fetchJson } from "@/lib/http/fetch-json";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import {
 	ACTIVITY_STREAK_REFRESH_EVENT,
@@ -18,6 +18,7 @@ import {
 } from "@/lib/student/activity-streak-display";
 import {
 	STREAK_REWARD_TARGET_WEEKS,
+	studentActivityStreakSnapshotSchema,
 	type StudentActivityStreakSnapshot,
 } from "@/lib/student/activity-streak";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,9 @@ const streakUrgencyBadge =
 
 const MILESTONE_SEGMENT_WEEKS = 4;
 const MILESTONE_COUNT = STREAK_REWARD_TARGET_WEEKS / MILESTONE_SEGMENT_WEEKS;
+
+/** A server-seeded / freshly-loaded snapshot is trusted this long before the open/focus handlers refetch. */
+const STREAK_STALE_MS = 60_000;
 
 const STREAK_WEEKLY_RULE =
 	"Submit at least one practice test or assignment each calendar week (India time).";
@@ -434,41 +438,63 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 	const [loading, setLoading] = React.useState(!initialSnapshot);
 	const [loadError, setLoadError] = React.useState(false);
 
+	// Out-of-order guard: only the most recent request may apply its result.
+	// `freshAtRef` records when we last had good data so the open/focus handlers
+	// can skip a refetch while the snapshot is still fresh.
+	const reqIdRef = React.useRef(0);
+	const freshAtRef = React.useRef(initialSnapshot ? Date.now() : 0);
+
 	const loadSnapshot = React.useCallback(async () => {
+		const reqId = ++reqIdRef.current;
 		setLoading(true);
 		setLoadError(false);
 		try {
-			const res = await fetch("/api/student/activity-streak", { cache: "no-store" });
-			if (!res.ok) throw new Error(`status=${res.status}`);
-			const json = (await res.json()) as StudentActivityStreakSnapshot;
+			const json = await fetchJson("/api/student/activity-streak", {
+				schema: studentActivityStreakSnapshotSchema,
+				report: { area: "activity_streak", op: "load" },
+			});
+			if (reqId !== reqIdRef.current) return;
 			setSnapshot(json);
-		} catch (err) {
+			freshAtRef.current = Date.now();
+		} catch {
+			if (reqId !== reqIdRef.current) return;
 			setLoadError(true);
-			Sentry.captureException(err, { tags: { area: "activity_streak", op: "load" } });
 		} finally {
-			setLoading(false);
+			if (reqId === reqIdRef.current) setLoading(false);
 		}
 	}, []);
 
+	// Initial fetch only when the server didn't seed us.
 	React.useEffect(() => {
 		if (initialSnapshot) return;
 		void loadSnapshot();
 	}, [initialSnapshot, loadSnapshot]);
 
+	// While the tray is OPEN, refresh a stale snapshot on open and on window
+	// focus. A CLOSED tray never listens to focus, so routine alt-tabbing no
+	// longer fires a request per focus — which used to burn the route's
+	// per-user rate limit and surface a spurious "could not load" error.
 	React.useEffect(() => {
 		if (!open) return;
-		void loadSnapshot();
+		const refreshIfStale = () => {
+			if (Date.now() - freshAtRef.current < STREAK_STALE_MS) return;
+			void loadSnapshot();
+		};
+		refreshIfStale();
+		window.addEventListener("focus", refreshIfStale);
+		return () => window.removeEventListener("focus", refreshIfStale);
 	}, [open, loadSnapshot]);
 
+	// Submit-driven refresh (low-rate, fired by notifyActivityStreakRefresh after
+	// a practice/assignment submit). Bypasses the staleness gate because the
+	// streak genuinely changed; keeps the closed-tray trigger badge current.
 	React.useEffect(() => {
 		const onRefresh = () => void loadSnapshot();
 		window.addEventListener(ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
 		window.addEventListener(LEGACY_ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
-		window.addEventListener("focus", onRefresh);
 		return () => {
 			window.removeEventListener(ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
 			window.removeEventListener(LEGACY_ACTIVITY_STREAK_REFRESH_EVENT, onRefresh);
-			window.removeEventListener("focus", onRefresh);
 		};
 	}, [loadSnapshot]);
 
@@ -477,7 +503,7 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 	const weeksToReward = snapshot?.weeksToReward ?? STREAK_REWARD_TARGET_WEEKS;
 	const rewardGranted = snapshot?.rewardGranted ?? false;
 	const longestStreakWeeks = snapshot?.longestStreakWeeks ?? 0;
-	const freezesAvailable = snapshot?.freezesAvailable ?? 1;
+	const freezesAvailable = snapshot?.freezesAvailable ?? 0;
 	const isAtRisk = streakWeeks > 0 && !isActiveThisWeek && !rewardGranted;
 	const isInitialLoad = loading && !snapshot;
 	const isRefreshing = loading && Boolean(snapshot);
@@ -582,7 +608,6 @@ export function ActivityStreakWidget({ initialSnapshot = null }: ActivityStreakW
 						: isAtRisk ? streakUrgencyText
 						: "text-muted-foreground",
 					)}
-					aria-live="polite"
 				>
 					{isInitialLoad ? "—" : rewardGranted ? STREAK_REWARD_TARGET_WEEKS : streakWeeks}
 				</span>

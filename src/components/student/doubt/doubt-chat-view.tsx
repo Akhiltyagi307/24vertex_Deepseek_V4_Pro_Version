@@ -73,14 +73,28 @@ export function DoubtChatView(props: {
 	const [topicId, setTopicId] = useState<string | null>(null);
 	const [startPending, setStartPending] = useState(false);
 
-	const [conversations, setConversations] = useState(props.conversations);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 	const [chatsOpen, setChatsOpen] = useState(false);
 
-	useEffect(() => {
-		setConversations(props.conversations);
-	}, [props.conversations]);
+	// `props.conversations` is the source of truth (refreshed via router.refresh).
+	// Two local overlays keep the optimistic UX without mirroring props into
+	// state — the old mirror+resync effect resurrected just-deleted rows on the
+	// next prop change and double-rendered:
+	//  - pendingDeletes: ids removed optimistically before the server refresh lands
+	//  - activityBumps:  newer updatedAt so a just-active chat sorts to the top
+	const [pendingDeletes, setPendingDeletes] = useState<ReadonlySet<string>>(() => new Set());
+	const [activityBumps, setActivityBumps] = useState<ReadonlyMap<string, string>>(() => new Map());
+
+	const conversations = useMemo(() => {
+		return props.conversations
+			.filter((r) => !pendingDeletes.has(r.id))
+			.map((r) => {
+				const bump = activityBumps.get(r.id);
+				return bump && bump > r.updatedAt ? { ...r, updatedAt: bump } : r;
+			})
+			.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+	}, [props.conversations, pendingDeletes, activityBumps]);
 
 	useEffect(() => {
 		setChatsOpen(false);
@@ -111,7 +125,7 @@ export function DoubtChatView(props: {
 					toast.error(res.message);
 					return;
 				}
-				setConversations((prev) => prev.filter((r) => r.id !== id));
+				setPendingDeletes((prev) => new Set(prev).add(id));
 				setConfirmDeleteId(null);
 				if (c === id) {
 					router.push("/student/doubt-chat");
@@ -129,13 +143,12 @@ export function DoubtChatView(props: {
 	// (an assistant turn finishing). Mirrors the server's `updated_at DESC`
 	// ordering without re-running the page's server data load on every turn.
 	const onConversationActivity = useCallback((conversationId: string) => {
-		setConversations((prev) => {
-			const idx = prev.findIndex((r) => r.id === conversationId);
-			if (idx < 0) return prev;
-			const bumped = { ...prev[idx]!, updatedAt: new Date().toISOString() };
-			return idx === 0
-				? [bumped, ...prev.slice(1)]
-				: [bumped, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+		// Record a local "just active" timestamp; the derived list re-sorts it to
+		// the top without re-running the page's server data load.
+		setActivityBumps((prev) => {
+			const next = new Map(prev);
+			next.set(conversationId, new Date().toISOString());
+			return next;
 		});
 	}, []);
 

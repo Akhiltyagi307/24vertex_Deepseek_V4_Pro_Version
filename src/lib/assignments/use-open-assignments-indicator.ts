@@ -2,9 +2,14 @@
 
 import * as React from "react";
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
+
+import { fetchJson, FetchJsonError, isAbortError } from "@/lib/http/fetch-json";
 
 /** Background poll interval for sidebar open-assignment dot (ms). */
 export const OPEN_ASSIGNMENTS_POLL_MS = 180_000;
+
+const openIndicatorSchema = z.object({ hasOpen: z.boolean().optional() });
 
 export type UseOpenAssignmentsIndicatorArgs = {
 	apiBasePath: string;
@@ -26,15 +31,28 @@ export function useOpenAssignmentsIndicator({
 }: UseOpenAssignmentsIndicatorArgs) {
 	const [hasOpen, setHasOpen] = React.useState(initialHasOpen);
 
+	const reqIdRef = React.useRef(0);
+	const acRef = React.useRef<AbortController | null>(null);
+
 	const refresh = React.useCallback(async () => {
+		const id = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		try {
-			const res = await fetch(`${apiBasePath}/open-indicator`, { cache: "no-store" });
-			if (!res.ok) return;
-			const json = (await res.json()) as { hasOpen?: boolean };
-			if (typeof json.hasOpen === "boolean") {
-				setHasOpen(json.hasOpen);
+			const result = await fetchJson(`${apiBasePath}/open-indicator`, {
+				schema: openIndicatorSchema,
+				signal: ac.signal,
+			});
+			if (id !== reqIdRef.current) return;
+			if (typeof result.hasOpen === "boolean") {
+				setHasOpen(result.hasOpen);
 			}
 		} catch (err) {
+			if (isAbortError(err)) return;
+			// Preserve prior behaviour: stay silent on HTTP/validation failures
+			// (`!res.ok` used to `return`); only report genuine network errors.
+			if (err instanceof FetchJsonError && err.status !== null) return;
 			Sentry.captureException(err, {
 				tags: { area: "assignments", op: "open_indicator_refresh" },
 			});
@@ -44,6 +62,9 @@ export function useOpenAssignmentsIndicator({
 	React.useEffect(() => {
 		if (skipMountRefresh) return;
 		void refresh();
+		return () => {
+			acRef.current?.abort();
+		};
 	}, [refresh, routeKey, skipMountRefresh]);
 
 	React.useEffect(() => {

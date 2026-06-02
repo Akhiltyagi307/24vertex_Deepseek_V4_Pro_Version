@@ -14,11 +14,22 @@ export function AdminEmailSuppressionsClient() {
 	const [msg, setMsg] = useState<string | null>(null);
 
 	useEffect(() => {
+		let cancelled = false;
+		const controller = new AbortController();
 		void (async () => {
-			const res = await fetch("/api/admin/email-log/suppressions");
-			const j = await res.json();
-			setRaw(JSON.stringify(j, null, 2));
+			try {
+				const res = await fetch("/api/admin/email-log/suppressions", { signal: controller.signal });
+				const j: unknown = await res.json();
+				if (cancelled) return;
+				setRaw(JSON.stringify(j, null, 2));
+			} catch {
+				// Aborted on unmount, or a network failure — leave the "Loading…" placeholder.
+			}
 		})();
+		return () => {
+			cancelled = true;
+			controller.abort();
+		};
 	}, []);
 
 	async function remove() {

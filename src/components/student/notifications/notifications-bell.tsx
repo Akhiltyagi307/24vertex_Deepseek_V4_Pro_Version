@@ -5,6 +5,7 @@ import * as React from "react";
 import * as Sentry from "@sentry/nextjs";
 import { BellIcon, CheckCheckIcon, ChevronRightIcon, LoaderIcon } from "lucide-react";
 
+import { fetchJson, isAbortError } from "@/lib/http/fetch-json";
 import { NotificationsEmptyState } from "@/components/student/notifications/notification-empty-state";
 import { typeMetaForRow } from "@/components/student/notifications/notification-type-meta";
 import { formatRelativeTime } from "@/components/student/notifications/relative-time";
@@ -58,7 +59,14 @@ export function StudentNotificationsBell({
 	const [loadingTray, setLoadingTray] = React.useState(false);
 	const [markingAll, setMarkingAll] = React.useState(false);
 
+	const trayReqIdRef = React.useRef(0);
+	const trayAcRef = React.useRef<AbortController | null>(null);
+
 	const loadTray = React.useCallback(async () => {
+		const id = ++trayReqIdRef.current;
+		trayAcRef.current?.abort();
+		const ac = new AbortController();
+		trayAcRef.current = ac;
 		setLoadingTray(true);
 		try {
 			const url = new URL(
@@ -67,27 +75,29 @@ export function StudentNotificationsBell({
 			);
 			url.searchParams.set("limit", String(TRAY_LIMIT));
 			url.searchParams.set("filter", "all");
-			const res = await fetch(url.toString(), { cache: "no-store" });
-			if (!res.ok) throw new Error(`status=${res.status}`);
-			const json = (await res.json()) as {
+			const json = await fetchJson<{
 				items: NotificationListItem[];
 				unreadCount: number;
-			};
+			}>(url.toString(), { signal: ac.signal, report: { area: "notifications", op: "tray_load" } });
+			if (id !== trayReqIdRef.current) return;
 			setItems(json.items ?? []);
 			if (typeof json.unreadCount === "number") {
 				setCount(Math.max(0, json.unreadCount));
 			}
 		} catch (err) {
-			Sentry.captureException(err, { tags: { area: "notifications", op: "tray_load" } });
+			if (isAbortError(err) || id !== trayReqIdRef.current) return;
 			setItems([]);
 		} finally {
-			setLoadingTray(false);
+			if (id === trayReqIdRef.current) setLoadingTray(false);
 		}
 	}, [apiBasePath, setCount]);
 
 	React.useEffect(() => {
 		if (!open) return;
 		void loadTray();
+		return () => {
+			trayAcRef.current?.abort();
+		};
 	}, [open, loadTray]);
 
 	React.useEffect(() => {

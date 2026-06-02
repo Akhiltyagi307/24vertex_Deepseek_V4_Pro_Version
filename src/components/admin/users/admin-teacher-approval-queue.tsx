@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { AdminExportButton } from "@/components/admin/data-table/export-button";
 import { AdminSavedViews } from "@/components/admin/data-table/saved-views";
 import { Button } from "@/components/ui/button";
+import { fetchJson, isAbortError } from "@/lib/http/fetch-json";
 import { adminHttpErrorMessage } from "@/lib/admin/http-error-message";
 import { ADMIN_LIST_ID } from "@/lib/admin/list-ids";
 
@@ -18,23 +20,54 @@ type Row = {
 	created_at: string | null;
 };
 
+const pendingTeachersResponseSchema = z.object({
+	data: z.array(
+		z.object({
+			id: z.string(),
+			email: z.string().nullable(),
+			full_name: z.string(),
+			phone: z.string().nullable(),
+			school_name: z.string().nullable(),
+			created_at: z.string().nullable(),
+		}),
+	),
+});
+
 export function AdminTeacherApprovalQueue() {
 	const [rows, setRows] = useState<Row[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [busy, setBusy] = useState<string | null>(null);
 
+	const reqIdRef = useRef(0);
+	const acRef = useRef<AbortController | null>(null);
+
 	const load = async () => {
+		const reqId = ++reqIdRef.current;
+		acRef.current?.abort();
+		const ac = new AbortController();
+		acRef.current = ac;
 		setLoading(true);
-		const res = await fetch("/api/admin/teachers/pending", { credentials: "include" });
-		if (res.ok) {
-			const j = (await res.json()) as { data: Row[] };
+		try {
+			const j = await fetchJson("/api/admin/teachers/pending", {
+				schema: pendingTeachersResponseSchema,
+				signal: ac.signal,
+				init: { credentials: "include" },
+			});
+			if (reqId !== reqIdRef.current) return;
 			setRows(j.data ?? []);
+		} catch (err) {
+			if (isAbortError(err) || reqId !== reqIdRef.current) return;
+			// Match the previous behaviour: a failed load leaves the existing rows.
+		} finally {
+			if (reqId === reqIdRef.current) setLoading(false);
 		}
-		setLoading(false);
 	};
 
 	useEffect(() => {
 		void load();
+		return () => {
+			acRef.current?.abort();
+		};
 	}, []);
 
 	const approve = async (id: string) => {
