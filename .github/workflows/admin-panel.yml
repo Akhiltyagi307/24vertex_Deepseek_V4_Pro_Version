@@ -58,6 +58,13 @@ jobs:
         # themselves with `it.skipIf(!process.env.ADMIN_INTEGRATION_TESTS)`
         # so they no-op without the secrets and are run in the two separate
         # steps below when secrets are present.
+        env:
+          # src/db/index.ts throws at module load if DATABASE_URL is unset, and
+          # many modules transitively import it. The unit suite never queries the
+          # real DB (a dummy URL just lets the client construct), so a placeholder
+          # is enough — matches unit-tests.yml. Integration specs skip here
+          # (ADMIN_INTEGRATION_TESTS unset) and run in the secret-gated steps below.
+          DATABASE_URL: postgres://ci-dummy:ci-dummy@127.0.0.1:5432/ci_test
         run: pnpm vitest run
 
       - name: Drizzle ↔ Postgres schema parity (blocks on real drift)
