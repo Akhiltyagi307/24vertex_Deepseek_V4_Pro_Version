@@ -116,9 +116,8 @@ export function FilterDatePickerField({
 					<div className="flex flex-wrap items-center gap-2 border-border border-t pt-4 dark:border-border/80">
 						<Button
 							type="button"
-							variant="ghost"
 							size="sm"
-							className="text-muted-foreground"
+							className="bg-emerald-600 text-white hover:bg-emerald-600/90 dark:bg-emerald-500 dark:hover:bg-emerald-500/90"
 							onClick={() => setOpen(false)}
 						>
 							Done

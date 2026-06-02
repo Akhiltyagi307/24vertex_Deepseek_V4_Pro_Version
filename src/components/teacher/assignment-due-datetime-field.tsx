@@ -8,8 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+	assignmentDueCalendarDisabledMatchers,
+	clampAssignmentDueAtToFuture,
+	defaultTimeOnAssignmentDueDay,
+} from "@/lib/assignments/assignment-due-at";
 import { formatDateTimeMediumShortInAppTimeZone } from "@/lib/datetime/app-timezone";
 import { cn } from "@/lib/utils";
+
+/** Matches practice / publish CTAs (emerald primary). */
+const pickerDoneButtonClassName =
+	"bg-emerald-600 text-white hover:bg-emerald-600/90 dark:bg-emerald-500 dark:hover:bg-emerald-500/90";
 
 function pad2(n: number): string {
 	return String(n).padStart(2, "0");
@@ -46,20 +55,44 @@ export function AssignmentDueDatetimeField({
 
 	const [open, setOpen] = React.useState(false);
 	const [selected, setSelected] = React.useState<Date | undefined>(undefined);
+	const [validationMessage, setValidationMessage] = React.useState<string | null>(null);
 
 	const timeInputValue = selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "";
 
-	const mergeCalendarDay = React.useCallback((day: Date) => {
-		setSelected((prev) => {
-			const next = new Date(day);
-			if (prev) {
-				next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
-			} else {
-				next.setHours(12, 0, 0, 0);
-			}
-			return next;
-		});
+	const applyDueSelection = React.useCallback((candidate: Date) => {
+		const now = new Date();
+		const clamped = clampAssignmentDueAtToFuture(candidate, now);
+		if (clamped.getTime() < candidate.getTime()) {
+			setValidationMessage("Due date must be in the future. Time was adjusted.");
+		} else {
+			setValidationMessage(null);
+		}
+		setSelected(clamped);
 	}, []);
+
+	const calendarDisabled = React.useMemo(() => assignmentDueCalendarDisabledMatchers(), [open]);
+
+	const mergeCalendarDay = React.useCallback(
+		(day: Date) => {
+			setSelected((prev) => {
+				const next = new Date(day);
+				if (prev) {
+					next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
+				} else {
+					const defaulted = defaultTimeOnAssignmentDueDay(day);
+					next.setHours(defaulted.getHours(), defaulted.getMinutes(), 0, 0);
+				}
+				const clamped = clampAssignmentDueAtToFuture(next);
+				if (clamped.getTime() < next.getTime()) {
+					setValidationMessage("Due date must be in the future. Time was adjusted.");
+				} else {
+					setValidationMessage(null);
+				}
+				return clamped;
+			});
+		},
+		[],
+	);
 
 	return (
 		<div className={cn(labelledByHeadingId ? "space-y-5" : "space-y-2", className)}>
@@ -72,8 +105,13 @@ export function AssignmentDueDatetimeField({
 					</span>
 				)}
 				<p id={hintId} className="text-muted-foreground text-xs leading-relaxed">
-					Optional. Students still see the assignment without one.
+					Optional. Students still see the assignment without one. Past dates cannot be selected.
 				</p>
+				{validationMessage ?
+					<p className="text-destructive text-xs leading-relaxed" role="status">
+						{validationMessage}
+					</p>
+				:	null}
 			</div>
 
 			<Popover open={open} onOpenChange={setOpen}>
@@ -119,6 +157,7 @@ export function AssignmentDueDatetimeField({
 								if (!day) return;
 								mergeCalendarDay(day);
 							}}
+							disabled={calendarDisabled}
 							defaultMonth={selected ?? new Date()}
 							showOutsideDays
 							className="mx-auto rounded-xl bg-muted/20 p-3 [--cell-size:3rem] medium:p-4 medium:[--cell-size:3.5rem]"
@@ -147,7 +186,7 @@ export function AssignmentDueDatetimeField({
 									if (!Number.isFinite(h) || !Number.isFinite(m)) return;
 									const next = new Date(selected);
 									next.setHours(h, m, 0, 0);
-									setSelected(next);
+									applyDueSelection(next);
 								}}
 								className={cn(
 									panelRaisedInputClass,
@@ -162,7 +201,12 @@ export function AssignmentDueDatetimeField({
 						</div>
 
 						<div className="flex flex-wrap items-center gap-2 border-border border-t pt-4 dark:border-border/80">
-							<Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(false)}>
+							<Button
+								type="button"
+								size="sm"
+								className={pickerDoneButtonClassName}
+								onClick={() => setOpen(false)}
+							>
 								Done
 							</Button>
 							<Button
@@ -172,6 +216,7 @@ export function AssignmentDueDatetimeField({
 								className="ml-auto border-dashed"
 								onClick={() => {
 									setSelected(undefined);
+									setValidationMessage(null);
 									setOpen(false);
 								}}
 							>

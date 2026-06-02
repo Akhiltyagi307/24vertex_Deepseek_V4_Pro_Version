@@ -8,6 +8,7 @@ import { GridLoader } from "@/components/ui/grid-loader";
 import { GENERATION_BUCKETS } from "@/lib/practice/generation-progress-buckets";
 import { cn } from "@/lib/utils";
 
+import { PracticeProgressChecklist } from "../practice-progress-checklist";
 import { practiceSolidCtaClassName } from "./types";
 
 /** 1-based index of the "Writing questions" bucket — where the drafted count shows. */
@@ -40,70 +41,36 @@ export function GenerationOverlay({
 	onBack,
 }: GenerationOverlayProps) {
 	if (!generating && !generatedPreview) return null;
+
+	const draftedDetail =
+		draftedCount !== null ?
+			draftedTotal ?
+				`Drafted ${Math.min(draftedCount, draftedTotal)} of ${draftedTotal} questions`
+			:	`Drafted ${draftedCount} questions`
+		:	null;
+
 	return (
 		<div
 			className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-background/85 px-6 backdrop-blur-sm"
 			aria-busy={generating}
 		>
-			{generating ? (
+			{generating ?
 				<>
 					<GridLoader size="md" />
-					<ol className="w-full max-w-xs space-y-2.5" aria-label="Generating your test">
-						{GENERATION_BUCKETS.map((bucket, i) => {
-							const index = i + 1;
-							const status =
-								index <= doneThrough ? "done"
-								: index === doneThrough + 1 ? "active"
-								: "pending";
-							const showDrafted =
-								status === "active" && index === WRITING_BUCKET_INDEX && draftedCount !== null;
-							return (
-								<li key={bucket.id} className="flex items-start gap-2.5">
-									<span
-										className={cn(
-											"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
-											status === "done" ?
-												"border-emerald-600/40 bg-emerald-600/10 text-emerald-600 dark:text-emerald-400"
-											: status === "active" ?
-												"border-primary/50 bg-primary/10 text-primary"
-											:	"border-border bg-muted/40",
-										)}
-										aria-hidden
-									>
-										{status === "done" ?
-											<CheckIcon className="size-3" strokeWidth={2.5} />
-										: status === "active" ?
-											<span className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse" />
-										:	<span className="size-1.5 rounded-full bg-muted-foreground/40" />}
-									</span>
-									<span className="flex flex-col gap-0.5">
-										<span
-											className={cn(
-												"text-sm leading-snug",
-												status === "pending" ? "text-muted-foreground/60" : "text-foreground",
-											)}
-										>
-											{bucket.label}
-										</span>
-										{showDrafted ? (
-											<span className="text-muted-foreground text-xs tabular-nums">
-												{draftedTotal ?
-													`Drafted ${Math.min(draftedCount, draftedTotal)} of ${draftedTotal} questions`
-												:	`Drafted ${draftedCount} questions`}
-											</span>
-										) : null}
-									</span>
-								</li>
-							);
-						})}
-					</ol>
+					<PracticeProgressChecklist
+						buckets={GENERATION_BUCKETS}
+						doneThrough={doneThrough}
+						progressBucketIndex={WRITING_BUCKET_INDEX}
+						progressDetail={draftedDetail}
+						ariaLabel="Generating your test"
+					/>
 					<p className="text-muted-foreground px-4 text-center text-sm">This usually takes a minute or two.</p>
 					<Button type="button" variant="outline" size="sm" onClick={onCancelGenerate} className="mt-1">
 						<XIcon className="mr-1.5 size-4" aria-hidden />
 						Cancel
 					</Button>
 				</>
-			) : generatedPreview ? (
+			: generatedPreview ?
 				<Card
 					role="dialog"
 					aria-modal="true"
@@ -145,7 +112,7 @@ export function GenerationOverlay({
 						</Button>
 					</CardContent>
 				</Card>
-			) : null}
+			:	null}
 		</div>
 	);
 }

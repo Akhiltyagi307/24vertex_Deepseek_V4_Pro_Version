@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isAssignmentDueAtInPast } from "@/lib/assignments/assignment-due-at";
 import { practiceDifficultySchema } from "@/lib/practice";
 
 const optionalTextToNull = z
@@ -70,10 +71,15 @@ export const createAssignmentInputSchema = z
 		instructions: optionalTextToNull,
 		config: assignmentConfigSchema,
 		student_ids: z.array(z.string().uuid()).min(1, "Select at least one student."),
-		due_at: optionalTextToNull.refine(
-			(value) => value === null || !Number.isNaN(Date.parse(value)),
-			"Enter a valid due date.",
-		),
+		due_at: optionalTextToNull
+			.refine(
+				(value) => value === null || !Number.isNaN(Date.parse(value)),
+				"Enter a valid due date.",
+			)
+			.refine(
+				(value) => value === null || !isAssignmentDueAtInPast(value),
+				"Due date must be in the future.",
+			),
 	})
 	.strict();
 

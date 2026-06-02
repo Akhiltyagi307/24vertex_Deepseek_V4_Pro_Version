@@ -37,7 +37,38 @@ type Props = {
 	subjectsCatalog: SubjectCatalogRow[];
 	topicsCatalog: AssignmentTopicCatalogRow[];
 	students: TeacherPerformanceStudentRow[];
+	/** Defaults the grade picker to the teacher’s roster grade when available. */
+	initialGrade?: number | null;
 };
+
+function assignmentGradeOptions(
+	subjectsCatalog: SubjectCatalogRow[],
+	students: TeacherPerformanceStudentRow[],
+): number[] {
+	const merged = new Set<number>();
+	for (const subject of subjectsCatalog) merged.add(subject.grade);
+	for (const student of students) {
+		if (student.grade != null) merged.add(student.grade);
+	}
+	const list = [...merged].sort((a, b) => a - b);
+	return list.length > 0 ? list : [9];
+}
+
+function resolveInitialAssignmentGrade(
+	subjectsCatalog: SubjectCatalogRow[],
+	students: TeacherPerformanceStudentRow[],
+	initialGrade?: number | null,
+): number {
+	const options = assignmentGradeOptions(subjectsCatalog, students);
+	if (initialGrade != null && options.includes(initialGrade)) return initialGrade;
+	const fromFirstSubject = subjectsCatalog[0]?.grade;
+	if (fromFirstSubject != null && options.includes(fromFirstSubject)) return fromFirstSubject;
+	return options[0] ?? 9;
+}
+
+function firstSubjectIdForGrade(subjectsCatalog: SubjectCatalogRow[], grade: number): string {
+	return subjectsCatalog.find((subject) => subject.grade === grade)?.id ?? subjectsCatalog[0]?.id ?? "";
+}
 
 const initialState: CreateTeacherAssignmentState = { ok: false, message: "" };
 
@@ -69,6 +100,7 @@ export function TeacherAssignmentsManager({
 	subjectsCatalog,
 	topicsCatalog,
 	students,
+	initialGrade,
 }: Props) {
 	const router = useRouter();
 	const [successDialogOpen, setSuccessDialogOpen] = React.useState(false);
@@ -78,10 +110,30 @@ export function TeacherAssignmentsManager({
 	} | null>(null);
 	const [state, formAction] = useActionState(createTeacherAssignmentAction, initialState);
 	const [formKey, setFormKey] = React.useState(0);
-	const [subjectId, setSubjectId] = React.useState(subjectsCatalog[0]?.id ?? "");
+	const gradeOptions = React.useMemo(
+		() => assignmentGradeOptions(subjectsCatalog, students),
+		[subjectsCatalog, students],
+	);
+	const [gradePick, setGradePick] = React.useState(() =>
+		resolveInitialAssignmentGrade(subjectsCatalog, students, initialGrade),
+	);
+	const [subjectId, setSubjectId] = React.useState(() =>
+		firstSubjectIdForGrade(
+			subjectsCatalog,
+			resolveInitialAssignmentGrade(subjectsCatalog, students, initialGrade),
+		),
+	);
+	const subjectsForGrade = React.useMemo(
+		() => subjectsCatalog.filter((subject) => subject.grade === gradePick),
+		[subjectsCatalog, gradePick],
+	);
 	const assignmentSubjectGroups = React.useMemo(
-		() => buildSubjectCatalogPillSelectModel(subjectsCatalog, { includeAll: false }).optionGroups,
-		[subjectsCatalog],
+		() => buildSubjectCatalogPillSelectModel(subjectsForGrade, { includeAll: false }).optionGroups,
+		[subjectsForGrade],
+	);
+	const studentsForGrade = React.useMemo(
+		() => students.filter((student) => student.grade === gradePick),
+		[students, gradePick],
 	);
 	const topicsForSubject = React.useMemo(
 		() => topicsCatalog.filter((topic) => topic.subjectId === subjectId),
@@ -107,13 +159,13 @@ export function TeacherAssignmentsManager({
 	const [selectedStudentIds, setSelectedStudentIds] = React.useState<string[]>([]);
 
 	const sortedAssignableStudentIds = React.useMemo(
-		() => [...students.map((s) => s.id)].sort(),
-		[students],
+		() => [...studentsForGrade.map((s) => s.id)].sort(),
+		[studentsForGrade],
 	);
 	const studentIdsFetchKey = sortedAssignableStudentIds.join(",");
 	const studentOrderById = React.useMemo(
-		() => new Map(students.map((student, index) => [student.id, index])),
-		[students],
+		() => new Map(studentsForGrade.map((student, index) => [student.id, index])),
+		[studentsForGrade],
 	);
 	const selectedTopicIdsArray = React.useMemo(() => Array.from(selectedTopicIds), [selectedTopicIds]);
 	const selectedTopicIdsFetchKey = React.useMemo(
@@ -128,28 +180,28 @@ export function TeacherAssignmentsManager({
 
 	const distinctStudentSections = React.useMemo(() => {
 		const seen = new Set<string>();
-		for (const s of students) {
+		for (const s of studentsForGrade) {
 			const sec = (s.section ?? "").trim();
 			if (sec) seen.add(sec);
 		}
 		return [...seen].sort((a, b) => a.localeCompare(b));
-	}, [students]);
+	}, [studentsForGrade]);
 
 	const hasStudentsWithoutSection = React.useMemo(
-		() => students.some((s) => !(s.section ?? "").trim()),
-		[students],
+		() => studentsForGrade.some((s) => !(s.section ?? "").trim()),
+		[studentsForGrade],
 	);
 
 	const filteredStudents = React.useMemo(
 		() =>
 			filterAssignmentCandidateStudents({
-				students,
+				students: studentsForGrade,
 				sectionFilter: studentSectionFilter,
 				bandByStudentId,
 				bandChecks,
 				bandsPending,
 			}),
-		[students, studentSectionFilter, bandByStudentId, bandChecks, bandsPending],
+		[studentsForGrade, studentSectionFilter, bandByStudentId, bandChecks, bandsPending],
 	);
 	const filteredStudentIds = React.useMemo(() => filteredStudents.map((student) => student.id), [filteredStudents]);
 	const filteredStudentsFetchKey = React.useMemo(() => filteredStudentIds.join(","), [filteredStudentIds]);
@@ -162,9 +214,10 @@ export function TeacherAssignmentsManager({
 	const submitDisabled = recipientSyncPending || selectedStudentIds.length === 0;
 
 	const sectionFilterDisabled =
-		students.length === 0 || (distinctStudentSections.length === 0 && !hasStudentsWithoutSection);
+		studentsForGrade.length === 0 ||
+		(distinctStudentSections.length === 0 && !hasStudentsWithoutSection);
 
-	React.useEffect(() => {
+	const resetAssignmentScopeSelections = React.useCallback(() => {
 		setChapterVersion((v) => v + 1);
 		setSelectedTopicIds(new Set());
 		setBandChecks({ at_risk: false, near_target: false, needs_support: false });
@@ -172,11 +225,16 @@ export function TeacherAssignmentsManager({
 		setSelectedStudentIds([]);
 		setEligibleStudentIds([]);
 		setEligibilityError(null);
-	}, [subjectId]);
+		setStudentSectionFilter("");
+	}, []);
+
+	React.useEffect(() => {
+		resetAssignmentScopeSelections();
+	}, [subjectId, gradePick, resetAssignmentScopeSelections]);
 
 	React.useEffect(() => {
 		let cancelled = false;
-		if (!subjectId || students.length === 0) {
+		if (!subjectId || studentsForGrade.length === 0) {
 			setBandByStudentId({});
 			setBandsPending(false);
 			setBandsError(null);
@@ -202,11 +260,11 @@ export function TeacherAssignmentsManager({
 		return () => {
 			cancelled = true;
 		};
-	}, [subjectId, studentIdsFetchKey, sortedAssignableStudentIds, students.length]);
+	}, [subjectId, studentIdsFetchKey, sortedAssignableStudentIds, studentsForGrade.length]);
 
 	React.useEffect(() => {
 		let cancelled = false;
-		if (!subjectId || students.length === 0) {
+		if (!subjectId || studentsForGrade.length === 0) {
 			setEligibilityPending(false);
 			setEligibilityError(null);
 			setEligibleStudentIds((prev) => (prev.length === 0 ? prev : []));
@@ -269,7 +327,7 @@ export function TeacherAssignmentsManager({
 		filteredStudentIdSet,
 		filteredStudentsFetchKey,
 		bandsPending,
-		students.length,
+		studentsForGrade.length,
 	]);
 
 	React.useEffect(() => {
@@ -397,23 +455,49 @@ export function TeacherAssignmentsManager({
 							<div className="space-y-5">
 								<div className="grid gap-5 medium:grid-cols-2">
 									<label className="block min-w-0 space-y-2">
+										<span className="font-medium text-foreground text-sm">Grade</span>
+										<NativeSelect
+											value={gradePick}
+											onChange={(e) => {
+												const nextGrade = Number(e.target.value);
+												setGradePick(nextGrade);
+												setSubjectId(firstSubjectIdForGrade(subjectsCatalog, nextGrade));
+											}}
+											required
+											className={cn("max-w-full rounded-lg border border-input", inputFocusRing)}
+											aria-label="Grade"
+										>
+											{gradeOptions.map((grade) => (
+												<option key={grade} value={grade}>
+													Grade {grade}
+												</option>
+											))}
+										</NativeSelect>
+									</label>
+
+									<label className="block min-w-0 space-y-2">
 										<span className="font-medium text-foreground text-sm">Subject</span>
 										<NativeSelect
+											key={gradePick}
 											name="subject_id"
 											value={subjectId}
 											onChange={(e) => setSubjectId(e.target.value)}
 											required
+											disabled={subjectsForGrade.length === 0}
 											className={cn("max-w-full rounded-lg border border-input", inputFocusRing)}
 										>
-											{assignmentSubjectGroups.map((group) => (
-												<optgroup key={group.heading} label={group.heading}>
-													{group.options.map((opt) => (
-														<option key={opt.value} value={opt.value}>
-															{opt.label}
-														</option>
-													))}
-												</optgroup>
-											))}
+											{subjectsForGrade.length === 0 ?
+												<option value="">No subjects for this grade</option>
+											:	assignmentSubjectGroups.map((group) => (
+													<optgroup key={group.heading} label={group.heading}>
+														{group.options.map((opt) => (
+															<option key={opt.value} value={opt.value}>
+																{opt.label}
+															</option>
+														))}
+													</optgroup>
+												))
+											}
 										</NativeSelect>
 									</label>
 
@@ -486,7 +570,7 @@ export function TeacherAssignmentsManager({
 							</div>
 							<div className="space-y-5">
 								<fieldset
-									disabled={students.length === 0 || !subjectId || bandsPending}
+									disabled={studentsForGrade.length === 0 || !subjectId || bandsPending}
 									className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60"
 									aria-labelledby="assign-performance-heading"
 								>
@@ -575,10 +659,11 @@ export function TeacherAssignmentsManager({
 								{selectedStudentIds.map((id) => (
 									<input key={id} type="hidden" name="student_ids" value={id} />
 								))}
-								{students.length > 0 ? (
+								{studentsForGrade.length > 0 ? (
 									<div className="flex flex-wrap items-center justify-between gap-3">
 										<p className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-											Showing {visibleStudentCount} of {students.length} · Recipients {selectedStudentIds.length}
+											Grade {gradePick} · Showing {visibleStudentCount} of {studentsForGrade.length} · Recipients{" "}
+											{selectedStudentIds.length}
 										</p>
 										{manualSelectionEnabled ? (
 											<button
@@ -609,8 +694,10 @@ export function TeacherAssignmentsManager({
 									<p className="text-muted-foreground text-xs">Syncing recipients from current filters…</p>
 								) : null}
 								<div className="max-h-52 space-y-2 overflow-auto rounded-xl border border-border/70 bg-muted/15 p-3 dark:bg-muted/10">
-									{students.length === 0 ? (
-										<p className="text-muted-foreground text-sm">No reachable students yet.</p>
+									{studentsForGrade.length === 0 ? (
+										<p className="text-muted-foreground text-sm">
+											No students on your roster for grade {gradePick}.
+										</p>
 									) : visibleStudentCount === 0 ? (
 										<p className="text-muted-foreground text-sm leading-relaxed">
 											{performanceBandFilterActive && !bandsPending ? (
@@ -634,7 +721,7 @@ export function TeacherAssignmentsManager({
 											)}
 										</p>
 									) : null}
-									{students.length === 0
+									{studentsForGrade.length === 0
 										? null
 										: filteredStudents.map((student) => {
 												const isEligible =
@@ -681,14 +768,18 @@ export function TeacherAssignmentsManager({
 						) : null}
 
 						<div className="flex flex-wrap items-center gap-3 border-border/50 border-t pt-8">
-							<SubmitButton disabled={submitDisabled} />
-							{submitDisabled ? (
+							<SubmitButton
+								disabled={submitDisabled || subjectsForGrade.length === 0 || !subjectId}
+							/>
+							{submitDisabled || subjectsForGrade.length === 0 || !subjectId ?
 								<p className="text-muted-foreground text-xs">
-									{recipientSyncPending
-										? "Recipients are still syncing."
-										: "Select at least one eligible student to publish."}
+									{subjectsForGrade.length === 0 || !subjectId ?
+										"Pick a grade with at least one subject."
+									: recipientSyncPending ?
+										"Recipients are still syncing."
+									:	"Select at least one eligible student to publish."}
 								</p>
-							) : null}
+							: null}
 						</div>
 			</form>
 

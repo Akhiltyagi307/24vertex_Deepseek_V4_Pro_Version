@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
 	assignmentConfigSchema,
@@ -33,6 +33,31 @@ describe("assignment schemas", () => {
 				questions: [{ question_text: "Nope" }],
 			}),
 		).toThrow();
+	});
+
+	it("rejects a due date in the past", () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-06-03T10:00:00+05:30"));
+		const result = createAssignmentInputSchema.safeParse({
+			title: "Algebra checkpoint",
+			instructions: null,
+			config: {
+				v: 1,
+				kind: "practice_test",
+				subject_id: "11111111-1111-1111-1111-111111111111",
+				topic_ids: ["22222222-2222-2222-2222-222222222222"],
+				difficulty: "medium",
+				question_count: 15,
+				time_limit_seconds: 3600,
+			},
+			student_ids: ["33333333-3333-3333-3333-333333333333"],
+			due_at: "2026-06-01T12:00",
+		});
+		vi.useRealTimers();
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((i) => i.message.includes("future"))).toBe(true);
+		}
 	});
 
 	it("normalizes publish input and requires selected students", () => {

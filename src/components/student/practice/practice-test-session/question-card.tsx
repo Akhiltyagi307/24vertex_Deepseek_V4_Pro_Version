@@ -201,7 +201,7 @@ export function QuestionCard({
 								</Button>
 							</div>
 						</div>
-						<CardTitle className="text-foreground max-w-prose text-balance text-base font-semibold leading-relaxed tracking-tight medium:text-lg">
+						<CardTitle className="text-foreground w-full max-w-none text-base font-semibold leading-relaxed tracking-tight medium:text-lg">
 							<LazyLatexText text={active.question_text} />
 						</CardTitle>
 						<QuestionVisual visual={active.visual} />
