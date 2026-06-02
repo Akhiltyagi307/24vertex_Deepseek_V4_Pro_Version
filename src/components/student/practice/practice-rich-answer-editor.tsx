@@ -12,7 +12,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import DOMPurify, { type Config as DomPurifyConfig } from "dompurify";
+import DOMPurify from "dompurify";
 import {
 	BoldIcon,
 	Heading2Icon,
@@ -43,38 +43,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-
-const RICH_ANSWER_PURIFY: DomPurifyConfig = {
-	ALLOWED_TAGS: [
-		"p",
-		"br",
-		"strong",
-		"b",
-		"em",
-		"i",
-		"u",
-		"s",
-		"strike",
-		"del",
-		"sub",
-		"sup",
-		"ul",
-		"ol",
-		"li",
-		"a",
-		"h2",
-		"h3",
-		"blockquote",
-		"hr",
-		"table",
-		"thead",
-		"tbody",
-		"tr",
-		"th",
-		"td",
-	],
-	ALLOWED_ATTR: ["href", "target", "rel", "colspan", "rowspan"],
-};
+import { RICH_ANSWER_PURIFY } from "@/lib/practice/rich-answer-purify-config";
 
 function sanitizeRichHtml(html: string): string {
 	return DOMPurify.sanitize(html, RICH_ANSWER_PURIFY) as string;

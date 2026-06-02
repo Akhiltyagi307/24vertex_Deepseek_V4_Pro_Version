@@ -30,6 +30,7 @@ const { mocks } = vi.hoisted(() => ({
 		supabase: null as ReturnType<typeof makeMockSupabase> | null,
 		admin: null as ReturnType<typeof makeMockSupabase> | null,
 		rateLimitVerdict: { ok: true } as { ok: true } | { ok: false; message: string },
+		entitlementGate: { ok: true } as { ok: true } | { ok: false; code: string; message: string },
 		generateObjectImpl: async () => ({
 			object: { questions: [] as unknown[] },
 			usage: { inputTokens: 10, outputTokens: 20 },
@@ -81,6 +82,16 @@ vi.mock("@/lib/practice", () => ({
 	validateAndStripGeneration: (...args: unknown[]) => mocks.validateImpl(...args),
 	practiceDifficultySchema: z.enum(["easy", "medium", "hard"]),
 }));
+// appendAdaptiveFollowups now gates on the AI-token entitlement and debits
+// tokens after generation. Preserve the real module and override just those two.
+vi.mock("@/lib/billing/entitlements", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/billing/entitlements")>();
+	return {
+		...actual,
+		canStartDoubtChat: async () => mocks.entitlementGate,
+		consumeTokens: async () => undefined,
+	};
+});
 
 import { appendAdaptiveFollowups } from "@/app/student/practice/session-actions";
 
@@ -129,6 +140,7 @@ describe("appendAdaptiveFollowups", () => {
 		mocks.supabase = userSupabase(ACTIVE_TEST_ROW);
 		mocks.admin = adminWithTopics([TOPIC_A]);
 		mocks.rateLimitVerdict = { ok: true };
+		mocks.entitlementGate = { ok: true };
 		mocks.generateObjectImpl = async () => ({
 			object: {
 				questions: [
@@ -186,6 +198,12 @@ describe("appendAdaptiveFollowups", () => {
 		mocks.rateLimitVerdict = { ok: false, message: "Slow down." };
 		const r = await appendAdaptiveFollowups(VALID_INPUT);
 		expect(r).toEqual({ ok: false, message: "Slow down." });
+	});
+
+	it("rejects when the AI-token entitlement gate denies (lapsed / out of tokens)", async () => {
+		mocks.entitlementGate = { ok: false, code: "quota_tokens", message: "You've used your token allowance." };
+		const r = await appendAdaptiveFollowups(VALID_INPUT);
+		expect(r).toEqual({ ok: false, message: "You've used your token allowance." });
 	});
 
 	it("rejects when the test is not in_progress", async () => {

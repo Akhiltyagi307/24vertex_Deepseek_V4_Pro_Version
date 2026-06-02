@@ -47,6 +47,8 @@ export const viewport: Viewport = {
 	width: "device-width",
 	initialScale: 1,
 	viewportFit: "cover",
+	// Tints mobile browser chrome to the brand colour (matches manifest.ts theme_color).
+	themeColor: "#2ea070",
 };
 
 export default function RootLayout({

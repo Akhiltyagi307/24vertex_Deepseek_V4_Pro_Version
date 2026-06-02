@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logServerError } from "@/lib/server/log-supabase-error";
+import { sanitizeStudentAnswerForStorage } from "@/lib/practice/rich-answer-sanitize-server";
 
 type ServerSupabase = SupabaseClient;
 
@@ -49,7 +50,10 @@ function buildInsertPayload(
 	const insertPayload: Record<string, unknown> = {
 		test_id: row.test_id,
 		question_id: row.question_id,
-		student_answer: row.student_answer,
+		// Defense-in-depth: rich "text" answers are sanitized client-side, but the
+		// API accepts arbitrary strings — sanitize server-side so the DB only ever
+		// holds allowlisted markup. MCQ / numerical pass through untouched.
+		student_answer: sanitizeStudentAnswerForStorage(row.student_answer),
 		flagged_for_review: row.flagged_for_review ?? false,
 		updated_at: row.updated_at,
 	};

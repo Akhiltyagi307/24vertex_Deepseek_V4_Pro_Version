@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { MotionPageEnter } from "@/components/motion/motion-page-enter";
 import { LegalContactBlock } from "@/components/legal/legal-contact-block";
 import { Providers } from "@/components/providers";
 
@@ -18,7 +17,11 @@ export default function LegalLayout({
 	return (
 		<Providers>
 		<main className="w-full min-w-0 max-w-none px-4 py-12 text-foreground medium:px-8">
-			<MotionPageEnter className="flex flex-col">
+			{/* Not MotionPageEnter: the legal layout puts ALL content inside the
+			    wrapper, and the `.motion-page-enter` opacity:0 entrance animation
+			    doesn't advance in Lighthouse's headless Chrome → page never paints
+			    (NO_FCP). Legal docs don't need an entrance; render them directly. */}
+			<div className="flex flex-col">
 				<nav aria-label="Legal section header" className="mb-6 flex items-center justify-between text-sm">
 					<Link
 						href="/"
@@ -52,7 +55,7 @@ export default function LegalLayout({
 						Home
 					</Link>
 				</nav>
-			</MotionPageEnter>
+			</div>
 		</main>
 		</Providers>
 	);

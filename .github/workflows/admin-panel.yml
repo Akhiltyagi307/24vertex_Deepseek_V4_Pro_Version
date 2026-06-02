@@ -11,6 +11,16 @@ on:
 jobs:
   admin-phase1-checks:
     runs-on: ubuntu-latest
+    # `secrets` is NOT a valid context in step-level `if:` — referencing it
+    # there makes the whole workflow file invalid (startup_failure; jobs never
+    # run). Mirror the presence-gating secrets into job env so the
+    # `if: env.X != ''` guards below are valid (`env` IS allowed in `if:`).
+    # Absent secrets resolve to '' → the gated steps skip, as before.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -48,18 +58,25 @@ jobs:
         # themselves with `it.skipIf(!process.env.ADMIN_INTEGRATION_TESTS)`
         # so they no-op without the secrets and are run in the two separate
         # steps below when secrets are present.
+        env:
+          # src/db/index.ts throws at module load if DATABASE_URL is unset, and
+          # many modules transitively import it. The unit suite never queries the
+          # real DB (a dummy URL just lets the client construct), so a placeholder
+          # is enough — matches unit-tests.yml. Integration specs skip here
+          # (ADMIN_INTEGRATION_TESTS unset) and run in the secret-gated steps below.
+          DATABASE_URL: postgres://ci-dummy:ci-dummy@127.0.0.1:5432/ci_test
         run: pnpm vitest run
 
-      - name: Drizzle ↔ Postgres schema parity (advisory until helper RPC ships in prod)
-        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+      - name: Drizzle ↔ Postgres schema parity (blocks on real drift)
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' && env.NEXT_PUBLIC_SUPABASE_URL != '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        # Set continue-on-error until the `_drizzle_parity_columns` helper
-        # (migration 20260623002000) is deployed to all projects — the script
-        # WARNs and exits 0 in that case anyway, but this belt-and-suspenders
-        # keeps a transient miss from blocking unrelated PRs.
-        continue-on-error: true
+        # Now blocking (no continue-on-error). The script already exits 0 when
+        # the `_drizzle_parity_columns` helper (migration 20260623002000) or the
+        # Supabase secrets are absent, and exits 1 only on a real table/column
+        # drift — so this fails the build for actual drift without breaking
+        # unrelated PRs or environments where the helper isn't deployed yet.
         run: node scripts/check-drizzle-postgres-parity.mjs
 
       - name: Migration drift (local sql files vs remote ledger; two-project parity)
@@ -77,7 +94,7 @@ jobs:
         run: node scripts/check-migration-drift.mjs
 
       - name: Next build + verify service role not in client static
-        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' && env.NEXT_PUBLIC_SUPABASE_URL != '' && env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY != '' }}
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
@@ -89,7 +106,7 @@ jobs:
           node scripts/ci-verify-no-service-role-in-next-static.mjs
 
       - name: Vitest (admin immutability — skips without Supabase env)
-        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' && env.NEXT_PUBLIC_SUPABASE_URL != '' }}
         env:
           ADMIN_INTEGRATION_TESTS: "true"
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -97,7 +114,7 @@ jobs:
         run: pnpm vitest run tests/admin/immutability.test.ts
 
       - name: Vitest (admin login — skips without DATABASE_URL)
-        if: ${{ secrets.DATABASE_URL != '' }}
+        if: ${{ env.DATABASE_URL != '' }}
         env:
           ADMIN_INTEGRATION_TESTS: "true"
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

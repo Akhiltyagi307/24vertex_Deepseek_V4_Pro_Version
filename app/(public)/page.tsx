@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { resolvePostAuthPath } from "@/lib/auth/routing";
 import { NonceProviders } from "@/components/nonce-providers";
@@ -106,15 +107,23 @@ export default async function HomePage() {
 		],
 	};
 
-	// `getServerUser` is React-cached so `resolvePostAuthPath` (also calls it)
-	// dedupes against this read — one Supabase round-trip total when logged in.
-	const user = await getServerUser();
-	if (user) {
-		const path = await resolvePostAuthPath();
-		// `resolvePostAuthPath` sends legacy `profiles.role === "admin"` users to "/".
-		// Redirecting "/" → "/" would loop; show marketing for that case instead.
-		if (path !== "/") {
-			redirect(path);
+	// Skip the Supabase client construction + getUser for the vast majority of
+	// landing traffic that arrives with no auth cookie; only logged-in visitors
+	// (cookie present) pay for the post-auth redirect check. `getServerUser` is
+	// React-cached so `resolvePostAuthPath` (also calls it) dedupes — one
+	// Supabase round-trip total when logged in.
+	const hasSupabaseAuthCookie = (await cookies())
+		.getAll()
+		.some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+	if (hasSupabaseAuthCookie) {
+		const user = await getServerUser();
+		if (user) {
+			const path = await resolvePostAuthPath();
+			// `resolvePostAuthPath` sends legacy `profiles.role === "admin"` users to "/".
+			// Redirecting "/" → "/" would loop; show marketing for that case instead.
+			if (path !== "/") {
+				redirect(path);
+			}
 		}
 	}
 

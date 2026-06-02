@@ -118,7 +118,10 @@ function daysUntil(iso: string | null): number | null {
 }
 
 export function deriveReason(args: {
-	status: SubscriptionStatus;
+	// `paused` isn't in the narrow entitlements SubscriptionStatus union, but the
+	// DB/RPC can return it (subscriptions.status='paused'). Accept it explicitly
+	// so the guard below type-checks and a paused sub is always blocked.
+	status: SubscriptionStatus | "paused";
 	trialEndsAt: string | null;
 	periodEnd: string;
 	testsLeft: number;
@@ -126,6 +129,15 @@ export function deriveReason(args: {
 }): { reason: EntitlementReason; canStartTest: boolean; canChatDoubt: boolean } {
 	const now = Date.now();
 	const periodExpired = new Date(args.periodEnd).getTime() <= now;
+
+	// A paused subscription never grants access, independent of whatever quota
+	// is left on the open period. Defense-in-depth: the pause route + webhook
+	// zero the period quota, but entitlement must not DEPEND on that bookkeeping
+	// having run — a Razorpay-initiated pause that skipped our route would
+	// otherwise keep a paused (non-paying) student on full paid access.
+	if (args.status === "paused") {
+		return { reason: "expired", canStartTest: false, canChatDoubt: false };
+	}
 
 	if (args.status === "expired" || args.status === "cancelled" || periodExpired) {
 		return { reason: args.status === "cancelled" ? "cancelled" : "expired", canStartTest: false, canChatDoubt: false };

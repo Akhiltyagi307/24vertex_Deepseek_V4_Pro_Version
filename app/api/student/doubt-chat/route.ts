@@ -164,17 +164,6 @@ export async function POST(req: Request) {
 		);
 	}
 
-	// Reserve a conservative chunk of tokens BEFORE we start streaming so
-	// concurrent turns observed before any onFinish runs cannot all pass the
-	// canStartDoubtChat gate while having only one turn's worth of quota left.
-	// Reconciled in onFinish below. Vision turns reserve a bit more because
-	// image tokens are denser per pixel than plain text.
-	const hasAttachments = attachmentIds.length > 0;
-	const preDebit = hasAttachments
-		? Math.round(DOUBT_CHAT_PRE_DEBIT_TOKENS * 1.7)
-		: DOUBT_CHAT_PRE_DEBIT_TOKENS;
-	await consumeTokens(supabase, user.id, preDebit);
-
 	const { data: existing, error: findErr } = await supabase
 		.from("doubt_conversations")
 		.select("id, student_id, subject_id, topic_id, metadata")
@@ -207,6 +196,19 @@ export async function POST(req: Request) {
 			headers: { "content-type": "application/json" },
 		});
 	}
+
+	// Reserve a conservative chunk of tokens AFTER confirming the caller owns
+	// this conversation and the subject/topic scope matches, so a request for a
+	// conversation the user does not own can't pre-debit their token balance.
+	// Still runs before streaming so concurrent turns observed before any
+	// onFinish cannot all pass the canStartDoubtChat gate above while having
+	// only one turn's worth of quota left. Reconciled in onFinish below. Vision
+	// turns reserve a bit more because image tokens are denser per pixel.
+	const hasAttachments = attachmentIds.length > 0;
+	const preDebit = hasAttachments
+		? Math.round(DOUBT_CHAT_PRE_DEBIT_TOKENS * 1.7)
+		: DOUBT_CHAT_PRE_DEBIT_TOKENS;
+	await consumeTokens(supabase, user.id, preDebit);
 
 	const scope = await resolveDoubtScopeForConversation(supabase, {
 		subjectId: existing.subject_id,

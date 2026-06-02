@@ -7,6 +7,7 @@ import { subscriptions as subscriptionsTbl, usagePeriods as usagePeriodsTbl } fr
 import { fetchInvoice } from "@/lib/billing/razorpay";
 import { isPlanCode, PLAN_CATALOG, tokenQuotaForGrade, type PlanCode, type PlanCatalogEntry } from "@/lib/billing/plans";
 import { ensureForwardPeriod } from "@/lib/billing/ensure-forward-period";
+import { parsePrePauseQuota } from "@/lib/billing/pre-pause-quota";
 import { assertTransition } from "@/lib/billing/subscription-state-machine";
 import {
 	sendPaymentFailedEmail,
@@ -296,6 +297,8 @@ async function handleSubscriptionActivated(ctx: WebhookHandlerContext): Promise<
 			studentName: profile?.full_name ?? undefined,
 			planName: targetPlan.name,
 			nextRenewalIso: periodEndIso,
+			// Replaying the activation event must not re-send the welcome email.
+			dedupKey: `subscription-active:${subscriptionId}:${periodStartIso}`,
 		});
 	}
 
@@ -361,6 +364,8 @@ async function handleSubscriptionCharged(ctx: WebhookHandlerContext): Promise<vo
 				planName: targetPlan.name,
 				invoiceShortUrl,
 				paymentRef: paymentId,
+				// Replaying this billing event must not re-send the receipt.
+				dedupKey: `payment-receipt:${paymentId}`,
 			});
 		}
 	}
@@ -437,6 +442,40 @@ async function handleSubscriptionPaused(ctx: WebhookHandlerContext): Promise<voi
 		.update({ status: "paused", paused_at: new Date().toISOString(), updated_at: new Date().toISOString() })
 		.eq("id", ours.id)
 		.is("paused_at", null);
+
+	// Zero the open period's quota so a pause initiated OUTSIDE our route (the
+	// Razorpay dashboard) — or a route call that paused at Razorpay but failed
+	// its own DB write — can't leave a paused (non-paying) student with full
+	// paid access. Idempotent: only stash + zero when pre_pause_quota hasn't
+	// been captured yet, so a webhook retry (or a race with the route) never
+	// overwrites the saved originals with the already-zeroed values. Mirrors
+	// the /api/billing/pause route logic so route and webhook converge.
+	const { data: openPeriod } = await admin
+		.from("usage_periods")
+		.select("id, tests_quota, tokens_quota, pre_pause_quota")
+		.eq("subscription_id", ours.id)
+		.order("period_start", { ascending: false })
+		.limit(1)
+		.maybeSingle<{
+			id: string;
+			tests_quota: number;
+			tokens_quota: number;
+			pre_pause_quota: unknown;
+		}>();
+	if (
+		openPeriod &&
+		openPeriod.pre_pause_quota == null &&
+		(openPeriod.tests_quota > 0 || openPeriod.tokens_quota > 0)
+	) {
+		await admin
+			.from("usage_periods")
+			.update({
+				pre_pause_quota: { testsQuota: openPeriod.tests_quota, tokensQuota: openPeriod.tokens_quota },
+				tests_quota: 0,
+				tokens_quota: 0,
+			})
+			.eq("id", openPeriod.id);
+	}
 }
 
 async function handleSubscriptionResumed(ctx: WebhookHandlerContext): Promise<void> {
@@ -445,6 +484,30 @@ async function handleSubscriptionResumed(ctx: WebhookHandlerContext): Promise<vo
 		.from("subscriptions")
 		.update({ status: "active", paused_at: null, updated_at: new Date().toISOString() })
 		.eq("id", ours.id);
+
+	// Restore the quota stashed at pause so a Razorpay-initiated resume doesn't
+	// leave a paying student locked out at 0 quota. Idempotent: a no-op once
+	// pre_pause_quota is cleared. Mirrors resumeSubscriptionForProfile().
+	const { data: openPeriod } = await admin
+		.from("usage_periods")
+		.select("id, pre_pause_quota")
+		.eq("subscription_id", ours.id)
+		.order("period_start", { ascending: false })
+		.limit(1)
+		.maybeSingle<{ id: string; pre_pause_quota: unknown }>();
+	// Validate the stashed shape (M8): a drifted / hand-edited JSONB row must not
+	// write `undefined` into the integer quota columns — skip the restore instead.
+	const restored = parsePrePauseQuota(openPeriod?.pre_pause_quota);
+	if (openPeriod && restored) {
+		await admin
+			.from("usage_periods")
+			.update({
+				tests_quota: restored.testsQuota,
+				tokens_quota: restored.tokensQuota,
+				pre_pause_quota: null,
+			})
+			.eq("id", openPeriod.id);
+	}
 }
 
 async function handleSubscriptionHaltedOrPending(ctx: WebhookHandlerContext): Promise<void> {

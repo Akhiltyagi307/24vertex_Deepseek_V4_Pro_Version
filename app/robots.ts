@@ -41,6 +41,7 @@ export default function robots(): MetadataRoute.Robots {
 					"/parents",
 					"/schools",
 					"/teachers",
+					"/students",
 					"/ai-tutor",
 					"/adaptive-practice",
 					"/parent-dashboard",

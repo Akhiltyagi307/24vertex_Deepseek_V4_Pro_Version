@@ -1,11 +1,31 @@
-name: Admin E2E (optional)
+name: Admin E2E
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "src/**"
+      - "tests/e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
 
 jobs:
   playwright:
     runs-on: ubuntu-latest
+    # `secrets` is NOT a valid context in step-level `if:` — referencing it
+    # there makes the whole workflow file invalid (startup_failure; jobs never
+    # run). Mirror the gating secrets into job env so the `if: env.X != ''`
+    # guards below are valid (`env` IS allowed in `if:`). Absent secrets resolve
+    # to '' → the e2e step is skipped and the notice step runs (job passes).
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
+      PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
+      PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
+      PLAYWRIGHT_E2E_TARGET_USER_ID: ${{ secrets.PLAYWRIGHT_E2E_TARGET_USER_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,14 +46,9 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Run Playwright (requires secrets + running app)
-        if: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL != '' && secrets.PLAYWRIGHT_ADMIN_PASSWORD != '' && secrets.PLAYWRIGHT_E2E_TARGET_USER_ID != '' }}
-        env:
-          PLAYWRIGHT_BASE_URL: ${{ secrets.PLAYWRIGHT_BASE_URL }}
-          PLAYWRIGHT_ADMIN_EMAIL: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL }}
-          PLAYWRIGHT_ADMIN_PASSWORD: ${{ secrets.PLAYWRIGHT_ADMIN_PASSWORD }}
-          PLAYWRIGHT_E2E_TARGET_USER_ID: ${{ secrets.PLAYWRIGHT_E2E_TARGET_USER_ID }}
+        if: ${{ env.PLAYWRIGHT_ADMIN_EMAIL != '' && env.PLAYWRIGHT_ADMIN_PASSWORD != '' && env.PLAYWRIGHT_E2E_TARGET_USER_ID != '' }}
         run: pnpm run test:e2e
 
       - name: Skip notice (no Playwright secrets)
-        if: ${{ secrets.PLAYWRIGHT_ADMIN_EMAIL == '' || secrets.PLAYWRIGHT_ADMIN_PASSWORD == '' || secrets.PLAYWRIGHT_E2E_TARGET_USER_ID == '' }}
+        if: ${{ env.PLAYWRIGHT_ADMIN_EMAIL == '' || env.PLAYWRIGHT_ADMIN_PASSWORD == '' || env.PLAYWRIGHT_E2E_TARGET_USER_ID == '' }}
         run: echo "Skipping E2E — set PLAYWRIGHT_* repository secrets and ensure PLAYWRIGHT_BASE_URL points at a running app."
