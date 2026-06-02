@@ -39,6 +39,7 @@ import { fetchPaymentRefunds, fetchSubscription, type RazorpayRefund, type Razor
 interface ReconcileSummary {
 	subsScanned: number;
 	subsDrifting: number;
+	subsAutoHealed: number;
 	refundsScanned: number;
 	refundsRecovered: number;
 	refundsOrphaned: number;
@@ -48,6 +49,13 @@ interface ReconcileSummary {
 const SUB_RECENT_WINDOW_MS = 7 * 86_400_000;
 const REFUND_PENDING_AGE_MS = 60 * 60_000;
 const PERIOD_TOLERANCE_MS = 60_000; // 1-minute tolerance on period bounds
+
+// H3b auto-heal sets. We only auto-correct the granting→denied direction — the
+// revenue-leak case where Razorpay (authoritative for lifecycle) has terminally
+// ended the sub but we're still serving it. The reverse (should-be-active) needs
+// the full charged-handler period/quota creation, so it stays drift-log-only.
+const ACCESS_GRANTING_LOCAL = new Set(["active", "grace", "trialing", "coupon", "past_due"]);
+const TERMINAL_DENY = new Set(["cancelled", "expired"]);
 
 /**
  * Map Razorpay's subscription.status to the canonical local status we'd
@@ -87,8 +95,8 @@ async function reconcileSubscription(localSub: {
 	currentPeriodEnd: Date;
 	razorpaySubscriptionId: string | null;
 	planCode: string;
-}): Promise<number> {
-	if (!localSub.razorpaySubscriptionId) return 0;
+}): Promise<{ driftCount: number; autoHealed: boolean }> {
+	if (!localSub.razorpaySubscriptionId) return { driftCount: 0, autoHealed: false };
 	let rzpSub: RazorpaySubscription;
 	try {
 		rzpSub = await fetchSubscription(localSub.razorpaySubscriptionId);
@@ -97,13 +105,29 @@ async function reconcileSubscription(localSub: {
 			tags: { component: "billing.reconcile", phase: "fetch_subscription" },
 			extra: { subscription_id: localSub.id, razorpay_subscription_id: localSub.razorpaySubscriptionId },
 		});
-		return 0;
+		return { driftCount: 0, autoHealed: false };
 	}
 
 	const drifts: { field: string; local: string | null; razorpay: string | null }[] = [];
+	let autoHealed = false;
 	const expected = expectedLocalStatus(rzpSub.status);
 	if (expected && expected !== localSub.status) {
-		drifts.push({ field: "status", local: localSub.status, razorpay: `${rzpSub.status} → expect ${expected}` });
+		// H3b: auto-heal only the revenue-leak direction — Razorpay has terminally
+		// ended the sub but we're still granting access. Set the local status to
+		// the (more-restrictive) expected one so the entitlement gate stops serving
+		// immediately, instead of merely logging drift for manual handling.
+		if (TERMINAL_DENY.has(expected) && ACCESS_GRANTING_LOCAL.has(localSub.status)) {
+			await db
+				.update(subscriptions)
+				.set({ status: expected, updatedAt: new Date() })
+				.where(eq(subscriptions.id, localSub.id));
+			autoHealed = true;
+		}
+		drifts.push({
+			field: autoHealed ? "status_auto_healed" : "status",
+			local: localSub.status,
+			razorpay: `${rzpSub.status} → ${autoHealed ? "set" : "expect"} ${expected}`,
+		});
 	}
 	if (!timestampsClose(localSub.currentPeriodEnd, rzpSub.current_end ?? null)) {
 		drifts.push({
@@ -113,7 +137,7 @@ async function reconcileSubscription(localSub: {
 		});
 	}
 
-	if (drifts.length === 0) return 0;
+	if (drifts.length === 0) return { driftCount: 0, autoHealed: false };
 
 	await db.insert(billingReconciliationDrift).values(
 		drifts.map((d) => ({
@@ -123,7 +147,7 @@ async function reconcileSubscription(localSub: {
 			razorpayValue: d.razorpay,
 		})),
 	);
-	return drifts.length;
+	return { driftCount: drifts.length, autoHealed };
 }
 
 async function reconcilePendingRefund(row: {
@@ -206,6 +230,7 @@ export async function runReconciliation(): Promise<ReconcileSummary> {
 	const summary: ReconcileSummary = {
 		subsScanned: 0,
 		subsDrifting: 0,
+		subsAutoHealed: 0,
 		refundsScanned: 0,
 		refundsRecovered: 0,
 		refundsOrphaned: 0,
@@ -229,8 +254,9 @@ export async function runReconciliation(): Promise<ReconcileSummary> {
 	for (const sub of activeSubs) {
 		summary.subsScanned += 1;
 		try {
-			const drifts = await reconcileSubscription(sub);
-			if (drifts > 0) summary.subsDrifting += 1;
+			const { driftCount, autoHealed } = await reconcileSubscription(sub);
+			if (driftCount > 0) summary.subsDrifting += 1;
+			if (autoHealed) summary.subsAutoHealed += 1;
 		} catch (e) {
 			summary.errors += 1;
 			Sentry.captureException(e, { tags: { component: "billing.reconcile", phase: "sub_loop" } });
@@ -260,7 +286,7 @@ export async function runReconciliation(): Promise<ReconcileSummary> {
 		}
 	}
 
-	if (summary.subsDrifting > 0 || summary.refundsOrphaned > 0) {
+	if (summary.subsDrifting > 0 || summary.refundsOrphaned > 0 || summary.subsAutoHealed > 0) {
 		Sentry.captureMessage("billing.reconcile.drift_detected", {
 			level: "warning",
 			tags: { component: "billing.reconcile" },

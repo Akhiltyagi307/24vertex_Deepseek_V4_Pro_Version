@@ -81,6 +81,8 @@ export const tests = pgTable(
 		/** Count of admin timer extensions (audit). */
 		adminExtensions: integer("admin_extensions").notNull().default(0),
 		assignmentSubmissionId: uuid("assignment_submission_id"),
+		/** Client-supplied idempotency key (H2): dedups generation retries; unique per student. */
+		clientRequestId: uuid("client_request_id"),
 		deviceFingerprint: varchar("device_fingerprint", { length: 64 }),
 		lastIp: varchar("last_ip", { length: 45 }),
 		tabBlurCount: integer("tab_blur_count").notNull().default(0),
@@ -96,6 +98,9 @@ export const tests = pgTable(
 		uniqueIndex("idx_tests_assignment_submission_uq")
 			.on(t.assignmentSubmissionId)
 			.where(sql`${t.assignmentSubmissionId} IS NOT NULL`),
+		uniqueIndex("uq_tests_student_client_request_id")
+			.on(t.studentId, t.clientRequestId)
+			.where(sql`${t.clientRequestId} IS NOT NULL`),
 		index("idx_tests_status_updated").on(t.status, t.updatedAt),
 	],
 );

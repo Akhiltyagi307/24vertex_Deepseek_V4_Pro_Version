@@ -2,6 +2,8 @@ import { notifyTestReportPdfReadyEmails, notifyTestReportReady } from "@/lib/not
 import { notifyAssignmentGraded } from "@/lib/notifications/assignment-events";
 import { materializeAssignedPracticeTest } from "@/lib/admin/assignment-generation";
 import { materializeReviewPracticeTest } from "@/lib/practice/review-generation";
+import { materializeStudentGeneratedTest } from "@/lib/practice/student-generation";
+import { safeParseGenerationInput } from "@/lib/practice/practice-generation-pipeline";
 import {
 	gradePracticeTestWithAi,
 	recordGradingFailure,
@@ -41,6 +43,8 @@ function perJobTimeoutMs(jobType: ClaimedJob["job_type"]): number {
 			return 180_000;
 		case "review_generate":
 			return 180_000;
+		case "student_generate_test":
+			return 180_000;
 		default:
 			return 90_000;
 	}
@@ -72,7 +76,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, jobType: string): Promi
 
 type ClaimedJob = {
 	id: string;
-	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update" | "assign_generate_test" | "review_generate";
+	job_type: "grade" | "pdf" | "auto_submit" | "email" | "tracker_update" | "assign_generate_test" | "review_generate" | "student_generate_test";
 	test_id: string | null;
 	student_id: string;
 	assignment_submission_id?: string | null;
@@ -86,20 +90,31 @@ function backoffMinutes(attempts: number): number {
 	return Math.min(30, Math.max(1, 2 ** (attempts - 1)));
 }
 
-async function markJobDone(admin: ServiceRoleClient, jobId: string) {
-	const { error } = await admin
+async function markJobDone(admin: ServiceRoleClient, jobId: string, workerId: string) {
+	// Fence on claimed_by: if this job was reclaimed and re-claimed by another
+	// worker, claimed_by no longer matches and this update hits 0 rows — so a
+	// slow worker that finishes after reclaim cannot overwrite the new owner's
+	// result (review finding M1, part 2).
+	const { data, error } = await admin
 		.from("practice_jobs")
 		.update({ status: "done", error: null, updated_at: new Date().toISOString() })
-		.eq("id", jobId);
+		.eq("id", jobId)
+		.eq("claimed_by", workerId)
+		.select("id");
 	if (error) {
 		throw new Error(error.message ?? "Could not mark practice job as done.");
 	}
+	if (!data || data.length === 0) {
+		logPracticeObs({ phase: "practice_job_done_fenced", jobId, workerId });
+	}
 }
 
-async function markJobFailure(admin: ServiceRoleClient, job: ClaimedJob, message: string) {
+async function markJobFailure(admin: ServiceRoleClient, job: ClaimedJob, message: string, workerId: string) {
 	const isDead = job.attempts >= job.max_attempts;
 	const next = new Date(Date.now() + backoffMinutes(job.attempts) * 60_000);
-	const { error } = await admin
+	// Fence on claimed_by (see markJobDone): a worker whose job was reclaimed by
+	// another worker must not rewrite its status or fire dead-letter side effects.
+	const { data, error } = await admin
 		.from("practice_jobs")
 		.update({
 			status: isDead ? "dead" : "pending",
@@ -107,9 +122,15 @@ async function markJobFailure(admin: ServiceRoleClient, job: ClaimedJob, message
 			run_after: isDead ? new Date().toISOString() : next.toISOString(),
 			updated_at: new Date().toISOString(),
 		})
-		.eq("id", job.id);
+		.eq("id", job.id)
+		.eq("claimed_by", workerId)
+		.select("id");
 	if (error) {
 		throw new Error(error.message ?? "Could not reschedule the practice job.");
+	}
+	if (!data || data.length === 0) {
+		logPracticeObs({ phase: "practice_job_failure_fenced", jobId: job.id, workerId });
+		return;
 	}
 	if (isDead && job.job_type === "assign_generate_test") {
 		const submissionId =
@@ -529,6 +550,26 @@ async function handleReviewGenerateJob(
 	return result.ok ? { ok: true } : { ok: false, message: result.message };
 }
 
+async function handleStudentGenerateJob(
+	job: ClaimedJob,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+	const payload = job.payload as { client_request_id?: unknown; input?: unknown };
+	const clientRequestId = typeof payload?.client_request_id === "string" ? payload.client_request_id : null;
+	if (!clientRequestId) {
+		return { ok: false, message: "student_generate_test payload missing client_request_id." };
+	}
+	const parsed = safeParseGenerationInput(payload?.input);
+	if (!parsed.success) {
+		return { ok: false, message: "student_generate_test payload failed validation." };
+	}
+	const result = await materializeStudentGeneratedTest({
+		studentId: job.student_id,
+		clientRequestId,
+		input: parsed.data,
+	});
+	return result.ok ? { ok: true } : { ok: false, message: result.message };
+}
+
 async function handleAssignGenerateTestJob(
 	job: ClaimedJob,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -576,7 +617,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 
 	const { data: jobs, error } = await admin.rpc("practice_claim_jobs", {
 		p_worker_id: workerId,
-		p_job_types: ["grade", "pdf", "email", "tracker_update", "assign_generate_test", "review_generate"],
+		p_job_types: ["grade", "pdf", "email", "tracker_update", "assign_generate_test", "review_generate", "student_generate_test"],
 		p_limit: limit,
 	});
 
@@ -597,6 +638,7 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 				: job.job_type === "tracker_update" ? handleTrackerUpdateJob(job)
 				: job.job_type === "assign_generate_test" ? handleAssignGenerateTestJob(job)
 				: job.job_type === "review_generate" ? handleReviewGenerateJob(job)
+				: job.job_type === "student_generate_test" ? handleStudentGenerateJob(job)
 				: Promise.resolve({ ok: false as const, message: `Unsupported job_type ${job.job_type}` });
 
 			// Per-job timeout: a stuck AI call cannot block the whole worker
@@ -605,15 +647,15 @@ async function runPracticeJobs(request: Request): Promise<Response> {
 			const out = await withTimeout(handlerPromise, perJobTimeoutMs(job.job_type), job.job_type);
 
 			if (out.ok) {
-				await markJobDone(admin, job.id);
+				await markJobDone(admin, job.id, workerId);
 				return { id: job.id, ok: true as const, type: job.job_type };
 			}
-			await markJobFailure(admin, job, out.message);
+			await markJobFailure(admin, job, out.message, workerId);
 			return { id: job.id, ok: false as const, type: job.job_type, message: out.message };
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : "Unknown worker error";
 			try {
-				await markJobFailure(admin, job, msg);
+				await markJobFailure(admin, job, msg, workerId);
 			} catch (markError) {
 				logServerError("runPracticeJobs.markJobFailure", markError, {
 					jobId: job.id,

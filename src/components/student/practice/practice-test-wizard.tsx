@@ -544,6 +544,80 @@ export function PracticeTestWizard({
 				durationSeconds: parsedDuration.data,
 				focusArea,
 			};
+			// Durable async path (review H2 increment 3): enqueue a background job,
+			// poll progress, then navigate into the finished test. Survives the 300s
+			// ceiling / disconnects; idempotent via clientRequestId. Flag-gated;
+			// streaming path below stays the default until this UX is proven.
+			const useAsyncGenerate = process.env.NEXT_PUBLIC_PRACTICE_ASYNC_GENERATE === "true";
+			if (useAsyncGenerate) {
+				const origin = typeof window !== "undefined" ? window.location.origin : "";
+				const clientRequestId = crypto.randomUUID();
+				const enqueueRes = await fetch(`${origin}/api/student/practice/generate`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ ...payload, clientRequestId }),
+					signal: abort.signal,
+				});
+				if (enqueueRes.status === 402) {
+					const j = (await enqueueRes.json().catch(() => ({}))) as { message?: string; code?: string };
+					const reason = j.code === "quota_tests" ? "quota_tests" : j.code === "trial_expired" ? "trial_expired" : "expired";
+					paywall.show({ reason, message: j.message ?? "Subscription required.", surface: "practice" });
+					return;
+				}
+				if (!enqueueRes.ok) {
+					const j = (await enqueueRes.json().catch(() => ({}))) as { message?: string };
+					setActionError(j.message ?? "Could not start generation. Please try again.");
+					setActionErrorCorrelationId(null);
+					return;
+				}
+				const enq = (await enqueueRes.json()) as { testId?: string; alreadyGenerated?: boolean };
+				if (enq.alreadyGenerated && enq.testId) {
+					clearPracticeWizardDraft();
+					router.push(`/student/practice/${enq.testId}`);
+					return;
+				}
+				let polls = 0;
+				const maxPolls = 200;
+				while (!abort.signal.aborted) {
+					await new Promise((resolve) => setTimeout(resolve, 2000));
+					if (abort.signal.aborted) return;
+					if (++polls > maxPolls) {
+						setActionError(
+							"This is taking longer than usual — your test will appear in your practice list when it's ready.",
+						);
+						setActionErrorCorrelationId(null);
+						return;
+					}
+					let st: { status?: string; testId?: string; message?: string; doneThrough?: number };
+					try {
+						const statusRes = await fetch(`${origin}/api/student/practice/generate/status?key=${clientRequestId}`, {
+							signal: abort.signal,
+						});
+						if (!statusRes.ok) continue;
+						st = (await statusRes.json()) as typeof st;
+					} catch {
+						if (abort.signal.aborted) return;
+						continue;
+					}
+					if (typeof st.doneThrough === "number") {
+						const dt = st.doneThrough;
+						setGenerationDoneThrough((d) => Math.max(d, dt));
+						const nextLabel = GENERATION_BUCKETS[dt - 1]?.label;
+						if (nextLabel) setLiveAnnouncement(nextLabel);
+					}
+					if (st.status === "failed") {
+						setActionError(st.message ?? "Generation failed. Please try again.");
+						setActionErrorCorrelationId(null);
+						return;
+					}
+					if (st.status === "done" && st.testId) {
+						clearPracticeWizardDraft();
+						router.push(`/student/practice/${st.testId}`);
+						return;
+					}
+				}
+				return;
+			}
 			const useClientStream = process.env.NEXT_PUBLIC_PRACTICE_STREAM === "true";
 
 			const resultPromise: Promise<GeneratePracticeResult> = (async () => {

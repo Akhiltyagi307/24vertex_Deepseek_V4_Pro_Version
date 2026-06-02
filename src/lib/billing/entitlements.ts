@@ -7,7 +7,7 @@ import { getServerUser } from "@/lib/auth/get-server-user";
 import { isSaasEnforcementEnabled } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
-import { consumeNextQuotaTestGrant } from "@/lib/billing/quota-grant-consume";
+import { consumeNextQuotaTestGrant, hasAvailableQuotaTestGrant } from "@/lib/billing/quota-grant-consume";
 import { PLAN_CATALOG, type PlanCode, tokenQuotaForGrade } from "@/lib/billing/plans";
 import { trialDaysLeftFromEnd } from "@/lib/billing/trial-days";
 import { findCurrentUsagePeriod } from "@/lib/billing/usage-period";
@@ -407,6 +407,13 @@ async function evaluatePracticeTestBilling(
 		return { ok: false, code: "expired", message: "Your subscription is not active." };
 	}
 	if (snapshot.testsLeft <= 0) {
+		// M9: the period quota is exhausted, but a manual admin grant (which
+		// consumeTest draws from before period quota) can still cover this test.
+		// Don't block when one is available — otherwise the grant feature is dead
+		// for exactly the out-of-quota students it exists to help.
+		if (await hasAvailableQuotaTestGrant(profileId)) {
+			return { ok: true };
+		}
 		return { ok: false, code: "quota_tests", message: QUOTA_TEST_MESSAGE };
 	}
 	return { ok: true };

@@ -1,5 +1,6 @@
 import { getApiRequestUser } from "@/lib/auth/api-request-user";
 import { resumeSubscription } from "@/lib/billing/razorpay";
+import { parsePrePauseQuota } from "@/lib/billing/pre-pause-quota";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { rlConsume } from "@/lib/ratelimit/consume";
@@ -73,14 +74,16 @@ export async function POST(req: Request) {
 		.eq("subscription_id", sub.id)
 		.order("period_start", { ascending: false })
 		.limit(1)
-		.maybeSingle<{ id: string; pre_pause_quota: { testsQuota: number; tokensQuota: number } | null }>();
+		.maybeSingle<{ id: string; pre_pause_quota: unknown }>();
 
-	if (openPeriod?.pre_pause_quota) {
+	// M8: validate the JSONB shape before restoring into integer quota columns.
+	const restoredQuota = parsePrePauseQuota(openPeriod?.pre_pause_quota);
+	if (openPeriod && restoredQuota) {
 		await admin
 			.from("usage_periods")
 			.update({
-				tests_quota: openPeriod.pre_pause_quota.testsQuota,
-				tokens_quota: openPeriod.pre_pause_quota.tokensQuota,
+				tests_quota: restoredQuota.testsQuota,
+				tokens_quota: restoredQuota.tokensQuota,
 				pre_pause_quota: null,
 			})
 			.eq("id", openPeriod.id);

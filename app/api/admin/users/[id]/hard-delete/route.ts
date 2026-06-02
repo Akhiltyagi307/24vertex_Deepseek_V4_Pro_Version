@@ -11,6 +11,7 @@ import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
 import { adminActionScope, consumeAdminActionRateLimit } from "@/lib/admin/rate-limit-action";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { adminGetUserById } from "@/lib/admin/users-list";
+import { performComplianceErasure } from "@/lib/compliance/erasure";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		// Rate limit fires AFTER input validation so a bad UUID or wrong
 		// confirm-email doesn't burn the admin's bucket. It fires BEFORE the
-		// destructive auth.deleteUser call so a runaway loop can't punch through.
+		// destructive erase+ban so a runaway loop can't punch through.
 		const rl = await consumeAdminActionRateLimit({
 			action: ADMIN_ACTIONS.USER_HARD_DELETE_REQUEST,
 			scope: adminActionScope({ jti: gate.jti, ip }),
@@ -106,7 +107,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		});
 
 		const supabase = createServiceRoleClient();
-		const { error } = await supabase.auth.admin.deleteUser(uuid.data);
+		// The auth row cannot be physically deleted: audit_logs, payments, and the
+		// FERPA-retained tests all reference auth.users with ON DELETE NO ACTION, so
+		// auth.admin.deleteUser() would raise a foreign-key violation. Instead
+		// "erase + disable": run the compliance erasure (deletes non-retained child
+		// data, anonymizes the profile, pseudonymizes the auth email) and then
+		// permanently ban the account so it can never authenticate again.
+		try {
+			await performComplianceErasure(uuid.data, { dryRun: false });
+		} catch (e) {
+			Sentry.captureException(e, { tags: { feature: "admin" } });
+			return adminErrorResponse(e instanceof Error ? e.message : "Erasure failed.", { status: 500 });
+		}
+		const { error } = await supabase.auth.admin.updateUserById(uuid.data, { ban_duration: "876600h" });
 		if (error) {
 			Sentry.captureException(error, { tags: { feature: "admin" } });
 			return adminErrorResponse(error.message, { status: 500 });
@@ -116,7 +129,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			action: ADMIN_ACTIONS.USER_HARD_DELETE_DONE,
 			targetType: "profile",
 			targetId: uuid.data,
-			payload: { email_snapshot: before.email },
+			payload: { email_snapshot: before.email, method: "erase_and_ban" },
 			ipAddress: ip,
 			userAgent: ua,
 			totpUsed: totpRequired && totpOk,

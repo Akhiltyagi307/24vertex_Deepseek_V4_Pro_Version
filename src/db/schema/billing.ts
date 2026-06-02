@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 import { profiles } from "./profiles";
 
@@ -42,6 +42,8 @@ export const subscriptions = pgTable(
 		razorpayCustomerEmail: text("razorpay_customer_email"),
 		razorpayCustomerEmailCollisionAt: timestamp("razorpay_customer_email_collision_at", { withTimezone: true }),
 		pausedAt: timestamp("paused_at", { withTimezone: true }),
+		/** Set when the sub enters grace/past_due, cleared on recovery; the stable dunning clock (H3c). */
+		dunningStartedAt: timestamp("dunning_started_at", { withTimezone: true }),
 		pendingPlanCode: varchar("pending_plan_code", { length: 32 }).references(() => plans.code),
 		staffOverride: boolean("staff_override").notNull().default(false),
 		metadata: jsonb("metadata").notNull().default({}),
@@ -51,6 +53,9 @@ export const subscriptions = pgTable(
 	(t) => [
 		index("idx_subscriptions_status").on(t.status),
 		index("idx_subscriptions_period_end").on(t.currentPeriodEnd),
+		uniqueIndex("uq_subscriptions_razorpay_subscription_id")
+			.on(t.razorpaySubscriptionId)
+			.where(sql`razorpay_subscription_id IS NOT NULL`),
 	],
 );
 
