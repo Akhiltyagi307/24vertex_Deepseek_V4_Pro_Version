@@ -90,7 +90,6 @@ async function generateAndStart(
 	const m = page.url().match(/\/practice\/([0-9a-f-]{36})/);
 	const testId = m?.[1];
 	expect(testId, `[${label}] could not parse testId from URL`).toBeTruthy();
-	// eslint-disable-next-line no-console
 	console.log(`\n=== [${label}] generated testId: ${testId} ===\n`);
 	test.info().annotations.push({ type: "testId", description: `${label}=${testId}` });
 	return testId!;
@@ -162,7 +161,6 @@ async function answerAllAndSubmit(page: Page, label: string): Promise<void> {
 		(url) => !/\/practice\/[0-9a-f-]{36}\/?$/.test(url.pathname),
 		{ timeout: 60_000 },
 	);
-	// eslint-disable-next-line no-console
 	console.log(`\n=== [${label}] submitted → redirected to ${page.url()} ===\n`);
 }
 
@@ -200,7 +198,6 @@ async function waitForGraded(page: Page, testId: string, label: string): Promise
 		await page.waitForTimeout(8_000);
 	}
 
-	// eslint-disable-next-line no-console
 	console.log(`\n=== [${label}] final UI status: ${lastStatus} (test ${testId}) ===\n`);
 	test.info().annotations.push({
 		type: "gradedStatus",

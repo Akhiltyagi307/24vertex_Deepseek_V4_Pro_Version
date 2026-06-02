@@ -3,11 +3,6 @@ import "server-only";
 import { generateText } from "ai";
 import { z } from "zod";
 
-import {
-	extractDeepSeekCacheTokens,
-	extractReasoningTokens,
-	getDeepSeekProvider,
-} from "@/lib/ai/deepseek-provider";
 import { resolveChatModel } from "@/lib/ai/model-router";
 import { getOpenAIProvider } from "@/lib/ai/openai-provider";
 import { recordAiCall } from "@/lib/ai/record-ai-call";

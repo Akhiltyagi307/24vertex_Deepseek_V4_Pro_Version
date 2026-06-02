@@ -4,7 +4,6 @@ import {
 	createContext,
 	useCallback,
 	useContext,
-	useEffect,
 	useMemo,
 	useState,
 	type ReactNode,
@@ -40,9 +39,13 @@ export function AssignmentTopicBandHoverProvider({
 		setOpenCellKey(null);
 	}, []);
 
-	useEffect(() => {
+	// Reset the open cell when `resetKey` changes — during render, not in an
+	// effect, to avoid the cascading re-render the set-state-in-effect rule flags.
+	const [prevResetKey, setPrevResetKey] = useState(resetKey);
+	if (prevResetKey !== resetKey) {
+		setPrevResetKey(resetKey);
 		setOpenCellKey(null);
-	}, [resetKey]);
+	}
 
 	const value = useMemo(
 		() => ({ openCellKey, openForCell, closeCell, closeAll }),
