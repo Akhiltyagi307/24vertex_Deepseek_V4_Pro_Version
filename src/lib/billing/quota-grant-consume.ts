@@ -6,6 +6,28 @@ import { db } from "@/db";
 import { quotaGrants } from "@/db/schema/billing";
 
 /**
+ * True when the student has at least one unexpired manual test grant with
+ * remaining quantity. Lets the entitlement gate admit a period-exhausted student
+ * whose admin-granted credits would otherwise be unreachable, because the gate
+ * runs before consumeNextQuotaTestGrant (review finding M9).
+ */
+export async function hasAvailableQuotaTestGrant(profileId: string): Promise<boolean> {
+	const grant = await db
+		.select({ id: quotaGrants.id })
+		.from(quotaGrants)
+		.where(
+			and(
+				eq(quotaGrants.studentId, profileId),
+				eq(quotaGrants.grantType, "tests"),
+				lt(quotaGrants.consumed, quotaGrants.quantity),
+				or(isNull(quotaGrants.expiresAt), gt(quotaGrants.expiresAt, sql`now()`)),
+			),
+		)
+		.limit(1);
+	return grant.length > 0;
+}
+
+/**
  * Consumes one test from the oldest eligible manual grant (FIFO by expires_at).
  * Returns true when a row was incremented.
  */

@@ -40,6 +40,7 @@
     "db:reconcile-migration-ledger": "node -r dotenv/config scripts/reconcile-supabase-migration-ledger.mjs dotenv_config_path=.env.local",
     "db:gen-types": "node scripts/gen-drizzle-types.mjs",
     "db:check-parity": "node scripts/check-drizzle-postgres-parity.mjs",
+    "db:check-fk-parity": "tsx scripts/check-fk-parity.ts",
     "db:apply:admin-phase2": "node scripts/apply-admin-phase2-migrations.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
