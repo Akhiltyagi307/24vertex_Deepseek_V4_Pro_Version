@@ -42,7 +42,12 @@ jobs:
       - name: Install
         run: pnpm install
 
+      # Only download the browser when we will actually run the e2e suite.
+      # Without the PLAYWRIGHT_* secrets the run step below is skipped, so
+      # installing chromium here is pure wasted work (and the download has
+      # hung the job on the hosted runner). Gate it on the same condition.
       - name: Install Playwright browser
+        if: ${{ env.PLAYWRIGHT_ADMIN_EMAIL != '' && env.PLAYWRIGHT_ADMIN_PASSWORD != '' && env.PLAYWRIGHT_E2E_TARGET_USER_ID != '' }}
         run: pnpm exec playwright install chromium
 
       - name: Run Playwright (requires secrets + running app)
