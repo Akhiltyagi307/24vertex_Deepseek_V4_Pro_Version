@@ -7,7 +7,7 @@ import { subjects } from "@/db/schema/academic";
 import { profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
 import { fetchSubjectNameMap } from "@/lib/academic/subject-names";
-import { assignmentConfigSchema } from "@/lib/assignments/schemas";
+import { readAssignmentConfigDisplayFields } from "@/lib/assignments/schemas";
 
 export type AdminAssignmentListRow = {
 	id: string;
@@ -79,18 +79,17 @@ export async function adminListAssignments(input: {
 	const countMap = new Map<string, number>(counts.map((r) => [r.assignmentId, Number(r.n)]));
 
 	const configByAssignment = new Map(
-		raw.map((r) => [r.id, assignmentConfigSchema.safeParse(r.config)]),
+		raw.map((r) => [r.id, readAssignmentConfigDisplayFields(r.config)]),
 	);
 	const subjectIds = [
 		...new Set(
-			[...configByAssignment.values()].flatMap((result) => (result.success ? [result.data.subject_id] : [])),
+			[...configByAssignment.values()].flatMap((display) => (display.subjectId ? [display.subjectId] : [])),
 		),
 	];
 	const subjectMap = await fetchSubjectNameMap(subjectIds);
 
 	const rows: AdminAssignmentListRow[] = raw.map((r) => {
-		const config = configByAssignment.get(r.id);
-		const subjectId = config?.success ? config.data.subject_id : null;
+		const subjectId = configByAssignment.get(r.id)?.subjectId ?? null;
 		return {
 			id: r.id,
 			title: r.title,
@@ -164,8 +163,8 @@ export async function adminGetAssignmentDetail(id: string): Promise<AdminAssignm
 	if (!row) return null;
 
 	const a = row.a;
-	const config = assignmentConfigSchema.safeParse(a.config);
-	const subjectId = config.success ? config.data.subject_id : null;
+	const config = readAssignmentConfigDisplayFields(a.config);
+	const subjectId = config.subjectId;
 	const [subjectRow] =
 		subjectId ?
 			await db.select({ name: subjects.name }).from(subjects).where(eq(subjects.id, subjectId)).limit(1)
@@ -179,10 +178,10 @@ export async function adminGetAssignmentDetail(id: string): Promise<AdminAssignm
 		teacher_name: row.teacherName ?? null,
 		subject_id: subjectId,
 		subject_name: subjectRow?.name ?? null,
-		topic_ids: config.success ? config.data.topic_ids : [],
-		difficulty: config.success ? config.data.difficulty : null,
-		question_count: config.success ? config.data.question_count : null,
-		time_limit_seconds: config.success ? config.data.time_limit_seconds : null,
+		topic_ids: config.topicIds,
+		difficulty: config.difficulty,
+		question_count: config.questionCount,
+		time_limit_seconds: config.timeLimitSeconds,
 		due_date: a.dueAt instanceof Date ? a.dueAt.toISOString() : (a.dueAt ?? null),
 		instructions: a.instructions ?? null,
 		status: a.status ?? null,

@@ -65,13 +65,8 @@ export async function previewEligibleStudentIdsForPracticeAssignment(
 			teacherRosterGrade: session.profile.teacher_roster_grade,
 			teacherRosterSubjectId: session.profile.teacher_roster_subject_id,
 			config: {
-				v: 1,
-				kind: "practice_test",
 				subject_id: parsed.data.subjectId,
 				topic_ids: parsed.data.topicIds,
-				difficulty: "medium",
-				question_count: 15,
-				time_limit_seconds: 3600,
 			},
 			studentIds: candidateStudentIds,
 		});

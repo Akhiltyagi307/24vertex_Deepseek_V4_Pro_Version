@@ -114,7 +114,7 @@ export default defineConfig({
 		},
 		{
 			name: "teacher",
-			testMatch: /teacher-(portal|a11y)\.spec\.ts$/,
+			testMatch: /teacher-(portal|a11y|manual-assignment)\.spec\.ts$/,
 			dependencies: ["teacher-auth-setup"],
 			use: { storageState: TEACHER_STORAGE_STATE },
 		},

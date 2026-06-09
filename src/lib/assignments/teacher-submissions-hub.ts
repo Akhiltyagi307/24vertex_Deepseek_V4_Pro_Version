@@ -9,7 +9,7 @@ import { assignments, assignmentSubmissions } from "@/db/schema/teaching";
 import type { TrackerTopicStatus } from "@/lib/practice/topic-rollup";
 
 import { listTeacherAssignmentSubmissionRows, type TeacherAssignmentSubmissionRow } from "./queries";
-import { assignmentConfigSchema } from "./schemas";
+import { assignmentConfigBaseSchema } from "./schemas";
 import type {
 	StudentSubmissionPerfRow,
 	TeacherSubmissionAssignmentBundle,
@@ -112,7 +112,7 @@ export async function loadTeacherSubmissionAssignmentBundles(
 
 	const metaById = new Map(
 		assignmentMetaRows.map((row) => {
-			const parsed = assignmentConfigSchema.safeParse(row.config);
+			const parsed = assignmentConfigBaseSchema.safeParse(row.config);
 			return [
 				row.id,
 				{
@@ -128,7 +128,7 @@ export async function loadTeacherSubmissionAssignmentBundles(
 	const subjectIds = [
 		...new Set(
 			assignmentMetaRows.flatMap((row) => {
-				const parsed = assignmentConfigSchema.safeParse(row.config);
+				const parsed = assignmentConfigBaseSchema.safeParse(row.config);
 				return parsed.success ? [parsed.data.subject_id] : [];
 			}),
 		),
@@ -156,9 +156,9 @@ export async function loadTeacherSubmissionAssignmentBundles(
 
 	const allTopicIds = new Set<string>();
 	for (const row of assignmentMetaRows) {
-		const parsed = assignmentConfigSchema.safeParse(row.config);
+		const parsed = assignmentConfigBaseSchema.safeParse(row.config);
 		if (!parsed.success) continue;
-		for (const tid of parsed.data.topic_ids) {
+		for (const tid of parsed.data.topic_ids ?? []) {
 			allTopicIds.add(tid);
 		}
 	}
@@ -333,6 +333,7 @@ export async function loadTeacherSubmissionAssignmentBundles(
 			subjectId,
 			subjectName,
 			subjectGrade,
+			authoringMode: rows[0]?.authoringMode ?? "ai",
 			sectionsLabel: formatSectionsLabel(rows),
 			submissions: rows,
 			counts: { assigned, submitted, notSubmitted },

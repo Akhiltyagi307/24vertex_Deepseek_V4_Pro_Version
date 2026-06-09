@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
 	BarChart3Icon,
 	ChevronLeftIcon,
@@ -372,7 +373,20 @@ export function TeacherAssignmentsSubmissionsHub({
 									<div className="min-w-0 flex-1 space-y-3">
 										<div className="flex flex-wrap items-start gap-2 gap-y-1">
 											<h2 className="min-w-0 font-semibold text-foreground text-lg tracking-tight">{bundle.title}</h2>
+											{bundle.authoringMode === "manual" ? (
+											<span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 font-medium text-[11px] text-sky-800 dark:bg-sky-950/40 dark:text-sky-200">Manual</span>
+											) : (
+											<span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 font-medium text-[11px] text-violet-800 dark:bg-violet-950/40 dark:text-violet-200">AI</span>
+											)}
 											{bucketStatusBadge(bundle, bucket)}
+											{bundle.authoringMode === "manual" ? (
+												<Link
+													href={`/teacher/assignments/${bundle.assignmentId}/edit`}
+													className="text-link text-xs underline-offset-4 hover:underline"
+												>
+													Edit
+												</Link>
+											) : null}
 										</div>
 										{bundle.dueAt ?
 											<p className="text-muted-foreground text-sm">

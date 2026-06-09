@@ -17,9 +17,10 @@ import {
 } from "@/lib/teachers/teacher-performance-directory-queries";
 
 import {
-	assignmentConfigSchema,
+	assignmentConfigBaseSchema,
 	computeAssignmentJobRunAfter,
 	type AssignmentConfig,
+	type AssignmentConfigBase,
 } from "./schemas";
 import type { StudentAssignmentCard } from "@/lib/assignments/student-assignment-card";
 
@@ -43,6 +44,7 @@ export type TeacherAssignmentSubmissionRow = {
 	dueAt: string | null;
 	createdAt: string | null;
 	subjectName: string | null;
+	authoringMode: "ai" | "manual";
 	studentId: string;
 	studentFullName: string;
 	studentGrade: number | null;
@@ -62,7 +64,8 @@ export type TeacherAssignmentSummaryRow = {
 	dueAt: string | null;
 	createdAt: string | null;
 	subjectName: string | null;
-	config: AssignmentConfig;
+	config: AssignmentConfigBase;
+	authoringMode: "ai" | "manual";
 	counts: {
 		assigned: number;
 		ready: number;
@@ -183,7 +186,7 @@ export async function listTeacherAssignmentSummaries(
 		.groupBy(assignmentSubmissions.assignmentId);
 	const countsByAssignment = new Map(counts.map((row) => [row.assignmentId, row]));
 
-	const configs = assignmentRows.map((row) => assignmentConfigSchema.safeParse(row.config));
+	const configs = assignmentRows.map((row) => assignmentConfigBaseSchema.safeParse(row.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
 	const subjectNameById = await fetchSubjectNameMap(subjectIds);
 
@@ -201,6 +204,7 @@ export async function listTeacherAssignmentSummaries(
 				createdAt: toIso(row.createdAt),
 				subjectName: subjectNameById.get(config.data.subject_id) ?? null,
 				config: config.data,
+				authoringMode: config.data.authoring_mode,
 				counts: {
 					assigned: Number(countRow?.assigned ?? 0),
 					ready: Number(countRow?.ready ?? 0),
@@ -245,7 +249,7 @@ export async function listTeacherAssignmentSubmissionRows(
 		)
 		.orderBy(desc(assignments.createdAt), asc(profiles.fullName));
 
-	const configs = rows.map((row) => assignmentConfigSchema.safeParse(row.config));
+	const configs = rows.map((row) => assignmentConfigBaseSchema.safeParse(row.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
 	const subjectNameById = await fetchSubjectNameMap(subjectIds);
 
@@ -259,6 +263,7 @@ export async function listTeacherAssignmentSubmissionRows(
 				dueAt: toIso(row.dueAt),
 				createdAt: toIso(row.createdAt),
 				subjectName,
+				authoringMode: config.success ? config.data.authoring_mode : "ai",
 				studentId: row.studentId,
 				studentFullName: row.studentFullName,
 				studentGrade: row.studentGrade,
@@ -342,7 +347,7 @@ export type PracticeAssignmentEligibilityInput = {
 	activeOrganizationId: string | null;
 	teacherRosterGrade: number | null;
 	teacherRosterSubjectId: string | null;
-	config: AssignmentConfig;
+	config: { subject_id: string; topic_ids: string[] };
 	studentIds: string[];
 };
 
@@ -453,7 +458,7 @@ export async function listAssignmentCardsForStudentIds(studentIds: string[]): Pr
 		.where(and(inArray(assignmentSubmissions.studentId, studentIds), eq(assignments.status, "published")))
 		.orderBy(desc(assignments.createdAt));
 
-	const configs = rows.map((row) => assignmentConfigSchema.safeParse(row.config));
+	const configs = rows.map((row) => assignmentConfigBaseSchema.safeParse(row.config));
 	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
 	const subjectNameById = await fetchSubjectNameMap(subjectIds);
 

@@ -13,7 +13,7 @@ import { notifications } from "@/db/schema/comms-audit";
 import { parentStudentLinks, profiles } from "@/db/schema/profiles";
 import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
 import { fetchSubjectNameMap } from "@/lib/academic/subject-names";
-import { assignmentConfigSchema } from "@/lib/assignments/schemas";
+import { readAssignmentConfigDisplayFields } from "@/lib/assignments/schemas";
 
 /** Single-line preview for L2 tables (notifications, long titles). */
 export function truncateForAdminPreview(text: string, maxLen: number): string {
@@ -71,15 +71,15 @@ export async function adminListAssignmentSubmissionsForStudent(
 		.limit(ps)
 		.offset(offset);
 
-	const configs = raw.map((r) => assignmentConfigSchema.safeParse(r.config));
-	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
+	const configs = raw.map((r) => readAssignmentConfigDisplayFields(r.config));
+	const subjectIds = [...new Set(configs.flatMap((d) => (d.subjectId ? [d.subjectId] : [])))];
 	const subjectMap = await fetchSubjectNameMap(subjectIds);
 
 	const rows: AdminUserAssignmentSubmissionRow[] = raw.map((r, index) => ({
 		submission_id: r.submissionId,
 		assignment_id: r.assignmentId,
 		assignment_title: r.title,
-		subject_name: configs[index]?.success ? (subjectMap.get(configs[index].data.subject_id) ?? null) : null,
+		subject_name: configs[index]?.subjectId ? (subjectMap.get(configs[index].subjectId as string) ?? null) : null,
 		status: r.status,
 		score: r.score != null ? String(r.score) : null,
 		is_late: r.isLate,
@@ -189,8 +189,8 @@ export async function adminListAssignmentsForTeacher(
 		.limit(ps)
 		.offset(offset);
 
-	const configs = raw.map((r) => assignmentConfigSchema.safeParse(r.config));
-	const subjectIds = [...new Set(configs.flatMap((result) => (result.success ? [result.data.subject_id] : [])))];
+	const configs = raw.map((r) => readAssignmentConfigDisplayFields(r.config));
+	const subjectIds = [...new Set(configs.flatMap((d) => (d.subjectId ? [d.subjectId] : [])))];
 	const subjectMap = await fetchSubjectNameMap(subjectIds);
 
 	const rows: AdminTeacherAssignmentRow[] = raw.map((r, index) => ({
@@ -198,7 +198,7 @@ export async function adminListAssignmentsForTeacher(
 		title: r.title,
 		status: r.status,
 		due_date: r.dueDate instanceof Date ? r.dueDate.toISOString() : (r.dueDate ?? null),
-		subject_name: configs[index]?.success ? (subjectMap.get(configs[index].data.subject_id) ?? null) : null,
+		subject_name: configs[index]?.subjectId ? (subjectMap.get(configs[index].subjectId as string) ?? null) : null,
 		updated_at: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updatedAt ?? null),
 	}));
 

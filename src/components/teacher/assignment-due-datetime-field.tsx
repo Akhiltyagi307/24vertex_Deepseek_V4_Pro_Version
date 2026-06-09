@@ -70,6 +70,9 @@ export function AssignmentDueDatetimeField({
 		setSelected(clamped);
 	}, []);
 
+	// assignmentDueCalendarDisabledMatchers() derives its matchers from the current time;
+	// `open` intentionally re-runs this when the calendar opens so "disable past dates" stays fresh.
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const calendarDisabled = React.useMemo(() => assignmentDueCalendarDisabledMatchers(), [open]);
 
 	const mergeCalendarDay = React.useCallback(

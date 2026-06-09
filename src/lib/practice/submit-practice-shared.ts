@@ -57,14 +57,15 @@ type AnswerKeyJson = {
 };
 
 /**
- * Phase 1: `validateAndStripGeneration` now enforces that stored answer keys
- * are already a single A–D letter, so this function only normalizes the
- * student's submitted letter. Anything that doesn't round-trip to one of A–D
- * is treated as no selection.
+ * Normalizes both the stored answer-key letter and the student's submitted
+ * letter to a single A–F option. AI-generated tests only ever use A–D, but
+ * teacher-authored (manual) assignments allow up to six options (A–F), so the
+ * range must cover E/F or those MCQs are silently scored wrong on the
+ * deterministic (grading-failed) fallback path. Anything else → no selection.
  */
 function normalizeMcqLetter(raw: string): string {
 	const candidate = raw.trim().toUpperCase();
-	return /^[A-D]$/.test(candidate) ? candidate : "";
+	return /^[A-F]$/.test(candidate) ? candidate : "";
 }
 
 type StartGradingRow = {
