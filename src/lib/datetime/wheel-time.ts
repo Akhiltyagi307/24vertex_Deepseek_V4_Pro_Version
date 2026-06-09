@@ -18,7 +18,6 @@ export type WheelTimeParts = {
 };
 
 export function snapMinuteToWheelStep(minute: number): number {
-	const step = WHEEL_TIME_MINUTE_STEP;
 	return (
 		WHEEL_TIME_MINUTES.find((m) => m === minute) ??
 		WHEEL_TIME_MINUTES.reduce((best, m) => (Math.abs(m - minute) < Math.abs(best - minute) ? m : best))
