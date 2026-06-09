@@ -41,6 +41,7 @@ export type TeacherSubmissionAssignmentBundle = {
 	subjectId: string | null;
 	subjectName: string | null;
 	subjectGrade: number | null;
+	authoringMode: "ai" | "manual";
 	sectionsLabel: string;
 	submissions: TeacherAssignmentSubmissionRow[];
 	counts: {

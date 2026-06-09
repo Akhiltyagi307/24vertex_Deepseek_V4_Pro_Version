@@ -62,6 +62,59 @@ export const assignmentConfigSchema = z
 	});
 
 export type AssignmentConfig = z.infer<typeof assignmentConfigSchema>;
+
+/**
+ * Lenient parser used by read paths that only need `subject_id` + `authoring_mode`.
+ * Tolerates BOTH the strict AI config and the manual config (and any future shape)
+ * via `.passthrough()`, so manual assignments are never dropped from lists.
+ * Existing rows without `authoring_mode` are treated as AI.
+ */
+export const assignmentConfigBaseSchema = z
+	.object({
+		subject_id: z.string().uuid(),
+		authoring_mode: z.enum(["ai", "manual"]).default("ai"),
+		topic_ids: z.array(z.string().uuid()).optional(),
+	})
+	.passthrough();
+
+export type AssignmentConfigBase = z.infer<typeof assignmentConfigBaseSchema>;
+
+/**
+ * Display-field reader for read paths that show config details for BOTH AI and
+ * manual assignments (e.g. the admin assignment list/detail). The strict
+ * {@link assignmentConfigSchema} rejects every manual config (manual uses
+ * arbitrary `question_count`/`time_limit_seconds` and carries `authoring_mode`),
+ * so using it here blanks out subject/difficulty/count/time for manual rows.
+ * This reads each field leniently and never throws.
+ */
+export function readAssignmentConfigDisplayFields(config: unknown): {
+	subjectId: string | null;
+	topicIds: string[];
+	difficulty: string | null;
+	questionCount: number | null;
+	timeLimitSeconds: number | null;
+	authoringMode: "ai" | "manual";
+} {
+	const base = assignmentConfigBaseSchema.safeParse(config);
+	const raw = (config ?? {}) as Record<string, unknown>;
+	const subjectId =
+		base.success ? base.data.subject_id : typeof raw.subject_id === "string" ? raw.subject_id : null;
+	const topicIds =
+		base.success && base.data.topic_ids
+			? base.data.topic_ids
+			: Array.isArray(raw.topic_ids)
+				? raw.topic_ids.filter((t): t is string => typeof t === "string")
+				: [];
+	return {
+		subjectId,
+		topicIds,
+		difficulty: typeof raw.difficulty === "string" ? raw.difficulty : null,
+		questionCount: typeof raw.question_count === "number" ? raw.question_count : null,
+		timeLimitSeconds: typeof raw.time_limit_seconds === "number" ? raw.time_limit_seconds : null,
+		authoringMode: base.success ? base.data.authoring_mode : raw.authoring_mode === "manual" ? "manual" : "ai",
+	};
+}
+
 export type AssignmentLifecycleStatus = z.infer<typeof assignmentLifecycleStatusSchema>;
 export type AssignmentStatus = z.infer<typeof assignmentStatusSchema>;
 

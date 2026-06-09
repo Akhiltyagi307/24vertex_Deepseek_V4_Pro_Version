@@ -8,8 +8,6 @@ import { stringifyStudentAnswer } from "@/lib/practice/grading-prompts";
 import { formatGenerationAnswerForPdf } from "@/lib/student/practice-pdf-answer-key-display";
 import { parseStoredQuestionVisualFromMetadata } from "@/lib/practice/visuals/parse-stored";
 
-import { practiceAnswerKeySchema } from "@/lib/practice/generation-schema";
-
 import { qnaLogPerformanceFromScore, qnaLogScorePercent } from "./qna-log-performance";
 import type { QnaLogAiFeedback, QnaLogDetail, QnaLogQuestionType } from "./types";
 
@@ -80,9 +78,14 @@ function extractStudentSelectedKey(questionType: QnaLogQuestionType, payload: un
 
 function extractCorrectOptionKey(questionType: QnaLogQuestionType, answerKey: unknown): string | null {
 	if (questionType !== "multiple_choice") return null;
-	const parsed = practiceAnswerKeySchema.safeParse(answerKey);
-	if (!parsed.success) return null;
-	const key = parsed.data.correct_answer.trim().toUpperCase();
+	// Read `correct_answer` directly rather than via practiceAnswerKeySchema: that
+	// AI-only schema requires explanation/common_mistakes/related_concept, which
+	// teacher-authored (manual) MCQ keys omit — parsing them would drop the
+	// correct-option highlight in the review UI. Both shapes store a letter here.
+	if (!answerKey || typeof answerKey !== "object" || Array.isArray(answerKey)) return null;
+	const correct = (answerKey as Record<string, unknown>).correct_answer;
+	if (typeof correct !== "string") return null;
+	const key = correct.trim().toUpperCase();
 	return key.length > 0 ? key : null;
 }
 

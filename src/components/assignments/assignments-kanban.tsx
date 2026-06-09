@@ -44,7 +44,7 @@ const columns = [
 		description: "Submitted, grading, and finished tests.",
 		emptyTitle: "Nothing submitted yet",
 		emptyBody: "After you submit, work moves here until grading finishes.",
-		statuses: ["submitted", "grading", "grading_failed", "late", "graded"],
+		statuses: ["submitted", "grading", "grading_failed", "late", "graded", "excused"],
 		icon: CheckCircle2Icon,
 	},
 ] as const;
@@ -71,6 +71,8 @@ function statusLabel(status: string): string {
 			return "Grading issue";
 		case "late":
 			return "Late";
+		case "excused":
+			return "Excused";
 		default:
 			return status.replaceAll("_", " ");
 	}
@@ -88,6 +90,8 @@ function statusBadgeClassName(status: string): string {
 		case "submitted":
 		case "graded":
 			return "border-primary/20 bg-primary/10 text-foreground";
+		case "excused":
+			return "border-border bg-muted/60 text-muted-foreground";
 		case "failed_generation":
 		case "grading_failed":
 		case "late":

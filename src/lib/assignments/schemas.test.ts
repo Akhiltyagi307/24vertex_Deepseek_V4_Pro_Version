@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+	assignmentConfigBaseSchema,
 	assignmentConfigSchema,
 	computeAssignedGradingRunAfter,
 	computeAssignmentJobRunAfter,
 	createAssignmentInputSchema,
+	readAssignmentConfigDisplayFields,
 } from "@/lib/assignments/schemas";
 
 describe("assignment schemas", () => {
@@ -21,6 +23,71 @@ describe("assignment schemas", () => {
 
 		expect(parsed.topic_ids).toEqual(["22222222-2222-2222-2222-222222222222"]);
 		expect(parsed.question_count).toBe(15);
+	});
+
+	it("base config parser accepts both AI and manual configs and defaults authoring_mode to ai", () => {
+		const ai = assignmentConfigBaseSchema.parse({
+			v: 1,
+			kind: "practice_test",
+			subject_id: "11111111-1111-1111-1111-111111111111",
+			topic_ids: ["22222222-2222-2222-2222-222222222222"],
+			difficulty: "medium",
+			question_count: 15,
+			time_limit_seconds: 3600,
+		});
+		expect(ai.authoring_mode).toBe("ai");
+		expect(ai.subject_id).toBe("11111111-1111-1111-1111-111111111111");
+
+		const manual = assignmentConfigBaseSchema.parse({
+			v: 1,
+			kind: "practice_test",
+			authoring_mode: "manual",
+			subject_id: "11111111-1111-1111-1111-111111111111",
+			topic_ids: ["22222222-2222-2222-2222-222222222222"],
+			difficulty: "easy",
+			question_count: 7,
+			time_limit_seconds: 1800,
+		});
+		expect(manual.authoring_mode).toBe("manual");
+	});
+
+	it("reads display fields from a manual config the strict schema rejects", () => {
+		const manualConfig = {
+			v: 1,
+			kind: "practice_test",
+			authoring_mode: "manual",
+			subject_id: "11111111-1111-1111-1111-111111111111",
+			topic_ids: ["22222222-2222-2222-2222-222222222222"],
+			difficulty: "hard",
+			question_count: 7,
+			time_limit_seconds: 5400,
+		};
+		// Strict parser rejects manual configs (count ∉ {15,30}, time ∉ {3600,10800}).
+		expect(assignmentConfigSchema.safeParse(manualConfig).success).toBe(false);
+		// Lenient display reader still surfaces every field — this is what keeps the
+		// admin list/detail from blanking manual assignments.
+		expect(readAssignmentConfigDisplayFields(manualConfig)).toEqual({
+			subjectId: "11111111-1111-1111-1111-111111111111",
+			topicIds: ["22222222-2222-2222-2222-222222222222"],
+			difficulty: "hard",
+			questionCount: 7,
+			timeLimitSeconds: 5400,
+			authoringMode: "manual",
+		});
+	});
+
+	it("treats a legacy AI config (no authoring_mode) as ai in the display reader", () => {
+		const display = readAssignmentConfigDisplayFields({
+			v: 1,
+			kind: "practice_test",
+			subject_id: "11111111-1111-1111-1111-111111111111",
+			topic_ids: ["22222222-2222-2222-2222-222222222222"],
+			difficulty: "medium",
+			question_count: 15,
+			time_limit_seconds: 3600,
+		});
+		expect(display.authoringMode).toBe("ai");
+		expect(display.questionCount).toBe(15);
 	});
 
 	it("rejects question payloads in educator assignments", () => {

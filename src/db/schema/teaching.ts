@@ -2,6 +2,7 @@ import {
 	boolean,
 	decimal,
 	index,
+	integer,
 	jsonb,
 	pgTable,
 	text,
@@ -11,6 +12,7 @@ import {
 	varchar,
 } from "drizzle-orm/pg-core";
 
+import { topics } from "./academic";
 import { tests } from "./assessment";
 import { organizations } from "./organizations";
 
@@ -66,5 +68,31 @@ export const assignmentSubmissions = pgTable(
 		index("idx_assignment_submissions_assignment_status").on(t.assignmentId, t.lifecycleStatus),
 		index("idx_assignment_submissions_student_status").on(t.studentId, t.lifecycleStatus),
 		index("idx_assignment_submissions_test").on(t.testId),
+	],
+);
+
+export const assignmentQuestions = pgTable(
+	"assignment_questions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		assignmentId: uuid("assignment_id")
+			.notNull()
+			.references(() => assignments.id, { onDelete: "cascade" }),
+		questionNumber: integer("question_number").notNull(),
+		topicId: uuid("topic_id")
+			.notNull()
+			.references(() => topics.id),
+		questionType: varchar("question_type", { length: 20 }).notNull(),
+		questionText: text("question_text").notNull(),
+		options: jsonb("options"),
+		answerKey: jsonb("answer_key").notNull(),
+		difficultyLevel: varchar("difficulty_level", { length: 10 }).notNull().default("medium"),
+		metadata: jsonb("metadata").notNull().default({}),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	},
+	(t) => [
+		unique("assignment_questions_number_uq").on(t.assignmentId, t.questionNumber),
+		index("idx_assignment_questions_assignment").on(t.assignmentId, t.questionNumber),
 	],
 );

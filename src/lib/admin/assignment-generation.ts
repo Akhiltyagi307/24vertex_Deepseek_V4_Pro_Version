@@ -4,9 +4,9 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { performanceTracker } from "@/db/schema/assessment";
-import { assignmentSubmissions, assignments } from "@/db/schema/teaching";
+import { assignmentQuestions, assignmentSubmissions, assignments } from "@/db/schema/teaching";
 import { ensurePerformanceTrackerRowsForAssignmentTopics } from "@/lib/assignments/queries";
-import { assignmentConfigSchema } from "@/lib/assignments/schemas";
+import { assignmentConfigBaseSchema, assignmentConfigSchema } from "@/lib/assignments/schemas";
 import { notifyAssignmentMaterialized } from "@/lib/notifications/assignment-events";
 import { resolvePracticeConfigForStudent } from "@/lib/practice";
 import { runPracticeGenerationAfterResolve } from "@/lib/practice/practice-generation-pipeline";
@@ -53,6 +53,17 @@ export async function materializeAssignedPracticeTest(
 	}
 	if (row.assignmentStatus !== "published") {
 		return { ok: false, message: "Assignment is not published." };
+	}
+
+	const baseConfig = assignmentConfigBaseSchema.safeParse(row.config);
+	if (baseConfig.success && baseConfig.data.authoring_mode === "manual") {
+		return materializeManualAssignedTest({
+			submissionId: row.submissionId,
+			studentId: row.studentId,
+			assignmentId: row.assignmentId,
+			assignmentTitle: row.assignmentTitle,
+			subjectId: baseConfig.data.subject_id,
+		});
 	}
 
 	const parsedConfig = assignmentConfigSchema.safeParse(row.config);
@@ -147,4 +158,56 @@ export async function materializeAssignedPracticeTest(
 	});
 
 	return { ok: true, testId: result.testId };
+}
+
+
+async function materializeManualAssignedTest(args: {
+	submissionId: string;
+	studentId: string;
+	assignmentId: string;
+	assignmentTitle: string;
+	subjectId: string;
+}): Promise<AssignmentGenerationResult> {
+	// Distinct authored topics -> ensure tracker rows exist first (mirrors the AI path),
+	// so the post-grading tracker update has rows to update.
+	const topicRows = await db
+		.selectDistinct({ topicId: assignmentQuestions.topicId })
+		.from(assignmentQuestions)
+		.where(eq(assignmentQuestions.assignmentId, args.assignmentId));
+	const topicIds = topicRows.map((r) => r.topicId);
+	if (topicIds.length === 0) {
+		const message = "Manual assignment has no questions.";
+		await markSubmissionGenerationFailed(args.submissionId, message);
+		return { ok: false, message };
+	}
+	await ensurePerformanceTrackerRowsForAssignmentTopics(args.studentId, args.subjectId, topicIds);
+
+	const admin = createServiceRoleClient();
+	// The migration that defines this RPC is applied separately, so it is not yet in
+	// the generated Supabase types. Cast the name; `error`/`data` remain well typed.
+	const { data, error } = await admin.rpc("practice_create_manual_assigned_test" as never, {
+		p_assignment_submission_id: args.submissionId,
+	} as never);
+	if (error) {
+		logSupabaseError("materializeManualAssignedTest.practice_create_manual_assigned_test", error, {
+			assignmentSubmissionId: args.submissionId,
+		});
+		await markSubmissionGenerationFailed(args.submissionId, error.message ?? "Manual materialization failed.");
+		return { ok: false, message: error.message ?? "Manual materialization failed." };
+	}
+	const testId = (data as string | null) ?? null;
+	if (!testId) {
+		const message = "Manual materialization returned no test id.";
+		await markSubmissionGenerationFailed(args.submissionId, message);
+		return { ok: false, message };
+	}
+
+	await notifyAssignmentMaterialized({
+		assignmentId: args.assignmentId,
+		submissionId: args.submissionId,
+		studentId: args.studentId,
+		title: args.assignmentTitle,
+	});
+
+	return { ok: true, testId };
 }
