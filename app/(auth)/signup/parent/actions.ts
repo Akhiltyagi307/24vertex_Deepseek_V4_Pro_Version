@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { writeAuthAudit } from "@/lib/auth/audit";
 import { AUTH_ACTIONS } from "@/lib/auth/audit-actions";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { consumeAuthSignup } from "@/lib/auth/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { resolveStudentProfileIdForLinkRef } from "@/lib/auth/resolve-student-link-ref";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
@@ -34,6 +35,12 @@ export async function completeParentRegistration(
 
 	if (!parsed.success) {
 		return { error: parsed.error.flatten().fieldErrors.studentLinkCode?.[0] ?? "Check your details." };
+	}
+
+	const ip = clientIpFromHeaders(await headers());
+	const rl = await consumeAuthSignup(ip);
+	if (!rl.ok) {
+		return { error: "Too many sign-up attempts. Please wait a few minutes and try again." };
 	}
 
 	const v = parsed.data;

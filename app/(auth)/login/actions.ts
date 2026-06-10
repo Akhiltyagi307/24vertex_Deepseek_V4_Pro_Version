@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { writeAuthAudit } from "@/lib/auth/audit";
 import { AUTH_ACTIONS, classifyLoginFailure } from "@/lib/auth/audit-actions";
 import { postAuthPathFromProfile } from "@/lib/auth/post-auth-path";
+import { consumeAuthLogin } from "@/lib/auth/rate-limit";
 import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +29,17 @@ export async function loginAction(
 
 	const reqHeaders = await headers();
 	const ip = clientIpFromHeaders(reqHeaders);
+
+	const rl = await consumeAuthLogin(ip, parsed.data.email);
+	if (!rl.ok) {
+		await writeAuthAudit({
+			action: AUTH_ACTIONS.LOGIN_FAILED,
+			userId: null,
+			changes: { reason: "rate_limited" },
+			ipAddress: ip,
+		});
+		return { error: "Too many sign-in attempts. Please wait a few minutes and try again." };
+	}
 
 	const supabase = await createClient();
 	const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { writeAuthAudit } from "@/lib/auth/audit";
 import { AUTH_ACTIONS } from "@/lib/auth/audit-actions";
 import { getServerUser } from "@/lib/auth/get-server-user";
+import { consumeAuthSignup } from "@/lib/auth/rate-limit";
 import { hasRecentTeacherRejection } from "@/lib/auth/teacher-recent-rejection-check";
 import { createClient } from "@/lib/supabase/server";
 import { sendTeacherPendingApprovalEmail } from "@/lib/email/teacher-pending-approval-email";
@@ -37,6 +38,12 @@ export async function completeTeacherRegistration(
 			parsed.error.flatten().formErrors[0] ??
 			"Check your details.";
 		return { error: msg };
+	}
+
+	const ip = clientIpFromHeaders(await headers());
+	const rl = await consumeAuthSignup(ip);
+	if (!rl.ok) {
+		return { error: "Too many sign-up attempts. Please wait a few minutes and try again." };
 	}
 
 	const v = parsed.data;
