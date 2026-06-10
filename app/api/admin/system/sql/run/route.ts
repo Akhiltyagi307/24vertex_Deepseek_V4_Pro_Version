@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
-import { verifyAdminTotpIfConfigured } from "@/lib/admin/auth";
+import { consumeAdminTotp } from "@/lib/admin/auth";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import {
 	adminActionScope,
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 					status: 403,
 				});
 			}
-			if (!totp?.trim() || !verifyAdminTotpIfConfigured(totp)) {
+			if (!totp?.trim() || !(await consumeAdminTotp(totp))) {
 				return adminErrorResponse("Valid TOTP required for writable SQL");
 			}
 

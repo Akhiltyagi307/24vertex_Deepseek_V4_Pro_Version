@@ -38,6 +38,7 @@ vi.mock("@/lib/admin/runtime-pg", () => ({
 	bumpAdminJwtVersion,
 	getAdminJwtKid,
 	setAdminJwtKid,
+	tryConsumeAdminTotpStep: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/admin/audit", () => ({

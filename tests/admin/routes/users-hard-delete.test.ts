@@ -9,6 +9,7 @@ const writeAdminAction = vi.fn<(input: unknown) => Promise<boolean>>(async () =>
 const writeAdminActionStrict = vi.fn<(input: unknown) => Promise<void>>(async () => {});
 const adminGetUserById = vi.fn<(id: string) => Promise<{ email: string; full_name: string | null } | null>>();
 const verifyAdminTotpIfConfigured = vi.fn(() => true);
+const consumeAdminTotp = vi.fn(async () => verifyAdminTotpIfConfigured());
 const isAdminTotpRequired = vi.fn(async () => false);
 const consumeAdminActionRateLimit = vi.fn(async () => ({
 	allowed: true,
@@ -32,7 +33,7 @@ vi.mock("@/lib/admin/audit-actions", () => ({
 		USER_HARD_DELETE_DONE: "user_hard_delete_done",
 	},
 }));
-vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured }));
+vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured, consumeAdminTotp }));
 vi.mock("@/lib/admin/feature-flags", () => ({ isAdminTotpRequired }));
 vi.mock("@/lib/admin/rate-limit-action", () => ({
 	consumeAdminActionRateLimit,

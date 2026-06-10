@@ -7,6 +7,7 @@ import {
 	ADMIN_RUNTIME_KV_JWT_VERSION,
 	ADMIN_RUNTIME_KV_REVOKED_PREFIX,
 	ADMIN_RUNTIME_KV_TOTP_FINGERPRINT,
+	ADMIN_RUNTIME_KV_TOTP_LAST_STEP,
 	ADMIN_SESSION_REVOKE_TTL_MS,
 } from "@/lib/admin/constants";
 import { db } from "@/db";
@@ -161,6 +162,40 @@ export async function setAdminTotpFingerprint(fingerprint: string): Promise<void
 	} catch {
 		// Best-effort: rotation tracking is informational. The auth path
 		// remains correct even if the fingerprint write fails.
+	}
+}
+
+// ---- M2: single-use (anti-replay) TOTP ----
+
+/**
+ * Atomically advance the stored last-consumed TOTP step to `step`, but only when
+ * `step` is strictly greater than the stored value. Returns true when accepted
+ * (the step advanced — first use), false when the stored value was already at or
+ * past `step` (the code was already consumed → replay).
+ *
+ * Fails OPEN (returns true) on a DB error: the token is still a valid TOTP, and
+ * locking admins out during a KV/DB outage is a worse tradeoff than briefly
+ * losing single-use enforcement. Replay protection holds whenever the KV store
+ * is healthy. Mirrors the swallow-and-degrade posture of the helpers above.
+ */
+export async function tryConsumeAdminTotpStep(step: number): Promise<boolean> {
+	try {
+		const rows = await db
+			.insert(adminRuntimeKv)
+			.values({
+				key: ADMIN_RUNTIME_KV_TOTP_LAST_STEP,
+				valueInt: step,
+				updatedAt: new Date(),
+			})
+			.onConflictDoUpdate({
+				target: adminRuntimeKv.key,
+				set: { valueInt: step, updatedAt: sql`now()` },
+				setWhere: lt(adminRuntimeKv.valueInt, step),
+			})
+			.returning({ valueInt: adminRuntimeKv.valueInt });
+		return rows.length > 0;
+	} catch {
+		return true;
 	}
 }
 

@@ -15,10 +15,10 @@ import { clientIpForPostgresInet } from "@/lib/admin/ip-sanitize";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { writeAdminAction } from "@/lib/admin/audit";
 import {
+	consumeAdminTotp,
 	signAdminJwt,
 	verifyAdminEmail,
 	verifyAdminPassword,
-	verifyAdminTotpIfConfigured,
 } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
@@ -222,7 +222,7 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 	const totpFailureDetail =
 		"Authenticator code did not verify against ADMIN_TOTP_SECRET (wrong code or clock drift). If DB flag ADMIN_TOTP_REQUIRED is false, clear this field unless you intend to use 2FA.";
 	if (totpRequired) {
-		if (!totpNorm || !verifyAdminTotpIfConfigured(totpNorm)) {
+		if (!totpNorm || !(await consumeAdminTotp(totpNorm))) {
 			await recordAdminLoginFailure(ip);
 			await writeAdminAction({
 				action: "login_failed",
@@ -243,7 +243,7 @@ export async function performAdminLogin(request: NextRequest, input: { email: st
 				message: GENERIC_LOGIN_FAILURE_MESSAGE,
 			};
 		}
-	} else if (secretConfigured && totpNorm && !verifyAdminTotpIfConfigured(totpNorm)) {
+	} else if (secretConfigured && totpNorm && !(await consumeAdminTotp(totpNorm))) {
 		await recordAdminLoginFailure(ip);
 		await writeAdminAction({
 			action: "login_failed",

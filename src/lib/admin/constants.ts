@@ -40,6 +40,14 @@ export const ADMIN_SESSION_REVOKE_TTL_MS = 12_000;
 export const ADMIN_RUNTIME_KV_TOTP_FINGERPRINT = "totp_secret_fingerprint";
 
 /**
+ * M2: last admin TOTP time-step (floor(epoch_ms / 30000)) that was successfully
+ * consumed, stored in `admin_runtime_kv.value_int`. A code is accepted only when
+ * its clock step is strictly greater than this stored value, making each TOTP
+ * code single-use and defeating replay of an intercepted code within its window.
+ */
+export const ADMIN_RUNTIME_KV_TOTP_LAST_STEP = "totp_last_step";
+
+/**
  * D4 / D12: current `kid` for admin JWTs, stored in `admin_runtime_kv`.
  * The associated key bytes are read from `ADMIN_JWT_SECRET_<kid>` (env-
  * keyed), falling back to `ADMIN_JWT_SECRET` for backward compatibility.

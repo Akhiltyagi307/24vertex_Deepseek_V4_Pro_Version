@@ -8,6 +8,7 @@ const requireAdminApi = vi.fn(async () => gateRef.value);
 const writeAdminAction = vi.fn<(input: unknown) => Promise<boolean>>(async () => true);
 const writeAdminActionStrict = vi.fn<(input: unknown) => Promise<void>>(async () => {});
 const verifyAdminTotpIfConfigured = vi.fn(() => true);
+const consumeAdminTotp = vi.fn(async () => verifyAdminTotpIfConfigured());
 const isAdminTotpRequired = vi.fn(async () => false);
 const purgeRetentionEntity = vi.fn(async () => 7);
 const selectOrderBy = vi.fn();
@@ -23,7 +24,7 @@ vi.mock("@/lib/admin/audit-actions", () => ({
 		RETENTION_PURGE_COMMIT: "retention_purge_commit",
 	},
 }));
-vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured }));
+vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured, consumeAdminTotp }));
 vi.mock("@/lib/admin/feature-flags", () => ({ isAdminTotpRequired }));
 vi.mock("@/lib/compliance/retention-purge", () => ({ purgeRetentionEntity }));
 vi.mock("@/db", () => ({

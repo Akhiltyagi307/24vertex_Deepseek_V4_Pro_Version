@@ -6,10 +6,12 @@ import { ADMIN_GATE_ALLOW, adminRequest } from "../_helpers/admin-route";
 const gateRef = { value: ADMIN_GATE_ALLOW as { jti: string; sessionId: string } | NextResponse };
 const requireAdminApi = vi.fn(async () => gateRef.value);
 const writeAdminAction = vi.fn<(input: unknown) => Promise<boolean>>(async () => true);
+const writeAdminActionStrict = vi.fn<(input: unknown) => Promise<void>>(async () => {});
+class AdminAuditWriteError extends Error {}
 const updateReturning = vi.fn();
 
 vi.mock("@/lib/admin/api-auth", () => ({ requireAdminApi }));
-vi.mock("@/lib/admin/audit", () => ({ writeAdminAction }));
+vi.mock("@/lib/admin/audit", () => ({ writeAdminAction, writeAdminActionStrict, AdminAuditWriteError }));
 vi.mock("@/lib/admin/audit-actions", () => ({
 	ADMIN_ACTIONS: { SUBSCRIPTION_STAFF_OVERRIDE: "subscription_staff_override" },
 }));
@@ -27,6 +29,7 @@ describe("D32 Sprint B · POST /api/admin/subscriptions/[id]/staff-override", ()
 	afterEach(() => {
 		gateRef.value = ADMIN_GATE_ALLOW;
 		writeAdminAction.mockClear();
+		writeAdminActionStrict.mockClear();
 		updateReturning.mockReset();
 	});
 
@@ -97,7 +100,7 @@ describe("D32 Sprint B · POST /api/admin/subscriptions/[id]/staff-override", ()
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(200);
-		const audit = writeAdminAction.mock.calls[0]?.[0] as unknown as {
+		const audit = writeAdminActionStrict.mock.calls[0]?.[0] as unknown as {
 			action: string;
 			payload: { staff_override: boolean };
 		};

@@ -8,6 +8,7 @@ const requireAdminApi = vi.fn(async () => gateRef.value);
 const writeAdminAction = vi.fn<(input: unknown) => Promise<boolean>>(async () => true);
 const writeAdminActionStrict = vi.fn<(input: unknown) => Promise<void>>(async () => {});
 const verifyAdminTotpIfConfigured = vi.fn(() => true);
+const consumeAdminTotp = vi.fn(async () => verifyAdminTotpIfConfigured());
 const consumeAdminActionRateLimit = vi.fn(async () => ({
 	allowed: true,
 	resetAt: new Date(Date.now() + 60_000),
@@ -33,7 +34,7 @@ vi.mock("@/lib/admin/audit-actions", () => ({
 		SQL_CONSOLE_EXECUTE_WRITE: "sql_console_execute_write",
 	},
 }));
-vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured }));
+vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured, consumeAdminTotp }));
 vi.mock("@/lib/admin/rate-limit-action", () => ({
 	adminActionScope: ({ jti }: { jti: string }) => jti,
 	consumeAdminActionRateLimit,

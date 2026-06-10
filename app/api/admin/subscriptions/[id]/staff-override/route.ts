@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
-import { writeAdminAction } from "@/lib/admin/audit";
+import { AdminAuditWriteError, writeAdminActionStrict } from "@/lib/admin/audit";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema/billing";
@@ -47,14 +47,24 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		if (!updated[0]) return adminErrorResponse("Not found", { status: 404 });
 
-		await writeAdminAction({
-			action: ADMIN_ACTIONS.SUBSCRIPTION_STAFF_OVERRIDE,
-			targetType: "subscription",
-			targetId: uuid.data,
-			payload: { staff_override: staffOverride },
-			ipAddress: clientIpFromRequest(request),
-			userAgent: userAgentFromRequest(request),
-		});
+		// Strict audit: staff-override grants unlimited paid access (bypasses
+		// billing/usage), so the grant must not commit unobserved. A failed audit
+		// write surfaces as 500 instead of being swallowed.
+		try {
+			await writeAdminActionStrict({
+				action: ADMIN_ACTIONS.SUBSCRIPTION_STAFF_OVERRIDE,
+				targetType: "subscription",
+				targetId: uuid.data,
+				payload: { staff_override: staffOverride },
+				ipAddress: clientIpFromRequest(request),
+				userAgent: userAgentFromRequest(request),
+			});
+		} catch (e) {
+			if (e instanceof AdminAuditWriteError) {
+				return adminErrorResponse(e.message, { status: 500 });
+			}
+			throw e;
+		}
 
 		return adminAckResponse({ staff_override: staffOverride });
 	});

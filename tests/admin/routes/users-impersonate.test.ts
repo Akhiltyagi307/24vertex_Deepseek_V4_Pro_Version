@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ADMIN_GATE_ALLOW, adminRequest } from "../_helpers/admin-route";
 
@@ -18,9 +18,11 @@ const generateLink = vi.fn(async () => ({
 	data: { properties: { action_link: "https://24vertex.app/magic-link/abc" } },
 	error: null as { message: string } | null,
 }));
+const consumeAdminTotp = vi.fn(async () => true);
 
 vi.mock("@/lib/admin/api-auth", () => ({ requireAdminApi }));
 vi.mock("@/lib/admin/audit", () => ({ writeAdminAction, writeAdminActionStrict }));
+vi.mock("@/lib/admin/auth", () => ({ consumeAdminTotp }));
 vi.mock("@/lib/admin/audit-actions", () => ({
 	ADMIN_ACTIONS: { IMPERSONATE: "impersonate" },
 }));
@@ -41,8 +43,18 @@ vi.mock("@/lib/supabase/admin", () => ({
 const VALID_UUID = "44444444-4444-4444-8444-444444444444";
 
 describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
+	const prevSecret = process.env.ADMIN_TOTP_SECRET;
+	beforeAll(() => {
+		process.env.ADMIN_TOTP_SECRET = "JBSWY3DPEHPK3PXP";
+	});
+	afterAll(() => {
+		if (prevSecret === undefined) delete process.env.ADMIN_TOTP_SECRET;
+		else process.env.ADMIN_TOTP_SECRET = prevSecret;
+	});
 	afterEach(() => {
 		gateRef.value = ADMIN_GATE_ALLOW;
+		consumeAdminTotp.mockClear();
+		consumeAdminTotp.mockResolvedValue(true);
 		writeAdminAction.mockClear();
 		writeAdminActionStrict.mockClear();
 		adminGetUserById.mockReset();
@@ -84,7 +96,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
 		adminGetUserById.mockResolvedValueOnce(null);
 		const { POST } = await import("@/app/api/admin/users/[id]/impersonate/route");
 		const res = await POST(
-			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`),
+			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`, { body: { totp: "123456" } }),
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(404);
@@ -101,7 +113,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
 		});
 		const { POST } = await import("@/app/api/admin/users/[id]/impersonate/route");
 		const res = await POST(
-			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`),
+			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`, { body: { totp: "123456" } }),
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(429);
@@ -116,7 +128,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
 		});
 		const { POST } = await import("@/app/api/admin/users/[id]/impersonate/route");
 		const res = await POST(
-			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`),
+			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`, { body: { totp: "123456" } }),
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(500);
@@ -127,7 +139,7 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
 		adminGetUserById.mockResolvedValue({ email: "user@example.com" });
 		const { POST } = await import("@/app/api/admin/users/[id]/impersonate/route");
 		const res = await POST(
-			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`),
+			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`, { body: { totp: "123456" } }),
 			{ params: Promise.resolve({ id: VALID_UUID }) },
 		);
 		expect(res.status).toBe(200);
@@ -142,5 +154,17 @@ describe("D32 Sprint A · POST /api/admin/users/[id]/impersonate", () => {
 		};
 		expect(auditCall.action).toBe("impersonate");
 		expect(auditCall.targetId).toBe(VALID_UUID);
+	});
+
+	it("401 when the TOTP code is missing or invalid (L3 step-up)", async () => {
+		adminGetUserById.mockResolvedValue({ email: "user@example.com" });
+		consumeAdminTotp.mockResolvedValueOnce(false);
+		const { POST } = await import("@/app/api/admin/users/[id]/impersonate/route");
+		const res = await POST(
+			adminRequest(`/api/admin/users/${VALID_UUID}/impersonate`, { body: { totp: "000000" } }),
+			{ params: Promise.resolve({ id: VALID_UUID }) },
+		);
+		expect(res.status).toBe(401);
+		expect(generateLink).not.toHaveBeenCalled();
 	});
 });
