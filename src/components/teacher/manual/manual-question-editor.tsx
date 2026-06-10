@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Trash2 } from "lucide-react";
 
+import { panelRaisedInputClass } from "@/app/student/settings/_settings-form-styles";
 import { ManualTopicPicker } from "@/components/teacher/manual/manual-topic-picker";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { AssignmentTopicCatalogRow } from "@/lib/assignments/queries";
@@ -59,8 +60,10 @@ const TYPE_LABELS: Record<ManualQuestionType, string> = {
 };
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
-const inputClass =
-	"w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/45";
+const inputFocusRing =
+	"outline-none transition-[border-color,box-shadow] duration-150 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/45";
+const inputClass = cn(panelRaisedInputClass, "w-full rounded-lg border border-input", inputFocusRing);
+const selectClass = cn("rounded-lg border border-input", inputFocusRing);
 
 export function ManualQuestionEditor({
 	index,
@@ -81,7 +84,7 @@ export function ManualQuestionEditor({
 	const isOpenEnded = draft.questionType === "short_answer" || draft.questionType === "long_answer";
 
 	return (
-		<div className="space-y-4 rounded-xl border border-border/70 bg-card p-4">
+		<div className="space-y-5 rounded-xl border border-border/70 bg-muted/15 p-4 dark:bg-muted/10">
 			<div className="flex items-center justify-between gap-3">
 				<span className="font-medium text-foreground text-sm">Question {index + 1}</span>
 				<button
@@ -93,13 +96,13 @@ export function ManualQuestionEditor({
 				</button>
 			</div>
 
-			<div className="grid gap-3 medium:grid-cols-2">
-				<label className="block space-y-1">
-					<span className="text-foreground text-xs">Type</span>
+			<div className="grid gap-5 medium:grid-cols-2">
+				<label className="block min-w-0 space-y-2">
+					<span className="font-medium text-foreground text-sm">Type</span>
 					<NativeSelect
 						value={draft.questionType}
 						onChange={(e) => set("questionType", e.target.value as ManualQuestionType)}
-						className="rounded-lg border border-input"
+						className={selectClass}
 					>
 						{(Object.keys(TYPE_LABELS) as ManualQuestionType[]).map((t) => (
 							<option key={t} value={t}>
@@ -108,26 +111,26 @@ export function ManualQuestionEditor({
 						))}
 					</NativeSelect>
 				</label>
-				<label className="block space-y-1">
-					<span className="text-foreground text-xs">Chapter &amp; topic</span>
+				<label className="block min-w-0 space-y-2">
+					<span className="font-medium text-foreground text-sm">Chapter &amp; topic</span>
 					<ManualTopicPicker topics={topics} value={draft.topicId} onChange={(id) => set("topicId", id)} />
 				</label>
 			</div>
 
-			<label className="block space-y-1">
-				<span className="text-foreground text-xs">Question (use $…$ for math)</span>
+			<label className="block space-y-2">
+				<span className="font-medium text-foreground text-sm">Question (use $…$ for math)</span>
 				<textarea
-					rows={2}
+					rows={3}
 					value={draft.questionText}
 					onChange={(e) => set("questionText", e.target.value)}
-					className={cn(inputClass, "resize-y")}
+					className={cn(inputClass, "min-h-[5rem] resize-y")}
 					placeholder="Write the question stem"
 				/>
 			</label>
 
 			{draft.questionType === "multiple_choice" ? (
-				<div className="space-y-2">
-					<span className="text-foreground text-xs">Options (select the correct one)</span>
+				<div className="space-y-3">
+					<span className="font-medium text-foreground text-sm">Options (select the correct one)</span>
 					{draft.options.map((opt, i) => (
 						<div key={i} className="flex items-center gap-2">
 							<input
@@ -181,9 +184,9 @@ export function ManualQuestionEditor({
 			) : null}
 
 			{draft.questionType === "fill_in_blank" || draft.questionType === "numerical" ? (
-				<div className="grid gap-3 medium:grid-cols-2">
-					<label className="block space-y-1">
-						<span className="text-foreground text-xs">Correct answer</span>
+				<div className="grid gap-5 medium:grid-cols-2">
+					<label className="block space-y-2">
+						<span className="font-medium text-foreground text-sm">Correct answer</span>
 						<input
 							value={draft.correctAnswer}
 							onChange={(e) => set("correctAnswer", e.target.value)}
@@ -192,9 +195,9 @@ export function ManualQuestionEditor({
 						/>
 					</label>
 					{draft.questionType === "numerical" ? (
-						<div className="grid grid-cols-2 gap-2">
-							<label className="block space-y-1">
-								<span className="text-foreground text-xs">± Tolerance</span>
+						<div className="grid grid-cols-2 gap-3">
+							<label className="block space-y-2">
+								<span className="font-medium text-foreground text-sm">± Tolerance</span>
 								<input
 									value={draft.tolerance}
 									onChange={(e) => set("tolerance", e.target.value)}
@@ -202,8 +205,8 @@ export function ManualQuestionEditor({
 									placeholder="0.1"
 								/>
 							</label>
-							<label className="block space-y-1">
-								<span className="text-foreground text-xs">Units</span>
+							<label className="block space-y-2">
+								<span className="font-medium text-foreground text-sm">Units</span>
 								<input
 									value={draft.units}
 									onChange={(e) => set("units", e.target.value)}
@@ -213,8 +216,8 @@ export function ManualQuestionEditor({
 							</label>
 						</div>
 					) : (
-						<label className="block space-y-1">
-							<span className="text-foreground text-xs">Accepted variants (one per line)</span>
+						<label className="block space-y-2">
+							<span className="font-medium text-foreground text-sm">Accepted variants (one per line)</span>
 							<textarea
 								rows={2}
 								value={draft.acceptableVariants}
@@ -227,9 +230,9 @@ export function ManualQuestionEditor({
 			) : null}
 
 			{isOpenEnded ? (
-				<div className="space-y-3">
-					<label className="block space-y-1">
-						<span className="text-foreground text-xs">Model answer (optional)</span>
+				<div className="space-y-5">
+					<label className="block space-y-2">
+						<span className="font-medium text-foreground text-sm">Model answer (optional)</span>
 						<textarea
 							rows={2}
 							value={draft.modelAnswer}
@@ -237,8 +240,8 @@ export function ManualQuestionEditor({
 							className={cn(inputClass, "resize-y")}
 						/>
 					</label>
-					<label className="block space-y-1">
-						<span className="text-foreground text-xs">
+					<label className="block space-y-2">
+						<span className="font-medium text-foreground text-sm">
 							Marking points (one per line — improves AI grading)
 						</span>
 						<textarea
@@ -252,12 +255,12 @@ export function ManualQuestionEditor({
 				</div>
 			) : null}
 
-			<label className="block space-y-1">
-				<span className="text-foreground text-xs">Difficulty</span>
+			<label className="block max-w-xs space-y-2">
+				<span className="font-medium text-foreground text-sm">Difficulty</span>
 				<NativeSelect
 					value={draft.difficultyLevel}
 					onChange={(e) => set("difficultyLevel", e.target.value as ManualQuestionDraft["difficultyLevel"])}
-					className="max-w-40 rounded-lg border border-input"
+					className={selectClass}
 				>
 					<option value="easy">Easy</option>
 					<option value="medium">Medium</option>

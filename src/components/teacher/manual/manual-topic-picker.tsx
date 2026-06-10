@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { panelRaisedInputClass } from "@/app/student/settings/_settings-form-styles";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { AssignmentTopicCatalogRow } from "@/lib/assignments/queries";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,11 @@ export function ManualTopicPicker({ topics, value, onChange, className, ...rest 
 		<NativeSelect
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
-			className={cn("rounded-lg border border-input", className)}
+			className={cn(
+				panelRaisedInputClass,
+				"max-w-full rounded-lg border border-input outline-none transition-[border-color,box-shadow] duration-150 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/45",
+				className,
+			)}
 			aria-label={rest["aria-label"] ?? "Chapter and topic"}
 		>
 			<option value="">Select chapter &amp; topic…</option>

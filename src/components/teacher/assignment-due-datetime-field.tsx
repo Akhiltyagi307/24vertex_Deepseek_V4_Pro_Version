@@ -37,7 +37,16 @@ export type AssignmentDueDatetimeFieldProps = {
 	 * When set, the visible “Due date” label is omitted — use the same id on the parent section `<h3>` for accessibility.
 	 */
 	labelledByHeadingId?: string;
+	/** Controlled value (`YYYY-MM-DDTHH:mm`). When set with `onValueChange`, skips the form hidden input. */
+	value?: string;
+	onValueChange?: (value: string) => void;
 };
+
+function dueAtFieldValueToDate(value: string): Date | undefined {
+	if (!value) return undefined;
+	const date = new Date(value);
+	return Number.isFinite(date.getTime()) ? date : undefined;
+}
 
 /**
  * Shadcn Calendar + Popover due picker for assignment forms.
@@ -47,28 +56,48 @@ export function AssignmentDueDatetimeField({
 	id,
 	className,
 	labelledByHeadingId,
+	value,
+	onValueChange,
 }: AssignmentDueDatetimeFieldProps) {
 	const labelId = id ?? "assignment-due-field-label";
 	const timeId = `${labelId}-time`;
 	const hintId = `${labelId}-hint`;
 	const triggerLabelledBy = labelledByHeadingId ?? labelId;
+	const isControlled = onValueChange !== undefined;
 
 	const [open, setOpen] = React.useState(false);
-	const [selected, setSelected] = React.useState<Date | undefined>(undefined);
+	const [uncontrolledSelected, setUncontrolledSelected] = React.useState<Date | undefined>(undefined);
 	const [validationMessage, setValidationMessage] = React.useState<string | null>(null);
+
+	const controlledSelected = React.useMemo(() => dueAtFieldValueToDate(value ?? ""), [value]);
+	const selected = isControlled ? controlledSelected : uncontrolledSelected;
+
+	const commitSelected = React.useCallback(
+		(next: Date | undefined) => {
+			if (isControlled) {
+				onValueChange(next ? dateToDueAtFieldValue(next) : "");
+				return;
+			}
+			setUncontrolledSelected(next);
+		},
+		[isControlled, onValueChange],
+	);
 
 	const timeInputValue = selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "";
 
-	const applyDueSelection = React.useCallback((candidate: Date) => {
-		const now = new Date();
-		const clamped = clampAssignmentDueAtToFuture(candidate, now);
-		if (clamped.getTime() < candidate.getTime()) {
-			setValidationMessage("Due date must be in the future. Time was adjusted.");
-		} else {
-			setValidationMessage(null);
-		}
-		setSelected(clamped);
-	}, []);
+	const applyDueSelection = React.useCallback(
+		(candidate: Date) => {
+			const now = new Date();
+			const clamped = clampAssignmentDueAtToFuture(candidate, now);
+			if (clamped.getTime() < candidate.getTime()) {
+				setValidationMessage("Due date must be in the future. Time was adjusted.");
+			} else {
+				setValidationMessage(null);
+			}
+			commitSelected(clamped);
+		},
+		[commitSelected],
+	);
 
 	// assignmentDueCalendarDisabledMatchers() derives its matchers from the current time;
 	// `open` intentionally re-runs this when the calendar opens so "disable past dates" stays fresh.
@@ -77,29 +106,30 @@ export function AssignmentDueDatetimeField({
 
 	const mergeCalendarDay = React.useCallback(
 		(day: Date) => {
-			setSelected((prev) => {
-				const next = new Date(day);
-				if (prev) {
-					next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
-				} else {
-					const defaulted = defaultTimeOnAssignmentDueDay(day);
-					next.setHours(defaulted.getHours(), defaulted.getMinutes(), 0, 0);
-				}
-				const clamped = clampAssignmentDueAtToFuture(next);
-				if (clamped.getTime() < next.getTime()) {
-					setValidationMessage("Due date must be in the future. Time was adjusted.");
-				} else {
-					setValidationMessage(null);
-				}
-				return clamped;
-			});
+			const prev = selected;
+			const next = new Date(day);
+			if (prev) {
+				next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
+			} else {
+				const defaulted = defaultTimeOnAssignmentDueDay(day);
+				next.setHours(defaulted.getHours(), defaulted.getMinutes(), 0, 0);
+			}
+			const clamped = clampAssignmentDueAtToFuture(next);
+			if (clamped.getTime() < next.getTime()) {
+				setValidationMessage("Due date must be in the future. Time was adjusted.");
+			} else {
+				setValidationMessage(null);
+			}
+			commitSelected(clamped);
 		},
-		[],
+		[commitSelected, selected],
 	);
 
 	return (
 		<div className={cn(labelledByHeadingId ? "space-y-5" : "space-y-2", className)}>
-			<input type="hidden" name="due_at" value={selected ? dateToDueAtFieldValue(selected) : ""} readOnly aria-hidden />
+			{isControlled ? null : (
+				<input type="hidden" name="due_at" value={selected ? dateToDueAtFieldValue(selected) : ""} readOnly aria-hidden />
+			)}
 
 			<div className="space-y-1">
 				{labelledByHeadingId ? null : (
@@ -218,7 +248,7 @@ export function AssignmentDueDatetimeField({
 								size="sm"
 								className="ml-auto border-dashed"
 								onClick={() => {
-									setSelected(undefined);
+									commitSelected(undefined);
 									setValidationMessage(null);
 									setOpen(false);
 								}}
