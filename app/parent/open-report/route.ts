@@ -2,8 +2,11 @@ import * as Sentry from "@sentry/nextjs";
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { db } from "@/db";
+import { tests } from "@/db/schema/assessment";
 import { clientIpFromHeaders } from "@/lib/admin/api-request-meta";
 import { getServerUser } from "@/lib/auth/get-server-user";
 import { PARENT_ACTIVE_STUDENT_COOKIE } from "@/lib/parent/active-student-cookie";
@@ -59,7 +62,20 @@ export async function GET(request: Request) {
 				redirect("/parent/select-student");
 			}
 
-			const jar = await cookies();
+			// Confirm the test belongs to the linked student before writing the
+				// audit row / redirecting — otherwise a linked parent could poison
+				// `parent_audit` with an arbitrary test id. The link is already
+				// verified above; this is a pure ownership check.
+				const [testRow] = await db
+					.select({ id: tests.id })
+					.from(tests)
+					.where(and(eq(tests.id, testParsed.data), eq(tests.studentId, studentParsed.data)))
+					.limit(1);
+				if (!testRow) {
+					redirect("/parent/notifications");
+				}
+
+				const jar = await cookies();
 			jar.set(PARENT_ACTIVE_STUDENT_COOKIE, studentParsed.data, {
 				path: "/",
 				httpOnly: true,

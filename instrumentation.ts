@@ -48,9 +48,32 @@ function assertSaasEnforcementConfiguredInProd(): void {
 	}
 }
 
+/**
+ * L1: Require a real admin second factor in production. The admin-login
+ * brute-force counter (`isAdminLoginBlocked`) fails OPEN on a rate-limit DB
+ * error, justified by "IP allowlist + TOTP" — but both default to off, leaving
+ * bcrypt as the only barrier during an outage. Refuse to boot in production
+ * unless at least one of `ADMIN_IP_ALLOWLIST` / `ADMIN_TOTP_SECRET` is
+ * configured. Mirrors {@link assertNoPlaintextAdminPasswordInProd}.
+ */
+function assertAdminSecondFactorInProd(): void {
+	const isProd =
+		process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+	if (!isProd) return;
+	const hasAllowlist = Boolean(process.env.ADMIN_IP_ALLOWLIST?.trim());
+	const hasTotp = Boolean(process.env.ADMIN_TOTP_SECRET?.trim());
+	if (!hasAllowlist && !hasTotp) {
+		throw new Error(
+			"Production admin auth requires a second factor: set ADMIN_IP_ALLOWLIST and/or ADMIN_TOTP_SECRET. " +
+				"The admin-login rate limiter fails open on a DB error, so without one of these bcrypt is the only brute-force barrier.",
+		);
+	}
+}
+
 export async function register() {
 	assertNoPlaintextAdminPasswordInProd();
 	assertSaasEnforcementConfiguredInProd();
+	assertAdminSecondFactorInProd();
 	if (!sentryDsnConfigured()) return;
 	if (process.env.NEXT_RUNTIME === "nodejs") {
 		await import("./sentry.server.config");

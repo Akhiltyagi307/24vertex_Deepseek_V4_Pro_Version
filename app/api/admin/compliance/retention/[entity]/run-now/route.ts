@@ -4,7 +4,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
-import { verifyAdminTotpIfConfigured } from "@/lib/admin/auth";
+import { consumeAdminTotp } from "@/lib/admin/auth";
 import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
 import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { purgeRetentionEntity } from "@/lib/compliance/retention-purge";
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ entity
 
 	if (!dryRun) {
 		const totpRequired = await isAdminTotpRequired();
-		if (totpRequired && !verifyAdminTotpIfConfigured(parsed.data.totp)) {
+		if (totpRequired && !(await consumeAdminTotp(parsed.data.totp))) {
 			return adminErrorResponse("TOTP required for commit", { status: 401 });
 		}
 	}

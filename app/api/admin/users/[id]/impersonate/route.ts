@@ -6,6 +6,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
+import { consumeAdminTotp } from "@/lib/admin/auth";
 import { ADMIN_IMPERSONATION_COOKIE } from "@/lib/admin/constants";
 import { adminActionScope, consumeAdminActionRateLimit } from "@/lib/admin/rate-limit-action";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
@@ -20,6 +21,8 @@ export const runtime = "nodejs";
 const IMPERSONATE_LIMIT = 5;
 const IMPERSONATE_WINDOW_SEC = 60;
 
+const bodySchema = z.object({ totp: z.string().optional() }).strict();
+
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	return Sentry.withScope(async (scope) => {
 		scope.setTag("feature", "admin");
@@ -29,6 +32,17 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		const { id } = await ctx.params;
 		const uuid = z.string().uuid().safeParse(id);
 		if (!uuid.success) return adminErrorResponse("Invalid user id");
+
+		let body: unknown;
+		try {
+			body = await request.json();
+		} catch {
+			return adminErrorResponse("Invalid JSON");
+		}
+		const parsed = bodySchema.safeParse(body);
+		if (!parsed.success) {
+			return adminErrorResponse("Invalid body", { details: parsed.error.flatten() });
+		}
 
 		const profile = await adminGetUserById(uuid.data);
 		if (!profile?.email) {
@@ -58,6 +72,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 				code: "rate_limited",
 				headers: { "Retry-After": String(retryAfterSec) },
 			});
+		}
+
+		// L3: impersonation mints a full account-takeover magic-link, so require a
+		// fresh TOTP step-up (single-use, fail-closed) — same posture as compliance
+		// erasure and writable SQL. Checked after the rate limit so a throttled
+		// request doesn't burn the operator's code.
+		if (!process.env.ADMIN_TOTP_SECRET?.trim()) {
+			return adminErrorResponse("ADMIN_TOTP_SECRET must be configured before impersonation", {
+				status: 403,
+			});
+		}
+		if (!parsed.data.totp?.trim() || !(await consumeAdminTotp(parsed.data.totp))) {
+			return adminErrorResponse("Valid TOTP required", { status: 401 });
 		}
 
 		const supabase = createServiceRoleClient();

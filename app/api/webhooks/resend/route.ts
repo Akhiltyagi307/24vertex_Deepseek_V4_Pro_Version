@@ -27,9 +27,11 @@ function timingSafeEqual(a: string, b: string): boolean {
  * Auth:
  *   - **Production:** Resend signs payloads with Svix. Set `RESEND_WEBHOOK_SECRET`
  *     to the signing secret from the Resend dashboard (starts with `whsec_`).
- *   - **Local / manual:** `Authorization: Bearer <same secret>`. The previous
- *     `?token=<secret>` query-param fallback was removed (W: 2026-05) because
- *     query strings leak to proxy access logs.
+ *   - **Local / manual:** `Authorization: Bearer <RESEND_WEBHOOK_BEARER>` — a
+ *     dedicated secret, distinct from the Svix signing secret, so a leaked bearer
+ *     header can't compromise signature verification. Unset ⇒ fallback disabled.
+ *     The earlier `?token=<secret>` query-param fallback was removed (W: 2026-05)
+ *     because query strings leak to proxy access logs.
  *
  * Idempotency: Svix guarantees at-least-once delivery. The route INSERTs the
  * `svix-id` into `email_webhook_events` with `ON CONFLICT (svix_id) DO NOTHING
@@ -71,8 +73,12 @@ export async function POST(request: NextRequest) {
 		}
 		dedupId = svixId;
 	} else {
+		// Dedicated bearer secret for the manual/local path so the Svix signing
+		// secret (RESEND_WEBHOOK_SECRET) is never accepted as a plain bearer
+		// credential. When RESEND_WEBHOOK_BEARER is unset, the fallback is closed.
+		const bearerSecret = process.env.RESEND_WEBHOOK_BEARER?.trim();
 		const auth = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-		if (!auth || !timingSafeEqual(auth, secret)) {
+		if (!bearerSecret || !auth || !timingSafeEqual(auth, bearerSecret)) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 		try {

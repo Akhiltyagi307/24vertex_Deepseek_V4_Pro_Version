@@ -6,14 +6,13 @@ import * as Sentry from "@sentry/nextjs";
 import { clientIpFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
-import { chooseNextAdminJwtKid } from "@/lib/admin/auth";
+import { chooseNextAdminJwtKid, consumeAdminTotp } from "@/lib/admin/auth";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import {
 	bumpAdminJwtVersion,
 	getAdminJwtKid,
 	setAdminJwtKid,
 } from "@/lib/admin/runtime-pg";
-import { verifyTotp } from "@/lib/admin/totp";
 import { sendHtmlEmailLogged } from "@/lib/email/send-html-email";
 import { getAdminNotificationRecipients } from "@/lib/env";
 import { rateLimitedResponse, rlConsume } from "@/lib/ratelimit";
@@ -115,7 +114,7 @@ async function handlePanic(request: NextRequest): Promise<NextResponse> {
 			);
 		}
 		const totp = readPanicTotpFromHeaders(request);
-		if (!totp || !verifyTotp(totpSecret, totp)) {
+		if (!totp || !(await consumeAdminTotp(totp))) {
 			return adminErrorResponse("Forbidden", { status: 403, code: "forbidden" });
 		}
 

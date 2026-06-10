@@ -11,7 +11,7 @@ import {
 	LEGACY_ADMIN_JWT_AUDIENCE,
 	LEGACY_ADMIN_JWT_ISSUER,
 } from "@/lib/admin/constants";
-import { getAdminJwtKid, getAdminJwtVersion } from "@/lib/admin/runtime-pg";
+import { getAdminJwtKid, getAdminJwtVersion, tryConsumeAdminTotpStep } from "@/lib/admin/runtime-pg";
 import { verifyTotp } from "@/lib/admin/totp";
 
 const EIGHT_HOURS_SEC = 8 * 60 * 60;
@@ -236,4 +236,24 @@ export function verifyAdminTotpIfConfigured(token: string | undefined): boolean 
 	const secret = process.env.ADMIN_TOTP_SECRET?.trim();
 	if (!secret) return true;
 	return verifyTotp(secret, token);
+}
+
+/**
+ * M2: verify a TOTP code AND enforce single-use (anti-replay). Returns true only
+ * when the code verifies against ADMIN_TOTP_SECRET and its clock step has not
+ * already been consumed. With no secret configured it behaves like
+ * {@link verifyAdminTotpIfConfigured} (returns true — nothing to replay-protect).
+ *
+ * Single-use is keyed on the wall-clock 30s step; within ~1s of a step boundary
+ * a code that otplib still accepts under epochTolerance could map to the next
+ * step, so the practical replay window collapses from the full code lifetime to
+ * that boundary sliver. Codes are single-use across login AND every step-up
+ * action — each privileged action needs a fresh code. Prefer this over
+ * {@link verifyAdminTotpIfConfigured} at every verification site.
+ */
+export async function consumeAdminTotp(token: string | undefined): Promise<boolean> {
+	if (!verifyAdminTotpIfConfigured(token)) return false;
+	if (!process.env.ADMIN_TOTP_SECRET?.trim()) return true;
+	const step = Math.floor(Date.now() / 30_000);
+	return tryConsumeAdminTotpStep(step);
 }

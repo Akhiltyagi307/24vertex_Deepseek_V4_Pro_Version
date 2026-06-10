@@ -1,7 +1,10 @@
 "use server";
 
 import * as Sentry from "@sentry/nextjs";
+import { headers } from "next/headers";
 
+import { consumeAuthPasswordReset } from "@/lib/auth/rate-limit";
+import { clientIpFromHeaders } from "@/lib/http/client-ip";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUrl } from "@/lib/env";
 import { logServerError, logSupabaseError } from "@/lib/server/log-supabase-error";
@@ -15,6 +18,13 @@ export async function forgotPasswordAction(_prev: ForgotState, formData: FormDat
 	});
 	if (!parsed.success) {
 		return { error: "Enter a valid email address." };
+	}
+
+	const ip = clientIpFromHeaders(await headers());
+	const rl = await consumeAuthPasswordReset(ip, parsed.data.email);
+	if (!rl.ok) {
+		// Enumeration-safe: behave exactly like the success path (no email sent).
+		return { success: true };
 	}
 
 	// Sentry breadcrumb only — writing an `audit_logs` row here would have to

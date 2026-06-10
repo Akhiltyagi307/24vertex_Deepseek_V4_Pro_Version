@@ -33,6 +33,18 @@ export async function POST(req: Request) {
 	const auth = await getApiRequestUser(req);
 	if (!auth) return Response.json({ success: false, ok: false }, { status: 401 });
 
+	// getApiRequestUser is identity-only. This is a student-namespaced telemetry
+	// sink, so confirm the caller is actually a student (RLS-scoped self read)
+	// before writing; parents/teachers get 403.
+	const { data: profile } = await auth.supabase
+		.from("profiles")
+		.select("role")
+		.eq("id", auth.user.id)
+		.maybeSingle();
+	if (profile?.role !== "student") {
+		return Response.json({ success: false, ok: false }, { status: 403 });
+	}
+
 	const json = await req.json().catch(() => null);
 	const parsed = bodySchema.safeParse(json);
 	if (!parsed.success) {

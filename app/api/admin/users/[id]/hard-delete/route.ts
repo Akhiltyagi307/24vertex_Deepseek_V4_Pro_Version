@@ -6,7 +6,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
-import { verifyAdminTotpIfConfigured } from "@/lib/admin/auth";
+import { consumeAdminTotp, verifyAdminTotpIfConfigured } from "@/lib/admin/auth";
 import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
 import { adminActionScope, consumeAdminActionRateLimit } from "@/lib/admin/rate-limit-action";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
@@ -59,7 +59,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		}
 
 		const totpRequired = await isAdminTotpRequired();
-		const totpOk = verifyAdminTotpIfConfigured(parsed.data.totp);
+		// Consume (single-use) only when TOTP is actually being enforced; when
+		// it's optional we still verify for the `totpUsed` audit signal without
+		// burning the code's time-step.
+		const totpOk = totpRequired
+			? await consumeAdminTotp(parsed.data.totp)
+			: verifyAdminTotpIfConfigured(parsed.data.totp);
 		if (totpRequired && !totpOk) {
 			return adminErrorResponse("TOTP required", { status: 401 });
 		}

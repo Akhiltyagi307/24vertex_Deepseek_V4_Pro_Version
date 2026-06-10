@@ -17,6 +17,7 @@ export function AdminUserDangerZone({ userId, email, totpRequired }: Props) {
 	const [busy, setBusy] = useState<string | null>(null);
 	const [suspendOpen, setSuspendOpen] = useState(false);
 	const [hardOpen, setHardOpen] = useState(false);
+	const [impOpen, setImpOpen] = useState(false);
 
 	const post = async (path: string, body?: object) => {
 		const res = await fetch(path, {
@@ -95,28 +96,16 @@ export function AdminUserDangerZone({ userId, email, totpRequired }: Props) {
 			</div>
 			<div>
 				<h3 className="text-sm font-semibold">Impersonate</h3>
-				<p className="mt-1 text-sm text-muted-foreground">Opens a magic link for this user in a new tab.</p>
+				<p className="mt-1 text-sm text-muted-foreground">Opens a magic link for this user in a new tab. Requires a TOTP code.</p>
 				<Button
 					type="button"
 					variant="secondary"
 					size="sm"
 					className="mt-2"
 					disabled={!email || busy !== null}
-					onClick={async () => {
-						setBusy("imp");
-						try {
-							const res = await fetch(`/api/admin/users/${userId}/impersonate`, { method: "POST", credentials: "include" });
-							const j = (await res.json()) as { magic_link?: string; error?: string };
-							if (!res.ok || !j.magic_link) throw new Error(j.error ?? "Failed");
-							window.open(j.magic_link, "_blank", "noopener,noreferrer");
-						} catch (e) {
-							alert(e instanceof Error ? e.message : "Failed");
-						} finally {
-							setBusy(null);
-						}
-					}}
+					onClick={() => setImpOpen(true)}
 				>
-					Open magic link
+					Open magic link…
 				</Button>
 			</div>
 
@@ -148,6 +137,27 @@ export function AdminUserDangerZone({ userId, email, totpRequired }: Props) {
 					router.push("/admin/users/students");
 				}}
 				submitLabel="Delete forever"
+			/>
+
+			<DestructiveConfirm
+				open={impOpen}
+				onOpenChange={setImpOpen}
+				title="Impersonate user"
+				description="Mints a one-time magic link that signs you in AS this user. Type the user email and a fresh TOTP code."
+				confirmText={email ?? ""}
+				requireTotp
+				onConfirm={async ({ totp: t }) => {
+					const res = await fetch(`/api/admin/users/${userId}/impersonate`, {
+						method: "POST",
+						credentials: "include",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ totp: t }),
+					});
+					const j = (await res.json().catch(() => ({}))) as { magic_link?: string; error?: string };
+					if (!res.ok || !j.magic_link) throw new Error(j.error ?? "Failed");
+					window.open(j.magic_link, "_blank", "noopener,noreferrer");
+				}}
+				submitLabel="Open magic link"
 			/>
 		</div>
 	);

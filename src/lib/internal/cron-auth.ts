@@ -32,8 +32,9 @@ function isLocalDevelopmentRequest(request: Request): boolean {
 /**
  * Validates internal cron/worker requests.
  * - In production deployment: `CRON_SECRET` must be set; client must send `Authorization: Bearer <secret>`.
- * - If `CRON_SECRET` is unset: only allowed when `NODE_ENV === "development"` and the request URL host
- *   is loopback (`localhost`, `127.0.0.1`, `::1`). LAN or hosted URLs must set `CRON_SECRET` and use Bearer
+ * - If `CRON_SECRET` is unset: only allowed when `ALLOW_UNAUTHENTICATED_CRON_DEV=1`,
+ *   `NODE_ENV === "development"`, and the request URL host is loopback (`localhost`,
+ *   `127.0.0.1`, `::1`). LAN or hosted URLs must set `CRON_SECRET` and use Bearer
  *   (see `triggerWorkerInBackground`).
  * - If `CRON_SECRET` is set: requires a matching Bearer token on every host.
  */
@@ -45,7 +46,15 @@ export function assertCronRequestAuthorized(request: Request): Response | null {
 	}
 
 	if (!secret) {
-		if (process.env.NODE_ENV === "development" && isLocalDevelopmentRequest(request)) {
+		// Dev-only bypass for local loopback runs without a CRON_SECRET, gated
+		// behind an explicit opt-in flag. Without the flag, a self-host left in
+		// dev mode behind a host-rewriting reverse proxy can't reach the internal
+		// jobs unauthenticated.
+		if (
+			process.env.ALLOW_UNAUTHENTICATED_CRON_DEV === "1" &&
+			process.env.NODE_ENV === "development" &&
+			isLocalDevelopmentRequest(request)
+		) {
 			return null;
 		}
 		return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });

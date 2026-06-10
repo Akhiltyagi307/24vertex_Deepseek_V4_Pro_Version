@@ -7,7 +7,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
-import { verifyAdminTotpIfConfigured } from "@/lib/admin/auth";
+import { consumeAdminTotp } from "@/lib/admin/auth";
 import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
 import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
 import { performComplianceErasure } from "@/lib/compliance/erasure";
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			{ status: 403 },
 		);
 	}
-	if (!parsed.data.totp?.trim() || !verifyAdminTotpIfConfigured(parsed.data.totp)) {
+	if (!parsed.data.totp?.trim() || !(await consumeAdminTotp(parsed.data.totp))) {
 		return adminErrorResponse("Valid TOTP required", { status: 401 });
 	}
 	// `isAdminTotpRequired()` is preserved as an audit signal — telemetry

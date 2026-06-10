@@ -9,6 +9,7 @@ const requireAdminApi = vi.fn(async () => gateRef.value);
 const writeAdminAction = vi.fn<(input: unknown) => Promise<boolean>>(async () => true);
 const writeAdminActionStrict = vi.fn<(input: unknown) => Promise<void>>(async () => {});
 const verifyAdminTotpIfConfigured = vi.fn(() => true);
+const consumeAdminTotp = vi.fn(async () => verifyAdminTotpIfConfigured());
 const isAdminTotpRequired = vi.fn(async () => true);
 const performComplianceErasure = vi.fn(async () => ({ profiles: 1, sessions: 0 }));
 
@@ -23,7 +24,7 @@ vi.mock("@/lib/admin/audit-actions", () => ({
 		COMPLIANCE_ERASURE_COMMIT: "compliance_erasure_commit",
 	},
 }));
-vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured }));
+vi.mock("@/lib/admin/auth", () => ({ verifyAdminTotpIfConfigured, consumeAdminTotp }));
 vi.mock("@/lib/admin/feature-flags", () => ({ isAdminTotpRequired }));
 vi.mock("@/lib/compliance/erasure", () => ({ performComplianceErasure }));
 vi.mock("@/lib/compliance/schemas", () => ({
