@@ -7,6 +7,7 @@ const hasRecentTeacherRejection = vi.fn();
 const sendTeacherPendingApprovalEmail = vi.fn();
 const supabaseRpc = vi.fn();
 const redirectFn = vi.fn();
+const consumeAuthSignup = vi.fn();
 
 class RedirectAbort extends Error {
 	constructor(public to: string) {
@@ -37,6 +38,10 @@ vi.mock("@/lib/auth/audit-actions", () => ({
 	AUTH_ACTIONS: { SIGNUP_COMPLETED: "signup_completed" },
 }));
 vi.mock("@/lib/http/client-ip", () => ({ clientIpFromHeaders: () => null }));
+// Rate limiter is a separate concern (tested in tests/auth/rate-limit.test.ts);
+// mock it here so the cooldown/register assertions don't depend on a live
+// rate-limit backend (which CI lacks — the real rlConsume trips its circuit).
+vi.mock("@/lib/auth/rate-limit", () => ({ consumeAuthSignup }));
 
 function buildFormData(): FormData {
 	const fd = new FormData();
@@ -52,6 +57,7 @@ describe("completeTeacherRegistration cooldown integration", () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 		getServerUser.mockResolvedValue({ id: "user-1", email: "teacher@example.com" });
+		consumeAuthSignup.mockResolvedValue({ ok: true });
 	});
 
 	it("returns a cooldown error when hasRecentTeacherRejection is active", async () => {
