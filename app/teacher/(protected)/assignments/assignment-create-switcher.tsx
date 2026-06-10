@@ -55,11 +55,19 @@ export function AssignmentCreateSwitcher(props: {
 				/>
 			</div>
 			<div className={cn(mode !== "manual" && "hidden")}>
-				<div className="mx-auto w-full max-w-6xl px-4 py-6 medium:px-0">
+				<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
+					<div className="space-y-2">
+						<h1 className="text-2xl font-semibold tracking-tight text-foreground">Practice assignments</h1>
+						<p className="max-w-[65ch] text-muted-foreground text-sm leading-relaxed">
+							Write your own questions and publish a fixed test to students on your roster. Each learner receives
+							the same questions you author.
+						</p>
+					</div>
+
 					{props.manualDrafts.length > 0 ? (
-						<div className="mb-5 rounded-xl border border-border/70 bg-muted/15 p-4">
-							<p className="mb-2 font-medium text-foreground text-sm">Continue a draft</p>
-							<ul className="space-y-1">
+						<div className="space-y-3">
+							<p className="font-medium text-foreground text-sm">Continue a draft</p>
+							<ul className="space-y-2 rounded-xl border border-border/70 bg-muted/15 p-4 dark:bg-muted/10">
 								{props.manualDrafts.map((d) => (
 									<li key={d.id}>
 										<Link
@@ -77,6 +85,7 @@ export function AssignmentCreateSwitcher(props: {
 							</ul>
 						</div>
 					) : null}
+
 					<TeacherManualAssignmentBuilder
 						subjectsCatalog={props.subjectsCatalog}
 						topicsCatalog={props.topicsCatalog}
