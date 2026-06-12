@@ -1,6 +1,6 @@
 # 24Vertex — Portal Documentation
 
-**Snapshot:** 2026-05-31 · branch `claude/festive-goldberg-e79b4b` @ `8f69969`.
+**Snapshot:** 2026-06-12 · branch `main` @ `27d7fbb`.
 
 Detailed, LLM-oriented documentation of the 24Vertex platform (NCERT practice-test product, grades 6–12) — what each portal does, how it benefits each party, and a PDR-style spec of the **current code state** so an agent can plan next steps.
 

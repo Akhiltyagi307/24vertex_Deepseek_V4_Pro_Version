@@ -1,6 +1,6 @@
 # 24Vertex — Admin Portal
 
-**Snapshot:** 2026-05-31 · branch `claude/festive-goldberg-e79b4b` @ `8f69969`. The §8 status tags were re-verified against current code on this date (superseding the older `docs/audit/*` snapshot of 2026-05-17 — several P0/P1 items it flagged are now resolved).
+**Snapshot:** 2026-06-12 · branch `main` @ `27d7fbb`. The §8 status tags were re-verified against current code on this date (superseding the 2026-05-31 snapshot `8f69969` — the June security series M1–M3/L1–L10 closed most of the remaining auth/step-up/audit gaps, and several §8.5 hooks listed in the previous snapshot had in fact already shipped in the audit-closure PR #76).
 **Product:** 24Vertex (technical slug `vertex24`; legacy `eduai`)
 **Audience for this doc:** mixed. **[Plain]** sections are for any human reader (operators, support, business). **[Technical]** sections are dense and name concrete files, tables, routes, and flows for engineers and LLMs.
 **Scope:** `app/admin/**`, `app/api/admin/**`, `app/api/internal/**`, `src/lib/admin/**`.
@@ -46,11 +46,13 @@ Same base platform (Next.js 16 App Router, Supabase Postgres, Drizzle, Tailwind 
 
 ### 3.2 Authentication — a separate, hardened stack
 Admins do **not** use Supabase Auth. The custom stack:
-- **Credentials:** bcrypt password hash (`bcryptjs`) + **TOTP** (`otplib`) two-factor. Login core `src/lib/admin/login-core.ts`, `auth.ts`, `totp.ts`.
-- **Sessions:** signed JWTs via `jose` (`src/lib/admin/jwt-edge.ts`), stored/tracked in `admin_sessions`; short-TTL in-process cache (`api-auth.ts`).
-- **Network controls:** IP allowlist (`ip-allowlist.ts`), login rate limiting (`admin-login-rate`, `login-rate-limit.ts`).
-- **Panic revoke:** `app/api/admin/panic` bumps `jwt_version`/runtime KV to invalidate all admin tokens.
-- **Step-up:** the writable SQL console requires a fresh TOTP code.
+- **Credentials:** bcrypt password hash (`bcryptjs`, cost ≥ 12 enforced in prod) + **TOTP** (`otplib`) two-factor. Login core `src/lib/admin/login-core.ts`, `auth.ts`, `totp.ts`. TOTP-rotation runbook: `docs/admin/totp-rotation.md`.
+- **Single-use TOTP (M2):** every verification site — login and all step-ups — goes through `consumeAdminTotp()` (`auth.ts`), which compare-and-sets the code's 30s clock step into `admin_runtime_kv` (`totp_last_step`, `tryConsumeAdminTotpStep` in `runtime-pg.ts`). A replayed code is rejected; each privileged action needs a fresh code. Fails **open** on a DB error (the code is still a valid TOTP).
+- **Prod boot assertions (`instrumentation.ts`):** production refuses to start if plaintext `ADMIN_PASSWORD` is set (D1), if `SAAS_ENFORCEMENT` is not explicitly `"true"`/`"false"` (C-1), or if **neither** `ADMIN_IP_ALLOWLIST` nor `ADMIN_TOTP_SECRET` is configured (L1 — a second factor is mandatory because the login rate limiter fails open on DB error).
+- **Sessions:** signed JWTs via `jose` (`src/lib/admin/jwt-edge.ts`) with `kid`-based key rotation (`ADMIN_JWT_SECRET_vN`), stored/tracked in `admin_sessions`; short-TTL in-process cache (`api-auth.ts`). Logout revokes the jti in DB, evicts the local cache, and writes a cross-process revocation tombstone to `admin_runtime_kv` (D10, `recordAdminSessionRevocation`) so peer nodes honor it within their cache TTL.
+- **Network controls:** IP allowlist with IPv4/IPv6 + CIDR support (`ip-allowlist.ts`, D7), login rate limiting (`admin_login_rate`, `login-rate-limit.ts` — fails open but now logs loudly via `logServerError`).
+- **Panic revoke:** `app/api/admin/panic` requires `ADMIN_PANIC_TOKEN` **and** a fresh single-use TOTP (D11; refuses to run if `ADMIN_TOTP_SECRET` is unset), is per-IP rate-limited (D6, 5/10min), bumps `jwt_version`, and rotates the JWT `kid` to the next available `ADMIN_JWT_SECRET_vN`.
+- **Step-up (fresh single-use TOTP):** writable SQL console, compliance erasure, retention run-now, user hard-delete (when the `ADMIN_TOTP_REQUIRED` flag is on), **impersonation** (always, fail-closed — L3), and panic.
 - **Routes:** `app/admin/login`, `app/api/admin/auth/{login,logout,session}`. Protected pages live under `app/admin/(authenticated)/` with `layout.tsx` + `loading.tsx`.
 
 ### 3.3 Admin sections (navigation)
@@ -63,7 +65,7 @@ Under `app/admin/(authenticated)/`: `dashboard`, `users`, `organizations`, `curr
 |---|---|
 | `admin_sessions` | Active admin JWT sessions (revocable). |
 | `admin_login_rate` | Admin login attempt throttling. |
-| `admin_runtime_kv` | Runtime key/value (e.g. panic/jwt-version, feature toggles). |
+| `admin_runtime_kv` | Runtime key/value: `jwt_version` (panic), JWT `kid`, TOTP secret fingerprint, single-use TOTP `totp_last_step` (M2), per-jti `revoked:*` session tombstones (D10). |
 | `admin_saved_views` | Saved filters/views for admin lists. |
 | `admin_action_log` | Audit trail of admin actions (actor, target, before/after). |
 | `feature_flags` | Server-driven feature gating. |
@@ -80,18 +82,18 @@ Under `app/admin/(authenticated)/`: `dashboard`, `users`, `organizations`, `curr
 | Billing set (`plans`, `subscriptions`, `usage_periods`, `payments`, `coupons`, `coupon_redemptions`, `billing_events`, `billing_plan_changes`, `billing_reconciliation_drift`, `billing_action_failures`, `quota_grants`, `free_trial_claims`, `identity_blocklist`) | Full SaaS billing surface (see §3.7). |
 
 ### 3.5 API surface (overview)
-`app/api/admin/**` is the largest API area in the codebase (~130+ handlers). Major groups: `users`, `teachers`, `organizations`, `subjects`/`topics`/`context-chunks` (curriculum), `tests` (assessments), `ai/prompts`/`ai/usage`, `analytics`, `performance`, `billing`/`payments`/`plans`/`coupons`/`subscriptions`/`grants`, `broadcasts`/`email-templates`/`email-log`, `compliance`, `moderation`, `audit`, `system` (`health`, `integrity`, `sql`), `feedback`, `saved-views`, `search`, `dashboard`, `sessions`, `trial-claims`, `panic`, `jobs`. Internal cron/worker endpoints live under `app/api/internal/**` (billing reconcile/dunning/trial-emails, practice auto-submit/run-jobs/metrics, compliance-retention, health-pings, integrity-checks, weekly-digest, doubt-chat cleanup).
+`app/api/admin/**` is the largest API area in the codebase (~145 handlers). Major groups: `users`, `teachers`, `organizations`, `subjects`/`topics`/`context-chunks` (curriculum), `tests` (assessments), `ai/prompts`/`ai/usage`, `analytics`, `performance`, `billing`/`payments`/`plans`/`coupons`/`subscriptions`/`grants`, `broadcasts`/`email-templates`/`email-log`, `compliance`, `moderation`, `audit`, `system` (`health`, `integrity`, `sql`), `feedback`, `saved-views`, `search`, `dashboard`, `sessions`, `trial-claims`, `panic`, `jobs`. A CI regression test (`tests/admin/admin-routes-require-auth.test.ts`, M12) fails the build if any admin route omits `requireAdminApi()` (allowlist: the auth endpoints + panic). Internal cron/worker endpoints live under `app/api/internal/**` (billing reconcile/dunning/trial-emails/pause-auto-cancel/expire-coupons, practice auto-submit/run-jobs/metrics/**review-scheduler**, compliance-retention, health-pings, integrity-checks, weekly-digest, doubt-chat cleanup, and **`ops/cron-heartbeat`** — a queue-backlog probe that detects a stalled pg_cron→pg_net substrate independently of the substrate itself; meant to be polled by an external uptime monitor with `Bearer <CRON_SECRET>`). Internal-route auth: `src/lib/internal/cron-auth.ts` — the unauthenticated dev bypass now requires an explicit `ALLOW_UNAUTHENTICATED_CRON_DEV=1` on loopback (L5).
 
 ### 3.6 Curriculum & AI governance
 - **Curriculum:** subjects/topics CRUD (`topics/bulk`, `topics/clone-to-grade`, `subjects/reorder`), and `context-chunks` (the `topic_context_chunks` RAG source). Import tooling in `src/lib/admin/import/`. (The repo also ships skills `topics-creator`, `topic-context-creator`, `topics-questions-chunks` that turn NCERT/question-bank PDFs into importable CSVs.)
-- **AI:** `ai/prompts` (versioned prompts editable in a Monaco editor, with `test` and `activate`), `ai/usage` over `ai_calls`, moderation queue (`moderation/flags`, `moderation/blacklist`). Prompt store `src/lib/ai/prompt-store.ts`.
+- **AI:** `ai/prompts` (versioned prompts editable in a Monaco editor, with `test` and `activate`), `ai/usage` over `ai_calls`, moderation queue (`moderation/flags`, `moderation/blacklist`). Prompt store `src/lib/ai/prompt-store.ts`. The `prompts/[id]/test` route is cost-bounded: per-admin rate limit (`rlConsume`), `maxDuration = 30`, and `maxOutputTokens` clamped to `ADMIN_PROMPT_TEST_MAX_OUTPUT_TOKENS`.
 
 ### 3.7 Billing & operations
 - **Plans/coupons:** plans (`plans/[code]/sync-razorpay`), coupons (`coupons/bulk-generate`, `[code]/sync-razorpay-offers`, redemptions).
 - **Subscriptions:** rich lifecycle ops (`change-plan`, `cancel-now`/`cancel-at-period-end`, `pause`/`resume`, `force-renew`, `apply-coupon`, `staff-override`, `recompute-usage`, `grants`). Logic in `src/lib/billing/subscription-*` + `src/lib/admin/billing/`.
 - **Payments:** view + `refund` (idempotent via `admin_refund_idempotency`).
 - **Reconciliation:** `billing/events/[id]/replay`, `reconciliation/[id]/resolve`, `action-failures/[id]/{retry,resolve}` — keep local state in sync with Razorpay (`billing_reconciliation_drift`, `billing_action_failures`, `billing_events`).
-- **Jobs:** `jobs`/`jobs/queues` (pause/resume), `jobs/[id]` (retry/cancel/promote), schedules — over `operator_jobs`.
+- **Jobs:** `jobs`/`jobs/queues` (pause/resume), `jobs/[id]` (retry/cancel/promote), schedules — over `operator_jobs`. The drain (`/api/internal/admin/process-operator-jobs` → `runOperatorJobDrain`) now leases jobs and **reclaims** ones stuck active past their lease (arch review M2), reporting a `reclaimed` count.
 
 ### 3.8 Assessments operations
 `app/api/admin/tests/**`: `live` (in-flight tests), `[id]` view, `extend` (timer), `pause`/`resume`, `force-submit`, `regrade`, `void`, `refund-credit`, `message` (push a message into a live test via `admin_test_messages`), `answers`. These manipulate `tests`/`student_answers` integrity fields (`isPaused`, `adminExtensions`, `accumulatedPauseSeconds`).
@@ -99,20 +101,21 @@ Under `app/admin/(authenticated)/`: `dashboard`, `users`, `organizations`, `curr
 ### 3.9 Compliance, audit & system
 - **Compliance:** `compliance/requests/[id]/{export,erase,reject,verify-identity}` (DPDP subject-rights), `consents/[studentId]/{request,revoke}`, `retention/[entity]/run-now`. Anonymisation in `src/lib/admin/anonymize.ts`.
 - **System:** `system/health/[provider]/check` (`service_health_pings`), `system/integrity/checks/[name]/{run,fix}` (`integrity_check_results`), and the **SQL console** `system/sql/run` (read-only by default; writable mode requires fresh TOTP + table allowlist + per-verb gate + audited statement hash; parser in `src/lib/admin/sql/read-only.ts`).
-- **Users:** `[id]/{suspend,unsuspend,soft-delete,hard-delete,revoke-sessions,impersonate}` — impersonation lets support reproduce a user's view.
-- **Audit:** `admin_action_log` records actor/target/before-after for admin writes.
+- **Users:** `[id]/{suspend,unsuspend,soft-delete,hard-delete,revoke-sessions,impersonate}` — impersonation lets support reproduce a user's view; it now demands a fresh single-use TOTP (fail-closed; 403 if `ADMIN_TOTP_SECRET` is unconfigured), is rate-limited to 5/min per admin+IP, and the magic-link mint is strict-audited. **Hard delete is "erase + ban"** (`performComplianceErasure` then a permanent `ban_duration`) because `audit_logs`/`payments`/`tests` reference `auth.users` with `ON DELETE NO ACTION` — the auth row is retained, anonymized, and banned.
+- **Audit:** `admin_action_log` records actor/target/before-after for admin writes. High-blast-radius writes (~60 routes: refunds, subscription lifecycle incl. `staff-override` (L2), broadcasts send/test, compliance ops, hard-delete pre+post, impersonate, panic, SQL writes, …) use `writeAdminActionStrict` — if the audit insert fails the action is refused with a 5xx instead of committing unobserved.
+- **DB-level guards (defense in depth):** SECURITY DEFINER RPCs reachable via PostgREST now carry in-function authorization — owner/service-role checks on `refresh_student_activity_streak`, `practice_enqueue_job`, `practice_update_tracker_running` and the teacher-scope helpers; `EXECUTE` revoked from `authenticated` on `compute_student_activity_streak` (`20260702000000_security_idor_hardening.sql`). `admin_set_teacher_verified` rejects any real authenticated non-service_role caller while keeping the direct-Drizzle path (where `auth.uid()` is NULL) working, and `link_parent_to_student`'s pending/confirm flow was restored after the rebrand migration had silently reverted it (`20260706000000_restore_parent_link_confirmation_and_harden_admin_rpcs.sql`, M1+L4).
 
 ---
 
 ## 4. Capabilities, feature by feature
 
 ### 4.1 Sign in securely (2FA + IP + panic)
-- **[Plain]** Staff log in with a password and a 6-digit authenticator code, only from approved networks, and a single "panic" button can instantly log out every admin if something looks wrong.
-- **[Technical]** bcrypt + TOTP + `jose` JWT + IP allowlist + login rate limit; `panic` bumps the token version. Writable SQL needs a fresh TOTP.
+- **[Plain]** Staff log in with a password and a 6-digit authenticator code, only from approved networks. Each code works exactly once — even if someone steals a code over your shoulder, it can't be reused. The most dangerous actions (impersonating a user, erasing data, the emergency "panic" logout-everyone button) each demand a fresh code. In production the system refuses to even start without a second factor configured.
+- **[Technical]** bcrypt (cost ≥ 12) + single-use TOTP (`consumeAdminTotp`) + `jose` JWT with `kid` rotation + IP allowlist (CIDR/IPv6) + login rate limit + prod boot assertions (`instrumentation.ts`); `panic` = `ADMIN_PANIC_TOKEN` + fresh TOTP + per-IP rate limit, bumps the token version and rotates the signing key. Step-up TOTP on writable SQL, erasure, retention run-now, hard-delete (flag-gated), and impersonation.
 
 ### 4.2 Manage users
-- **[Plain]** Search any user, view their full profile and activity, suspend or delete them, reset their sessions, or temporarily "see what they see" to help with a support ticket.
-- **[Technical]** `users` list + `[userId]` detail (multi-tab) → suspend/unsuspend, soft/hard delete, revoke-sessions, impersonate. Writes audited to `admin_action_log`.
+- **[Plain]** Search any user, view their full profile and activity, suspend or delete them, reset their sessions, or temporarily "see what they see" to help with a support ticket. "Seeing what they see" and permanent deletion both require typing a fresh authenticator code, and every such action is written to a tamper-proof log before it happens — if the log can't be written, the action is refused.
+- **[Technical]** `users` list + `[userId]` detail (multi-tab) → suspend/unsuspend, soft/hard delete, revoke-sessions, impersonate. Impersonate = fail-closed single-use TOTP + 5/min rate limit; hard-delete = confirm-email + (flag-gated) TOTP + rate limit + strict pre/post audit + erase-and-ban. Writes audited to `admin_action_log`.
 
 ### 4.3 Approve teachers & manage organizations
 - **[Plain]** Review teacher sign-ups and approve, reject, or ask for more info; create schools/institutes and hand out their join codes.
@@ -143,8 +146,8 @@ Under `app/admin/(authenticated)/`: `dashboard`, `users`, `organizations`, `curr
 - **[Technical]** `compliance/requests/[id]/{verify-identity,export,erase,reject}`, `consents/[studentId]/{request,revoke}`, `retention/[entity]/run-now`; anonymisation helpers.
 
 ### 4.10 System health, jobs & SQL
-- **[Plain]** Check that all the external services are up, run data-integrity checks (and auto-fix some), manage background jobs, and — carefully — run database queries for deep support.
-- **[Technical]** `system/health`, `system/integrity` (run/fix), `jobs`/queues, and the guarded `system/sql/run` console (read-only default; writable = TOTP + allowlist + audit).
+- **[Plain]** Check that all the external services are up, run data-integrity checks (and auto-fix some), manage background jobs, and — carefully — run database queries for deep support. A dedicated heartbeat can tell an outside monitoring service when the platform's scheduled-job machinery has silently stalled, and jobs that get stuck are automatically reclaimed.
+- **[Technical]** `system/health`, `system/integrity` (run/fix), `jobs`/queues (with lease/reclaim on the drain), the guarded `system/sql/run` console (read-only default; writable = fresh single-use TOTP + allowlist + audit; per-admin action rate limit), and `/api/internal/ops/cron-heartbeat` (pg_cron-substrate stall detection via practice-job backlog, for an external uptime monitor).
 
 ### 4.11 Analytics, performance & audit
 - **[Plain]** See top-level metrics, funnels and cohorts, recompute a student's performance if needed, and review a complete log of admin actions.
@@ -191,12 +194,14 @@ Under `app/admin/(authenticated)/`: `dashboard`, `users`, `organizations`, `curr
 
 ## 7. Honest limitations & current edges — [Technical]
 
-- **Previously highest-risk paths are now hardened:** the read-only SQL console uses a real tokenizer (`sql/read-only.ts`) that rejects CTE-with-DML / multi-statement / forbidden keywords, AND the run route executes `SET TRANSACTION READ ONLY` (`system/sql/run/route.ts:~303`); the admin JWT now supports `kid`-based key rotation (`auth.ts:20-44`; panic picks the next `ADMIN_JWT_SECRET_vN`). Remaining nuance to confirm: in-process session-cache invalidation on logout across HA nodes.
-- The **plaintext `ADMIN_PASSWORD` fallback is now blocked in production** (`auth.ts:143` returns false when `NODE_ENV==='production'`); prod must use `ADMIN_PASSWORD_HASH_B64` (bcrypt).
-- **Step-up reauth** is enforced for writable SQL but not for every sensitive action (e.g. mass deletes, teacher de-verification).
-- **Per-route automated test coverage** of the ~130+ admin handlers is thin; the SQL read-only parser especially warrants table-driven tests.
+- **The previously listed auth/step-up gaps are closed:** logout invalidation across nodes (D10 tombstones in `admin_runtime_kv` + `invalidateAdminSessionCache`), plaintext-password prod block (now also a boot-time throw in `instrumentation.ts`), single-use TOTP everywhere (M2), impersonation step-up (L3), strict audit on staff-override/hard-delete/impersonate (L2), SQL-parser test suites (`tests/admin/sql-read-only.test.ts`, `sql-write-guard.test.ts`), per-route specs for every admin route group (`tests/admin/routes/`, ~124 specs), CIDR/IPv6 allowlist, and rate limits on `system/sql/run` + `panic`.
+- **Fail-open trade-offs remain by design:** `tryConsumeAdminTotpStep` returns true on a DB error (replay protection degrades during a KV outage — the code is still a valid TOTP), and the admin-login rate limiter fails open on DB error (now loud-logged, and backstopped by the boot-mandated second factor). Both are deliberate "don't lock every admin out" choices, not omissions.
+- **Step-up TOTP residue:** hard-delete only *consumes* (single-uses) the code when the `ADMIN_TOTP_REQUIRED` flag is on; soft-delete, revoke-sessions, and teacher de-verification have no TOTP step-up at all (they rely on strict audit + per-action rate limits).
+- **SQL writable-mode audit** records the statement hash but still no OLD/NEW row diff snapshot.
+- **Review-scheduler rollout knobs** (`review_scheduler_rollout_pct()`, `review_scheduler_cohort_org_ids()`, kill-switch `review_scheduler_enabled()`) are DB-side SQL functions flipped via `CREATE OR REPLACE` — there is no admin UI for them; changing the cohort is a migration/SQL-console operation on **both** Supabase projects.
+- **`/api/internal/ops/cron-heartbeat` only helps if watched:** wiring an external (non-Vercel, non-Supabase) uptime monitor to poll it is an open ops task (see route docstring).
 - Heavy client deps (Monaco editor, Recharts) and missing parallelisation affect some admin pages' performance.
-- See `docs/audit/admin-portal.md` and `docs/admin/ops-readiness.md` for the full, current punch list.
+- See `docs/audit/admin-portal.md`, `docs/admin/ops-readiness.md`, and `docs/admin/totp-rotation.md` for the full punch list and runbooks.
 
 ---
 
@@ -214,18 +219,20 @@ Under `app/admin/(authenticated)/`: `dashboard`, `users`, `organizations`, `curr
 | Phase 7 `20260510120000_admin_phase7_compliance.sql` | §4.23 | `compliance_requests`, `parental_consents`, `retention_policies` |
 | Phase 8 `20260515130000_admin_phase8_operational.sql` | §4.25/§4.27/§4.29/§4.30 | dashboard metrics + job queues (§4.25), moderation (§4.27), `service_health_pings` (§4.29), `integrity_check_results` (§4.30) |
 | Core PDR `20260412000001/2_eduai_pdr_v3_*` | §3–§5 | core data model + RLS + RPCs |
+| Security hardening `20260702000000_security_idor_hardening.sql` + `20260706000000_restore_parent_link_confirmation_and_harden_admin_rpcs.sql` | §6 (security) | in-function authz on SECURITY DEFINER RPCs; `admin_set_teacher_verified` guard; parent-link pending/confirm restored |
 | (cross-cutting) | §3.3 | command palette (jumps = navigation-only; actions confirm) |
 | (cross-cutting) | §5.4 | weekly operator digest (`src/lib/admin/digest/weekly.ts`) |
 
 ### 8.1 Entity state machines
 
-**Admin session** (`admin_sessions` + `jwt_version` in `admin_runtime_kv`)
+**Admin session** (`admin_sessions` + `jwt_version`/`kid`/tombstones in `admin_runtime_kv`)
 ```
-login (bcrypt + TOTP + IP allowlist + rate-limit) ──▶ active (jose JWT, jti in admin_sessions)
-active ──(logout)──▶ revoked        [verify: in-process session-cache invalidation across HA nodes]
-active ──(panic /api/admin/panic)──▶ ALL revoked (bump jwt_version)
+login (bcrypt + single-use TOTP + IP allowlist (CIDR/IPv6) + rate-limit) ──▶ active (jose JWT w/ kid, jti in admin_sessions)
+active ──(logout)──▶ revoked (DB) + local cache evicted + cross-process tombstone `revoked:<jti>` (D10)
+active ──(panic: ADMIN_PANIC_TOKEN + fresh TOTP, per-IP rate-limited)──▶ ALL revoked (bump jwt_version + rotate kid → next ADMIN_JWT_SECRET_vN)
 active ──(TTL elapse)──▶ re-validated against DB
-writable SQL / sensitive ops ──require fresh TOTP (step-up)──▶ allowed
+step-up ops (writable SQL · erase · retention run-now · impersonate · hard-delete*) ──fresh TOTP, consumed single-use (admin_runtime_kv.totp_last_step CAS)──▶ allowed
+   * hard-delete consumes only when ADMIN_TOTP_REQUIRED flag is on
 ```
 
 **Compliance request — `compliance_requests.status`** (PDR §4.23)
@@ -246,10 +253,11 @@ each writes admin_action_log; tabBlur/speed anomalies surfaced (anomalies.ts, §
 
 **Operator job — `jobs.status`** (PDR §4.25; table `jobs`, `operator-jobs.ts`)
 ```
-queued ──▶ running ──▶ done
-                  └──▶ failed (attempts++ ≤ maxAttempts; error)
+queued ──▶ running (leased) ──▶ done
+                  ├──▶ failed (attempts++ ≤ maxAttempts; error)
+                  └──(lease expired: stuck-active)──▶ reclaimed ──▶ queued   [arch M2]
 controls: pause/resume queue · retry/cancel/promote job
-processor: /api/internal/admin/process-operator-jobs
+processor: /api/internal/admin/process-operator-jobs (runOperatorJobDrain → {processed, stoppedForPause, reclaimed})
 ```
 
 **Billing webhook event — `billing_events`** (Razorpay)
@@ -271,7 +279,7 @@ all recorded in billing_plan_changes / payments / audit
 
 | ID | Requirement | Status | Evidence | PDR |
 |---|---|---|---|---|
-| ADM-R1 | Separate hardened admin auth: bcrypt + TOTP 2FA + IP allowlist + login rate-limit + panic revoke. | `[IMPLEMENTED]` | `login-core.ts`, `auth.ts`, `totp.ts`, `ip-allowlist.ts`, `jwt-edge.ts`, `/api/admin/panic` | §6 |
+| ADM-R1 | Separate hardened admin auth: bcrypt + TOTP 2FA + IP allowlist + login rate-limit + panic revoke. | `[IMPLEMENTED]` | `login-core.ts`, `auth.ts`, `totp.ts`, `ip-allowlist.ts` (CIDR/IPv6), `jwt-edge.ts`, `/api/admin/panic` (token + TOTP + rate limit) | §6 |
 | ADM-R2 | Append-only admin audit log of actor/target/before-after. | `[IMPLEMENTED]` | `admin_action_log` (immutable), `src/lib/admin/audit.ts` | §6 item 2 |
 | ADM-R3 | User management: view, suspend/unsuspend, soft/hard delete, revoke sessions, impersonate. | `[IMPLEMENTED]` | `app/api/admin/users/[id]/**` | §6 |
 | ADM-R4 | Teacher approval workflow (approve/reject/request-info) with history. | `[IMPLEMENTED]` | `app/api/admin/teachers/**`, `teacher_approval_history` | core |
@@ -286,17 +294,29 @@ all recorded in billing_plan_changes / payments / audit
 | ADM-R13 | Communications: broadcasts (audience filter, preview/test/schedule/send), email templates, email log + suppressions, Resend webhooks. | `[IMPLEMENTED]` | `broadcasts/**`, `email-templates/**`, `email-log/**`, `broadcasts`, `email_templates`, `comms_audit` | §4.14 |
 | ADM-R14 | Compliance/DSR: identity-verify → export/erase/reject, parental consent request/revoke, retention run-now; statutory deadline alerts. | `[IMPLEMENTED]` | `compliance/**`, `export-user-data.ts`, `erasure.ts`, `anonymize.ts`, `due-at.ts`, `alerts.ts` | §4.23 |
 | ADM-R15 | Operations: provider health checks, integrity checks (run + check-specific auto-fix), job queues. | `[IMPLEMENTED]` | `system/health/**`, `system/integrity/**`, `jobs/**`, `service_health_pings`, `integrity_check_results`, `jobs` | §4.29/§4.30/§4.25 |
-| ADM-R16 | Guarded SQL console: read-only by default; writable = fresh TOTP + table allowlist + per-verb gate + audited statement hash. | `[IMPLEMENTED]` | `system/sql/run/route.ts` runs `SET TRANSACTION READ ONLY` (~line 303); `sql/read-only.ts` tokenizer blocks DML/DDL/multi-statement; `sql/explain.ts` plan-cost gate | core (ops) |
+| ADM-R16 | Guarded SQL console: read-only by default; writable = fresh TOTP + table allowlist + per-verb gate + audited statement hash. | `[IMPLEMENTED]` | `system/sql/run/route.ts` runs `SET TRANSACTION READ ONLY` + per-admin action rate limit; TOTP is single-use (`consumeAdminTotp`); `sql/read-only.ts` tokenizer blocks DML/DDL/multi-statement; `sql/explain.ts` plan-cost gate; parser suites `tests/admin/sql-read-only.test.ts`, `sql-write-guard.test.ts` | core (ops) |
 | ADM-R17 | Analytics (overview/funnel/cohorts/export), performance recalc/reinit (+ bulk), global search, saved views, command palette. | `[IMPLEMENTED]` | `analytics/**`, `performance/**`, `search`, `saved-views`, `command-palette-registry.ts` | §3.3/§4.25 |
 | ADM-R18 | Weekly operator digest. | `[IMPLEMENTED]` | `digest/weekly.ts`, `/api/internal/admin/weekly-digest` | §5.4 |
-| ADM-R19 | Disable plaintext `ADMIN_PASSWORD` fallback in production. | `[IMPLEMENTED]` | `auth.ts:143` returns false when `NODE_ENV==='production'`; prod requires `ADMIN_PASSWORD_HASH_B64` (bcrypt) | §6 (security) |
+| ADM-R19 | Disable plaintext `ADMIN_PASSWORD` fallback in production. | `[IMPLEMENTED]` | `auth.ts` returns false when `NODE_ENV==='production'`; `instrumentation.ts` additionally **throws at boot** (D1) if `ADMIN_PASSWORD` is set in prod; prod requires `ADMIN_PASSWORD_HASH_B64` (bcrypt, cost ≥ 12) | §6 (security) |
 | ADM-R20 | Read-only SQL must block CTE-with-DML escapes. | `[IMPLEMENTED]` | `sql/read-only.ts` `findForbiddenReadOnlyTerm` tokenizes (skips strings/comments/identifiers) and rejects DML in CTEs, multi-statements, `SET ROLE`, `FOR UPDATE`; backed by txn-level `SET TRANSACTION READ ONLY` | core (security) |
-| ADM-R21 | JWT `kid`/key rotation; invalidate session cache on logout in HA. | `[IMPLEMENTED]` (kid) · `[PARTIAL]` (logout cache) | `auth.ts:20-44` kid-aware resolver + panic picks next `ADMIN_JWT_SECRET_vN`; confirm `invalidateAdminSessionCache` on logout across nodes | §6 (security) |
-| ADM-R22 | Step-up TOTP on all sensitive actions (not just writable SQL). | `[PARTIAL]` | only SQL writable mode today | §6 (security) |
-| ADM-R23 | Per-route automated tests for the ~130+ admin handlers; SQL read-only parser test suite. | `[GAP]` | sparse `tests/admin/` | — |
+| ADM-R21 | JWT `kid`/key rotation; invalidate session cache on logout in HA. | `[IMPLEMENTED]` | `auth.ts` kid-aware resolver + panic picks next `ADMIN_JWT_SECRET_vN`; logout calls `invalidateAdminSessionCache(jti)` + writes a cross-process tombstone (D10, `recordAdminSessionRevocation`); `tests/admin/session-revoke-tombstone.test.ts`, `jwt-kid-rotation.test.ts` | §6 (security) |
+| ADM-R22 | Step-up TOTP on all sensitive actions (not just writable SQL). | `[PARTIAL]` | now covers writable SQL, compliance erase, retention run-now, impersonate (fail-closed, L3), panic (D11), hard-delete (consumed only when `ADMIN_TOTP_REQUIRED` flag on) — all single-use via `consumeAdminTotp`. Remaining: soft-delete, revoke-sessions, teacher de-verification (strict audit + rate limits only) | §6 (security) |
+| ADM-R23 | Per-route automated tests for the ~145 admin handlers; SQL read-only parser test suite. | `[IMPLEMENTED]` | `tests/admin/routes/` (~124 specs, ≥1 per route group), `sql-read-only.test.ts` + `sql-write-guard.test.ts` (table-driven parser), `consume-admin-totp.test.ts`, `totp-step-consume.test.ts`; run in CI by `.github/workflows/admin-panel.yml` (+ `admin-e2e.yml` Playwright when secrets present) | — |
+| ADM-R24 | Single-use (anti-replay) admin TOTP across login and every step-up site. | `[IMPLEMENTED]` | `consumeAdminTotp` (`auth.ts`) + `tryConsumeAdminTotpStep` CAS on `admin_runtime_kv.totp_last_step` (`runtime-pg.ts`, fails open on DB error); migrated all verification sites in `0e976fe` (M2) | §6 (security) |
+| ADM-R25 | Impersonation requires fail-closed TOTP step-up + per-admin rate limit + strict audit. | `[IMPLEMENTED]` | `users/[id]/impersonate/route.ts`: 403 when `ADMIN_TOTP_SECRET` unset, 401 without fresh code, 5/min per jti+IP, `writeAdminActionStrict` before returning the magic link (L3) | §6 (security) |
+| ADM-R26 | Production boot assertions: no plaintext admin password; explicit `SAAS_ENFORCEMENT`; mandatory admin second factor (`ADMIN_IP_ALLOWLIST` and/or `ADMIN_TOTP_SECRET`). | `[IMPLEMENTED]` | `instrumentation.ts` `register()` throws (D1, C-1, L1) — a misconfigured deploy fails fast instead of shipping weakened auth | §6 (security) |
+| ADM-R27 | Fail-closed (strict) audit on high-blast-radius admin writes — action refused if the audit row can't be written. | `[IMPLEMENTED]` | `writeAdminActionStrict` on ~60 routes incl. `subscriptions/[id]/staff-override` (L2 — unlimited-access grant), hard-delete pre+post, impersonate, refunds, broadcasts send, compliance ops | §6 item 2 |
+| ADM-R28 | Hard delete = compliance erasure + permanent auth ban (auth row retained for `NO ACTION` FK consumers: `audit_logs`, `payments`, FERPA-retained `tests`). | `[IMPLEMENTED]` | `users/[id]/hard-delete/route.ts`: `performComplianceErasure` then `updateUserById(..., { ban_duration: "876600h" })`; confirm-email + rate limit + flag-gated TOTP | §4.23/§6 |
+| ADM-R29 | DB-level function authorization on SECURITY DEFINER RPCs (PostgREST IDOR hardening), incl. `admin_set_teacher_verified` and restored `link_parent_to_student` pending/confirm. | `[IMPLEMENTED]` | `20260702000000_security_idor_hardening.sql` (streak/practice/teacher-helper guards, EXECUTE revokes), `20260706000000_restore_parent_link_confirmation_and_harden_admin_rpcs.sql` (M1+L4) — applied to BOTH Supabase projects | §6 (security) |
+| ADM-R30 | CI regression guard: every admin API route enforces `requireAdminApi()`; every student/parent/teacher API route authenticates. | `[IMPLEMENTED]` | `tests/admin/admin-routes-require-auth.test.ts` (M12; allowlist = auth endpoints + panic), H5 counterpart for user-facing routes | §6 (security) |
+| ADM-R31 | Background-ops resilience: cron-substrate heartbeat + operator-job lease/reclaim + review-scheduler kill-switch & staged-rollout cohort. | `[IMPLEMENTED]` | `/api/internal/ops/cron-heartbeat` (H1, queue-backlog probe), `runOperatorJobDrain` reclaim (arch M2), `review_scheduler_enabled()` + `review_scheduler_rollout_pct()` + `review_scheduler_cohort_org_ids()` feeding nightly pg_cron → `/api/internal/practice/review-scheduler` (`20260704020000/30000`) | §4.25/§4.29 |
+| ADM-R32 | Internal cron & webhook auth hardening: explicit dev-only bypass flag; dedicated Resend bearer secret. | `[IMPLEMENTED]` | `cron-auth.ts` honors `ALLOW_UNAUTHENTICATED_CRON_DEV=1` only on loopback in dev (L5); `app/api/webhooks/resend/route.ts` manual path uses `RESEND_WEBHOOK_BEARER`, distinct from the Svix secret (L6); both documented in `.env.example` | §6 (security) |
+| ADM-R33 | Cost-bound the admin AI prompt-test endpoint. | `[IMPLEMENTED]` | `ai/prompts/[id]/test/route.ts`: per-admin `rlConsume` rate limit, `maxDuration = 30`, `maxOutputTokens` clamp | §6 (AI governance) |
 
 ### 8.3 Data contracts & invariants (enforced)
-- **Admin audit immutability** — `admin_action_log` is append-only (PDR §6 item 2). Writes precede side effects where possible.
+- **Admin audit immutability** — `admin_action_log` is append-only (PDR §6 item 2). Writes precede side effects where possible; on the strict routes (ADM-R27) a failed audit write **blocks** the action.
+- **TOTP single-use** — `admin_runtime_kv.totp_last_step` only ever advances (CAS `setWhere value_int < step`); a code whose 30s step is ≤ the stored value is a replay and is rejected (degrades open only on a KV/DB error).
+- **Hard delete never orphans FKs** — the auth row is anonymized + banned, never physically deleted (`audit_logs`/`payments`/`tests` hold `ON DELETE NO ACTION` references).
 - **Refund idempotency** — `admin_refund_idempotency.idempotency_key` PK guarantees one refund per key.
 - **Webhook idempotency** — `billing_events.razorpay_event_id` UNIQUE; reprocessing is a replay, not a double-apply.
 - **Usage-notification once** — `usage_notification_log` unique `(profile, usage_period, meter, threshold)`; server-only (RLS denies authenticated/anon).
@@ -305,13 +325,13 @@ all recorded in billing_plan_changes / payments / audit
 - **Trial once per identity** — `free_trial_claims.identity_key` PK (normalized email/phone); `identity_blocklist` blocks abusers.
 
 ### 8.4 Telemetry & observability
-- `admin_action_log` (who/what/before-after); `ai_calls` (AI cost/tokens); `service_health_pings` (provider health); `integrity_check_results` (data drift); `billing_events`/`billing_reconciliation_drift`/`billing_action_failures` (money correctness); `comms_audit`/`email_webhook_events` (delivery). Structured per-action metric counters are `[GAP]`.
+- `admin_action_log` (who/what/before-after, `totpUsed` flag, rate-limited attempts logged with `rate_limited: true`); `ai_calls` (AI cost/tokens); `service_health_pings` (provider health); `integrity_check_results` (data drift); `billing_events`/`billing_reconciliation_drift`/`billing_action_failures` (money correctness); `comms_audit`/`email_webhook_events` (delivery). New: `admin.login_rate.check_failed` loud server log when the login limiter degrades open; `/api/internal/ops/cron-heartbeat` 503s when the pg_cron substrate stalls; operator-job drain reports `reclaimed`; Sentry events for panic anomalies (`admin_panic_missing_totp_secret`, kid-rotation audit rows). Structured per-action metric counters are `[GAP]`.
 
 ### 8.5 Known gaps & next-step hooks (ordered by risk)
-1. **ADM-R20 read-only SQL hardening** `[IMPLEMENTED]` — `SET TRANSACTION READ ONLY` + tokenizer guard shipped. Remaining: add the table-driven test suite `src/lib/admin/sql/__tests__/read-only.test.ts` (CTE-with-DML, multi-statement, comment-injected DML) to lock it in.
-2. **ADM-R19 plaintext password guard** `[IMPLEMENTED]` — prod branch disabled in `auth.ts:143`. Optional: add an `instrumentation.ts` startup assertion that throws if `ADMIN_PASSWORD` is set in prod.
-3. **ADM-R21 JWT rotation** `[IMPLEMENTED]` (kid). Remaining **Hook:** confirm `/api/admin/auth/logout` calls `invalidateAdminSessionCache(jti)` (+ bump `jwt_version`) so logout is honored before TTL across HA nodes.
-4. **ADM-R22 step-up reauth** `[PARTIAL]` — **Hook:** add a `requireRecentTotp()` guard to a defined sensitive-action allowlist (mass deletes, teacher de-verify, panic).
-5. **ADM-R16 SQL audit diff** `[PARTIAL]` — **Hook:** capture OLD/NEW row JSON via `RETURNING` for DML on allowlisted tables into the audit row.
-6. **ADM-R23 tests** `[GAP]` — **Hook:** `tests/admin/routes/` (≥1 spec per route group) + Playwright for curriculum import and panic-revoke.
-7. **Rate limits** on `/api/admin/system/sql/run` and `/api/admin/panic`; **CIDR/IPv6** support in `ip-allowlist.ts`.
+*(Closed since the previous snapshot: SQL parser test suite, `instrumentation.ts` plaintext-password assertion, logout cache invalidation/D10 tombstones, per-route tests, sql/panic rate limits, CIDR/IPv6 allowlist — see ADM-R19/R21/R23/R26 above.)*
+1. **ADM-R22 step-up residue** `[PARTIAL]` — **Hook:** extend the single-use TOTP step-up to soft-delete, revoke-sessions, and teacher de-verification, and make hard-delete consume the code unconditionally (today it consumes only when the `ADMIN_TOTP_REQUIRED` flag is on, `users/[id]/hard-delete/route.ts`).
+2. **ADM-R16 SQL audit diff** `[PARTIAL]` — **Hook:** capture OLD/NEW row JSON via `RETURNING` for DML on allowlisted tables into the audit row (statement hash only today).
+3. **ADM-R24 fail-open replay window** — **Hook:** consider failing **closed** in `tryConsumeAdminTotpStep` for the two highest-blast-radius sites (impersonate, panic), or at minimum a Sentry alert on the DB-error fallback path.
+4. **ADM-R31 heartbeat unwatched** — **Hook:** wire an external (non-Vercel, non-Supabase) uptime monitor to `GET /api/internal/ops/cron-heartbeat` with `Bearer <CRON_SECRET>` every 1–5 min (see route docstring + `docs/admin/ops-readiness.md`).
+5. **Review-scheduler rollout has no admin UI** — cohort/percentage changes are `CREATE OR REPLACE FUNCTION` migrations applied to both projects. **Hook:** an `admin/system` panel (or at least a saved SQL-console snippet) over the three knobs, with audit.
+6. **Structured per-action metric counters** (§8.4) `[GAP]` — audit rows exist, but no aggregated counters/dashboards per admin action.
