@@ -53,6 +53,10 @@ jobs:
           # instrumentation.ts (C-1) refuses to boot in production unless this is
           # explicitly "true"/"false". CI audits placeholder infra, so disable.
           SAAS_ENFORCEMENT: "false"
+          # instrumentation.ts (L1) also refuses to boot in production without an
+          # admin second factor. Lighthouse only audits public pages, so this
+          # placeholder satisfies the boot guard and is never used by any auth path.
+          ADMIN_TOTP_SECRET: "AAAAAAAAAAAAAAAA"
         run: pnpm build
 
       # Background processes started in one step do NOT reliably survive into
@@ -70,6 +74,10 @@ jobs:
           # instrumentation.ts (C-1) refuses to boot in production unless this is
           # explicitly "true"/"false". CI audits placeholder infra, so disable.
           SAAS_ENFORCEMENT: "false"
+          # instrumentation.ts (L1) also refuses to boot in production without an
+          # admin second factor. Lighthouse only audits public pages, so this
+          # placeholder satisfies the boot guard and is never used by any auth path.
+          ADMIN_TOTP_SECRET: "AAAAAAAAAAAAAAAA"
         run: |
           set -e
           nohup pnpm start > server.log 2>&1 &
