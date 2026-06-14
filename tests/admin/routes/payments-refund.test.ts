@@ -14,6 +14,9 @@ const consumeAdminActionRateLimit = vi.fn(async () => ({
 	degraded: false,
 }));
 const refundPayment = vi.fn(async () => ({ id: "rfnd_test_1" }));
+const isAdminTotpRequired = vi.fn(async () => false);
+const verifyAdminTotpIfConfigured = vi.fn(() => true);
+const consumeAdminTotp = vi.fn(async () => true);
 
 // db.select() and db.insert()/.update() shapes — drizzle chain mocks.
 const paymentsSelectLimit = vi.fn();
@@ -45,6 +48,8 @@ let updateCallTarget: "idemp" | "payments" = "idemp";
 let selectCallTarget: "payments" | "idemp" = "payments";
 
 vi.mock("@/lib/admin/api-auth", () => ({ requireAdminApi }));
+vi.mock("@/lib/admin/auth", () => ({ consumeAdminTotp, verifyAdminTotpIfConfigured }));
+vi.mock("@/lib/admin/feature-flags", () => ({ isAdminTotpRequired }));
 vi.mock("@/lib/admin/audit", () => ({ writeAdminAction, writeAdminActionStrict }));
 vi.mock("@/lib/admin/audit-actions", () => ({
 	ADMIN_ACTIONS: { PAYMENT_REFUND: "payment_refund" },
@@ -104,6 +109,11 @@ describe("D32 Sprint A · POST /api/admin/payments/[id]/refund", () => {
 		idempLookupLimit.mockReset();
 		refundPayment.mockClear();
 		refundPayment.mockResolvedValue({ id: "rfnd_test_1" });
+		isAdminTotpRequired.mockReset();
+		isAdminTotpRequired.mockResolvedValue(false);
+		verifyAdminTotpIfConfigured.mockReturnValue(true);
+		consumeAdminTotp.mockReset();
+		consumeAdminTotp.mockResolvedValue(true);
 		selectCallTarget = "payments";
 		updateCallTarget = "idemp";
 	});
@@ -216,5 +226,28 @@ describe("D32 Sprint A · POST /api/admin/payments/[id]/refund", () => {
 		);
 		expect(res.status).toBe(400);
 		expect(refundPayment).not.toHaveBeenCalled();
+	});
+
+	it("401 when TOTP required and the code is missing/invalid (no Razorpay call)", async () => {
+		paymentsSelectLimit.mockResolvedValueOnce([
+			{
+				id: VALID_UUID,
+				razorpayPaymentId: "pay_xyz",
+				amountPaise: 1000,
+				refundedAt: null,
+				razorpayRefundId: null,
+			},
+		]);
+		isAdminTotpRequired.mockResolvedValueOnce(true);
+		consumeAdminTotp.mockResolvedValueOnce(false);
+		const { POST } = await import("@/app/api/admin/payments/[id]/refund/route");
+		const res = await POST(
+			refundReq({ idempotency: "abc", body: { totp: "000000" } }),
+			{ params: Promise.resolve({ id: VALID_UUID }) },
+		);
+		expect(res.status).toBe(401);
+		expect(refundPayment).not.toHaveBeenCalled();
+		// The wrong code must NOT have reserved an idempotency row.
+		expect(idempInsert).not.toHaveBeenCalled();
 	});
 });

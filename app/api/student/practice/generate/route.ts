@@ -1,4 +1,4 @@
-import { getApiRequestUser } from "@/lib/auth/api-request-user";
+import { requireApiStudent } from "@/lib/auth/api-request-user";
 import { triggerPracticeWorkerInBackground } from "@/lib/admin/practice-worker-trigger";
 import { httpStatusForGenerateFailure } from "@/lib/practice/generate-stream-envelope";
 import { preflightPracticeGeneration, safeParseGenerationInput } from "@/lib/practice/practice-generation-pipeline";
@@ -56,9 +56,12 @@ export async function POST(request: Request) {
 	const rawKey = (json as { clientRequestId?: unknown })?.clientRequestId;
 	const clientRequestId = typeof rawKey === "string" && UUID_RE.test(rawKey) ? rawKey : crypto.randomUUID();
 
-	const auth = await getApiRequestUser(request);
-	if (!auth) {
-		return Response.json({ success: false, code: "unauthorized", message: "Unauthorized." }, { status: 401 });
+	const auth = await requireApiStudent(request);
+	if (!auth.ok) {
+		return Response.json(
+			{ success: false, code: auth.status === 401 ? "unauthorized" : "forbidden", message: auth.message },
+			{ status: auth.status },
+		);
 	}
 	const { supabase, user } = auth;
 	const admin = createServiceRoleClient();

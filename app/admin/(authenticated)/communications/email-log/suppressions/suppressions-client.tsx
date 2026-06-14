@@ -60,18 +60,31 @@ export function AdminEmailSuppressionsClient() {
 			<pre className="max-h-[320px] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs">{raw}</pre>
 			<div className="space-y-2 rounded-md border border-border p-4">
 				<h2 className="text-sm font-medium">Remove suppression</h2>
-				<input
-					className="w-full rounded-md border border-border px-3 py-2 text-sm"
-					placeholder="email@domain.com"
-					value={email}
-					onChange={(e) => setEmail(e.target.value)}
-				/>
-				<input
-					className="w-full rounded-md border border-border px-3 py-2 text-sm"
-					placeholder="Reason (required)"
-					value={reason}
-					onChange={(e) => setReason(e.target.value)}
-				/>
+				<div className="flex flex-col gap-1">
+					<label className="text-xs font-medium text-muted-foreground" htmlFor="suppression-email">
+						Email address
+					</label>
+					<input
+						id="suppression-email"
+						type="email"
+						className="w-full rounded-md border border-border px-3 py-2 text-sm"
+						placeholder="email@domain.com"
+						value={email}
+						onChange={(e) => setEmail(e.target.value)}
+					/>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-xs font-medium text-muted-foreground" htmlFor="suppression-reason">
+						Reason (required)
+					</label>
+					<input
+						id="suppression-reason"
+						className="w-full rounded-md border border-border px-3 py-2 text-sm"
+						placeholder="Why are you removing this suppression?"
+						value={reason}
+						onChange={(e) => setReason(e.target.value)}
+					/>
+				</div>
 				{msg ?
 					<p className="text-sm">{msg}</p>
 				:	null}

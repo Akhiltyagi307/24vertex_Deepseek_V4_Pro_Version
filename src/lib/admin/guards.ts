@@ -3,11 +3,12 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import * as Sentry from "@sentry/nextjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
 import { verifyAdminJwt } from "@/lib/admin/auth";
+import { isAdminRequestIpAllowed } from "@/lib/admin/ip-allowlist";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { db } from "@/db";
 import { adminSessions } from "@/db/schema/admin-sessions";
@@ -16,6 +17,14 @@ import { adminSessions } from "@/db/schema/admin-sessions";
  * Server Components / Server Actions: require valid admin JWT, Redis version, non-revoked session.
  */
 export async function requireAdmin(): Promise<void> {
+	// Request-time IP allowlist for admin pages/RSC — same posture as the API
+	// guard. A leaked session cookie is unusable off-network. No-op when
+	// ADMIN_IP_ALLOWLIST is unset. On mismatch we redirect to the login page,
+	// which runs its own (identical) allowlist check and shows the block there.
+	if (!isAdminRequestIpAllowed(await headers())) {
+		redirect("/admin/login");
+	}
+
 	const jar = await cookies();
 	const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
 	if (!token) {

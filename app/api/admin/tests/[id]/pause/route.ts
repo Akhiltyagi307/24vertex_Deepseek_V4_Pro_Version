@@ -4,7 +4,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { adminAckResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		})
 		.eq("id", id);
 
-	if (error) return adminErrorResponse(error.message, { status: 500 });
+	if (error) return adminInternalErrorResponse(error, { code: "test_pause_failed" });
 
 	await writeAdminAction({
 		action: ADMIN_ACTIONS.TEST_PAUSE,

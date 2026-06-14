@@ -173,10 +173,11 @@ export async function setAdminTotpFingerprint(fingerprint: string): Promise<void
  * (the step advanced — first use), false when the stored value was already at or
  * past `step` (the code was already consumed → replay).
  *
- * Fails OPEN (returns true) on a DB error: the token is still a valid TOTP, and
- * locking admins out during a KV/DB outage is a worse tradeoff than briefly
- * losing single-use enforcement. Replay protection holds whenever the KV store
- * is healthy. Mirrors the swallow-and-degrade posture of the helpers above.
+ * Fails CLOSED (returns false) on a DB error: single-use is a security control,
+ * so when the KV store is unavailable we deny rather than silently drop replay
+ * protection. The caller has already verified the code against ADMIN_TOTP_SECRET,
+ * so a failure here only blocks the rare case of a real KV/DB outage — and the
+ * operator can retry with a fresh code on the next 30s step.
  */
 export async function tryConsumeAdminTotpStep(step: number): Promise<boolean> {
 	try {
@@ -195,7 +196,7 @@ export async function tryConsumeAdminTotpStep(step: number): Promise<boolean> {
 			.returning({ valueInt: adminRuntimeKv.valueInt });
 		return rows.length > 0;
 	} catch {
-		return true;
+		return false;
 	}
 }
 

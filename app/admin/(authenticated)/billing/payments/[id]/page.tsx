@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AdminRefundPaymentButton } from "@/components/admin/billing/admin-refund-payment-button";
 import { AdminPageHeader } from "@/components/admin/shell/admin-page-header";
+import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/auth-users";
 import { payments } from "@/db/schema/billing";
@@ -32,6 +33,7 @@ export default async function AdminBillingPaymentDetailPage({ params }: Props) {
 	const row = rows[0];
 	if (!row) notFound();
 	const p = row.p;
+	const totpRequired = await isAdminTotpRequired();
 
 	return (
 		<div className="space-y-6">
@@ -76,6 +78,7 @@ export default async function AdminBillingPaymentDetailPage({ params }: Props) {
 				amountPaise={p.amountPaise}
 				refundedAt={p.refundedAt?.toISOString() ?? null}
 				razorpayPaymentId={p.razorpayPaymentId}
+				totpRequired={totpRequired}
 			/>
 
 			<p className="text-sm text-muted-foreground">

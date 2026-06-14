@@ -4,7 +4,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { ADMIN_RESPONSE_HEADERS, adminAckResponse, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { adminGetTestReport, adminLoadQuestionAnomalies } from "@/lib/admin/tests-admin";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -26,10 +26,10 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
 		.eq("test_id", id)
 		.order("question_number", { ascending: true });
 
-	if (qErr) return adminErrorResponse(qErr.message, { status: 500 });
+	if (qErr) return adminInternalErrorResponse(qErr, { code: "tests_questions_query_failed" });
 
 	const { data: answers, error: aErr } = await admin.from("student_answers").select("*").eq("test_id", id);
-	if (aErr) return adminErrorResponse(aErr.message, { status: 500 });
+	if (aErr) return adminInternalErrorResponse(aErr, { code: "tests_answers_query_failed" });
 
 	const qAnomalies = await adminLoadQuestionAnomalies(id);
 	const report = await adminGetTestReport(id);
@@ -59,7 +59,7 @@ export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: 
 		})
 		.eq("id", id);
 
-	if (error) return adminErrorResponse(error.message, { status: 500 });
+	if (error) return adminInternalErrorResponse(error, { code: "test_soft_delete_failed" });
 
 	// Strict audit: high-stakes assessment override (the test is now expired
 	// from the student's perspective).

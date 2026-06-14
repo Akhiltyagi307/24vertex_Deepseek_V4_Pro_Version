@@ -94,10 +94,15 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		} catch (e) {
 			Sentry.captureException(e, { tags: { feature: "admin", route: "teachers_approve" } });
 			if (e instanceof AdminAuditWriteError) {
-				return adminErrorResponse(e.message, { status: 500 });
+				return adminErrorResponse("Could not record the approval audit.", {
+					status: 500,
+					code: "audit_write_failed",
+				});
 			}
-			const msg = e instanceof Error ? e.message : "Unexpected error";
-			return adminErrorResponse(msg, { status: 500 });
+			return adminErrorResponse("Failed to approve the teacher.", {
+				status: 500,
+				code: "teacher_approve_failed",
+			});
 		}
 	});
 }

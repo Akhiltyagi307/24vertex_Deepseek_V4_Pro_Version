@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ConfirmDestructive } from "@/components/admin/confirm-destructive";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +54,6 @@ export function AdminSubjectForm({ subject }: { subject: SubjectRow }) {
 	};
 
 	const softDelete = async () => {
-		if (!confirm("Deactivate this subject?")) return;
 		setBusy(true);
 		try {
 			await fetch(`/api/admin/subjects/${subject.id}`, { method: "DELETE", credentials: "include" });
@@ -100,9 +100,15 @@ export function AdminSubjectForm({ subject }: { subject: SubjectRow }) {
 				<Button type="button" onClick={() => void save()} disabled={busy}>
 					Save
 				</Button>
-				<Button type="button" variant="destructive" onClick={() => void softDelete()} disabled={busy}>
+				<ConfirmDestructive
+					title="Deactivate subject"
+					description="This hides the subject from students and teachers. You can re-activate it later."
+					confirmLabel="Deactivate"
+					disabled={busy}
+					onConfirm={softDelete}
+				>
 					Deactivate
-				</Button>
+				</ConfirmDestructive>
 			</div>
 		</div>
 	);

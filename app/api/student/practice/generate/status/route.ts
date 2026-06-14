@@ -1,4 +1,4 @@
-import { getApiRequestUser } from "@/lib/auth/api-request-user";
+import { requireApiStudent } from "@/lib/auth/api-request-user";
 import { BUCKET_INDEX, BUCKET_TOTAL, bucketForStepKey } from "@/lib/practice/generation-progress-buckets";
 import { logSupabaseError } from "@/lib/server/log-supabase-error";
 import { createServiceRoleClient, type ServiceRoleClient } from "@/lib/supabase/admin";
@@ -59,9 +59,9 @@ export async function GET(request: Request) {
 		return Response.json({ status: "error", message: "Invalid key." }, { status: 400 });
 	}
 
-	const auth = await getApiRequestUser(request);
-	if (!auth) {
-		return Response.json({ status: "error", message: "Unauthorized." }, { status: 401 });
+	const auth = await requireApiStudent(request);
+	if (!auth.ok) {
+		return Response.json({ status: "error", message: auth.message }, { status: auth.status });
 	}
 	const studentId = auth.user.id;
 	const admin = createServiceRoleClient();

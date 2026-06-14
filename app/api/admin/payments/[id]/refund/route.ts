@@ -7,6 +7,8 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
+import { consumeAdminTotp, verifyAdminTotpIfConfigured } from "@/lib/admin/auth";
+import { isAdminTotpRequired } from "@/lib/admin/feature-flags";
 import { consumeAdminActionRateLimit, adminActionScope } from "@/lib/admin/rate-limit-action";
 import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
 import { refundPayment } from "@/lib/billing/razorpay";
@@ -18,6 +20,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
 	amount_paise: z.number().int().positive().optional(),
+	totp: z.string().optional(),
 }).strict();
 
 const REFUND_RATE_LIMIT_PER_MIN = 5;
@@ -100,6 +103,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			return adminErrorResponse(
 				`Refund amount ${parsed.data.amount_paise} exceeds paid amount ${pay.amountPaise}`,
 			);
+		}
+
+		// Step-up TOTP (default-on via ADMIN_TOTP_REQUIRED). Checked AFTER the
+		// cheap validations (so a 404 / already-refunded doesn't burn a code) but
+		// BEFORE the idempotency reservation — a wrong code must never leave a key
+		// stuck in 'pending'. Consume (single-use) only when actually enforced;
+		// otherwise verify for the audit signal without burning the time-step.
+		const totpRequired = await isAdminTotpRequired();
+		const totpOk = totpRequired
+			? await consumeAdminTotp(parsed.data.totp)
+			: verifyAdminTotpIfConfigured(parsed.data.totp);
+		if (totpRequired && !totpOk) {
+			return adminErrorResponse("TOTP required", { status: 401 });
 		}
 
 		// State-aware idempotency:
@@ -231,6 +247,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			payload: { razorpay_payment_id: pay.razorpayPaymentId, razorpay_refund_id: rzpRefundId, amount_paise: amountRefunded },
 			ipAddress: ip,
 			userAgent: ua,
+			totpUsed: totpRequired && totpOk,
 		});
 
 		return adminAckResponse({ razorpay_refund_id: rzpRefundId });

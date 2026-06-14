@@ -19,9 +19,19 @@ export const adminOrganizationInputSchema = z.object({
 	type: organizationTypeSchema,
 	name: z.string().trim().min(1, "Enter an organization name.").max(300),
 	external_id: optionalTextToNull(100),
+	// Restrict to https:// — `z.string().url()` alone accepts javascript:/data:/
+	// http: schemes (the URL constructor treats them as valid). The value is
+	// rendered as an <img src>, so we keep it to a real, secure https URL.
 	favicon_url: optionalTextToNull(2000).refine(
-		(value) => value === null || z.string().url().safeParse(value).success,
-		{ message: "Invalid favicon URL." },
+		(value) => {
+			if (value === null) return true;
+			try {
+				return new URL(value).protocol === "https:";
+			} catch {
+				return false;
+			}
+		},
+		{ message: "Favicon URL must be a valid https:// URL." },
 	),
 	is_active: z.boolean().default(true),
 });

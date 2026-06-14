@@ -1,3 +1,5 @@
+import "server-only";
+
 import { timingSafeEqual } from "crypto";
 
 import { isProductionDeployment } from "@/lib/env";

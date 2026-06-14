@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 const AUTH_PATTERNS: RegExp[] = [
 	/\.auth\.getUser\s*\(/, // createClient() + supabase.auth.getUser()
 	/getApiRequestUser\s*\(/,
+	/requireApiStudent\s*\(/, // getApiRequestUser + student-role assertion
 	/getServerUser\s*\(/,
 	/requireVerifiedStudent\s*\(/,
 	/resolveStudentQnaViewer\s*\(/,

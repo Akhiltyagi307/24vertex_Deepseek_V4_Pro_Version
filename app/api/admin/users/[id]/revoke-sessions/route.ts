@@ -25,7 +25,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		const { error } = await admin.auth.admin.signOut(uuid.data, "global");
 		if (error) {
 			Sentry.captureException(error, { tags: { feature: "admin", action: "user_sessions_revoke_all" } });
-			return adminErrorResponse(error.message, { status: 502 });
+			return adminErrorResponse("Failed to revoke the user's sessions.", {
+				status: 502,
+				code: "user_sessions_revoke_failed",
+			});
 		}
 
 		await writeAdminActionStrict({

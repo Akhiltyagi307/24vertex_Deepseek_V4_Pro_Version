@@ -122,12 +122,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			await performComplianceErasure(uuid.data, { dryRun: false });
 		} catch (e) {
 			Sentry.captureException(e, { tags: { feature: "admin" } });
-			return adminErrorResponse(e instanceof Error ? e.message : "Erasure failed.", { status: 500 });
+			return adminErrorResponse("Erasure failed.", { status: 500, code: "erasure_failed" });
 		}
 		const { error } = await supabase.auth.admin.updateUserById(uuid.data, { ban_duration: "876600h" });
 		if (error) {
 			Sentry.captureException(error, { tags: { feature: "admin" } });
-			return adminErrorResponse(error.message, { status: 500 });
+			return adminErrorResponse("Failed to disable the account.", { status: 500, code: "ban_failed" });
 		}
 
 		await writeAdminActionStrict({

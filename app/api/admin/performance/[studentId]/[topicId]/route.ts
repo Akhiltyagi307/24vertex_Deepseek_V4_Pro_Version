@@ -5,7 +5,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { adminAckResponse, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ stude
 		.eq("student_id", studentId)
 		.eq("topic_id", topicId);
 
-	if (error) return adminErrorResponse(error.message, { status: 500 });
+	if (error) return adminInternalErrorResponse(error, { code: "performance_patch_failed" });
 
 	await writeAdminAction({
 		action: ADMIN_ACTIONS.PERFORMANCE_TRACKER_PATCH,

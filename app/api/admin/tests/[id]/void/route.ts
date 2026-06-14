@@ -7,7 +7,7 @@ import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { adminRefundTestCredit } from "@/lib/admin/billing/test-refund";
-import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { adminAckResponse, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 		})
 		.eq("id", testId);
 
-	if (error) return adminErrorResponse(error.message, { status: 500 });
+	if (error) return adminInternalErrorResponse(error, { code: "test_void_failed" });
 
 	// Strict audit: voiding a test ends the attempt and may refund a credit
 	// — combined assessment + billing impact.

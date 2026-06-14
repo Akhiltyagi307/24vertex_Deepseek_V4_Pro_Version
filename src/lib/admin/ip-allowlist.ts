@@ -1,5 +1,7 @@
 import "server-only";
 
+import { clientIpFromHeaders } from "@/lib/admin/api-request-meta";
+
 function allowlistEntries(): string[] | null {
 	const raw = process.env.ADMIN_IP_ALLOWLIST;
 	if (raw == null) return null;
@@ -177,4 +179,15 @@ export function isAdminIpAllowed(ip: string): boolean {
 		if (entryMatches(entry, parsed)) return true;
 	}
 	return false;
+}
+
+/**
+ * Request-time wrapper: resolve the client IP from proxy/platform headers and
+ * check it against the allowlist. Used by the Node-runtime admin guards
+ * (`requireAdminApi`, `requireAdmin`) so the allowlist gates every admin request,
+ * not just login — a stolen session cookie is then unusable off-network. A no-op
+ * (returns true) when `ADMIN_IP_ALLOWLIST` is unset.
+ */
+export function isAdminRequestIpAllowed(h: Headers): boolean {
+	return isAdminIpAllowed(clientIpFromHeaders(h));
 }

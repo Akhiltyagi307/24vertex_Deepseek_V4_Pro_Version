@@ -7,7 +7,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction } from "@/lib/admin/audit";
-import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { adminAckResponse, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { isCouponSingleUseGlobalExhausted } from "@/lib/billing/coupon-policy";
 import { PLAN_CATALOG, tokenQuotaForGrade, type PlanCode } from "@/lib/billing/plans";
 import { db } from "@/db";
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			p_tokens_quota: tokensQuota,
 		});
 
-		if (redeemErr) return adminErrorResponse(redeemErr.message, { status: 500 });
+		if (redeemErr) return adminInternalErrorResponse(redeemErr, { code: "coupon_redeem_failed" });
 		const redeemRow = Array.isArray(redeemRows) ? redeemRows[0] : redeemRows;
 		if (!redeemRow?.ok) {
 			const errorCode = String(redeemRow?.error_code ?? "database_error");

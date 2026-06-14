@@ -1,5 +1,6 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 
 /**
@@ -120,6 +121,26 @@ export function adminErrorResponse(
 	return NextResponse.json(body, {
 		status: opts.status ?? 400,
 		headers: mergeHeaders(opts.headers),
+	});
+}
+
+/**
+ * 5xx for an unexpected internal failure (DB error, upstream exception). Captures
+ * the real error to Sentry server-side and returns a GENERIC client message —
+ * never the raw `error.message` / stack, which can leak schema names, row
+ * contents, or deployment topology even on admin-gated routes. Pass a stable
+ * `code` so clients/tests branch without parsing prose; override `message` only
+ * for a non-leaking, operator-friendly hint.
+ */
+export function adminInternalErrorResponse(
+	error: unknown,
+	opts: AdminResponseOptions & { code?: string; message?: string } = {},
+): NextResponse<AdminErrorEnvelope> {
+	Sentry.captureException(error);
+	return adminErrorResponse(opts.message ?? "Something went wrong. Please try again.", {
+		status: opts.status ?? 500,
+		code: opts.code ?? "internal_error",
+		headers: opts.headers,
 	});
 }
 

@@ -114,7 +114,6 @@ import { tagTopicContextTruncated, withPracticeSpan } from "@/lib/practice/sentr
 import { getPracticeGenerationRepairBudget } from "@/lib/practice/ai-retry";
 import { consumeGenerationRateLimit } from "@/lib/practice/practice-rate-limit";
 import {
-	appendGenerationStep,
 	attachTestIdToRunAiCalls,
 	finishGenerationRun,
 	markGenerationRunAbortedIfRunning,
@@ -123,6 +122,7 @@ import {
 	type PracticeGenerationRequestMode,
 	type PracticeGenerationStepStatus,
 } from "@/lib/practice/generation-telemetry";
+import { createGenerationStepWriter } from "@/lib/practice/pipeline/generation-step-writer";
 import { finalizePracticeConfigSchema, type FinalizePracticeConfigInput } from "@/lib/practice/schemas";
 import type { PracticeConfigResolveSuccess } from "@/lib/practice/resolve-config";
 import { logPracticeObs, newPracticeCorrelationId } from "@/lib/server/practice-observability";
@@ -834,40 +834,7 @@ async function runPracticeGenerationAfterResolveCore(
 		startedAt: new Date(pipelineT0),
 	});
 	runState.generationRunId = generationRunId;
-	let stepOrder = 0;
-	const nextStepOrder = () => {
-		stepOrder += 1;
-		return stepOrder;
-	};
-	const writeGenerationStep = async (params: {
-		stepKey: string;
-		status: PracticeGenerationStepStatus;
-		model?: string | null;
-		feature?: string | null;
-		latencyMs?: number | null;
-		inputTokens?: number | null;
-		outputTokens?: number | null;
-		error?: string | null;
-		metadata?: Record<string, unknown>;
-	}) => {
-		// Surface progress to the client BEFORE the telemetry guard, so the
-		// generation checklist keeps advancing even if telemetry is unavailable.
-		opts.onStage?.({ stepKey: params.stepKey, status: params.status });
-		if (!generationRunId) return;
-		await appendGenerationStep({
-			runId: generationRunId,
-			stepOrder: nextStepOrder(),
-			stepKey: params.stepKey,
-			status: params.status,
-			model: params.model ?? null,
-			feature: params.feature ?? null,
-			latencyMs: params.latencyMs ?? null,
-			inputTokens: params.inputTokens ?? null,
-			outputTokens: params.outputTokens ?? null,
-			error: params.error ?? null,
-			metadata: params.metadata ?? {},
-		});
-	};
+	const stepWriter = createGenerationStepWriter({ generationRunId, onStage: opts.onStage });
 
 	if (opts.recordGenerateClicked !== false) {
 		void recordPracticeEvent(
@@ -899,7 +866,7 @@ async function runPracticeGenerationAfterResolveCore(
 	const tc0 = Date.now();
 	const preFetchedTopicContext = await fetchTopicContextChunksByTopicIds(admin, topicIds);
 	timingsMs.topicContextFetch = Date.now() - tc0;
-	await writeGenerationStep({
+	await stepWriter.write({
 		stepKey: "topic_context_fetch",
 		status: "ok",
 		latencyMs: timingsMs.topicContextFetch,
@@ -1005,7 +972,7 @@ async function runPracticeGenerationAfterResolveCore(
 			generationJobConfigSnapshot(jobContext),
 		);
 	}
-	await writeGenerationStep({
+	await stepWriter.write({
 		stepKey: "job_context_built",
 		status: "ok",
 		metadata: generationJobConfigSnapshot(jobContext),
@@ -1094,7 +1061,7 @@ async function runPracticeGenerationAfterResolveCore(
 					outputTokens: 0,
 				};
 		cumulativeModelMs += blueprintResult.modelMs;
-		await writeGenerationStep({
+		await stepWriter.write({
 			stepKey: "blueprint_generate",
 			status: blueprintResult.ok ? "ok" : "error",
 			model: blueprintResult.ok && "model" in blueprintResult ? blueprintResult.model : null,
@@ -1229,7 +1196,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			cumulativeModelMs += Date.now() - m0;
 
 			for (const { batch, result, stepKey } of settled) {
-				await writeGenerationStep({
+				await stepWriter.write({
 					stepKey,
 					status: result.ok ? "ok" : "error",
 					model: result.usage.model,
@@ -1286,7 +1253,7 @@ ${JSON.stringify(blueprintSlots)}`;
 					expectedTimeSumMin: Math.round(durationSeconds * 0.6),
 					expectedTimeSumMax: Math.round(durationSeconds * 1.2),
 				});
-				await writeGenerationStep({
+				await stepWriter.write({
 					stepKey: "batch_audit",
 					status: "ok",
 					metadata: {
@@ -1308,7 +1275,7 @@ ${JSON.stringify(blueprintSlots)}`;
 						abortSignal: opts.abortSignal,
 					});
 					cumulativeModelMs += editorResult.modelMs;
-					await writeGenerationStep({
+					await stepWriter.write({
 						stepKey: "batch_editor",
 						status: editorResult.ok ? "ok" : "error",
 						model: editorResult.model,
@@ -1379,7 +1346,7 @@ ${JSON.stringify(blueprintSlots)}`;
 				correlationId,
 			});
 			cumulativeModelMs += Date.now() - m0;
-			await writeGenerationStep({
+			await stepWriter.write({
 				stepKey: "question_generation",
 				status: r.ok ? "ok" : "error",
 				model: r.usage.model,
@@ -1460,7 +1427,7 @@ ${JSON.stringify(blueprintSlots)}`;
 				abortSignal: opts.abortSignal,
 			});
 			cumulativeModelMs += repaired.modelMs;
-			await writeGenerationStep({
+			await stepWriter.write({
 				stepKey,
 				status: repaired.ok ? "ok" : "error",
 				model: resolveChatModel("practice.generation.repair").modelId,
@@ -1671,7 +1638,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			},
 			{ studentId: resolved.userId },
 		);
-		await writeGenerationStep({
+		await stepWriter.write({
 			stepKey: "pipeline_failed",
 			status: "error",
 			error: attempt.message,
@@ -1761,7 +1728,7 @@ ${JSON.stringify(blueprintSlots)}`;
 		});
 	}
 
-	await writeGenerationStep({
+	await stepWriter.write({
 		stepKey: "visual_intent_gate",
 		status: "ok",
 		metadata: {
@@ -1854,7 +1821,7 @@ ${JSON.stringify(blueprintSlots)}`;
 		initialCandidateBatch.length > 0
 	) {
 		const perQ = visualEnrichmentResult.perQuestionStats;
-		await writeGenerationStep({
+		await stepWriter.write({
 			stepKey: usePerQuestionEnrichment ? "visual_enrichment_per_question" : "visual_enrichment",
 			status: visualEnrichmentResult.ok ? "ok" : "error",
 			model: resolveChatModel("practice.generation.visual_enrichment").modelId,
@@ -1968,7 +1935,7 @@ ${JSON.stringify(blueprintSlots)}`;
 				retryVisualEnrichment.patches.length > 0 ||
 				plan.batch.length > 0
 			) {
-				await writeGenerationStep({
+				await stepWriter.write({
 					stepKey: "visual_enrichment_retry",
 					status: retryVisualEnrichment.ok ? "ok" : "error",
 					model: resolveChatModel("practice.generation.visual_enrichment").modelId,
@@ -2075,7 +2042,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			}
 		}
 		if (fallbackApplied > 0) {
-			await writeGenerationStep({
+			await stepWriter.write({
 				stepKey: "visual_enrichment_fallback",
 				status: "ok",
 				feature: "practice.generation.visual_enrichment",
@@ -2115,7 +2082,7 @@ ${JSON.stringify(blueprintSlots)}`;
 		userId: resolved.userId,
 		generationRunId,
 	});
-	await writeGenerationStep({
+	await stepWriter.write({
 		stepKey: "visual_validator",
 		status: validatorResult.ok ? "ok" : "error",
 		feature: "practice.generation.validator_pass",
@@ -2174,7 +2141,7 @@ ${JSON.stringify(blueprintSlots)}`;
 				correlationId,
 				abortSignal: opts.abortSignal,
 			});
-			await writeGenerationStep({
+			await stepWriter.write({
 				stepKey: "visual_enrichment_recovery",
 				status: recoveryResult.ok ? "ok" : "error",
 				model: resolveChatModel("practice.generation.visual_enrichment").modelId,
@@ -2207,7 +2174,7 @@ ${JSON.stringify(blueprintSlots)}`;
 					userId: resolved.userId,
 					generationRunId,
 				});
-				await writeGenerationStep({
+				await stepWriter.write({
 					stepKey: "visual_validator_recheck",
 					status: recoveryValidatorResult.ok ? "ok" : "error",
 					feature: "practice.generation.validator_pass",
@@ -2247,7 +2214,7 @@ ${JSON.stringify(blueprintSlots)}`;
 			},
 			abortSignal: opts.abortSignal,
 		});
-		await writeGenerationStep({
+		await stepWriter.write({
 			stepKey: "post_assembly_validation",
 			status: v.ok ? "ok" : "error",
 			feature: "practice.generation.validation",
@@ -2377,7 +2344,7 @@ ${JSON.stringify(blueprintSlots)}`;
 		await wait(750 * attempt);
 	}
 	timingsMs.rpcPersist = Date.now() - rpcT0;
-	await writeGenerationStep({
+	await stepWriter.write({
 		stepKey: "persist_test_rpc",
 		status: rpcErr || !newTestId ? "error" : "ok",
 		latencyMs: timingsMs.rpcPersist,
