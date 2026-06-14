@@ -7,7 +7,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { AdminAuditWriteError, writeAdminActionStrict } from "@/lib/admin/audit";
-import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { adminAckResponse, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema/billing";
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			});
 		} catch (e) {
 			if (e instanceof AdminAuditWriteError) {
-				return adminErrorResponse(e.message, { status: 500 });
+				return adminInternalErrorResponse(e, { code: "audit_write_failed" });
 			}
 			throw e;
 		}

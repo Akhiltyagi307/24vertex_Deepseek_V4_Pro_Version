@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { isAdminIpAllowed } from "@/lib/admin/ip-allowlist";
+import { isAdminIpAllowed, isAdminRequestIpAllowed } from "@/lib/admin/ip-allowlist";
 
 describe("isAdminIpAllowed", () => {
 	const prev = { ...process.env };
@@ -105,5 +105,42 @@ describe("isAdminIpAllowed", () => {
 			process.env.ADMIN_IP_ALLOWLIST = "2001:db8::/32";
 			expect(isAdminIpAllowed("203.0.113.1")).toBe(false);
 		});
+	});
+});
+
+describe("isAdminRequestIpAllowed (request-time guard wrapper)", () => {
+	const prev = { ...process.env };
+
+	beforeEach(() => {
+		process.env = { ...prev };
+		vi.unstubAllEnvs();
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		process.env = { ...prev };
+	});
+
+	it("is a no-op (true) when the allowlist is unset, whatever the IP header", () => {
+		delete process.env.ADMIN_IP_ALLOWLIST;
+		expect(isAdminRequestIpAllowed(new Headers({ "x-forwarded-for": "198.51.100.5" }))).toBe(true);
+	});
+
+	it("resolves the first x-forwarded-for hop and allows a match", () => {
+		process.env.ADMIN_IP_ALLOWLIST = "203.0.113.0/24";
+		expect(
+			isAdminRequestIpAllowed(new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" })),
+		).toBe(true);
+	});
+
+	it("denies an IP not on the allowlist", () => {
+		process.env.ADMIN_IP_ALLOWLIST = "203.0.113.0/24";
+		expect(isAdminRequestIpAllowed(new Headers({ "x-forwarded-for": "198.51.100.5" }))).toBe(false);
+	});
+
+	it("denies when no IP headers are present (resolves to 0.0.0.0)", () => {
+		process.env.ADMIN_IP_ALLOWLIST = "203.0.113.0/24";
+		delete process.env.ADMIN_LOGIN_ALLOW_UNKNOWN_IP;
+		expect(isAdminRequestIpAllowed(new Headers())).toBe(false);
 	});
 });

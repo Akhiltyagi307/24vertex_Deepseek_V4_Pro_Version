@@ -105,3 +105,31 @@ export async function getApiRequestUser(request: Request): Promise<RequestAuthCo
 	if (process.env.ALLOW_API_HEADER_AUTH?.trim().toLowerCase() !== "true") return null;
 	return tryAuthorizationHeaderAuth(request);
 }
+
+export type ApiStudentResult =
+	| { ok: true; supabase: SupabaseClient; user: User }
+	| { ok: false; status: 401 | 403; message: string };
+
+/**
+ * Identity + student-role guard for student practice API routes. Builds on
+ * {@link getApiRequestUser} (so it keeps the header-auth path used by local/CI
+ * e2e tooling) and then asserts `profiles.role === 'student'` via the request's
+ * own authenticated client — RLS lets a user read only their own profile row.
+ *
+ * Closes the gap where a signed-in parent/teacher could enqueue a practice
+ * generation billed to their own account. Returns a structured result so each
+ * route can keep its existing error envelope.
+ */
+export async function requireApiStudent(request: Request): Promise<ApiStudentResult> {
+	const auth = await getApiRequestUser(request);
+	if (!auth) return { ok: false, status: 401, message: "Unauthorized." };
+	const { data, error } = await auth.supabase
+		.from("profiles")
+		.select("role")
+		.eq("id", auth.user.id)
+		.maybeSingle<{ role: string | null }>();
+	if (error || data?.role !== "student") {
+		return { ok: false, status: 403, message: "Sign in as a student to continue." };
+	}
+	return { ok: true, supabase: auth.supabase, user: auth.user };
+}

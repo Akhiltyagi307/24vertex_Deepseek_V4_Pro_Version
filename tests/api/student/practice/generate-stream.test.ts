@@ -36,7 +36,10 @@ const { pipelineMock, authMock } = vi.hoisted(() => {
 			} as Shape,
 		},
 		authMock: {
-			current: { user: { id: "stud-1" } as { id: string } | null },
+			current: {
+				user: { id: "stud-1" } as { id: string } | null,
+				role: "student" as string | null,
+			},
 		},
 	};
 });
@@ -51,10 +54,15 @@ vi.mock("@/lib/practice/practice-generation-pipeline", () => ({
 }));
 
 vi.mock("@/lib/auth/api-request-user", () => ({
-	getApiRequestUser: async () => {
+	// Mirrors the real requireApiStudent: 401 without a user, 403 unless the
+	// caller's profile role is "student", else { ok, supabase, user }.
+	requireApiStudent: async () => {
 		const u = authMock.current.user;
-		if (!u) return null;
-		return { user: u, supabase: { from: () => ({ select: () => ({}) }) } };
+		if (!u) return { ok: false, status: 401, message: "Unauthorized." };
+		if (authMock.current.role !== "student") {
+			return { ok: false, status: 403, message: "Sign in as a student to continue." };
+		}
+		return { ok: true, user: u, supabase: { from: () => ({ select: () => ({}) }) } };
 	},
 }));
 
@@ -87,6 +95,7 @@ describe("POST /api/student/practice/generate-stream", () => {
 			questions: [],
 		});
 		authMock.current.user = { id: "stud-1" };
+		authMock.current.role = "student";
 		vi.unstubAllEnvs();
 	});
 
@@ -125,6 +134,15 @@ describe("POST /api/student/practice/generate-stream", () => {
 		expect(res.status).toBe(401);
 		const body = await res.json();
 		expect(body.message).toBe("Unauthorized.");
+	});
+
+	it("returns 403 when the caller is signed in but not a student (S4 role gate)", async () => {
+		authMock.current.user = { id: "parent-1" };
+		authMock.current.role = "parent";
+		const res = await POST(makeRequest(DEFAULT_BODY));
+		expect(res.status).toBe(403);
+		const body = await res.json();
+		expect(body.message).toBe("Sign in as a student to continue.");
 	});
 
 	it("returns 402 with paywall: true when preflight reports paywall", async () => {

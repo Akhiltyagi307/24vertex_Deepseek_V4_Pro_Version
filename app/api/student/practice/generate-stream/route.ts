@@ -11,7 +11,7 @@ import {
 	httpStatusForGenerateFailure,
 } from "@/lib/practice/generate-stream-envelope";
 import { BUCKET_INDEX, BUCKET_TOTAL, bucketForStepKey } from "@/lib/practice/generation-progress-buckets";
-import { getApiRequestUser } from "@/lib/auth/api-request-user";
+import { requireApiStudent } from "@/lib/auth/api-request-user";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,9 +52,12 @@ export async function POST(request: Request) {
 		);
 	}
 
-	const auth = await getApiRequestUser(request);
-	if (!auth) {
-		return Response.json({ success: false, code: "unauthorized", message: "Unauthorized." }, { status: 401 });
+	const auth = await requireApiStudent(request);
+	if (!auth.ok) {
+		return Response.json(
+			{ success: false, code: auth.status === 401 ? "unauthorized" : "forbidden", message: auth.message },
+			{ status: auth.status },
+		);
 	}
 	const { supabase } = auth;
 

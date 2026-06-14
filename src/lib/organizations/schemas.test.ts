@@ -36,6 +36,21 @@ describe("organization schemas", () => {
 		).toThrow();
 	});
 
+	it("accepts an https favicon URL but rejects other schemes", () => {
+		const ok = adminOrganizationInputSchema.parse({
+			type: "school",
+			name: "Org",
+			favicon_url: "https://cdn.example.com/favicon.ico",
+		});
+		expect(ok.favicon_url).toBe("https://cdn.example.com/favicon.ico");
+
+		for (const bad of ["http://example.com/f.ico", "javascript:alert(1)", "data:image/png;base64,AAAA", "not a url"]) {
+			expect(() =>
+				adminOrganizationInputSchema.parse({ type: "school", name: "Org", favicon_url: bad }),
+			).toThrow();
+		}
+	});
+
 	it("identifies catalog-visible organizations only", () => {
 		expect(isCatalogOrganization({ isActive: true, deletedAt: null })).toBe(true);
 		expect(isCatalogOrganization({ isActive: false, deletedAt: null })).toBe(false);

@@ -6,7 +6,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminAction, writeAdminActionStrict } from "@/lib/admin/audit";
-import { ADMIN_RESPONSE_HEADERS, adminErrorResponse } from "@/lib/admin/response";
+import { ADMIN_RESPONSE_HEADERS, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { recordComplianceEvent } from "@/lib/compliance/events";
 import { buildComplianceExportZip } from "@/lib/compliance/export-user-data";
 import { getComplianceExportsBucket } from "@/lib/env";
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 			errorMessage: upErr.message,
 			payload: { storage_path: storagePath },
 		});
-		return adminErrorResponse(upErr.message, { status: 500 });
+		return adminInternalErrorResponse(upErr, { code: "compliance_export_upload_failed" });
 	}
 
 	const signedTtl = 60 * 60 * 24 * 7;

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ParentShell } from "@/components/parent/parent-shell";
-import { getCachedAppProfileRow } from "@/lib/auth/cached-profile";
-import { getServerUser } from "@/lib/auth/get-server-user";
+import { requireParent } from "@/lib/auth/require-parent";
 import { hasOpenAssignmentsForStudent } from "@/lib/assignments/has-open-assignments";
 import { getCachedEntitlementsForProfile } from "@/lib/billing/entitlements";
 import { formatPersonDisplayName } from "@/lib/format/person-display-name";
@@ -30,15 +29,9 @@ function isWithinParentOnboardingWindow(createdAtIso: string | null): boolean {
 }
 
 export default async function ParentPortalLayout({ children }: { children: React.ReactNode }) {
-	const user = await getServerUser();
-	if (!user) {
-		redirect("/login");
-	}
-
-	const parentRow = await getCachedAppProfileRow();
-	if (!parentRow || parentRow.role !== "parent") {
-		redirect("/login");
-	}
+	// Shared guard: redirects unauthenticated / non-parent / suspended sessions
+	// (the suspended check is new here — it matches the student/teacher layouts).
+	const { user, profile: parentRow } = await requireParent();
 
 	const activeId = await getParentActiveStudentIdFromCookie();
 	if (!activeId) {

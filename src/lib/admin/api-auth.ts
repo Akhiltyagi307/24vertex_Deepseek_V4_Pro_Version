@@ -3,11 +3,12 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import * as Sentry from "@sentry/nextjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { verifyAdminJwt } from "@/lib/admin/auth";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/constants";
+import { isAdminRequestIpAllowed } from "@/lib/admin/ip-allowlist";
 import { isAdminSessionRevoked } from "@/lib/admin/runtime-pg";
 import { isPostgresTooManyConnectionsError } from "@/lib/db/postgres-errors";
 import { db } from "@/db";
@@ -105,6 +106,18 @@ export function __resetAdminSessionCacheForTest(): void {
 }
 
 export async function requireAdminApi(): Promise<{ jti: string; sessionId: string } | NextResponse> {
+	// Request-time IP allowlist: enforce on every admin API call, not just login,
+	// so a leaked session cookie is unusable from a non-allowlisted IP. Cheapest
+	// rejection — runs before the cookie read and DB lookup. No-op when
+	// ADMIN_IP_ALLOWLIST is unset. /api/admin/panic (emergency revoke) and
+	// /api/admin/auth/login enforce their own access and do not call this guard.
+	if (!isAdminRequestIpAllowed(await headers())) {
+		return NextResponse.json(
+			{ error: "Forbidden", code: "admin_ip_blocked" },
+			{ status: 403, headers: adminHeaders() },
+		);
+	}
+
 	const jar = await cookies();
 	const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
 	if (!token) {

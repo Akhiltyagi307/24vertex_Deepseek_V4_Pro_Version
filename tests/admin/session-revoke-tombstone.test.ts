@@ -25,6 +25,9 @@ vi.mock("next/headers", () => ({
 		get: (name: string) =>
 			name === "edu_admin_session" ? { value: "FAKE.ADMIN.JWT" } : undefined,
 	})),
+	// requireAdminApi now resolves the client IP for the request-time allowlist
+	// check; ADMIN_IP_ALLOWLIST is unset in tests so this is a no-op pass.
+	headers: vi.fn(async () => new Headers()),
 }));
 
 vi.mock("@/lib/admin/auth", () => ({

@@ -5,7 +5,7 @@ import { requireAdminApi } from "@/lib/admin/api-auth";
 import { ADMIN_ACTIONS } from "@/lib/admin/audit-actions";
 import { writeAdminActionStrict } from "@/lib/admin/audit";
 import { clientIpFromRequest, userAgentFromRequest } from "@/lib/admin/api-request-meta";
-import { adminAckResponse, adminErrorResponse } from "@/lib/admin/response";
+import { adminAckResponse, adminErrorResponse, adminInternalErrorResponse } from "@/lib/admin/response";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 		.eq("id", answerId)
 		.eq("test_id", testId);
 
-	if (error) return adminErrorResponse(error.message, { status: 500 });
+	if (error) return adminInternalErrorResponse(error, { code: "answer_override_failed" });
 
 	// Strict audit: per-answer score override is a direct grade manipulation.
 	await writeAdminActionStrict({

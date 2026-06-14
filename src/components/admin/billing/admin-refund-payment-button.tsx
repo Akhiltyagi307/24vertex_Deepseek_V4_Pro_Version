@@ -11,12 +11,14 @@ type Props = {
 	amountPaise: number;
 	refundedAt: string | null;
 	razorpayPaymentId: string | null;
+	totpRequired: boolean;
 };
 
-export function AdminRefundPaymentButton({ paymentId, amountPaise, refundedAt, razorpayPaymentId }: Props) {
+export function AdminRefundPaymentButton({ paymentId, amountPaise, refundedAt, razorpayPaymentId, totpRequired }: Props) {
 	const router = useRouter();
 	const [busy, setBusy] = useState(false);
 	const [partialPaise, setPartialPaise] = useState("");
+	const [totp, setTotp] = useState("");
 
 	if (refundedAt || !razorpayPaymentId) {
 		return (
@@ -25,6 +27,8 @@ export function AdminRefundPaymentButton({ paymentId, amountPaise, refundedAt, r
 			</p>
 		);
 	}
+
+	const totpValid = !totpRequired || /^\d{6}$/.test(totp.trim());
 
 	return (
 		<div className="space-y-2 rounded-lg border border-border p-4">
@@ -44,17 +48,33 @@ export function AdminRefundPaymentButton({ paymentId, amountPaise, refundedAt, r
 					onChange={(e) => setPartialPaise(e.target.value.replace(/\D/g, ""))}
 				/>
 			</div>
+			{totpRequired ?
+				<div className="flex max-w-xs flex-col gap-1">
+					<label className="text-xs font-medium text-muted-foreground" htmlFor="refund-totp">
+						TOTP code
+					</label>
+					<Input
+						id="refund-totp"
+						inputMode="numeric"
+						autoComplete="one-time-code"
+						placeholder="000000"
+						value={totp}
+						onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+					/>
+				</div>
+			:	null}
 			<Button
 				type="button"
 				variant="destructive"
 				size="sm"
-				disabled={busy}
+				disabled={busy || !totpValid}
 				onClick={async () => {
 					if (!confirm("Submit refund to Razorpay? This cannot be undone from this panel.")) return;
 					const idempotencyKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
-					const body: { amount_paise?: number } = {};
+					const body: { amount_paise?: number; totp?: string } = {};
 					const n = partialPaise.trim() ? Number(partialPaise) : NaN;
 					if (Number.isFinite(n) && n > 0) body.amount_paise = n;
+					if (totpRequired) body.totp = totp.trim();
 					setBusy(true);
 					try {
 						const res = await fetch(`/api/admin/payments/${paymentId}/refund`, {
