@@ -98,8 +98,7 @@ export async function publishManualAssignmentAction(
 		});
 		const scope = await validatePracticeAssignmentConfigForStudents({
 			activeOrganizationId: organization?.id ?? null,
-			teacherRosterGrade: profile.teacher_roster_grade,
-			teacherRosterSubjectId: profile.teacher_roster_subject_id,
+			subjectsTaught: profile.subjects_taught,
 			config: { subject_id: config.subject_id, topic_ids: config.topic_ids },
 			studentIds: uniqueStudentIds,
 		});
@@ -171,8 +170,7 @@ export async function updatePublishedManualAssignmentAction(input: unknown): Pro
 		});
 		const scope = await validatePracticeAssignmentConfigForStudents({
 			activeOrganizationId: organization?.id ?? null,
-			teacherRosterGrade: profile.teacher_roster_grade,
-			teacherRosterSubjectId: profile.teacher_roster_subject_id,
+			subjectsTaught: profile.subjects_taught,
 			config: { subject_id: config.subject_id, topic_ids: config.topic_ids },
 			studentIds: [],
 		});

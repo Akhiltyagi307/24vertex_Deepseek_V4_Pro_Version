@@ -45,10 +45,12 @@ export function shapeReviewSummary(
 export async function loadTeacherReviewSummary(params: {
 	teacherId: string;
 	activeOrganizationId: string | null;
+	gradesInScope?: number[];
 }): Promise<TeacherReviewSummary> {
 	const roster = await listTeacherPerformanceDirectoryStudents({
 		teacherId: params.teacherId,
 		activeOrganizationId: params.activeOrganizationId,
+		gradesInScope: params.gradesInScope,
 	});
 	const studentIds = roster.map((s) => s.id);
 	if (studentIds.length === 0) return { issued: 0, completed: 0, overdue: 0 };

@@ -83,8 +83,7 @@ export async function createTeacherAssignmentAction(
 		const activeOrganization = await getActiveTeacherOrganizationSnapshot(user.id);
 		const scopeCheck = await validatePracticeAssignmentConfigForStudents({
 			activeOrganizationId: activeOrganization?.id ?? null,
-			teacherRosterGrade: profile.teacher_roster_grade,
-			teacherRosterSubjectId: profile.teacher_roster_subject_id,
+			subjectsTaught: profile.subjects_taught,
 			config: parsed.data.config,
 			studentIds: uniqueStudentIds,
 		});

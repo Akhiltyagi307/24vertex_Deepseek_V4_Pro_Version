@@ -1,13 +1,11 @@
 "use client";
 
-import { BookMarked, Building2, KeyRound, Link2, Mail, User, Users } from "lucide-react";
+import { Building2, KeyRound, Link2, Mail, User, Users } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
 	updateTeacherProfile,
-	updateTeacherTeachingFocus,
 	type UpdateTeacherProfileState,
-	type UpdateTeacherTeachingFocusState,
 } from "./account-actions";
 import {
 	joinTeacherOrganization,
@@ -21,7 +19,6 @@ import { TeacherOrganizationSection } from "./sections/organization-section";
 import { TeacherOrgStudentsDeferredTab } from "./sections/org-students-section";
 import { TeacherPasswordSection } from "./sections/password-section";
 import { TeacherProfileSection } from "./sections/profile-section";
-import { TeacherTeachingFiltersSection } from "./sections/teaching-filters-section";
 import type { TeacherAccountProfile } from "./teacher-account-settings-form-types";
 import { tabAccentClass } from "@/app/student/settings/_settings-form-styles";
 import SmoothTab from "@/components/kokonutui/smooth-tab";
@@ -61,10 +58,6 @@ export function TeacherAccountSettingsForm({
 		UpdateTeacherProfileState | undefined,
 		FormData
 	>(updateTeacherProfile, undefined);
-	const [focusState, focusAction] = useActionState<
-		UpdateTeacherTeachingFocusState | undefined,
-		FormData
-	>(updateTeacherTeachingFocus, undefined);
 	const [joinState, joinAction] = useActionState<TeacherOrganizationState | undefined, FormData>(
 		joinTeacherOrganization,
 		undefined,
@@ -77,7 +70,6 @@ export function TeacherAccountSettingsForm({
 	const feedbackRef = useRef<HTMLDivElement | null>(null);
 	const joinJumpHandledRef = useRef(false);
 	const [activateTabRequest, setActivateTabRequest] = useState<{ token: number; tabId: string } | null>(null);
-	const [gradePick, setGradePick] = useState<number>(() => profile.teacher_roster_grade ?? 9);
 
 	useEffect(() => {
 		if (!activeOrganization) {
@@ -91,7 +83,7 @@ export function TeacherAccountSettingsForm({
 		let cancelled = false;
 		queueMicrotask(() => {
 			if (!cancelled) {
-				setActivateTabRequest({ token: Date.now(), tabId: "teaching-filters" });
+				setActivateTabRequest({ token: Date.now(), tabId: "organization-students" });
 			}
 		});
 		return () => {
@@ -103,8 +95,6 @@ export function TeacherAccountSettingsForm({
 		if (
 			profileState?.error ||
 			profileState?.success ||
-			focusState?.error ||
-			focusState?.success ||
 			joinState?.error ||
 			joinState?.success ||
 			leaveState?.error ||
@@ -115,8 +105,6 @@ export function TeacherAccountSettingsForm({
 	}, [
 		profileState?.error,
 		profileState?.success,
-		focusState?.error,
-		focusState?.success,
 		joinState?.error,
 		joinState?.success,
 		leaveState?.error,
@@ -189,25 +177,6 @@ export function TeacherAccountSettingsForm({
 					},
 				]
 			: []),
-		...(activeOrganization
-			? [
-					{
-						id: "teaching-filters",
-						title: "Teaching filters",
-						icon: BookMarked,
-						color: tabAccentClass,
-						content: (
-							<TeacherTeachingFiltersSection
-								profile={profile}
-								subjectsCatalog={subjectsCatalog}
-								gradePick={gradePick}
-								setGradePick={setGradePick}
-								formAction={focusAction}
-							/>
-						),
-					},
-				]
-			: []),
 	];
 
 	return (
@@ -216,9 +185,9 @@ export function TeacherAccountSettingsForm({
 				<h1 className="text-2xl font-semibold tracking-tight">Account settings</h1>
 				<p className="text-sm text-muted-foreground">
 					Switch tabs for profile, sign-in, your institution, students linked by code when you&apos;re independent, or your
-					organization roster and teaching filters when you belong to a school.{" "}
+					organization roster when you belong to a school.{" "}
 					<span className="text-foreground">Save profile</span> only updates the Profile tab. Login email and password use
-					their own buttons; organization and teaching filters save per section.
+					their own buttons; organization changes save per section.
 				</p>
 			</div>
 
@@ -233,18 +202,6 @@ export function TeacherAccountSettingsForm({
 					<Alert className="mb-2">
 						<AlertTitle>Profile saved</AlertTitle>
 						<AlertDescription>Your details were updated.</AlertDescription>
-					</Alert>
-				) : null}
-				{focusState?.error ? (
-					<Alert variant="destructive" className="mb-2">
-						<AlertTitle>Teaching filters</AlertTitle>
-						<AlertDescription>{focusState.error}</AlertDescription>
-					</Alert>
-				) : null}
-				{focusState?.success ? (
-					<Alert className="mb-2">
-						<AlertTitle>Teaching filters saved</AlertTitle>
-						<AlertDescription>Your Link Student page will use this grade and subject.</AlertDescription>
 					</Alert>
 				) : null}
 			</div>
@@ -270,8 +227,7 @@ export function TeacherAccountSettingsForm({
 					<strong className="font-medium text-foreground">Update login email</strong> and{" "}
 					<strong className="font-medium text-foreground">Update password</strong> live on their tabs. Joining or leaving
 					an organization submits immediately; browse organization students on the Students tab, or link-code students on
-					Linked students while independent; teaching filters use{" "}
-					<strong className="font-medium text-foreground">Save teaching filters</strong>.
+					Linked students while independent.
 				</p>
 			</div>
 		</div>

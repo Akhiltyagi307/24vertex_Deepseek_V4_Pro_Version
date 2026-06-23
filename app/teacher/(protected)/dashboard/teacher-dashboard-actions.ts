@@ -5,9 +5,11 @@ import { z } from "zod";
 import {
 	loadTeacherDashboardBundleForTeacher,
 	type TeacherDashboardBundle,
+	type TeacherDashboardFilters,
 } from "./teacher-dashboard-data";
 import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
+import { coerceFiltersToScope, getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 import { consumeTeacherPortalDataActionRateLimit } from "@/lib/teachers/teacher-portal-action-rate-limit";
 import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
 import { classifyTeacherActionError } from "@/lib/teachers/classify-teacher-action-error";
@@ -41,6 +43,43 @@ const filtersSchema = z
 	})
 	.strict();
 
+/**
+ * Resolve the teacher's subject scope, clamp any out-of-scope grade/subject filter
+ * back to "all", and load the dashboard bundle bounded to the teacher's taught grades.
+ * Returns the coerced filters so the insight scope/fingerprint matches the summary.
+ */
+async function resolveScopedDashboardBundle(
+	teacherUserId: string,
+	subjectsTaught: string[] | null,
+	rawFilters: TeacherDashboardFilters,
+): Promise<{
+	bundle: TeacherDashboardBundle;
+	activeOrganizationId: string | null;
+	filters: TeacherDashboardFilters;
+}> {
+	const activeOrg = await getActiveTeacherOrganizationSnapshot(teacherUserId);
+	const scope = await getTeacherSubjectScope({
+		activeOrganizationId: activeOrg?.id ?? null,
+		subjectsTaught,
+	});
+	const coerced = coerceFiltersToScope(scope, {
+		grade: rawFilters.grade,
+		subjectId: rawFilters.subjectId,
+	});
+	const filters: TeacherDashboardFilters = {
+		grade: coerced.grade,
+		section: rawFilters.section,
+		subjectId: coerced.subjectId,
+	};
+	const bundle = await loadTeacherDashboardBundleForTeacher({
+		teacherId: teacherUserId,
+		activeOrganizationId: activeOrg?.id ?? null,
+		filters,
+		gradesInScope: scope.isScoped ? scope.grades : undefined,
+	});
+	return { bundle, activeOrganizationId: activeOrg?.id ?? null, filters };
+}
+
 export async function fetchTeacherDashboardBundle(
 	raw: unknown,
 ): Promise<TeacherDashboardBundleActionResult> {
@@ -62,13 +101,11 @@ export async function fetchTeacherDashboardBundle(
 			return { error: rate.message };
 		}
 
-		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
-
-		const bundle = await loadTeacherDashboardBundleForTeacher({
-			teacherId: session.user.id,
-			activeOrganizationId: activeOrg?.id ?? null,
-			filters: parsed.data,
-		});
+		const { bundle } = await resolveScopedDashboardBundle(
+			session.user.id,
+			session.profile.subjects_taught,
+			parsed.data,
+		);
 		breadcrumb("dashboard_loaded");
 		return bundle;
 	});
@@ -129,22 +166,17 @@ export async function generateTeacherClassInsightAction(
 			return { error: rate.message };
 		}
 
-		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
-		const bundle = await loadTeacherDashboardBundleForTeacher({
-			teacherId: session.user.id,
-			activeOrganizationId: activeOrg?.id ?? null,
-			filters: {
-				grade: parsed.data.grade,
-				section: parsed.data.section,
-				subjectId: parsed.data.subjectId,
-			},
-		});
+		const { bundle, activeOrganizationId, filters } = await resolveScopedDashboardBundle(
+			session.user.id,
+			session.profile.subjects_taught,
+			parsed.data,
+		);
 
 		try {
 			const outcome = await getOrGenerateClassInsight({
 				teacherUserId: session.user.id,
-				organizationId: activeOrg?.id ?? null,
-				scope: toClassInsightScope(parsed.data),
+				organizationId: activeOrganizationId,
+				scope: toClassInsightScope(filters),
 				scopeLabel: parsed.data.scopeLabel?.trim() || "Selected scope",
 				summary: bundle.summary,
 				forceFresh: parsed.data.force,
@@ -193,20 +225,15 @@ export async function fetchCachedClassInsightAction(
 			return { error: rate.message };
 		}
 
-		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
-		const bundle = await loadTeacherDashboardBundleForTeacher({
-			teacherId: session.user.id,
-			activeOrganizationId: activeOrg?.id ?? null,
-			filters: {
-				grade: parsed.data.grade,
-				section: parsed.data.section,
-				subjectId: parsed.data.subjectId,
-			},
-		});
+		const { bundle, filters } = await resolveScopedDashboardBundle(
+			session.user.id,
+			session.profile.subjects_taught,
+			parsed.data,
+		);
 
 		const outcome = await lookupClassInsightOnly({
 			teacherUserId: session.user.id,
-			scope: toClassInsightScope(parsed.data),
+			scope: toClassInsightScope(filters),
 			summary: bundle.summary,
 		});
 		breadcrumb(`insight_lookup_${outcome.status}`);

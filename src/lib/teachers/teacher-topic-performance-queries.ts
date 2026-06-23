@@ -14,6 +14,7 @@ export type TeacherTopicPerformanceScope = {
 	grade?: number | null;
 	section?: string | null;
 	subjectId?: string | null;
+	gradesInScope?: number[];
 };
 
 export type TeacherTopicBelowSupportLineStudent = {
@@ -68,6 +69,7 @@ export async function listTeacherTopicPerformanceRows(
 		grade: params.grade ?? undefined,
 		section: params.section ?? undefined,
 		subjectId: params.subjectId ?? undefined,
+		gradesInScope: params.gradesInScope,
 	});
 
 	if (roster.length === 0) return [];
@@ -203,6 +205,7 @@ export async function listTeacherTopicStudentBreakdown(params: {
 	grade?: number | null;
 	section?: string | null;
 	subjectId?: string | null;
+	gradesInScope?: number[];
 }): Promise<{
 	topicLabel: string;
 	chapterNumber: number | null;
@@ -216,6 +219,7 @@ export async function listTeacherTopicStudentBreakdown(params: {
 		grade: params.grade ?? undefined,
 		section: params.section ?? undefined,
 		subjectId: params.subjectId ?? undefined,
+		gradesInScope: params.gradesInScope,
 	});
 
 	const rosterById = new Map(roster.map((s) => [s.id, s]));

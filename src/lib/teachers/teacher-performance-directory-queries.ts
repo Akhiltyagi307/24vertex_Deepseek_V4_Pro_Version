@@ -80,6 +80,8 @@ export async function listTeacherPerformanceDirectoryStudents(params: {
 	grade?: number | null;
 	section?: string | null;
 	subjectId?: string | null;
+	/** When set and no explicit `grade` is given, bound the roster to these grades (teacher scope). */
+	gradesInScope?: number[];
 }): Promise<TeacherPerformanceStudentRow[]> {
 	if (params.activeOrganizationId) {
 		return listOrganizationStudentsWithFilters({
@@ -87,6 +89,7 @@ export async function listTeacherPerformanceDirectoryStudents(params: {
 			grade: params.grade ?? undefined,
 			section: params.section ?? undefined,
 			subjectId: params.subjectId ?? undefined,
+			gradesInScope: params.gradesInScope,
 		});
 	}
 
@@ -94,6 +97,8 @@ export async function listTeacherPerformanceDirectoryStudents(params: {
 
 	if (params.grade != null) {
 		conditions.push(eq(profiles.grade, params.grade));
+	} else if (params.gradesInScope && params.gradesInScope.length > 0) {
+		conditions.push(inArray(profiles.grade, params.gradesInScope));
 	}
 
 	const trimmedSection = params.section?.trim();
@@ -160,11 +165,17 @@ async function getIndependentTeacherPerformanceFilterOptions(
 export async function getTeacherPerformanceDirectoryFilterOptions(params: {
 	activeOrganizationId: string | null;
 	teacherId: string;
+	/** Teacher's taught grades; when set, the grade dropdown lists these (even grades with no students). */
+	gradesInScope?: number[];
 }): Promise<OrganizationRosterFilterOptions> {
-	if (params.activeOrganizationId) {
-		return getOrganizationRosterFilterOptions(params.activeOrganizationId);
+	const base = params.activeOrganizationId
+		? await getOrganizationRosterFilterOptions(params.activeOrganizationId)
+		: await getIndependentTeacherPerformanceFilterOptions(params.teacherId);
+	if (params.gradesInScope && params.gradesInScope.length > 0) {
+		// Sections still come from present students; grades come from the scope.
+		return { grades: [...params.gradesInScope].sort((a, b) => a - b), sections: base.sections };
 	}
-	return getIndependentTeacherPerformanceFilterOptions(params.teacherId);
+	return base;
 }
 
 /**
@@ -181,6 +192,7 @@ export async function listTeacherPerformanceDirectoryRows(params: {
 	grade?: number | null;
 	section?: string | null;
 	subjectId?: string | null;
+	gradesInScope?: number[];
 }): Promise<TeacherPerformanceDirectoryRow[]> {
 	const roster = await listTeacherPerformanceDirectoryStudents(params);
 	return enrichTeacherPerformanceDirectoryRows({

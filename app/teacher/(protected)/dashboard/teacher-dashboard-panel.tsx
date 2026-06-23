@@ -51,12 +51,10 @@ export function TeacherDashboardPanel({
 	const [dashboardError, setDashboardError] = useState<string | null>(null);
 	const [dashboardPending, setDashboardPending] = useState(false);
 
-	const gradeOptions = useMemo(() => {
-		const fromData = filterOptions.grades.length ? filterOptions.grades : [];
-		const fallback = Array.from({ length: 7 }, (_, i) => i + 6);
-		const merged = new Set(fromData.length ? fromData : fallback);
-		return [...merged].sort((a, b) => a - b);
-	}, [filterOptions.grades]);
+	const gradeOptions = useMemo(
+		() => [...new Set(filterOptions.grades)].sort((a, b) => a - b),
+		[filterOptions.grades],
+	);
 
 	const subjectOptions = useMemo(() => {
 		if (grade === "all") return subjectsCatalog;

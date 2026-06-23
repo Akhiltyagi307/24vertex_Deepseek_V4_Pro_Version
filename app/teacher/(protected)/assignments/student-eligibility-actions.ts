@@ -62,8 +62,7 @@ export async function previewEligibleStudentIdsForPracticeAssignment(
 		const activeOrganization = await getActiveTeacherOrganizationSnapshot(session.user.id);
 		const eligibility = await resolvePracticeAssignmentEligibleStudentIds({
 			activeOrganizationId: activeOrganization?.id ?? null,
-			teacherRosterGrade: session.profile.teacher_roster_grade,
-			teacherRosterSubjectId: session.profile.teacher_roster_subject_id,
+			subjectsTaught: session.profile.subjects_taught,
 			config: {
 				subject_id: parsed.data.subjectId,
 				topic_ids: parsed.data.topicIds,

@@ -9,6 +9,7 @@ import {
 	listTeacherPerformanceDirectoryRows,
 } from "@/lib/teachers/teacher-performance-directory-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
+import { filterSubjectsCatalogToScope, getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 import { loadTeacherReviewSummary } from "@/lib/teachers/teacher-review-summary";
 import { TeacherReviewSummaryCard } from "@/components/teacher/review-summary-card";
 
@@ -32,14 +33,21 @@ export default async function TeacherStudentPerformanceDirectoryPage({ searchPar
 	const { user } = session;
 
 	const activeOrg = await getActiveTeacherOrganizationSnapshot(user.id);
+	const scope = await getTeacherSubjectScope({
+		activeOrganizationId: activeOrg?.id ?? null,
+		subjectsTaught: session.profile.subjects_taught,
+	});
+	const gradesInScope = scope.isScoped ? scope.grades : undefined;
 
-	const [subjectsCatalog, filterOptions] = await Promise.all([
+	const [subjectsCatalogAll, filterOptions] = await Promise.all([
 		listActiveSubjectsCatalog(),
 		getTeacherPerformanceDirectoryFilterOptions({
 			teacherId: user.id,
 			activeOrganizationId: activeOrg?.id ?? null,
+			gradesInScope,
 		}),
 	]);
+	const subjectsCatalog = filterSubjectsCatalogToScope(scope, subjectsCatalogAll);
 	const sp = await searchParams;
 	const initialSubjectId =
 		sp.subject && subjectsCatalog.some((subject) => subject.id === sp.subject) ? sp.subject : "all";
@@ -48,6 +56,7 @@ export default async function TeacherStudentPerformanceDirectoryPage({ searchPar
 		teacherId: user.id,
 		activeOrganizationId: activeOrg?.id ?? null,
 		subjectId: initialSubjectId === "all" ? undefined : initialSubjectId,
+		gradesInScope,
 	});
 
 	const workspaceDescription = activeOrg
@@ -57,6 +66,7 @@ export default async function TeacherStudentPerformanceDirectoryPage({ searchPar
 	const reviewSummary = await loadTeacherReviewSummary({
 		teacherId: user.id,
 		activeOrganizationId: activeOrg?.id ?? null,
+		gradesInScope,
 	});
 
 	return (

@@ -43,8 +43,8 @@ export function TeacherOrganizationSection({
 				{joinState?.error ? <p className="text-sm text-destructive">{joinState.error}</p> : null}
 				{joinState?.success ? (
 					<p className="text-sm text-muted-foreground">
-						Organization connected. Use the <span className="font-medium text-foreground">Teaching filters</span> tab (opened
-						for you) to choose grade and subject for roster data.
+						Organization connected. Use the <span className="font-medium text-foreground">Students</span> tab (opened
+						for you) to browse your organization roster.
 					</p>
 				) : null}
 				{leaveState?.error ? <p className="text-sm text-destructive">{leaveState.error}</p> : null}

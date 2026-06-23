@@ -7,6 +7,7 @@ import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/querie
 import { getTeacherPerformanceDirectoryFilterOptions } from "@/lib/teachers/teacher-performance-directory-queries";
 import { listTeacherTopicPerformanceRows } from "@/lib/teachers/teacher-topic-performance-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
+import { filterSubjectsCatalogToScope, getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 
 // Authenticated teacher topic analytics are roster-scoped and should not be statically cached.
 export const dynamic = "force-dynamic";
@@ -28,14 +29,21 @@ export default async function TeacherTopicPerformancePage({ searchParams }: Page
 	const { user } = session;
 
 	const activeOrg = await getActiveTeacherOrganizationSnapshot(user.id);
+	const scope = await getTeacherSubjectScope({
+		activeOrganizationId: activeOrg?.id ?? null,
+		subjectsTaught: session.profile.subjects_taught,
+	});
+	const gradesInScope = scope.isScoped ? scope.grades : undefined;
 
-	const [subjectsCatalog, filterOptions] = await Promise.all([
+	const [subjectsCatalogAll, filterOptions] = await Promise.all([
 		listActiveSubjectsCatalog(),
 		getTeacherPerformanceDirectoryFilterOptions({
 			teacherId: user.id,
 			activeOrganizationId: activeOrg?.id ?? null,
+			gradesInScope,
 		}),
 	]);
+	const subjectsCatalog = filterSubjectsCatalogToScope(scope, subjectsCatalogAll);
 	const sp = await searchParams;
 	const initialSubjectId =
 		sp.subject && subjectsCatalog.some((subject) => subject.id === sp.subject) ? sp.subject : "all";
@@ -44,6 +52,7 @@ export default async function TeacherTopicPerformancePage({ searchParams }: Page
 		teacherId: user.id,
 		activeOrganizationId: activeOrg?.id ?? null,
 		subjectId: initialSubjectId === "all" ? undefined : initialSubjectId,
+		gradesInScope,
 	});
 
 	const workspaceDescription = activeOrg

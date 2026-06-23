@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { profiles } from "@/db/schema/profiles";
@@ -52,11 +52,15 @@ export async function listOrganizationStudentsWithFilters(params: {
 	grade?: number | null;
 	section?: string | null;
 	subjectId?: string | null;
+	/** When set and no explicit `grade` is given, bound the roster to these grades (teacher scope). */
+	gradesInScope?: number[];
 }): Promise<OrganizationRosterStudentRow[]> {
 	const conditions = [organizationStudentBaseConditions(params.organizationId)];
 
 	if (params.grade != null) {
 		conditions.push(eq(profiles.grade, params.grade));
+	} else if (params.gradesInScope && params.gradesInScope.length > 0) {
+		conditions.push(inArray(profiles.grade, params.gradesInScope));
 	}
 
 	const trimmedSection = params.section?.trim();

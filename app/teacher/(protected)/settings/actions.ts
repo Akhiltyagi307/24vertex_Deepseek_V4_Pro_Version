@@ -287,9 +287,8 @@ export async function unlinkTeacherFromStudent(
 		}
 		const supabase = await createClient();
 
-		// Tenant boundary: `unlink_teacher_from_student` filters on
-		// `teacher_id = auth.uid() AND student_id = p_student_id` server-side
-		// (supabase/migrations/20260617103000_teacher_roster_and_unlink_student.sql:127),
+		// Tenant boundary: the `unlink_teacher_from_student` RPC filters on
+		// `teacher_id = auth.uid() AND student_id = p_student_id` server-side,
 		// so an unrelated student id resolves to a no-op rather than a cross-tenant write.
 		const { error } = await supabase.rpc("unlink_teacher_from_student", {
 			p_student_id: studentId,
