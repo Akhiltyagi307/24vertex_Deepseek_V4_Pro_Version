@@ -57,8 +57,7 @@ describe("createTeacherAssignmentAction", () => {
 			role: "teacher",
 			is_verified: true,
 			is_suspended: false,
-			teacher_roster_grade: 10,
-			teacher_roster_subject_id: SUBJECT,
+			subjects_taught: [SUBJECT],
 		});
 		rlConsume.mockResolvedValue({ allowed: true, remaining: 119, resetAt: new Date() });
 		getActiveTeacherOrganizationSnapshot.mockResolvedValue({ id: "org-1" });

@@ -10,6 +10,7 @@ import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
 import { handleVerifiedTeacherSessionFailure } from "@/lib/auth/handle-verified-teacher-session-failure";
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
 import { listTeacherTopicStudentBreakdown } from "@/lib/teachers/teacher-topic-performance-queries";
+import { coerceFiltersToScope, getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 
 // Authenticated teacher topic breakdowns are roster-scoped and should not be statically cached.
 export const dynamic = "force-dynamic";
@@ -94,18 +95,32 @@ export default async function TeacherTopicPerformanceBreakdownPage({ params, sea
 	const activeOrg = await getActiveTeacherOrganizationSnapshot(user.id);
 	const sp = await searchParams;
 	const filters = parseFilters(sp);
+	const scope = await getTeacherSubjectScope({
+		activeOrganizationId: activeOrg?.id ?? null,
+		subjectsTaught: session.profile.subjects_taught,
+	});
+	const coerced = coerceFiltersToScope(scope, {
+		grade: filters.grade ?? "all",
+		subjectId: filters.subjectId ?? "all",
+	});
+	const effectiveFilters = {
+		grade: coerced.grade === "all" ? undefined : coerced.grade,
+		section: filters.section,
+		subjectId: coerced.subjectId === "all" ? undefined : coerced.subjectId,
+	};
 
 	const { topicLabel, chapterNumber, subjectName, topicSubjectId, rows } =
 		await listTeacherTopicStudentBreakdown({
 		teacherId: user.id,
 		activeOrganizationId: activeOrg?.id ?? null,
 		topicId,
-		grade: filters.grade,
-		section: filters.section,
-		subjectId: filters.subjectId,
+		grade: effectiveFilters.grade,
+		section: effectiveFilters.section,
+		subjectId: effectiveFilters.subjectId,
+		gradesInScope: scope.isScoped ? scope.grades : undefined,
 	});
 
-	const backHref = breakdownListHref(filters);
+	const backHref = breakdownListHref(effectiveFilters);
 
 	return (
 		<div className="mx-auto w-full max-w-6xl px-4 py-4 medium:px-6 medium:py-6">

@@ -32,8 +32,7 @@ describe("previewEligibleStudentIdsForPracticeAssignment", () => {
 			role: "teacher",
 			is_verified: true,
 			is_suspended: false,
-			teacher_roster_grade: 10,
-			teacher_roster_subject_id: SUBJECT,
+			subjects_taught: [SUBJECT],
 		});
 		rlConsume.mockResolvedValue({
 			allowed: true,
@@ -65,8 +64,7 @@ describe("previewEligibleStudentIdsForPracticeAssignment", () => {
 		expect(resolvePracticeAssignmentEligibleStudentIds).toHaveBeenCalledWith(
 			expect.objectContaining({
 				activeOrganizationId: "org-1",
-				teacherRosterGrade: 10,
-				teacherRosterSubjectId: SUBJECT,
+				subjectsTaught: [SUBJECT],
 				studentIds: [STUDENT_A],
 			}),
 		);

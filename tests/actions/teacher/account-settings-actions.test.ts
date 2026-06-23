@@ -4,14 +4,12 @@ vi.mock("server-only", () => ({}));
 
 const getServerUser = vi.fn();
 const getCachedAppProfileRow = vi.fn();
-const getActiveTeacherOrganizationSnapshot = vi.fn();
 const revalidatePath = vi.fn();
 const isOwnSupabaseAvatarUrl = vi.fn();
 
 type ChainBuilder = ReturnType<typeof buildSupabaseChain>;
 
 function buildSupabaseChain() {
-	const subjectMaybeSingle = vi.fn();
 	const profilesUpdate = vi.fn();
 
 	const fromMap: Record<string, () => unknown> = {
@@ -23,35 +21,25 @@ function buildSupabaseChain() {
 				return { eq: eqUserId };
 			},
 		}),
-		subjects: () => ({
-			select: () => ({
-				eq: () => ({
-					maybeSingle: () => subjectMaybeSingle(),
-				}),
-			}),
-		}),
 	};
 
 	const supabase = {
 		from: (table: string) => fromMap[table]?.() ?? {},
 	};
 
-	return { supabase, subjectMaybeSingle, profilesUpdate };
+	return { supabase, profilesUpdate };
 }
 
 let chain: ChainBuilder;
 
 vi.mock("@/lib/auth/get-server-user", () => ({ getServerUser }));
 vi.mock("@/lib/auth/cached-profile", () => ({ getCachedAppProfileRow }));
-vi.mock("@/lib/organizations/queries", () => ({ getActiveTeacherOrganizationSnapshot }));
 vi.mock("@/lib/supabase/server", () => ({
 	createClient: () => Promise.resolve(chain.supabase),
 }));
 vi.mock("@/lib/supabase/avatar-storage-url", () => ({ isOwnSupabaseAvatarUrl }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/server/log-supabase-error", () => ({ logSupabaseError: vi.fn() }));
-
-const SUBJECT = "11111111-1111-4111-8111-111111111111";
 
 describe("teacher account/settings actions", () => {
 	beforeEach(() => {
@@ -70,8 +58,7 @@ describe("teacher account/settings actions", () => {
 			full_name: "Jane",
 			avatar_url: overrides.avatar_url ?? null,
 			phone: overrides.phone ?? null,
-			teacher_roster_grade: null,
-			teacher_roster_subject_id: null,
+			subjects_taught: null,
 		});
 	}
 
@@ -103,37 +90,5 @@ describe("teacher account/settings actions", () => {
 		const result = await updateTeacherProfile(undefined, fd);
 		expect(result).toEqual({ success: true });
 		expect(chain.profilesUpdate).toHaveBeenCalledTimes(1);
-	});
-
-	it("updateTeacherTeachingFocus rejects when no active org", async () => {
-		arrangeTeacher();
-		getActiveTeacherOrganizationSnapshot.mockResolvedValue(null);
-		const fd = new FormData();
-		fd.set("grade", "10");
-		fd.set("subjectId", SUBJECT);
-		const { updateTeacherTeachingFocus } = await import(
-			"@/app/teacher/(protected)/settings/account-actions"
-		);
-		const result = await updateTeacherTeachingFocus(undefined, fd);
-		expect(result.error).toMatch(/join an organization/i);
-		expect(chain.profilesUpdate).not.toHaveBeenCalled();
-	});
-
-	it("updateTeacherTeachingFocus rejects on grade/subject mismatch", async () => {
-		arrangeTeacher();
-		getActiveTeacherOrganizationSnapshot.mockResolvedValue({ id: "org-1" });
-		chain.subjectMaybeSingle.mockResolvedValue({
-			data: { id: SUBJECT, grade: 11, is_active: true },
-			error: null,
-		});
-		const fd = new FormData();
-		fd.set("grade", "10");
-		fd.set("subjectId", SUBJECT);
-		const { updateTeacherTeachingFocus } = await import(
-			"@/app/teacher/(protected)/settings/account-actions"
-		);
-		const result = await updateTeacherTeachingFocus(undefined, fd);
-		expect(result.error).toMatch(/does not match/i);
-		expect(chain.profilesUpdate).not.toHaveBeenCalled();
 	});
 });

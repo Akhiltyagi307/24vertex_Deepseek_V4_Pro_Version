@@ -15,6 +15,7 @@ import {
 	listTeacherPerformanceDirectoryStudents,
 	type TeacherPerformanceStudentRow,
 } from "@/lib/teachers/teacher-performance-directory-queries";
+import { getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 
 import {
 	assignmentConfigBaseSchema,
@@ -105,14 +106,14 @@ export async function listAssignmentTopicCatalog(): Promise<AssignmentTopicCatal
 export async function listTeacherAssignmentSubjectCatalog(teacherId: string): Promise<AssignmentTopicCatalogRow[]> {
 	const activeOrganization = await getActiveTeacherOrganizationSnapshot(teacherId);
 	const [teacher] = await db
-		.select({ teacherRosterSubjectId: profiles.teacherRosterSubjectId })
+		.select({ subjectsTaught: profiles.subjectsTaught })
 		.from(profiles)
 		.where(eq(profiles.id, teacherId))
 		.limit(1);
 
-	if (!activeOrganization) return listAssignmentTopicCatalog();
-	const subjectId = teacher?.teacherRosterSubjectId;
-	if (!subjectId) return [];
+	// Unscoped (independent, or org teacher with no chosen subjects) ⇒ full catalog.
+	const taught = [...new Set((teacher?.subjectsTaught ?? []).filter(Boolean))];
+	if (!activeOrganization || taught.length === 0) return listAssignmentTopicCatalog();
 
 	const rows = await db
 		.select({
@@ -126,7 +127,7 @@ export async function listTeacherAssignmentSubjectCatalog(teacherId: string): Pr
 			topicName: topics.topicName,
 		})
 		.from(topics)
-		.where(and(eq(topics.isActive, true), eq(topics.subjectId, subjectId)))
+		.where(and(eq(topics.isActive, true), inArray(topics.subjectId, taught)))
 		.orderBy(asc(topics.grade), asc(topics.unitNumber), asc(topics.chapterNumber), asc(topics.topicNumber));
 	return rows;
 }
@@ -135,19 +136,20 @@ export const listTeacherAssignableStudents = cache(async (teacherId: string): Pr
 	const activeOrganization = await getActiveTeacherOrganizationSnapshot(teacherId);
 	if (activeOrganization) {
 		const [teacher] = await db
-			.select({
-				grade: profiles.teacherRosterGrade,
-				subjectId: profiles.teacherRosterSubjectId,
-			})
+			.select({ subjectsTaught: profiles.subjectsTaught })
 			.from(profiles)
 			.where(eq(profiles.id, teacherId))
 			.limit(1);
-		if (teacher?.grade == null || !teacher.subjectId) return [];
+		const scope = await getTeacherSubjectScope({
+			activeOrganizationId: activeOrganization.id,
+			subjectsTaught: teacher?.subjectsTaught ?? null,
+		});
+		// Scoped ⇒ all students in the teacher's taught grades; unscoped ⇒ whole org.
+		// Per-assignment validation enforces "student takes the chosen subject" at publish.
 		return listTeacherPerformanceDirectoryStudents({
 			teacherId,
 			activeOrganizationId: activeOrganization.id,
-			grade: teacher.grade,
-			subjectId: teacher.subjectId,
+			gradesInScope: scope.isScoped ? scope.grades : undefined,
 		});
 	}
 	return listTeacherPerformanceDirectoryStudents({
@@ -345,8 +347,7 @@ export async function createPublishedPracticeAssignment(input: {
 
 export type PracticeAssignmentEligibilityInput = {
 	activeOrganizationId: string | null;
-	teacherRosterGrade: number | null;
-	teacherRosterSubjectId: string | null;
+	subjectsTaught: string[] | null;
 	config: { subject_id: string; topic_ids: string[] };
 	studentIds: string[];
 };
@@ -357,13 +358,12 @@ export async function resolvePracticeAssignmentEligibleStudentIds(
 	const uniqueStudentIds = [...new Set(input.studentIds)];
 	const requiredTopicIds = [...new Set(input.config.topic_ids)];
 
-	if (input.activeOrganizationId) {
-		if (input.teacherRosterGrade == null || input.teacherRosterSubjectId == null) {
-			return { ok: false, message: "Set your organization teaching grade and subject before assigning tests." };
-		}
-		if (input.teacherRosterSubjectId !== input.config.subject_id) {
-			return { ok: false, message: "Select the subject configured for your organization teaching roster." };
-		}
+	const taught = [...new Set((input.subjectsTaught ?? []).filter(Boolean))];
+	const isScoped = input.activeOrganizationId != null && taught.length > 0;
+
+	// A scoped org teacher may only assign one of their taught subjects.
+	if (isScoped && !taught.includes(input.config.subject_id)) {
+		return { ok: false, message: "Select a subject you teach for this organization." };
 	}
 
 	if (requiredTopicIds.length > 0) {
@@ -376,20 +376,28 @@ export async function resolvePracticeAssignmentEligibleStudentIds(
 		}
 	}
 
-	if (input.activeOrganizationId && input.teacherRosterGrade != null && uniqueStudentIds.length > 0) {
-		const studentRows = await db
-			.select({ id: profiles.id, grade: profiles.grade })
-			.from(profiles)
-			.where(and(inArray(profiles.id, uniqueStudentIds), eq(profiles.role, "student")));
-		if (
-			studentRows.length !== uniqueStudentIds.length ||
-			studentRows.some((student) => student.grade !== input.teacherRosterGrade)
-		) {
-			return { ok: false, message: "Selected students must be in your configured organization teaching grade." };
-		}
+	if (uniqueStudentIds.length === 0) {
+		return { ok: true, eligibleStudentIds: [] };
 	}
 
-	return { ok: true, eligibleStudentIds: uniqueStudentIds };
+	// Keep only the students who actually take config.subject_id, per their
+	// grade/stream/elective (same membership check the roster filters use).
+	const enrolledRows = await db
+		.select({ id: profiles.id })
+		.from(profiles)
+		.where(
+			and(
+				inArray(profiles.id, uniqueStudentIds),
+				eq(profiles.role, "student"),
+				sql`EXISTS (
+					SELECT 1
+					FROM public.get_student_subjects(${profiles.grade}, ${profiles.stream}, ${profiles.electiveSubjectId}) gs
+					WHERE gs.id = ${input.config.subject_id}::uuid
+				)`,
+			),
+		);
+
+	return { ok: true, eligibleStudentIds: enrolledRows.map((r) => r.id) };
 }
 
 /** Creates missing tracker rows for assignment topics so generation can resolve topic config. */
@@ -429,7 +437,15 @@ export async function validatePracticeAssignmentConfigForStudents(
 	input: PracticeAssignmentEligibilityInput,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
 	const eligibility = await resolvePracticeAssignmentEligibleStudentIds(input);
-	return eligibility.ok ? { ok: true } : eligibility;
+	if (!eligibility.ok) return eligibility;
+
+	// All-or-reject: every selected student must be eligible (publish uses the
+	// original ids, so a partial match must fail rather than silently shrink).
+	const uniqueInputCount = new Set(input.studentIds).size;
+	if (eligibility.eligibleStudentIds.length !== uniqueInputCount) {
+		return { ok: false, message: "One or more selected students do not take this subject." };
+	}
+	return { ok: true };
 }
 
 export async function listStudentAssignments(studentId: string): Promise<StudentAssignmentCard[]> {

@@ -28,6 +28,7 @@ async function computeTeacherDashboardBundle(params: {
 	teacherId: string;
 	activeOrganizationId: string | null;
 	filters: TeacherDashboardFilters;
+	gradesInScope?: number[];
 }): Promise<TeacherDashboardBundle> {
 	const { teacherId, activeOrganizationId, filters } = params;
 	const grade = filters.grade === "all" ? undefined : filters.grade;
@@ -43,6 +44,7 @@ async function computeTeacherDashboardBundle(params: {
 		grade,
 		section,
 		subjectId,
+		gradesInScope: params.gradesInScope,
 	});
 
 	const [summary, atRiskRows] = await Promise.all([
@@ -75,6 +77,7 @@ export async function loadTeacherDashboardBundleForTeacher(params: {
 	teacherId: string;
 	activeOrganizationId: string | null;
 	filters: TeacherDashboardFilters;
+	gradesInScope?: number[];
 }): Promise<TeacherDashboardBundle> {
 	const isUnfiltered =
 		params.filters.grade === "all" &&
@@ -91,6 +94,7 @@ export async function loadTeacherDashboardBundleForTeacher(params: {
 			"teacher-dashboard-bundle",
 			params.teacherId,
 			params.activeOrganizationId ?? "none",
+			(params.gradesInScope ?? []).join("-") || "all",
 		],
 		{
 			revalidate: 60,

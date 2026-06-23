@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
 import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
+import { coerceFiltersToScope, getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 import { consumeTeacherPortalDataActionRateLimit } from "@/lib/teachers/teacher-portal-action-rate-limit";
 import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
 import {
@@ -45,8 +46,15 @@ export async function fetchTeacherPerformanceDirectory(
 		}
 
 		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
-
-		const { grade, section, subjectId } = parsed.data;
+		const scope = await getTeacherSubjectScope({
+			activeOrganizationId: activeOrg?.id ?? null,
+			subjectsTaught: session.profile.subjects_taught,
+		});
+		const { grade, subjectId } = coerceFiltersToScope(scope, {
+			grade: parsed.data.grade,
+			subjectId: parsed.data.subjectId,
+		});
+		const section = parsed.data.section;
 
 		const rows = await listTeacherPerformanceDirectoryRows({
 			teacherId: session.user.id,
@@ -54,6 +62,7 @@ export async function fetchTeacherPerformanceDirectory(
 			grade: grade === "all" ? undefined : grade,
 			section: section === "all" ? undefined : section,
 			subjectId: subjectId === "all" ? undefined : subjectId,
+			gradesInScope: scope.isScoped ? scope.grades : undefined,
 		});
 
 		breadcrumb("directory_loaded", { count: rows.length });

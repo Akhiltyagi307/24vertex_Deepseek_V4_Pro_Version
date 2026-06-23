@@ -8,7 +8,7 @@ import {
 	listActiveTeacherLinkedStudentProfiles,
 	listCatalogOrganizations,
 } from "@/lib/organizations/queries";
-import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
+import { listTeacherScopedSubjectsCatalog } from "@/lib/teachers/teacher-subject-scope";
 
 // Authenticated teacher settings include organization/roster-sensitive state and should not be statically cached.
 export const dynamic = "force-dynamic";
@@ -25,11 +25,15 @@ export default async function TeacherSettingsPage() {
 	}
 	const { user, profile } = session;
 
-	const [catalog, activeOrganization, subjectsCatalog] = await Promise.all([
+	const [catalog, activeOrganization] = await Promise.all([
 		listCatalogOrganizations(),
 		getActiveTeacherOrganizationSnapshot(user.id),
-		listActiveSubjectsCatalog(),
 	]);
+	// Org-students roster filter shows only the teacher's taught subjects (full catalog when unscoped).
+	const subjectsCatalog = await listTeacherScopedSubjectsCatalog({
+		activeOrganizationId: activeOrganization?.id ?? null,
+		subjectsTaught: profile.subjects_taught,
+	});
 
 	const independentLinkedStudents = activeOrganization
 		? null
@@ -43,8 +47,6 @@ export default async function TeacherSettingsPage() {
 				full_name: profile.full_name,
 				avatar_url: profile.avatar_url,
 				phone: profile.phone,
-				teacher_roster_grade: profile.teacher_roster_grade,
-				teacher_roster_subject_id: profile.teacher_roster_subject_id,
 			}}
 			organizations={catalog}
 			activeOrganization={activeOrganization}

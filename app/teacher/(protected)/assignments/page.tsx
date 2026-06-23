@@ -23,7 +23,7 @@ export default async function TeacherAssignmentsPage() {
 	if (!session.ok) {
 		handleVerifiedTeacherSessionFailure(session);
 	}
-	const { user, profile } = session;
+	const { user } = session;
 
 	const [subjectsCatalogRaw, topicsCatalog, students, manualDrafts] = await Promise.all([
 		listActiveSubjectsCatalog(),
@@ -40,7 +40,6 @@ export default async function TeacherAssignmentsPage() {
 			topicsCatalog={topicsCatalog}
 			students={students}
 			manualDrafts={manualDrafts}
-			initialGrade={profile.teacher_roster_grade}
 		/>
 	);
 }

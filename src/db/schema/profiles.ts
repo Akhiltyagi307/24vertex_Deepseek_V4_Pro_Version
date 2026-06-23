@@ -35,10 +35,6 @@ export const profiles = pgTable(
 		website: varchar("website", { length: 500 }),
 		subjectsTaught: uuid("subjects_taught").array(),
 		avatarUrl: text("avatar_url"),
-		teacherRosterGrade: integer("teacher_roster_grade"),
-		teacherRosterSubjectId: uuid("teacher_roster_subject_id").references(() => subjects.id, {
-			onDelete: "set null",
-		}),
 		organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
 		isVerified: boolean("is_verified").default(false),
 		lastActiveAt: timestamp("last_active_at"),

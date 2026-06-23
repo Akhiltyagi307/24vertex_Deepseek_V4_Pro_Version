@@ -14,6 +14,7 @@ import {
 	AT_RISK_SCORE_THRESHOLD_PERCENT,
 } from "@/lib/teachers/teacher-at-risk-queries";
 import { listActiveSubjectsCatalog } from "@/lib/teachers/subjects-catalog";
+import { filterSubjectsCatalogToScope, getTeacherSubjectScope } from "@/lib/teachers/teacher-subject-scope";
 import { lookupClassInsightOnly } from "@/lib/teachers/teacher-class-insight-service";
 
 export const metadata: Metadata = {
@@ -29,22 +30,30 @@ export default async function TeacherDashboardPage() {
 	const teacherId = session.user.id;
 
 	const activeOrganization = await getActiveTeacherOrganizationSnapshot(teacherId);
+	const scope = await getTeacherSubjectScope({
+		activeOrganizationId: activeOrganization?.id ?? null,
+		subjectsTaught: session.profile.subjects_taught,
+	});
+	const gradesInScope = scope.isScoped ? scope.grades : undefined;
 	const linkCodeStudents = activeOrganization
 		? []
 		: await listActiveTeacherLinkedStudentProfiles(teacherId);
 
-	const [subjectsCatalog, filterOptions, initialDashboardBundle] = await Promise.all([
+	const [subjectsCatalogAll, filterOptions, initialDashboardBundle] = await Promise.all([
 		listActiveSubjectsCatalog(),
 		getTeacherPerformanceDirectoryFilterOptions({
 			teacherId,
 			activeOrganizationId: activeOrganization?.id ?? null,
+			gradesInScope,
 		}),
 		loadTeacherDashboardBundleForTeacher({
 			teacherId,
 			activeOrganizationId: activeOrganization?.id ?? null,
 			filters: { grade: "all", section: "all", subjectId: "all" },
+			gradesInScope,
 		}),
 	]);
+	const subjectsCatalog = filterSubjectsCatalogToScope(scope, subjectsCatalogAll);
 
 	const initialInsightLookup = await lookupClassInsightOnly({
 		teacherUserId: teacherId,

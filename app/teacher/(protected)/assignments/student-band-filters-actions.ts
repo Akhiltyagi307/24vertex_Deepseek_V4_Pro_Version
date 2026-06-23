@@ -4,9 +4,11 @@ import { z } from "zod";
 
 import { listTeacherAssignableStudents } from "@/lib/assignments/queries";
 import { getVerifiedTeacherSession } from "@/lib/auth/require-verified-teacher";
+import { getActiveTeacherOrganizationSnapshot } from "@/lib/organizations/queries";
 import {
 	getTeacherStudentPerformanceBandsForSubject,
 } from "@/lib/teachers/teacher-class-performance-summary";
+import { getTeacherSubjectScope, isSubjectOutOfScope } from "@/lib/teachers/teacher-subject-scope";
 import type { TeacherPerformanceBandId } from "@/lib/teachers/teacher-class-performance-summary-types";
 import { consumeTeacherPortalDataActionRateLimit } from "@/lib/teachers/teacher-portal-action-rate-limit";
 import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
@@ -42,6 +44,16 @@ export async function fetchAssignableStudentPerformanceBands(
 		if (!rate.ok) {
 			breadcrumb("rate_limited");
 			return { error: rate.message };
+		}
+
+		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
+		const scope = await getTeacherSubjectScope({
+			activeOrganizationId: activeOrg?.id ?? null,
+			subjectsTaught: session.profile.subjects_taught,
+		});
+		if (isSubjectOutOfScope(scope, parsed.data.subjectId)) {
+			breadcrumb("subject_out_of_scope");
+			return { error: "You can only view bands for subjects you teach." };
 		}
 
 		const assignable = await listTeacherAssignableStudents(session.user.id);

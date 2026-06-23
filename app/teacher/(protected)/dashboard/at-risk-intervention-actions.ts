@@ -23,6 +23,7 @@ import { consumeTeacherPortalDataActionRateLimit } from "@/lib/teachers/teacher-
 import { withTeacherActionTelemetry } from "@/lib/teachers/teacher-action-observability";
 import { teacherFilterAccessibleStudentIdsForSession } from "@/lib/teachers/teacher-student-access";
 import { getStudentInterventionTarget } from "@/lib/teachers/teacher-student-weak-topics-queries";
+import { getTeacherSubjectScope, isSubjectOutOfScope } from "@/lib/teachers/teacher-subject-scope";
 
 export type PlanAtRiskInterventionResult =
 	| { plan: AtRiskInterventionPlan; studentName: string }
@@ -81,7 +82,17 @@ export async function planAtRiskInterventionAction(
 		}
 
 		const activeOrg = await getActiveTeacherOrganizationSnapshot(session.user.id);
-		const forcedRosterSubjectId = activeOrg ? session.profile.teacher_roster_subject_id : null;
+		const scope = await getTeacherSubjectScope({
+			activeOrganizationId: activeOrg?.id ?? null,
+			subjectsTaught: session.profile.subjects_taught,
+		});
+		// A scoped teacher may only diagnose subjects they teach.
+		if (parsed.data.subjectId !== "all" && isSubjectOutOfScope(scope, parsed.data.subjectId)) {
+			breadcrumb("subject_out_of_scope");
+			return { error: "You can only plan interventions for subjects you teach." };
+		}
+		// Honor an explicit in-scope subject; otherwise let the target picker choose.
+		const forcedRosterSubjectId = parsed.data.subjectId !== "all" ? parsed.data.subjectId : null;
 
 		const target = await getStudentInterventionTarget({
 			teacherId: session.user.id,
@@ -170,8 +181,7 @@ export async function publishAtRiskInterventionAction(
 		const activeOrganization = await getActiveTeacherOrganizationSnapshot(user.id);
 		const scopeCheck = await validatePracticeAssignmentConfigForStudents({
 			activeOrganizationId: activeOrganization?.id ?? null,
-			teacherRosterGrade: profile.teacher_roster_grade,
-			teacherRosterSubjectId: profile.teacher_roster_subject_id,
+			subjectsTaught: profile.subjects_taught,
 			config: config.data,
 			studentIds: [parsed.data.studentId],
 		});

@@ -245,14 +245,6 @@ export const teacherProfileUpdateSchema = z
 /** Parent self-service profile on `/parent/settings`. */
 export const parentProfileUpdateSchema = teacherProfileUpdateSchema;
 
-/** Org teachers choose roster filters on `/teacher/settings`. */
-export const teacherTeachingFocusSchema = z
-	.object({
-		grade: z.coerce.number().int().min(6).max(12),
-		subjectId: z.string().uuid(),
-	})
-	.strict();
-
 /** Student change-password flow (client-side with Supabase Auth). */
 export const studentChangePasswordSchema = z
 	.object({
