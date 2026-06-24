@@ -36,23 +36,29 @@ export default async function ParentPerformancePage({ searchParams }: PageProps)
 	if (!activeId) {
 		redirect("/parent/select-student");
 	}
-	const ok = await assertParentActiveLink(user.id, activeId);
-	if (!ok) {
-		redirect("/parent/select-student");
-	}
 
-	const { row } = await Sentry.startSpan(
-		{ name: "parent.performance.prepare", op: "function" },
-		async () => {
-			const supabase = await createClient();
+	// The link check, the child-profile read, and the advisory load all depend only
+	// on (user.id, activeId) — run them concurrently instead of as three serial
+	// round-trips. RLS is the real data guard (the parent's client can only read a
+	// linked child's profile/tracker), so running the reads alongside the link check
+	// is safe; we still redirect on the link/role checks below before rendering.
+	const supabase = await createClient();
+	const [ok, row, advisoryActions] = await Promise.all([
+		assertParentActiveLink(user.id, activeId),
+		Sentry.startSpan({ name: "parent.performance.prepare", op: "function" }, async () => {
 			const { data } = await supabase
 				.from("profiles")
 				.select("grade, stream, elective_subject_id, role, full_name")
 				.eq("id", activeId)
 				.maybeSingle();
-			return { row: data };
-		},
-	);
+			return data;
+		}),
+		loadAdvisoryActions(supabase, activeId),
+	]);
+
+	if (!ok) {
+		redirect("/parent/select-student");
+	}
 
 	if (!row || row.role !== "student") {
 		redirect("/parent/select-student");
@@ -66,11 +72,6 @@ export default async function ParentPerformancePage({ searchParams }: PageProps)
 	};
 
 	const childName = formatPersonDisplayName(row.full_name ?? "") || "your child";
-
-	// Parent already authorized for activeId above (assertParentActiveLink). The
-	// parent's RLS client can read the linked child's tracker — the same access the
-	// performance matrix below relies on.
-	const advisoryActions = await loadAdvisoryActions(await createClient(), activeId);
 
 	return (
 		<ParentPerformanceChartA11yWrapper childName={childName}>

@@ -17,6 +17,9 @@ import { parseTestRow, type SubjectTestRowSerialized } from "@/lib/student/subje
 import { TestReportPdfDocument } from "@/lib/student/test-report-pdf-document";
 
 export const runtime = "nodejs";
+// Building the report PDF (@react-pdf renderToBuffer) on a cache miss is CPU-heavy
+// and can take several seconds; give the function headroom past the platform default.
+export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ testId: string }> };
 
