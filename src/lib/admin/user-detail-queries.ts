@@ -24,25 +24,20 @@ export async function getAdminUserDetailStats(userId: string, role: string): Pro
 		performanceTrackerRows: 0,
 	};
 
-	const [notifRow] = await db
-		.select({ c: count() })
-		.from(notifications)
-		.where(eq(notifications.recipientId, userId));
-	const notificationsCount = Number(notifRow?.c ?? 0);
+	// All counts are independent — fan them out per role in a single round-trip
+	// batch instead of awaiting each serially.
+	const notificationsQuery = db.select({ c: count() }).from(notifications).where(eq(notifications.recipientId, userId));
 
 	if (role === "student") {
-		const [tRow] = await db.select({ c: count() }).from(tests).where(eq(tests.studentId, userId));
-		const [subRow] = await db
-			.select({ c: count() })
-			.from(assignmentSubmissions)
-			.where(eq(assignmentSubmissions.studentId, userId));
-		const [pRow] = await db
-			.select({ c: count() })
-			.from(performanceTracker)
-			.where(eq(performanceTracker.studentId, userId));
+		const [[notifRow], [tRow], [subRow], [pRow]] = await Promise.all([
+			notificationsQuery,
+			db.select({ c: count() }).from(tests).where(eq(tests.studentId, userId)),
+			db.select({ c: count() }).from(assignmentSubmissions).where(eq(assignmentSubmissions.studentId, userId)),
+			db.select({ c: count() }).from(performanceTracker).where(eq(performanceTracker.studentId, userId)),
+		]);
 		return {
 			...empty,
-			notificationsCount,
+			notificationsCount: Number(notifRow?.c ?? 0),
 			testsCount: Number(tRow?.c ?? 0),
 			assignmentSubmissionsCount: Number(subRow?.c ?? 0),
 			performanceTrackerRows: Number(pRow?.c ?? 0),
@@ -50,14 +45,18 @@ export async function getAdminUserDetailStats(userId: string, role: string): Pro
 	}
 
 	if (role === "teacher") {
-		const [aRow] = await db.select({ c: count() }).from(assignments).where(eq(assignments.teacherId, userId));
+		const [[notifRow], [aRow]] = await Promise.all([
+			notificationsQuery,
+			db.select({ c: count() }).from(assignments).where(eq(assignments.teacherId, userId)),
+		]);
 		return {
 			...empty,
-			notificationsCount,
+			notificationsCount: Number(notifRow?.c ?? 0),
 			assignmentsCreatedCount: Number(aRow?.c ?? 0),
 		};
 	}
 
 	// parent / other: notifications only for now
-	return { ...empty, notificationsCount };
+	const [notifRow] = await notificationsQuery;
+	return { ...empty, notificationsCount: Number(notifRow?.c ?? 0) };
 }

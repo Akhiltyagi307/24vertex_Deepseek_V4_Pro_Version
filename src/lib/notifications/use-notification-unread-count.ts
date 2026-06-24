@@ -10,8 +10,15 @@ import type { NotificationsRealtimeScope } from "@/lib/notifications/realtime-cl
 
 const unreadCountSchema = z.object({ count: z.number().optional() });
 
-/** Background poll interval when Realtime is healthy (ms). */
-export const NOTIFICATION_UNREAD_POLL_MS = 180_000;
+/**
+ * Background reconciliation poll interval (ms). Realtime delivers live unread
+ * increments, so this poll only reconciles out-of-band changes (e.g. read on
+ * another device); a long interval keeps steady-state DB load low.
+ */
+export const NOTIFICATION_UNREAD_POLL_MS = 600_000;
+
+/** Minimum gap between a tab-focus-triggered refresh and the previous refresh. */
+const NOTIFICATION_UNREAD_FOCUS_COOLDOWN_MS = 60_000;
 
 export type UseNotificationUnreadCountArgs = {
 	userId: string;
@@ -38,9 +45,11 @@ export function useNotificationUnreadCount({
 
 	const reqIdRef = React.useRef(0);
 	const acRef = React.useRef<AbortController | null>(null);
+	const lastRefreshAtRef = React.useRef(0);
 
 	const refresh = React.useCallback(async () => {
 		const id = ++reqIdRef.current;
+		lastRefreshAtRef.current = Date.now();
 		acRef.current?.abort();
 		const ac = new AbortController();
 		acRef.current = ac;
@@ -90,7 +99,10 @@ export function useNotificationUnreadCount({
 		};
 		const interval = setInterval(tick, NOTIFICATION_UNREAD_POLL_MS);
 		const onVisible = () => {
-			if (document.visibilityState === "visible") void refresh();
+			if (document.visibilityState !== "visible") return;
+			// Debounce focus bursts: skip if we refreshed very recently.
+			if (Date.now() - lastRefreshAtRef.current < NOTIFICATION_UNREAD_FOCUS_COOLDOWN_MS) return;
+			void refresh();
 		};
 		document.addEventListener("visibilitychange", onVisible);
 		return () => {

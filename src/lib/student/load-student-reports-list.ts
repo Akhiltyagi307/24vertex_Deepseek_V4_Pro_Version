@@ -65,7 +65,24 @@ export async function loadStudentReportsList(
 		query = query.gte("test_date", windowStartIso);
 	}
 
-	const { data: testRows, error: testsErr } = await query;
+	// The "older outside window" count is independent of the page query, so run
+	// both concurrently instead of serially — one fewer round-trip per load.
+	// Only paginate-from-top loads (no `beforeTestDateIso`) need the count.
+	const olderCountQuery = opts?.beforeTestDateIso
+		? null
+		: supabase
+				.from("tests")
+				.select("id", { count: "exact", head: true })
+				.eq("student_id", userId)
+				.eq("is_draft", false)
+				.in("status", ["submitted", "graded"])
+				.not("test_date", "is", null)
+				.lt("test_date", windowStartIso);
+
+	const [{ data: testRows, error: testsErr }, olderCountResult] = await Promise.all([
+		query,
+		olderCountQuery ?? Promise.resolve(null),
+	]);
 
 	if (testsErr) {
 		logSupabaseError(logContext, testsErr, { userId });
@@ -73,15 +90,8 @@ export async function loadStudentReportsList(
 	}
 
 	let hasOlderOutsideWindow = false;
-	if (!opts?.beforeTestDateIso) {
-		const { count, error: countErr } = await supabase
-			.from("tests")
-			.select("id", { count: "exact", head: true })
-			.eq("student_id", userId)
-			.eq("is_draft", false)
-			.in("status", ["submitted", "graded"])
-			.not("test_date", "is", null)
-			.lt("test_date", windowStartIso);
+	if (olderCountResult) {
+		const { count, error: countErr } = olderCountResult;
 		if (countErr) {
 			logSupabaseError(`${logContext}.older_count`, countErr, { userId });
 		} else {
