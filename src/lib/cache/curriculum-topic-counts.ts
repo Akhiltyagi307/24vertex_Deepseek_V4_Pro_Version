@@ -3,6 +3,7 @@ import "server-only";
 import { revalidateTag, unstable_cache } from "next/cache";
 
 import { createAnonClient } from "@/lib/supabase/anon";
+import { SUBJECTS_CATALOG_CACHE_TAG } from "@/lib/teachers/subjects-catalog";
 
 const CURRICULUM_TOPICS_TAG = "curriculum-topics";
 const PAGE_SIZE = 1000;
@@ -71,4 +72,8 @@ export async function getCachedTopicCountsBySubjectForGrade(
 /** Call from trusted admin/server actions when curriculum rows change (optional). */
 export function revalidateCurriculumTopicCaches(): void {
 	revalidateTag(CURRICULUM_TOPICS_TAG, "max");
+	// Subject create/edit/activate/reorder also changes the cached active-subjects
+	// catalog (teacher roster filters). Bust it here so the same admin mutations
+	// that already call this helper refresh both caches in one place.
+	revalidateTag(SUBJECTS_CATALOG_CACHE_TAG, "max");
 }

@@ -7,7 +7,14 @@ import { z } from "zod";
 import { fetchJson, FetchJsonError, isAbortError } from "@/lib/http/fetch-json";
 
 /** Background poll interval for sidebar open-assignment dot (ms). */
-export const OPEN_ASSIGNMENTS_POLL_MS = 180_000;
+export const OPEN_ASSIGNMENTS_POLL_MS = 600_000;
+
+/**
+ * Minimum gap between a tab-focus-triggered refresh and the previous refresh.
+ * Rapid tab switching used to fire a DB-backed indicator fetch every time the
+ * tab regained focus; this debounces those bursts.
+ */
+const OPEN_ASSIGNMENTS_FOCUS_COOLDOWN_MS = 60_000;
 
 const openIndicatorSchema = z.object({ hasOpen: z.boolean().optional() });
 
@@ -33,9 +40,11 @@ export function useOpenAssignmentsIndicator({
 
 	const reqIdRef = React.useRef(0);
 	const acRef = React.useRef<AbortController | null>(null);
+	const lastRefreshAtRef = React.useRef(0);
 
 	const refresh = React.useCallback(async () => {
 		const id = ++reqIdRef.current;
+		lastRefreshAtRef.current = Date.now();
 		acRef.current?.abort();
 		const ac = new AbortController();
 		acRef.current = ac;
@@ -74,7 +83,10 @@ export function useOpenAssignmentsIndicator({
 		};
 		const interval = setInterval(tick, OPEN_ASSIGNMENTS_POLL_MS);
 		const onVisible = () => {
-			if (document.visibilityState === "visible") void refresh();
+			if (document.visibilityState !== "visible") return;
+			// Debounce focus bursts: skip if we refreshed very recently.
+			if (Date.now() - lastRefreshAtRef.current < OPEN_ASSIGNMENTS_FOCUS_COOLDOWN_MS) return;
+			void refresh();
 		};
 		document.addEventListener("visibilitychange", onVisible);
 		return () => {
